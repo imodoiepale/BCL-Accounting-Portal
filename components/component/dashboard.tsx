@@ -63,8 +63,18 @@ export function Dashboard() {
   return (
     <div className="flex">
       <main className="flex-1 p-6 bg-gray-50">
-        <div className="mb-6 text-2xl font-semibold text-red-700">
+        <div className="mb-6 font-semibold flex justify-between">
+          <div className='text-2xl'>
+            <p> Welcome ABC Limited</p>
+          </div>
+          <div className="flex text-md items-center gap-8">
           {currentDate}
+            {/* <Button variant="secondary">Customize This App</Button> */}
+            <Avatar>
+              <AvatarImage src="/placeholder-user.jpg" />
+              <AvatarFallback>J</AvatarFallback>
+            </Avatar>
+          </div>
         </div>
         {/* {error ? (
           <div className="mb-6 text-red-600">Error: {error}</div>
@@ -80,35 +90,30 @@ export function Dashboard() {
         ) : (
           <div className="mb-6">Loading alien data...</div>
         )} */}
-        <header className="flex items-center justify-between mb-6">
+        <header className="flex justify-end mb-6">
           <div className="flex items-center space-x-4">
-            <Button variant="outline">Main</Button>
+            {/* <Button variant="outline">Main</Button> */}
             <Select>
               <SelectTrigger>
-                <SelectValue placeholder="us $ (US Dollar)" />
+                <SelectValue placeholder="KES" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="usd">US Dollar</SelectItem>
+                <SelectItem value="kes">KES</SelectItem>
+                <SelectItem value="US">USD</SelectItem>
                 <SelectItem value="eur">Euro</SelectItem>
               </SelectContent>
             </Select>
             <Select>
-              <SelectTrigger>
-                <SelectValue placeholder="US English" />
+              <SelectTrigger className="w-28">
+                <SelectValue placeholder="English" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="en">English</SelectItem>
-                <SelectItem value="es">Spanish</SelectItem>
+                {/* <SelectItem value="gr">Gujrati</SelectItem> */}
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center space-x-4">
-            <Button variant="secondary">Customize This App</Button>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>J</AvatarFallback>
-            </Avatar>
-          </div>
+          
         </header>
         <div className="grid grid-cols-1 gap-6 mb-6 lg:grid-cols-4">
           <Card>
@@ -131,7 +136,7 @@ export function Dashboard() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Offers</CardTitle>
+              <CardTitle>Petty Cash</CardTitle>
               <CardDescription>This Month</CardDescription>
             </CardHeader>
             <CardContent>
@@ -229,7 +234,7 @@ export function Dashboard() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Offers</CardTitle>
+              <CardTitle>Petty Cash</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -293,22 +298,6 @@ export function Dashboard() {
               </Table>
             </CardContent>
           </Card>
-          <Drawer>
-            <DrawerTrigger>Open</DrawerTrigger>
-            <DrawerContent>
-              <DrawerHeader>
-                <DrawerTitle>Are you absolutely sure?</DrawerTitle>
-                <DrawerDescription>This action cannot be undone.</DrawerDescription>
-              </DrawerHeader>
-              <DrawerFooter>
-                <Button>Submit</Button>
-                <DrawerClose>
-                  <Button variant="outline">Cancel</Button>
-                </DrawerClose>
-              </DrawerFooter>
-            </DrawerContent>
-          </Drawer>
-
           <Card>
             <CardHeader>
               <CardTitle>Recent Quotes</CardTitle>

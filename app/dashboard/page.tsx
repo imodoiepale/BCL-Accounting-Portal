@@ -3,7 +3,7 @@ import { Dashboard } from "@/components/component/dashboard";
 
 export default function Home() {
   return (
-    <main className="">
+    <main className="w-full">
       <Dashboard/>
     </main>
   );
