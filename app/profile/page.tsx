@@ -13,7 +13,7 @@ export default function Profile() {
           <Tabs defaultValue="company-info">
             <TabsList >
               <TabsTrigger value="company-info">Company Info</TabsTrigger>
-              <TabsTrigger value="kyc-docs">KYC Docs</TabsTrigger>
+              <TabsTrigger value="kyc-docs">KYC Documents</TabsTrigger>
               <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
               <TabsTrigger value="banks">Banks</TabsTrigger>
             </TabsList>
@@ -22,7 +22,7 @@ export default function Profile() {
               <CompanyInfoTab/>
             </TabsContent>
             <TabsContent value="kyc-docs">
-              <h2 className="text-xl font-semibold mb-2">KYC Docs</h2>
+              <h2 className="text-xl font-semibold mb-2">KYC Documents</h2>
               <div className="space-y-4">
                 <div>
                   <h3 className="text-lg font-medium">One-off</h3>

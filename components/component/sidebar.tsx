@@ -20,15 +20,15 @@ import {
 const navItems = [
   { href: "/", icon: LayoutDashboardIcon, label: "Dashboard" },
   { href: "/profile", icon: User2Icon, label: "Profile" },
-  { href: "/customers", icon: UsersIcon, label: "Customers" },
+  // { href: "/customers", icon: UsersIcon, label: "Customers" },
   { href: "/documents", icon: FileIcon, label: "Monthly Documents" },
   { href: "/reports", icon: FileIcon, label: "Reports" },
   { href: "/checklist", icon: CheckIcon, label: "Checklist" },
   { href: "/communication", icon: VoicemailIcon, label: "Communication & Ticket" },
-  { href: "/invoices", icon: ReceiptIcon, label: "Invoices" },
-  { href: "/proforma-invoices", icon: ReceiptIcon, label: "Proforma Invoices" },
-  { href: "/petty-cash", icon: CoinsIcon, label: "Petty Cash" },
-  { href: "/expenses", icon: ReceiptIcon, label: "Expenses" },
+  // { href: "/invoices", icon: ReceiptIcon, label: "Invoices" },
+  // { href: "/proforma-invoices", icon: ReceiptIcon, label: "Proforma Invoices" },
+  // { href: "/petty-cash", icon: CoinsIcon, label: "Petty Cash" },
+  // { href: "/expenses", icon: ReceiptIcon, label: "Expenses" },
   { href: "/settings", icon: SettingsIcon, label: "Settings" },
 ]
 
