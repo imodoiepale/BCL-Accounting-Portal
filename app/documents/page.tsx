@@ -114,7 +114,7 @@ const DocumentUpload = () => {
         </TabsList>
         <TabsContent value="current">
 
-        <Tabs defaultValue="account" className="w-full">
+        <Tabs defaultValue="supplier" className="w-full">
           <TabsList>
             <TabsTrigger value="supplier">Supplier Statements</TabsTrigger>
             <TabsTrigger value="bank">Bank Statements</TabsTrigger>
