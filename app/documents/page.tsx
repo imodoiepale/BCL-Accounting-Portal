@@ -10,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from 'lucide-react';
 
+
 const getCurrentMonth = () => {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const currentDate = new Date();
@@ -112,6 +113,15 @@ const DocumentUpload = () => {
           <TabsTrigger value="previous" onClick={() => setActiveTab('previous')}>Previous Months</TabsTrigger>
         </TabsList>
         <TabsContent value="current">
+
+        <Tabs defaultValue="account" className="w-full">
+          <TabsList>
+            <TabsTrigger value="supplier">Supplier Statements</TabsTrigger>
+            <TabsTrigger value="bank">Bank Statements</TabsTrigger>
+            <TabsTrigger value="other">Other Docs</TabsTrigger>
+          </TabsList>
+          <TabsContent value="supplier">
+            <div className="p-4">Supplier Table</div>
           <Alert className="my-8">
             <AlertTitle>Upload Status for {getCurrentMonth()}</AlertTitle>
             <AlertDescription>
@@ -133,6 +143,13 @@ const DocumentUpload = () => {
               </React.Fragment>
             ))}
           </div>
+          </TabsContent>
+          <TabsContent value="bank">Bank Table</TabsContent>
+          <TabsContent value="other">Other Docs</TabsContent>
+        </Tabs>
+
+
+          
         </TabsContent>
         <TabsContent value="previous">
           <p>Previous months documents would be displayed here.</p>

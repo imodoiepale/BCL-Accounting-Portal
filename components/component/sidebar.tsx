@@ -34,7 +34,11 @@ export function Sidebar() {
           </Link>
           <Link href="/documents" className="flex items-center p-2 text-gray-700" prefetch={false}>
             <FileIcon className="w-5 h-5 mr-2" />
-            Documents
+            Monthly Documents
+          </Link>
+          <Link href="/reports" className="flex items-center p-2 text-gray-700" prefetch={false}>
+            <FileIcon className="w-5 h-5 mr-2" />
+            Reports
           </Link>
           <Link href="#" className="flex items-center p-2 text-gray-700" prefetch={false}>
             <CheckIcon className="w-5 h-5 mr-2" />

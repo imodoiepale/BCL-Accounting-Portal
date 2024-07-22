@@ -76,7 +76,7 @@ export function Dashboard() {
             </Avatar>
           </div>
         </div>
-        {/* {error ? (
+        {error ? (
           <div className="mb-6 text-red-600">Error: {error}</div>
         ) : alienData ? (
           <Card className="mb-6">
@@ -89,7 +89,7 @@ export function Dashboard() {
           </Card>
         ) : (
           <div className="mb-6">Loading alien data...</div>
-        )} */}
+        )}
         <header className="flex justify-end mb-6">
           <div className="flex items-center space-x-4">
             {/* <Button variant="outline">Main</Button> */}
