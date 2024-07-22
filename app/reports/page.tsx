@@ -5,14 +5,12 @@ export default function Reports() {
     return (
         <div className="p-4">
           <h1 className="text-xl font-bold mb-4">Reports</h1>
-          <Tabs defaultValue="company-info">
+          <Tabs defaultValue="suppliers">
             <TabsList >
               <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
               <TabsTrigger value="banks">Banks</TabsTrigger>
               <TabsTrigger value="others">Other Docs</TabsTrigger>
             </TabsList>
-           
-           
             <TabsContent value="suppliers">
               <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
               {/* Add suppliers content here */}

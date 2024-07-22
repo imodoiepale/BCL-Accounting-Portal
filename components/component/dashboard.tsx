@@ -62,7 +62,7 @@ export function Dashboard() {
 
   return (
     <div className="flex">
-      <main className="flex-1 p-6 bg-gray-50">
+      <main className="flex-1 p-6 bg-gray-50 h-screen">
         <div className="mb-6 font-semibold flex justify-between">
           <div className='text-2xl'>
             <p> Welcome ABC Limited</p>
@@ -76,7 +76,7 @@ export function Dashboard() {
             </Avatar>
           </div>
         </div>
-        {error ? (
+        {/* {error ? (
           <div className="mb-6 text-red-600">Error: {error}</div>
         ) : alienData ? (
           <Card className="mb-6">
@@ -89,7 +89,7 @@ export function Dashboard() {
           </Card>
         ) : (
           <div className="mb-6">Loading alien data...</div>
-        )}
+        )} */}
         <header className="flex justify-end mb-6">
           <div className="flex items-center space-x-4">
             {/* <Button variant="outline">Main</Button> */}
@@ -115,7 +115,7 @@ export function Dashboard() {
           </div>
           
         </header>
-        <div className="grid grid-cols-1 gap-6 mb-6 lg:grid-cols-4">
+        {/* <div className="grid grid-cols-1 gap-6 mb-6 lg:grid-cols-4">
           <Card>
             <CardHeader>
               <CardTitle>Invoices</CardTitle>
@@ -152,8 +152,8 @@ export function Dashboard() {
               <Badge variant="destructive">$13.00</Badge>
             </CardContent>
           </Card>
-        </div>
-        <div className="grid grid-cols-1 gap-6 mb-6 lg:grid-cols-3">
+        </div> */}
+        {/* <div className="grid grid-cols-1 gap-6 mb-6 lg:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Invoices</CardTitle>
@@ -322,7 +322,7 @@ export function Dashboard() {
               </Table>
             </CardContent>
           </Card>
-        </div>
+        </div> */}
       </main>
     </div>
   )
