@@ -28,25 +28,26 @@ const ReportTable = ({ data }) => (
 
 
 export default function Reports() {
-  return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Statements Reports</h1>
-      <Tabs defaultValue="suppliers">
-        <TabsList className="mb-4">
-          <TabsTrigger value="suppliers">Suppliers Statement Reports</TabsTrigger>
-          <TabsTrigger value="banks">Banks Statement Reports</TabsTrigger>
-          <TabsTrigger value="others">Other Docs Statement Reports</TabsTrigger>
-        </TabsList>
-       
-        <TabsContent value="suppliers">
-          <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
-         
-        </TabsContent>
-        
-        <TabsContent value="banks">
-          <h2 className="text-xl font-semibold mb-2">Banks</h2>
-          <p>Bank report content goes here.</p>
-        </TabsContent>
+    return (
+        <div className="p-4">
+          <h1 className="text-xl font-bold mb-4">Reports</h1>
+          <Tabs defaultValue="company-info">
+            <TabsList >
+              <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+              <TabsTrigger value="banks">Banks</TabsTrigger>
+              <TabsTrigger value="others">Other Docs</TabsTrigger>
+            </TabsList>
+           
+           
+            <TabsContent value="suppliers">
+              <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
+              {/* Add suppliers content here */}
+            </TabsContent>
+            
+            <TabsContent value="banks">
+              <h2 className="text-xl font-semibold mb-2">Banks</h2>
+              {/* Add banks content here */}
+            </TabsContent>
 
         <TabsContent value="others">
           <h2 className="text-xl font-semibold mb-2">Other Docs</h2>

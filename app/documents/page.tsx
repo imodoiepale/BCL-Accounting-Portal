@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from 'lucide-react';
+import MonthlyDocs from './monthlyDocs/page';
 
 
 const getCurrentMonth = () => {
@@ -121,15 +122,7 @@ const DocumentUpload = () => {
             <TabsTrigger value="other">Other Docs</TabsTrigger>
           </TabsList>
           <TabsContent value="supplier">
-            <div className="p-4">Supplier Table</div>
-          <Alert className="my-8">
-            <AlertTitle>Upload Status for {getCurrentMonth()}</AlertTitle>
-            <AlertDescription>
-              <Progress value={progress} className="mt-2" />
-              <p className="mt-2">{uploadedCount} of {documents.length + 2} documents uploaded</p>
-            </AlertDescription>
-          </Alert>
-
+          <MonthlyDocs/>
           <div className="grid grid-cols-5 gap-4">
             {documents.map((doc, index) => (
               <React.Fragment key={doc.id}>
@@ -138,7 +131,7 @@ const DocumentUpload = () => {
                     <DocumentCard doc={doc} uploadedDocs={uploadedDocs} handleFileUpload={handleFileUpload} />
                   </div>
                 ) : ( */}
-                  <DocumentCard doc={doc} uploadedDocs={uploadedDocs} handleFileUpload={handleFileUpload} />
+                  {/* <DocumentCard doc={doc} uploadedDocs={uploadedDocs} handleFileUpload={handleFileUpload} /> */}
                 {/* )} */}
               </React.Fragment>
             ))}
