@@ -1,15 +1,31 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 //@ts-nocheck
-
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTableRowActions } from "./data-table-row-actions";
 import { useEffect, useState } from "react";
-import { handleDocumentUpload, checkFileExists, handleDocumentUpdateOrDelete } from "./utils"
-
+import { handleDocumentUpload, checkFileExists, handleDocumentUpdateOrDelete } from "./utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
 
 export type AllCompanies = {
   CompanyId: string;
@@ -22,10 +38,6 @@ export type AllCompanies = {
   balanceSheets: string;
   taxReturns: string;
 };
-
-
-
-
 
 export const supplierColumns: ColumnDef<AllCompanies>[] = [
   {
@@ -63,27 +75,44 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
     header: "Verified by BCL ",
     cell: ({ row }) => <div>{row.getValue("verifiedByBCLAccManager") ? "✅" : "❌"}</div>,
   },
-  // {
-  //   accessorKey: "supplierDetailsByFinance",
-  //   header: "Suppliers Details By Finance",
-  //   cell: ({ row }) => <div>{row.getValue("supplierDetailsByFinance") ? "Yes" : "No"}</div>,
-  // },
   {
     accessorKey: "uploadStatus",
     header: "Upload",
     cell: ({ row }) => {
-      const [status, setStatus] = useState('checking'); // Initial state of "checking"
+      const [status, setStatus] = useState('checking');
+      const [isDialogOpen, setIsDialogOpen] = useState(false);
       
+      const form = useForm({
+        defaultValues: {
+          periodFrom: '',
+          periodTo: '',
+          closingBalance: '',
+          file: null
+        }
+      });
+
       useEffect(() => {
         const fetchData = async () => {
           const fileExists = await checkFileExists(row.original.CompanyId, "PURCHASE");
           setStatus(fileExists ? "true" : "false");
         }
         fetchData();
-      }, [row.original.CompanyId]); // Fetch when CompanyId changes
-  
-      const icon = status === "true" ? "✅" : status === "false" ? "❌" : "...";
-  
+      }, [row.original.CompanyId]);
+
+      const icon = status === "true" ? "✅" : status === "false" ? "" : "...";
+
+      const onSubmit = async (data) => {
+        await handleDocumentUpload(
+          data.file,
+          setStatus,
+          row.original.companyName,
+          "PURCHASE",
+          row.original.CompanyId,
+          data
+        );
+        setIsDialogOpen(false);
+      };
+
       return (
         <div className="text-center font-medium">
           {status === "true" ? (
@@ -91,24 +120,78 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
               {icon} View Upload
             </Button>
           ) : (
-            <>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  document.getElementById(`fileInput-${row.original.CompanyId}`).click();
-                }}
-              >
-                {icon} {status === "false" ? "Upload" : "View Upload"}
-              </Button>
-              <input
-                id={`fileInput-${row.original.CompanyId}`}
-                type="file"
-                style={{ display: "none" }}
-                onChange={(e) =>
-                  handleDocumentUpload(e, setStatus, row.original.companyName, "PURCHASE", row.original.CompanyId)
-                }
-              />
-            </>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  {icon} {status === "false" ? "Upload" : "View Upload"}
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Upload Document</DialogTitle>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                    <FormField
+                      control={form.control}
+                      name="periodFrom"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Period From</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="periodTo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Period To</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="closingBalance"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Closing Balance</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="file"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Upload File</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="file" 
+                              onChange={(e) => field.onChange(e.target.files[0])}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit">Submit</Button>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
       );
@@ -154,8 +237,6 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
     header: "Contact Email",
     cell: ({ row }) => <div>{row.getValue("suppContactEmail")}</div>,
   },
-  
-
   {
     id: "actions",
     cell: ({ row }) => <DataTableRowActions row={row} companyId={row.original.CompanyId} />,

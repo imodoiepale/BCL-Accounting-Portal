@@ -33,9 +33,9 @@ export default function Reports() {
           <h1 className="text-xl font-bold mb-4">Reports</h1>
           <Tabs defaultValue="company-info">
             <TabsList >
-              <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
-              <TabsTrigger value="banks">Banks</TabsTrigger>
-              <TabsTrigger value="others">Other Docs</TabsTrigger>
+              <TabsTrigger value="suppliers">Suppliers Statement Reports </TabsTrigger>
+              <TabsTrigger value="banks">Banks Statement Reports</TabsTrigger>
+              <TabsTrigger value="others">Other Docs Statement Reports</TabsTrigger>
             </TabsList>
            
            
