@@ -1,57 +1,44 @@
-//@ts-nocheck 
+//@ts-nocheck
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const ReportTable = ({ data }) => (
-  <table className="min-w-full bg-white border border-gray-300">
-    <thead>
-      <tr className="bg-gray-100">
-        <th className="border p-2">Supplier</th>
-        <th className="border p-2">Start Date</th>
-        {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => (
-          <th key={month} className="border p-2">{month}-24</th>
-        ))}
-      </tr>
-    </thead>
-    <tbody>
-      {data.map((row, index) => (
-        <tr key={index}>
-          <td className="border p-2">{row.supplier}</td>
-          <td className="border p-2">{row.startDate}</td>
-          {row.months.map((value, idx) => (
-            <td key={idx} className="border p-2 text-center">{value}</td>
-          ))}
-        </tr>
-      ))}
-    </tbody>
-  </table>
-);
-
+import ReportTable from "./ReportTable";
 
 export default function Reports() {
-    return (
-        <div className="p-4">
-          <h1 className="text-xl font-bold mb-4">Reports</h1>
-          <Tabs defaultValue="company-info">
-            <TabsList >
-              <TabsTrigger value="suppliers">Suppliers Statement Reports </TabsTrigger>
-              <TabsTrigger value="banks">Banks Statement Reports</TabsTrigger>
-              <TabsTrigger value="others">Other Docs Statement Reports</TabsTrigger>
-            </TabsList>
-           
-           
-            <TabsContent value="suppliers">
-              <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
-              {/* Add suppliers content here */}
-            </TabsContent>
-            
-            <TabsContent value="banks">
-              <h2 className="text-xl font-semibold mb-2">Banks</h2>
-              {/* Add banks content here */}
-            </TabsContent>
+  const supplierData = [
+    { name: "Supplier A", startDate: "2024-01-01", months: [100, 150, 200, 180, 220, 190, 210] },
+    { name: "Supplier B", startDate: "2024-02-15", months: [0, 80, 120, 150, 160, 140, 170] },
+  ];
+
+  const bankData = [
+    { name: "Bank X", startDate: "2024-01-01", months: [5000, 5200, 4800, 5100, 5300, 5150, 5400] },
+    { name: "Bank Y", startDate: "2024-03-01", months: [0, 0, 3000, 3200, 3100, 3300, 3500] },
+  ];
+
+  const otherDocsData = [
+    { name: "Document 1", startDate: "2024-01-01", months: [10, 15, 12, 18, 20, 16, 22] },
+    { name: "Document 2", startDate: "2024-02-01", months: [0, 5, 8, 7, 9, 11, 13] },
+  ];
+
+  return (
+    <div className="p-4">
+      <h1 className="text-xl font-bold mb-4">Reports</h1>
+      <Tabs defaultValue="suppliers">
+        <TabsList>
+          <TabsTrigger value="suppliers">Suppliers Statement Reports</TabsTrigger>
+          <TabsTrigger value="banks">Banks Statement Reports</TabsTrigger>
+          <TabsTrigger value="others">Other Docs Statement Reports</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="suppliers">
+          <ReportTable data={supplierData} title="Suppliers Report" />
+        </TabsContent>
+        
+        <TabsContent value="banks">
+          <ReportTable data={bankData} title="Banks Report" />
+        </TabsContent>
 
         <TabsContent value="others">
-          <h2 className="text-xl font-semibold mb-2">Other Docs</h2>
-          <p>Other documents report content goes here.</p>
+          <ReportTable data={otherDocsData} title="Other Documents Report" />
         </TabsContent>
       </Tabs>
     </div>

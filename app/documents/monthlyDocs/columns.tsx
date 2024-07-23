@@ -137,7 +137,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
-                  {icon} {status === "false" ? "Upload" : "View Upload"}
+                  {icon} Upload
                 </Button>
               </DialogTrigger>
               <DialogContent>

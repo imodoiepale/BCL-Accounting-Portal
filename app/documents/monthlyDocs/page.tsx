@@ -44,7 +44,7 @@ const mockData = [
       suppStartDate: "01/01/2024",
       verifiedByBCLAccManager: false,
       supplierDetailsByFinance: true,
-      uploadStatus: "true",
+      uploadStatus: "false",
       uploadDate: "01/08/2024",
       supplierWefDate: "01/01/2024",
       supplierUntilDate: "31/05/2024",
