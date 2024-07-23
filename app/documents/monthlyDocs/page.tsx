@@ -1,11 +1,9 @@
 //@ts-nocheck
 //@ts-ignore
 "use client"
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supplierColumns } from "./columns";
-import { createClient } from '@supabase/supabase-js';
 import { DataTable } from "./data-table";
-import moment from 'moment';
 
 // const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
 // const supabaseAnonKey =
@@ -56,6 +54,8 @@ const mockData = [
       suppContactName: "John Doe",
       suppContactMobile: "1234567890",
       suppContactEmail: "john@supp1.com",
+      closingBalance: "209000",
+      closingBalanceVerify:"true",
     },
     {
       suppSeq: "SUP-002",
@@ -74,6 +74,8 @@ const mockData = [
       suppContactName: "Jane Smith",
       suppContactMobile: "9876543210",
       suppContactEmail: "jane@supp2.com",
+      closingBalance: "20000",
+      closingBalanceVerify:"true",
     },
     // Add more mock data entries here...
   ];

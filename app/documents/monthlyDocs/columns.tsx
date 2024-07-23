@@ -1,12 +1,13 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 //@ts-nocheck
+
 "use client";
 
+import React, { useEffect, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTableRowActions } from "./data-table-row-actions";
-import { useEffect, useState } from "react";
 import { handleDocumentUpload, checkFileExists, handleDocumentUpdateOrDelete } from "./utils";
 import {
   Dialog,
@@ -16,7 +17,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { 
   Form, 
   FormControl, 
@@ -29,14 +29,23 @@ import { useForm } from "react-hook-form";
 
 export type AllCompanies = {
   CompanyId: string;
-  incorporation: string;
-  cr12: boolean;
-  bank_slips: boolean;
-  bank_statements: string;
-  sbp: string;
-  fireLicense: string;
-  balanceSheets: string;
-  taxReturns: string;
+  suppSeq: string;
+  suppName: string;
+  suppStatus: string;
+  suppStartDate: string;
+  verifiedByBCLAccManager: boolean;
+  supplierDetailsByFinance: boolean;
+  uploadStatus: string;
+  uploadDate: string;
+  supplierWefDate: string;
+  supplierUntilDate: string;
+  verifyByBCL: boolean;
+  suppPIN: string;
+  suppContactName: string;
+  suppContactMobile: string;
+  suppContactEmail: string;
+  closingBalance: string;
+  closingBalanceVerify: string;
 };
 
 export const supplierColumns: ColumnDef<AllCompanies>[] = [
@@ -74,6 +83,11 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
     accessorKey: "verifiedByBCLAccManager",
     header: "Verified by BCL ",
     cell: ({ row }) => <div>{row.getValue("verifiedByBCLAccManager") ? "✅" : "❌"}</div>,
+  },
+  {
+    accessorKey: "supplierDetailsByFinance",
+    header: "Supplier Details by Finance",
+    cell: ({ row }) => <div>{row.getValue("supplierDetailsByFinance") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "uploadStatus",
@@ -218,24 +232,14 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
     cell: ({ row }) => <div>{row.getValue("verifyByBCL") ? "✅" : "❌"}</div>,
   },
   {
-    accessorKey: "suppPIN",
-    header: "KRA PIN",
-    cell: ({ row }) => <div>{row.getValue("suppPIN")}</div>,
+    accessorKey: "closingBalance",
+    header: "Closing Balance",
+    cell: ({ row }) => <div>{row.getValue("closingBalance")}</div>,
   },
   {
-    accessorKey: "suppContactName",
-    header: "Contact Name",
-    cell: ({ row }) => <div>{row.getValue("suppContactName")}</div>,
-  },
-  {
-    accessorKey: "suppContactMobile",
-    header: "Contact Mobile",
-    cell: ({ row }) => <div>{row.getValue("suppContactMobile")}</div>,
-  },
-  {
-    accessorKey: "suppContactEmail",
-    header: "Contact Email",
-    cell: ({ row }) => <div>{row.getValue("suppContactEmail")}</div>,
+    accessorKey: "closingBalanceVerify",
+    header: "Closing Balance Verified",
+    cell: ({ row }) => <div>{row.getValue("closingBalanceVerify") === "true" ? "✅" : "❌"}</div>,
   },
   {
     id: "actions",
