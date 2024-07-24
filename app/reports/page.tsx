@@ -20,7 +20,7 @@ export default function Reports() {
   ];
 
   return (
-    <div className="p-4">
+    <div className="p-4 w-full ">
       <h1 className="text-xl font-bold mb-4">Reports</h1>
       <Tabs defaultValue="suppliers">
         <TabsList>
@@ -30,7 +30,24 @@ export default function Reports() {
         </TabsList>
         
         <TabsContent value="suppliers">
+        <Tabs defaultValue="docs">
+        <TabsList>
+          <TabsTrigger value="docs">Suppliers Statement Documents</TabsTrigger>
+          <TabsTrigger value="balance">Suppliers Statement Closing Balance</TabsTrigger>
+        
+        </TabsList>
+        
+        <TabsContent value="docs">
           <ReportTable data={supplierData} title="Suppliers Report" />
+        </TabsContent>
+        
+        <TabsContent value="balance">
+          {/* <ReportTable data={bankData} title="Banks Report" /> */}
+        </TabsContent>
+
+      
+      </Tabs>
+          {/* <ReportTable data={supplierData} title="Suppliers Report" /> */}
         </TabsContent>
         
         <TabsContent value="banks">

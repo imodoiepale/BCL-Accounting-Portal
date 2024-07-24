@@ -2,19 +2,19 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card"; // Import ShadCN UI card components
 import { Input } from "@/components/ui/input";
+import {
+    Pagination,
+    PaginationContent,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious
+} from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowUpDown } from "lucide-react";
 import { useMemo, useState } from "react";
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationPrevious, 
-  PaginationNext 
-} from "@/components/ui/pagination";
-import { Card, CardHeader, CardContent } from "@/components/ui/card"; // Import ShadCN UI card components
 
 interface DataRow {
   name: string;
@@ -80,11 +80,12 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title }) => {
   const totalPages = Math.ceil(sortedData.length / rowsPerPage);
 
   return (
-    <div>
-      <Card className="mb-4 p-4">
-        <CardHeader className="text-lg font-semibold mb-2">Choose Period to View Reports</CardHeader>
+    <div className="w-full">
+      <Card className="p-2 mb-4">
         <CardContent>
-          <div className="flex flex-col space-y-4 mb-4">
+            <p className="flex text-lg font-bold pb-2">Choose Period to View Reports</p>
+          <div className="flex justify-between   space-y-4 mb-4">
+          
             <div className="flex space-x-4">
               <div>
                 <label htmlFor="fromDate" className="block text-sm font-medium text-gray-700">From</label>
@@ -105,7 +106,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title }) => {
                 />
               </div>
             </div>
-            <div>
+            <div className="w-[250px]">
               <label htmlFor="search" className="block text-sm font-medium text-gray-700">Search</label>
               <Input
                 id="search"
@@ -118,8 +119,8 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title }) => {
         </CardContent>
       </Card>
 
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto border rounded shadow-lg">
+      <h3 className="text-lg font-semibold mb-2 p-2">{title}</h3>  
         <Table>
           <TableHeader>
             <TableRow>
