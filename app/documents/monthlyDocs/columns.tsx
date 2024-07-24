@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTableRowActions } from "./data-table-row-actions";
 import { handleDocumentUpload, checkFileExists, handleDocumentUpdateOrDelete } from "./utils";
@@ -51,47 +51,93 @@ export type AllCompanies = {
 export const supplierColumns: ColumnDef<AllCompanies>[] = [
   {
     accessorKey: "suppSeq",
-    header: () => <div className="text-center">Supp Seq</div>,
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Supp Seq
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div className="text-center font-medium">{row.getValue("suppSeq")}</div>,
   },
   {
     accessorKey: "suppName",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Supp Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Supp Name
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div className="font-medium">{row.getValue("suppName")}</div>,
   },
   {
     accessorKey: "suppStatus",
-    header: "Status",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Status
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div>{row.getValue("suppStatus")}</div>,
   },
   {
     accessorKey: "suppStartDate",
-    header: "Start date",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Start date
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div>{row.getValue("suppStartDate")}</div>,
   },
   {
     accessorKey: "verifiedByBCLAccManager",
-    header: "Verified by BCL ",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Verified by BCL
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div>{row.getValue("verifiedByBCLAccManager") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "supplierDetailsByFinance",
-    header: "Supplier Details by Finance",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Supplier Details by Finance
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div>{row.getValue("supplierDetailsByFinance") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "uploadStatus",
-    header: "Upload",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Upload
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => {
       const [status, setStatus] = useState('checking');
       const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -213,33 +259,129 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
   },
   {
     accessorKey: "uploadDate",
-    header: "Upload Date",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Upload Date
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div>{row.getValue("uploadDate")}</div>,
   },
   {
     accessorKey: "supplierWefDate",
-    header: "Supplier W.E.F Date",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Supplier W.E.F Date
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div>{row.getValue("supplierWefDate")}</div>,
   },
   {
     accessorKey: "supplierUntilDate",
-    header: "Supplier Until date",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Supplier Until date
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div>{row.getValue("supplierUntilDate")}</div>,
   },
   {
     accessorKey: "verifyByBCL",
-    header: "Start Range Verification",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Start Range Verification
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div>{row.getValue("verifyByBCL") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "closingBalance",
-    header: "Closing Balance",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Closing Balance
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div>{row.getValue("closingBalance")}</div>,
   },
   {
     accessorKey: "closingBalanceVerify",
-    header: "Closing Balance Verified",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Closing Balance Verified
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => <div>{row.getValue("closingBalanceVerify") === "true" ? "✅" : "❌"}</div>,
+  },
+  {
+    id: "profile",
+    header: "Profile",
+    cell: ({ row }) => {
+      const supplier = row.original;
+      return (
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open profile</span>
+              <Info className="h-4 w-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{supplier.suppName} Profile</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Supplier PIN:</span>
+                <span className="col-span-3">{supplier.suppPIN}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Contact Name:</span>
+                <span className="col-span-3">{supplier.suppContactName}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Contact Mobile:</span>
+                <span className="col-span-3">{supplier.suppContactMobile}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Contact Email:</span>
+                <span className="col-span-3">{supplier.suppContactEmail}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Start Date:</span>
+                <span className="col-span-3">{supplier.suppStartDate}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Status:</span>
+                <span className="col-span-3">{supplier.suppStatus}</span>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      );
+    },
   },
   {
     id: "actions",
