@@ -34,14 +34,14 @@ export function Navbar() {
             <BellIcon className="w-6 h-6 text-muted-foreground" />
             <span className="sr-only">Notifications</span>
           </Button>
-          <Button variant="ghost" size="icon" className="rounded-full">
             <SignedOut>
-              <SignInButton />
+              <Button className="bg-gradient-to-r from-cyan-500 to-blue-500 gap-2 hover:animate-none hover:scale-105">
+                <SignInButton />
+              </Button>
             </SignedOut>
             <SignedIn>
               <UserButton />
             </SignedIn>
-          </Button>
         </div>
       </header>
     </div>
