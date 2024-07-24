@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/component/sidebar";
+import { Navbar } from '@/components/component/navbar';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,17 +21,13 @@ export default function RootLayout({
     <ClerkProvider>
     <html lang="en">
       <body className={inter.className}>
-      <header>
-            <SignedOut>
-              <SignInButton />
-            </SignedOut>
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-          </header>
+      
         <div className="flex gap-4">
           <Sidebar/>
-          {children}
+          <div className="flex flex-col w-full"> {/* Full height column */}
+            <Navbar/>
+              {children}
+          </div>
         </div>
         </body>
     </html>

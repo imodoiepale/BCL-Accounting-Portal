@@ -63,19 +63,7 @@ export function Dashboard() {
   return (
     <div className="flex">
       <main className="flex-1 p-6 bg-gray-50 h-screen">
-        <div className="mb-6 font-semibold flex justify-between">
-          <div className='text-2xl'>
-            <p> Welcome ABC Limited</p>
-          </div>
-          <div className="flex text-md items-center gap-8">
-          {currentDate}
-            {/* <Button variant="secondary">Customize This App</Button> */}
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>J</AvatarFallback>
-            </Avatar>
-          </div>
-        </div>
+        
         {/* {error ? (
           <div className="mb-6 text-red-600">Error: {error}</div>
         ) : alienData ? (
@@ -90,9 +78,9 @@ export function Dashboard() {
         ) : (
           <div className="mb-6">Loading alien data...</div>
         )} */}
-        <header className="flex justify-end mb-6">
+        {/* <header className="flex justify-end mb-6">
           <div className="flex items-center space-x-4">
-            {/* <Button variant="outline">Main</Button> */}
+            <Button variant="outline">Main</Button>
             <Select>
               <SelectTrigger>
                 <SelectValue placeholder="KES" />
@@ -109,12 +97,12 @@ export function Dashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="en">English</SelectItem>
-                {/* <SelectItem value="gr">Gujrati</SelectItem> */}
+                <SelectItem value="gr">Gujrati</SelectItem>
               </SelectContent>
             </Select>
           </div>
           
-        </header>
+        </header> */}
         {/* <div className="grid grid-cols-1 gap-6 mb-6 lg:grid-cols-4">
           <Card>
             <CardHeader>
