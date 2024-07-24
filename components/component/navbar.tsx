@@ -17,10 +17,10 @@ export function Navbar() {
   });
 
   return (
-    <div className="flex flex-col w-full">
+    <div className="flex flex-col w-full sticky top-0 z-10 bg-white border-b border-b-gray-200">
       <header className="flex items-center h-16 px-4 border-b shrink-0 md:px-6 shadow-sm">
         <div className="flex items-center gap-6 text-lg font-semibold whitespace-nowrap justify-between md:gap-5 md:text-sm lg:gap-6">
-          <p className='text-xl'> Welcome ABC Limited</p>
+          <p className='text-xl'>ABC Limited</p>
         </div>
         <div className="flex items-center w-full gap-4 ml-auto md:gap-2 lg:gap-4">
         <p className="flex-1 ml-auto sm:flex-initial font-semibold gradient-text">{currentDate}</p>
