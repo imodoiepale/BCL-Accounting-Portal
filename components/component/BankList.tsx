@@ -19,6 +19,15 @@ const url="https://zyszsqgdlrpnunkegipk.supabase.co"
 // Initialize Supabase client
 const supabase = createClient(url, key)
 
+// Utility function to format date
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
 export function BankList() {
   const [banks, setBanks] = useState([])
   const [newBank, setNewBank] = useState({
@@ -39,6 +48,7 @@ export function BankList() {
     const { data, error } = await supabase
       .from('acc_portal_banks')
       .select('*')
+      .order('id', { ascending: true });
     if (error) console.error('Error fetching banks:', error)
     else setBanks(data)
   }
@@ -150,6 +160,7 @@ export function BankList() {
                 <TableHead>RM Name</TableHead>
                 <TableHead>RM Mobile</TableHead>
                 <TableHead>RM Email</TableHead>
+                <TableHead>Start Date</TableHead>
                 <TableHead>Approved by BCL</TableHead>
               </TableRow>
             </TableHeader>
@@ -164,6 +175,7 @@ export function BankList() {
                   <TableCell>{bank.relationship_manager_name}</TableCell>
                   <TableCell>{bank.relationship_manager_mobile}</TableCell>
                   <TableCell>{bank.relationship_manager_email}</TableCell>
+                  <TableCell>{formatDate(bank.startdate)}</TableCell>
                   <TableCell className='text-center'>
                     <Badge variant={bank.status ? "success" : "destructive"}>
                       {bank.status ? "✔️" : "❌"}
