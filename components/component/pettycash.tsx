@@ -175,7 +175,7 @@ export function PettyCash() {
                     </div>
                   ))}
                    <div className="space-y-1">
-                    <Label htmlFor="payment_type">Payment Type</Label>
+                    <Label htmlFor="payment_type">Payment Type </Label>
                     <Select onValueChange={handlePaymentTypeChange} defaultValue="">
                       <SelectTrigger>
                         <SelectValue placeholder="Select Payment Type" />
