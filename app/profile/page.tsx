@@ -1,17 +1,15 @@
 //@ts-nocheck
-import { SupplierList } from "@/components/component/SupplierList"
 import { BankList } from "@/components/component/BankList"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CompanyInfoTab } from "@/components/component/companyInfo"
-
-
+import { SupplierList } from "@/components/component/SupplierList"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function Profile() {
     return (
         <div className="p-4 w-full">
           <h1 className="text-xl font-bold mb-4">Company Profile</h1>
           <Tabs defaultValue="company-info">
-            <TabsList >
+            <TabsList>
               <TabsTrigger value="company-info">Company Info</TabsTrigger>
               <TabsTrigger value="kyc-docs">KYC Documents</TabsTrigger>
               <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
@@ -19,30 +17,38 @@ export default function Profile() {
             </TabsList>
             <TabsContent value="company-info" className="px-8">
               <h2 className="text-xl font-semibold mb-2">Company Info</h2>
-              <CompanyInfoTab/>
+              <CompanyInfoTab />
             </TabsContent>
             <TabsContent value="kyc-docs">
               <h2 className="text-xl font-semibold mb-2">KYC Documents</h2>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium">One-off</h3>
-                  {/* Add one-off KYC docs content */}
-                </div>
-                <div>
-                  <h3 className="text-lg font-medium">Renewal</h3>
-                  {/* Add renewal KYC docs content */}
-                </div>
-              </div>
+              <Tabs defaultValue="one-off">
+                <TabsList>
+                  <TabsTrigger value="one-off">One-off KYC Documents </TabsTrigger>
+                  <TabsTrigger value="renewal">Renewal KYC Documents </TabsTrigger>
+                </TabsList>
+                <TabsContent value="one-off">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">One-off KYC Documents</h3>
+                    {/* Add one-off KYC docs content */}
+                  </div>
+                </TabsContent>
+                <TabsContent value="renewal">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Renewal KYC Documents</h3>
+                    {/* Add renewal KYC docs content */}
+                  </div>
+                </TabsContent>
+              </Tabs>
             </TabsContent>
             <TabsContent value="suppliers">
               <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
-              <SupplierList/>
+              <SupplierList />
             </TabsContent>
             <TabsContent value="banks">
               <h2 className="text-xl font-semibold mb-2">Banks</h2>
-              <BankList/>
+              <BankList />
             </TabsContent>
           </Tabs>
         </div>
       )
-    }
+}
