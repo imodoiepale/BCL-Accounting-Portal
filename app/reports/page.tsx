@@ -11,12 +11,12 @@ export default function Reports() {
 
   const bankData = [
     { name: "Bank X", startDate: "2024-01-01", months: ["✅", "✅", "✅", "✅", "✅", "✅", "✅"] },
-    { name: "Bank Y", startDate: "2024-03-01", months: ["X", "X", "✅", "✅", "✅", "✅", "✅"] },
+    { name: "Bank Y", startDate: "2024-03-01", months: ["❌", "❌", "✅", "✅", "✅", "✅", "✅"] },
   ];
 
   const otherDocsData = [
     { name: "Document 1", startDate: "2024-01-01", months: ["✅", "✅", "✅", "✅", "✅", "✅", "✅"] },
-    { name: "Document 2", startDate: "2024-02-01", months: ["X", "✅", "✅", "✅", "✅", "✅", "✅"] },
+    { name: "Document 2", startDate: "2024-02-01", months: ["❌", "✅", "✅", "✅", "✅", "✅", "✅"] },
   ];
 
   return (
