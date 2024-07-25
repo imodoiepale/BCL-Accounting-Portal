@@ -23,8 +23,33 @@ const formatDate = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
+
+const staticFloatData = [
+  { payment_type: 'mpesa', float_allocated: 10000, float_used: 2500 },
+  { payment_type: 'cash', float_allocated: 5000, float_used: 1500 },
+  { payment_type: 'credit_card', float_allocated: 2000, float_used: 500 },
+];
+
+const calculateFloatData = () => {
+  const data = {};
+
+  // Initialize data structure for each payment type
+  staticFloatData.forEach(entry => {
+    data[entry.payment_type] = {
+      allocated: entry.float_allocated,
+      used: entry.float_used,
+      balance: entry.float_allocated - entry.float_used,
+    };
+  });
+
+  return data;
+};
+
+
 export function PettyCash() {
   const [pettyCashEntries, setPettyCashEntries] = useState([]);
+  const [floatData, setFloatData] = useState(calculateFloatData());
+
   const [newPettyCash, setNewPettyCash] = useState({
     amount: '',
     invoice_number: '',
@@ -137,12 +162,35 @@ export function PettyCash() {
     },
   ];
 
+  const FloatCard = ({ title, allocated, used, balance }) => {
+    return (
+      <Card className="p-2 bg-white shadow-sm rounded-lg flex gap-2 items-center mb-4">
+        <h3 className="text-md font-semibold">{title}</h3>
+        <p className="text-sm mt-1">Allocated: {allocated}</p>
+        <p className="text-sm mt-1">Used: {used}</p>
+        <p className="text-sm mt-1">Balance: {balance}</p>
+      </Card>
+    );
+  };
+
   return (
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
+            <div className="flex justify-between space-x-4">
+                {Object.keys(floatData).map((type) => (
+                  <FloatCard
+                    key={type}
+                    title={type.charAt(0).toUpperCase() + type.slice(1)}
+                    allocated={floatData[type].allocated}
+                    used={floatData[type].used}
+                    balance={floatData[type].balance}
+                  />
+                ))}
+              </div>
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-semibold">Petty Cash Entries</h1>
+          <h1 className="text-xl font-semibold">Monthly Petty Cash Entries</h1>
           <div className="flex items-center space-x-2">
+
             <Input type="search" placeholder="search" className="w-48" />
             <Button variant="outline" className="flex items-center" onClick={fetchPettyCashEntries}>
               <RefreshCwIcon className="w-4 h-4 mr-1" />

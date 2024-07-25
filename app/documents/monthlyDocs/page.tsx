@@ -158,25 +158,23 @@ export default function MonthlyDocs() {
   
 
   return (
-    <div className=" px-4 sm:px-6 lg:px-8">
-      <main className="flex flex-col justify-start w-5/6">
-        <h1 className="text-2xl font-bold my-4">Monthly Documents</h1>
-        <p className="text-lg mb-4">
-          <span className="font-semibold text-blue-700">{currentMonth}</span> Supplier Statements
-        </p>
-        <div className="">
-          <div className="inline-block min-w-full align-middle">
-            <div className=" border-b border-gray-200 shadow sm:rounded-lg">
-              <DataTable 
-                columns={supplierColumns} 
-                data={data} 
-                setData={setData} 
-                handleFileUpload={handleFileUpload}
-              />
-            </div>
+    <main className="flex flex-col justify-start w-5/6">
+      <h1 className="text-2xl font-bold my-4">Monthly Documents</h1>
+      <p className="text-lg mb-4">
+        <span className="font-semibold text-blue-700">{currentMonth}</span> Supplier Statements
+      </p>
+      <div className="">
+        <div className="inline-block min-w-full align-middle">
+          <div className=" border-b border-gray-200 shadow sm:rounded-lg">
+            <DataTable 
+              columns={supplierColumns} 
+              data={data} 
+              setData={setData} 
+              handleFileUpload={handleFileUpload}
+            />
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }  
