@@ -1,95 +1,171 @@
 //@ts-nocheck
-'use client';
+"use client"
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card"; // Import ShadCN UI card components
-import { Input } from "@/components/ui/input";
+import * as React from "react"
 import {
-    Pagination,
-    PaginationContent,
-    PaginationItem,
-    PaginationLink,
-    PaginationNext,
-    PaginationPrevious
-} from "@/components/ui/pagination";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowUpDown } from "lucide-react";
-import { useMemo, useState } from "react";
+  ColumnDef,
+  ColumnFiltersState,
+  SortingState,
+  VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+import { ArrowUpDown, ChevronDown } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
 
 interface DataRow {
+  id: string;
   name: string;
   startDate: string;
-  months: string[];  
-
+  months: string[];
 }
 
 interface ReportTableProps {
   data: DataRow[];
   title: string;
-  
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const ReportTable: React.FC<ReportTableProps> = ({ data, title }) => {
-  const [sortColumn, setSortColumn] = useState<string>("");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [fromDate, setFromDate] = useState<string>("2024-01-01");
-  const [toDate, setToDate] = useState<string>("2024-12-31");
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const rowsPerPage = 10; // Adjust this to set the number of rows per page
+  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const [rowSelection, setRowSelection] = React.useState({})
+  const [fromDate, setFromDate] = React.useState<string>("2024-01-01")
+  const [toDate, setToDate] = React.useState<string>("2024-12-31")
 
-  const currentMonthIndex = useMemo(() => new Date().getMonth(), []);
+  const currentMonthIndex = React.useMemo(() => new Date().getMonth(), [])
 
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortColumn(column);
-      setSortDirection("asc");
-    }
-  };
+  const columns: ColumnDef<DataRow>[] = React.useMemo(
+    () => [
+      {
+        id: "select",
+        header: ({ table }) => (
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      },
+      {
+        accessorKey: "name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            >
+              Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          )
+        },
+        cell: ({ row }) => <div>{row.getValue("name")}</div>,
+      },
+      {
+        accessorKey: "startDate",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            >
+              Start Date
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          )
+        },
+        cell: ({ row }) => <div>{row.getValue("startDate")}</div>,
+      },
+      ...MONTHS.map((month, index) => ({
+        accessorKey: `months.${index}`,
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className={index === currentMonthIndex ? "bg-yellow-100" : ""}
+            >
+              {month}
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          )
+        },
+        cell: ({ row }) => (
+          <div className={index === currentMonthIndex ? "bg-yellow-100" : ""}>
+            {index < currentMonthIndex ? row.getValue(`months.${index}`) || "" : ""}
+          </div>
+        ),
+      })),
+    ],
+    [currentMonthIndex]
+  )
 
-  const filteredData = data.filter((row) => {
-    const rowDate = new Date(row.startDate);
-    return rowDate >= new Date(fromDate) && rowDate <= new Date(toDate);
-  }).filter((row) =>
-    Object.values(row).some((value) =>
-      value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const filteredData = React.useMemo(() => {
+    return data.filter((row) => {
+      const rowDate = new Date(row.startDate);
+      return rowDate >= new Date(fromDate) && rowDate <= new Date(toDate);
+    });
+  }, [data, fromDate, toDate]);
 
-  const sortedData = [...filteredData].sort((a, b) => {
-    if (sortColumn === "") return 0;
-    const aValue = sortColumn.startsWith("months.") 
-      ? a.months[parseInt(sortColumn.split('.')[1])]
-      : a[sortColumn as keyof DataRow];
-    const bValue = sortColumn.startsWith("months.") 
-      ? b.months[parseInt(sortColumn.split('.')[1])]
-      : b[sortColumn as keyof DataRow];
-    if (aValue === bValue) return 0;
-    if (aValue === "✅" && bValue === "X") return sortDirection === "asc" ? -1 : 1;
-    if (aValue === "X" && bValue === "✅") return sortDirection === "asc" ? 1 : -1;
-    return 0;
-  });
-  
-
-  const paginatedData = useMemo(() => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return sortedData.slice(startIndex, endIndex);
-  }, [sortedData, currentPage, rowsPerPage]);
-
-  const totalPages = Math.ceil(sortedData.length / rowsPerPage);
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+    },
+  })
 
   return (
     <div className="w-full">
       <Card className="p-2 mb-4">
         <CardContent>
-            <p className="flex text-lg font-bold pb-2">Choose Period to View Reports</p>
-          <div className="flex justify-between   space-y-4 mb-4">
-          
+          <p className="flex text-lg font-bold pb-2">Choose Period to View Reports</p>
+          <div className="flex justify-between space-y-4 mb-4">
             <div className="flex space-x-4">
               <div>
                 <label htmlFor="fromDate" className="block text-sm font-medium text-gray-700">From</label>
@@ -111,81 +187,117 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title }) => {
               </div>
             </div>
             <div className="w-[250px]">
-              <label htmlFor="search" className="block text-sm font-medium text-gray-700">Search</label>
               <Input
-                id="search"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Filter names..."
+                value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+                onChange={(event) =>
+                  table.getColumn("name")?.setFilterValue(event.target.value)
+                }
+                className="max-w-sm"
               />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="overflow-x-auto border rounded shadow-lg">
-      <h3 className="text-lg font-semibold mb-2 p-2">{title}</h3>  
+      <div className="flex items-center py-4">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              Columns <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => {
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {column.id}
+                  </DropdownMenuCheckboxItem>
+                )
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="rounded-md border">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="sticky left-0 bg-white">
-                <Button variant="ghost" onClick={() => handleSort("name")}>
-                  Name <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button variant="ghost" onClick={() => handleSort("startDate")}>
-                  Start Date <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-              </TableHead>
-              {MONTHS.map((month, index) => (
-                <TableHead 
-                  key={month}
-                  className={index === currentMonthIndex ? "bg-yellow-100" : ""}
-                >
-                  <Button variant="ghost" onClick={() => handleSort(`months.${index}`)}>
-                    {month} <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-              ))}
-            </TableRow>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  )
+                })}
+              </TableRow>
+            ))}
           </TableHeader>
           <TableBody>
-          {paginatedData.map((row, rowIndex) => (
-            <TableRow key={rowIndex}>
-                <TableCell className="sticky left-0 bg-white">{row.name}</TableCell>
-                <TableCell>{row.startDate}</TableCell>
-                {MONTHS.map((_, monthIndex) => (
-                <TableCell 
-                    key={monthIndex}
-                    className={monthIndex === currentMonthIndex ? "bg-yellow-100" : ""}
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
                 >
-                    {monthIndex < currentMonthIndex ? row.months[monthIndex] || "" : ""}
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  No results.
                 </TableCell>
-                ))}
-            </TableRow>
-            ))}
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
-      <Pagination className="mt-4">
-        <PaginationContent>
-          <PaginationPrevious onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} />
-          {[...Array(totalPages)].map((_, index) => (
-            <PaginationItem key={index}>
-              <PaginationLink
-                isActive={index + 1 === currentPage}
-                onClick={() => setCurrentPage(index + 1)}
-              >
-                {index + 1}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
-          <PaginationNext onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))} />
-        </PaginationContent>
-      </Pagination>
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <div className="flex-1 text-sm text-muted-foreground">
+          {table.getFilteredSelectedRowModel().rows.length} of{" "}
+          {table.getFilteredRowModel().rows.length} row(s) selected.
+        </div>
+        <div className="space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
-  );
-};
+  )
+}
 
 export default ReportTable;

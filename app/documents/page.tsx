@@ -7,7 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from 'lucide-react';
 import React, { useState } from 'react';
 import MonthlyDocs from './monthlyDocs/page';
-
+import BankTable from './monthlyDocs/bank-table/page';
+import OtherDocs from './monthlyDocs/other-docs/page';
 
 const getCurrentMonth = () => {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -16,11 +17,6 @@ const getCurrentMonth = () => {
 };
 
 const documents = [
-  // { id: 'bankStatements', name: 'Bank Statements', deadline: '2024-08-05', subDocs: [
-  //   { id: 'bankKES', name: 'KES Account' },
-  //   { id: 'bankUSD', name: 'USD Account' },
-  //   { id: 'bankEUR', name: 'EUR Account' },
-  // ]},
   { id: 'bankStatements', name: 'Bank Statements', deadline: '2024-08-05'},
   { id: 'salesInvoices', name: 'Sales Invoices', deadline: '2024-08-10' },
   { id: 'purchaseInvoices', name: 'Purchase Invoices', deadline: '2024-08-10' },
@@ -111,35 +107,36 @@ const DocumentUpload = () => {
           <TabsTrigger value="previous" onClick={() => setActiveTab('previous')}>Previous Months</TabsTrigger>
         </TabsList>
         <TabsContent value="current">
-
-        <Tabs defaultValue="supplier" className="w-full">
-          <TabsList>
-            <TabsTrigger value="supplier">Supplier Statements</TabsTrigger>
-            <TabsTrigger value="bank">Bank Statements</TabsTrigger>
-            <TabsTrigger value="other">Other Docs</TabsTrigger>
-          </TabsList>
-          <TabsContent value="supplier">
-          <MonthlyDocs/>
-          <div className="grid grid-cols-5 gap-4">
-            {documents.map((doc, index) => (
-              <React.Fragment key={doc.id}>
-                {/* {index === 0 ? (
-                  <div className="col-span-3">
-                    <DocumentCard doc={doc} uploadedDocs={uploadedDocs} handleFileUpload={handleFileUpload} />
-                  </div>
-                ) : ( */}
-                  {/* <DocumentCard doc={doc} uploadedDocs={uploadedDocs} handleFileUpload={handleFileUpload} /> */}
-                {/* )} */}
-              </React.Fragment>
-            ))}
-          </div>
-          </TabsContent>
-          <TabsContent value="bank">Bank Table</TabsContent>
-          <TabsContent value="other">Other Docs</TabsContent>
-        </Tabs>
-
-
-          
+          <Tabs defaultValue="supplier" className="w-full">
+            <TabsList>
+              <TabsTrigger value="supplier">Supplier Statements</TabsTrigger>
+              <TabsTrigger value="bank">Bank Statements</TabsTrigger>
+              <TabsTrigger value="other">Other Docs</TabsTrigger>
+            </TabsList>
+            <TabsContent value="supplier">
+              <MonthlyDocs/>
+              <div className="grid grid-cols-5 gap-4">
+                {documents.map((doc, index) => (
+                  <React.Fragment key={doc.id}>
+                    {/* Commented out code left intact */}
+                    {/* {index === 0 ? (
+                      <div className="col-span-3">
+                        <DocumentCard doc={doc} uploadedDocs={uploadedDocs} handleFileUpload={handleFileUpload} />
+                      </div>
+                    ) : ( */}
+                      {/* <DocumentCard doc={doc} uploadedDocs={uploadedDocs} handleFileUpload={handleFileUpload} /> */}
+                    {/* )} */}
+                  </React.Fragment>
+                ))}
+              </div>
+            </TabsContent>
+            <TabsContent value="bank">
+              <BankTable />
+            </TabsContent>
+            <TabsContent value="other">
+              <OtherDocs />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
         <TabsContent value="previous">
           <p>Previous months documents would be displayed here.</p>
