@@ -176,6 +176,7 @@ export function PettyCash() {
   return (
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
+              <h1 className="text-xl font-semibold mb-2">Monthly Petty Cash Entries</h1>
             <div className="flex justify-between space-x-4">
                 {Object.keys(floatData).map((type) => (
                   <FloatCard
@@ -188,7 +189,6 @@ export function PettyCash() {
                 ))}
               </div>
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-semibold">Monthly Petty Cash Entries</h1>
           <div className="flex items-center space-x-2">
 
             <Input type="search" placeholder="search" className="w-48" />
