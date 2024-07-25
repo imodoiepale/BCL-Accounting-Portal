@@ -20,6 +20,16 @@ const url="https://zyszsqgdlrpnunkegipk.supabase.co"
 // Initialize Supabase client
 const supabase = createClient(url, key)
 
+
+// Utility function to format date
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
 export function SupplierList() {
   const [suppliers, setSuppliers] = useState([])
   const [newSupplier, setNewSupplier] = useState({
@@ -38,6 +48,7 @@ export function SupplierList() {
     const { data, error } = await supabase
       .from('acc_portal_suppliers')
       .select('*')
+      .order('id', { ascending: true });
     if (error) console.error('Error fetching suppliers:', error)
     else setSuppliers(data)
   }
@@ -125,6 +136,7 @@ export function SupplierList() {
                 <TableHead>Contact Name</TableHead>
                 <TableHead>Contact Mobile</TableHead>
                 <TableHead>Contact Email</TableHead>
+                <TableHead>Start Date</TableHead>
                 <TableHead>Approved by BCL</TableHead>
               </TableRow>
             </TableHeader>
@@ -137,6 +149,7 @@ export function SupplierList() {
                   <TableCell>{supplier.contact_name}</TableCell>
                   <TableCell>{supplier.contact_mobile}</TableCell>
                   <TableCell>{supplier.contact_email}</TableCell>
+                  <TableCell>{formatDate(supplier.startdate)}</TableCell>
                   <TableCell className='text-center'>
                     <Badge variant={supplier.status ? "success" : "destructive"}>
                       {supplier.status ? "✔️" : "❌"}

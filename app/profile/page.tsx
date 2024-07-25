@@ -1,6 +1,7 @@
 //@ts-nocheck
 import { BankList } from "@/components/component/BankList"
 import { CompanyInfoTab } from "@/components/component/companyInfo"
+import { EmployeeList } from "@/components/component/Employees"
 import { SupplierList } from "@/components/component/SupplierList"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -12,6 +13,7 @@ export default function Profile() {
             <TabsList>
               <TabsTrigger value="company-info">Company Info</TabsTrigger>
               <TabsTrigger value="kyc-docs">KYC Documents</TabsTrigger>
+              <TabsTrigger value="employees">Employees</TabsTrigger>
               <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
               <TabsTrigger value="banks">Banks</TabsTrigger>
             </TabsList>
@@ -39,6 +41,10 @@ export default function Profile() {
                   </div>
                 </TabsContent>
               </Tabs>
+            </TabsContent>
+            <TabsContent value="employees" className="px-8">
+              <h2 className="text-xl font-semibold mb-2">Employees</h2>
+              <EmployeeList />
             </TabsContent>
             <TabsContent value="suppliers">
               <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
