@@ -157,7 +157,7 @@ export function EmployeeList() {
                 <TableHead>EMP ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>ID Number</TableHead>
-                <TableHead>Company ID</TableHead>
+                {/* <TableHead>Company ID</TableHead> */}
                 <TableHead>KRA PIN</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Mobile</TableHead>
@@ -173,7 +173,7 @@ export function EmployeeList() {
                   <TableCell>EMP-{employee.id}</TableCell>
                   <TableCell>{employee.name}</TableCell>
                   <TableCell>{employee.id_number}</TableCell>
-                  <TableCell>{employee.company_id}</TableCell>
+                  {/* <TableCell>{employee.company_id}</TableCell> */}
                   <TableCell>{employee.kra_pin}</TableCell>
                   <TableCell>{employee.email}</TableCell>
                   <TableCell>{employee.mobile}</TableCell>
