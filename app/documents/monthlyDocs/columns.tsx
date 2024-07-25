@@ -178,32 +178,34 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                    <FormField
-                      control={form.control}
-                      name="periodFrom"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Period From</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="periodTo"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Period To</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="periodFrom"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Period From</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="periodTo"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Period To</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     <FormField
                       control={form.control}
                       name="closingBalance"
