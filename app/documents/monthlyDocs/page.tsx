@@ -33,18 +33,7 @@ export default function MonthlyDocs() {
 
   const fetchData = async () => {
     try {
-      const { data: uploadData, error: uploadError } = await supabase
-        .from('acc_portal_monthly_files_upload')
-        .select(`
-          *,
-          company:acc_portal_company(name)
-        `)
-        .order('upload_date', { ascending: false });
-  
-      if (uploadError) {
-        throw new Error(`Error fetching upload data: ${uploadError.message}`);
-      }
-  
+      // Fetch all suppliers
       const { data: supplierData, error: supplierError } = await supabase
         .from('acc_portal_suppliers')
         .select(`
@@ -56,47 +45,69 @@ export default function MonthlyDocs() {
           contact_email,
           status,
           startdate
-        `);
-  
-      if (supplierError) {
-        throw new Error(`Error fetching supplier data: ${supplierError.message}`);
-      }
-  
-      const supplierMap = supplierData.reduce((map, supplier) => {
-        map[supplier.id] = supplier;
+        `)
+        .order('id', { ascending: true });
+
+      if (supplierError) throw new Error(`Error fetching supplier data: ${supplierError.message}`);
+
+      console.log('Supplier Data:', supplierData);
+
+      // Fetch upload data
+      const { data: uploadData, error: uploadError } = await supabase
+        .from('acc_portal_monthly_files_upload')
+        .select(`
+          *,
+          company:acc_portal_company(name)
+        `)
+        .order('upload_date', { ascending: false });
+
+      if (uploadError) throw new Error(`Error fetching upload data: ${uploadError.message}`);
+
+      console.log('Upload Data:', uploadData);
+
+      // Create a map of upload data keyed by supplier_id
+      const uploadMap = uploadData.reduce((map, item) => {
+        if (!map[item.supplier_id]) {
+          map[item.supplier_id] = [];
+        }
+        map[item.supplier_id].push(item);
         return map;
       }, {});
-  
-      const transformedData = uploadData.map(item => {
-        const supplier = supplierMap[item.supplier_id] || {};
+
+      // Transform data
+      const transformedData = supplierData.map(supplier => {
+        const uploads = uploadMap[supplier.id] || [];
+        const latestUpload = uploads[0] || {}; // Get the latest upload or an empty object
+
         return {
           suppSeq: supplier.id,
           suppName: supplier.name,
           suppStatus: supplier.status ? 'Active' : 'Inactive',
           suppStartDate: supplier.startdate,
-          verifiedByBCLAccManager: item.is_verified,
-          supplierDetailsByFinance: true,
-          uploadStatus: item.document_type,
-          uploadDate: item.upload_date,
-          supplierWefDate: item.docs_date_range,
-          supplierUntilDate: null,
-          stateRange: "Verified",
-          verifyByBCL: item.is_verified,
+          verifiedByBCLAccManager: latestUpload.is_verified || false,
+          supplierDetailsByFinance: true, // Assuming this is always true
+          uploadStatus: latestUpload.document_type || 'Not Uploaded',
+          uploadDate: latestUpload.upload_date || null,
+          supplierWefDate: latestUpload.docs_date_range || null,
+          supplierUntilDate: null, // This field is not present in the original data
+          stateRange: latestUpload.is_verified ? "Verified" : "Not Verified",
+          verifyByBCL: latestUpload.is_verified || false,
           suppPIN: supplier.pin,
           suppContactName: supplier.contact_name,
           suppContactMobile: supplier.contact_mobile,
           suppContactEmail: supplier.contact_email,
-          closingBalance: item.closing_balance,
-          closingBalanceVerify: item.balance_verification ? "true" : "false",
+          closingBalance: latestUpload.closing_balance || null,
+          closingBalanceVerify: latestUpload.balance_verification ? "true" : "false",
         };
       });
-  
-      console.log('Transformed Data:', transformedData); // Debugging line
+
+      console.log('Transformed Data:', transformedData);
       setData(transformedData);
     } catch (error) {
-      console.error('Error fetching data:', error.message);
+      console.error('Error fetching data:', error);
     }
-  };
+  }
+  
   
   
 
@@ -147,15 +158,15 @@ export default function MonthlyDocs() {
   
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-      <main className="flex flex-col justify-start w-full">
+    <div className=" px-4 sm:px-6 lg:px-8">
+      <main className="flex flex-col justify-start w-5/6">
         <h1 className="text-2xl font-bold my-4">Monthly Documents</h1>
         <p className="text-lg mb-4">
           <span className="font-semibold text-blue-700">{currentMonth}</span> Supplier Statements
         </p>
-        <div className="overflow-x-auto">
+        <div className="">
           <div className="inline-block min-w-full align-middle">
-            <div className="overflow-hidden border-b border-gray-200 shadow sm:rounded-lg">
+            <div className=" border-b border-gray-200 shadow sm:rounded-lg">
               <DataTable 
                 columns={supplierColumns} 
                 data={data} 
