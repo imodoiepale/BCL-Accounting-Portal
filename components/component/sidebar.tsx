@@ -25,7 +25,7 @@ const navItems = [
   { href: "/communication", icon: VoicemailIcon, label: "Communication & Ticket" },
   // { href: "/invoices", icon: ReceiptIcon, label: "Invoices" },
   // { href: "/proforma-invoices", icon: ReceiptIcon, label: "Proforma Invoices" },
-  // { href: "/petty-cash", icon: CoinsIcon, label: "Petty Cash" },
+  { href: "/pettycash", icon: CoinsIcon, label: "Petty Cash" },
   // { href: "/expenses", icon: ReceiptIcon, label: "Expenses" },
   { href: "/settings", icon: SettingsIcon, label: "Settings" },
 ]
