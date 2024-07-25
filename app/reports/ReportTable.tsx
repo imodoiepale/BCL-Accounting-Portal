@@ -19,12 +19,14 @@ import { useMemo, useState } from "react";
 interface DataRow {
   name: string;
   startDate: string;
-  months: number[];
+  months: string[];  
+
 }
 
 interface ReportTableProps {
   data: DataRow[];
   title: string;
+  
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -66,10 +68,12 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title }) => {
     const bValue = sortColumn.startsWith("months.") 
       ? b.months[parseInt(sortColumn.split('.')[1])]
       : b[sortColumn as keyof DataRow];
-    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+    if (aValue === bValue) return 0;
+    if (aValue === "✅" && bValue === "X") return sortDirection === "asc" ? -1 : 1;
+    if (aValue === "X" && bValue === "✅") return sortDirection === "asc" ? 1 : -1;
     return 0;
   });
+  
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * rowsPerPage;
@@ -147,19 +151,19 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title }) => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedData.map((row, rowIndex) => (
-              <TableRow key={rowIndex}>
+          {paginatedData.map((row, rowIndex) => (
+            <TableRow key={rowIndex}>
                 <TableCell className="sticky left-0 bg-white">{row.name}</TableCell>
                 <TableCell>{row.startDate}</TableCell>
                 {MONTHS.map((_, monthIndex) => (
-                  <TableCell 
+                <TableCell 
                     key={monthIndex}
                     className={monthIndex === currentMonthIndex ? "bg-yellow-100" : ""}
-                  >
+                >
                     {monthIndex < currentMonthIndex ? row.months[monthIndex] || "" : ""}
-                  </TableCell>
+                </TableCell>
                 ))}
-              </TableRow>
+            </TableRow>
             ))}
           </TableBody>
         </Table>

@@ -3,12 +3,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DataTableRowActions } from "./data-table-row-actions";
-import { handleDocumentUpload, checkFileExists, handleDocumentUpdateOrDelete } from "./utils";
 import {
   Dialog,
   DialogContent,
@@ -16,16 +11,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { ColumnDef } from "@tanstack/react-table";
+import { ArrowUpDown, Info } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { DataTableRowActions } from "./data-table-row-actions";
+import { checkFileExists, handleDocumentUpdateOrDelete, handleDocumentUpload } from "./utils";
 
 export type AllCompanies = {
   CompanyId: string;
@@ -34,7 +34,6 @@ export type AllCompanies = {
   suppStatus: string;
   suppStartDate: string;
   verifiedByBCLAccManager: boolean;
-  supplierDetailsByFinance: boolean;
   uploadStatus: string;
   uploadDate: string;
   supplierWefDate: string;
@@ -113,19 +112,6 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
       </Button>
     ),
     cell: ({ row }) => <div>{row.getValue("verifiedByBCLAccManager") ? "✅" : "❌"}</div>,
-  },
-  {
-    accessorKey: "supplierDetailsByFinance",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Supplier Details by Finance
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => <div>{row.getValue("supplierDetailsByFinance") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "uploadStatus",

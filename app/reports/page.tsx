@@ -5,18 +5,18 @@ import ReportTable from "./ReportTable";
 
 export default function Reports() {
   const supplierData = [
-    { name: "Supplier A", startDate: "2024-01-01", months: [100, 150, 200, 180, 220, 190, 210] },
-    { name: "Supplier B", startDate: "2024-02-15", months: [0, 80, 120, 150, 160, 140, 170] },
+    { name: "Supplier A", startDate: "2024-01-01", months: ["✅", "✅", "✅", "✅", "✅", "✅", "✅"] },
+    { name: "Supplier B", startDate: "2024-02-15", months: ["X", "✅", "✅", "✅", "✅", "✅", "✅"] },
   ];
 
   const bankData = [
-    { name: "Bank X", startDate: "2024-01-01", months: [5000, 5200, 4800, 5100, 5300, 5150, 5400] },
-    { name: "Bank Y", startDate: "2024-03-01", months: [0, 0, 3000, 3200, 3100, 3300, 3500] },
+    { name: "Bank X", startDate: "2024-01-01", months: ["✅", "✅", "✅", "✅", "✅", "✅", "✅"] },
+    { name: "Bank Y", startDate: "2024-03-01", months: ["X", "X", "✅", "✅", "✅", "✅", "✅"] },
   ];
 
   const otherDocsData = [
-    { name: "Document 1", startDate: "2024-01-01", months: [10, 15, 12, 18, 20, 16, 22] },
-    { name: "Document 2", startDate: "2024-02-01", months: [0, 5, 8, 7, 9, 11, 13] },
+    { name: "Document 1", startDate: "2024-01-01", months: ["✅", "✅", "✅", "✅", "✅", "✅", "✅"] },
+    { name: "Document 2", startDate: "2024-02-01", months: ["X", "✅", "✅", "✅", "✅", "✅", "✅"] },
   ];
 
   return (
@@ -34,7 +34,6 @@ export default function Reports() {
         <TabsList>
           <TabsTrigger value="docs">Suppliers Statement Documents</TabsTrigger>
           <TabsTrigger value="balance">Suppliers Statement Closing Balance</TabsTrigger>
-        
         </TabsList>
         
         <TabsContent value="docs">
@@ -44,10 +43,7 @@ export default function Reports() {
         <TabsContent value="balance">
           {/* <ReportTable data={bankData} title="Banks Report" /> */}
         </TabsContent>
-
-      
       </Tabs>
-          {/* <ReportTable data={supplierData} title="Suppliers Report" /> */}
         </TabsContent>
         
         <TabsContent value="banks">
