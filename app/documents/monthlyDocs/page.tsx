@@ -42,7 +42,7 @@ function formatDate(dateString) {
 }
 
 // Utility function to format date and time as dd/mm/yyyy 9:00 am/pm
-export function formatDateTime(dateTimeString) {
+function formatDateTime(dateTimeString) {
   if (!dateTimeString) return 'N/A';
   const date = new Date(dateTimeString);
   return date.toLocaleString('en-GB', {
