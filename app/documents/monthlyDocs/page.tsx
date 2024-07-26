@@ -39,7 +39,7 @@ export default function MonthlyDocs() {
       setIsLoading(true);
       const [{ data: supplierData, error: supplierError }, { data: uploadData, error: uploadError }] = await Promise.all([
         supabase.from('acc_portal_suppliers').select('*').order('id', { ascending: true }),
-        supabase.from('acc_portal_monthly_files_upload').select('*').order('upload_date', { ascending: false })
+        supabase.from('acc_portal_monthly_files_upload').select('*')
       ]);
 
       if (supplierError) throw new Error(`Error fetching supplier data: ${supplierError.message}`);
@@ -56,7 +56,7 @@ export default function MonthlyDocs() {
           suppStatus: supplier.status ? 'Active' : 'Inactive',
           suppStartDate: supplier.startdate,
           verifiedByBCLAccManager: latestUpload.is_verified || false,
-          uploadStatus: latestUpload.document_type ? 'Uploaded' : 'Not Uploaded',
+          uploadStatus: latestUpload.upload_status ? 'Uploaded' : 'Not Uploaded',
           uploadDate: latestUpload.upload_date || '',
           supplierWefDate: latestUpload.docs_date_range || '',
           supplierUntilDate: latestUpload.docs_date_range_end || '',

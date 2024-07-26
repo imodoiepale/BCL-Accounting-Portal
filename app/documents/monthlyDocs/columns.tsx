@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from '@supabase/supabase-js';
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Info } from "lucide-react";
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useForm } from "react-hook-form";
 import { AllCompanies } from './page';
 
@@ -34,7 +34,38 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const UploadCell = React.memo(({ row }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(row.getValue("uploadStatus"));
-  
+  const [isLoading, setIsLoading] = useState(false);
+
+  const form = useForm({
+    defaultValues: {
+      periodFrom: '',
+      periodTo: '',
+      closingBalance: '',
+      file: null
+    }
+  });
+
+  useEffect(() => {
+    const fetchUploadStatus = async () => {
+      const { data, error } = await supabase
+        .from('acc_portal_monthly_files_upload')
+        .select('upload_status')
+        .eq('company_id', row.original.CompanyId)
+        .eq('document_type', 'supplier statement')
+        .order('upload_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) {
+        console.error('Error fetching upload status:', error);
+      } else if (data) {
+        setUploadStatus(data.upload_status);
+      }
+    };
+
+    fetchUploadStatus();
+  }, [row.original.CompanyId]);
+
   const handleViewUpload = useCallback(async () => {
     if (row.original.filePath) {
       try {
@@ -53,40 +84,24 @@ const UploadCell = React.memo(({ row }) => {
     }
   }, [row.original.filePath]);
 
-  const form = useForm({
-    defaultValues: {
-      periodFrom: '',
-      periodTo: '',
-      closingBalance: '',
-      file: null
-    }
-  });
-
   const onSubmit = useCallback(async (data) => {
+    setIsLoading(true);
     try {
       const file = data.file[0];
       const currentDate = new Date();
       const year = currentDate.getFullYear();
       const month = currentDate.toLocaleString('default', { month: 'long' });
   
-      // Fetch the company name from acc_portal_company table
       const { data: companyData, error: companyError } = await supabase
         .from('acc_portal_company')
         .select('company_name')
-        .eq('id', row.original.CompanyId);
+        .eq('id', row.original.CompanyId)
+        .single();
   
       if (companyError) throw companyError;
   
-      let companyName;
-      if (companyData && companyData.length > 0) {
-        companyName = companyData[0].company_name;
-      } else {
-        throw new Error('Company not found');
-      }
+      const filePath = `Monthly-Documents/suppliers/${year}/${month}/${companyData.company_name}/${file.name}`;
   
-      const filePath = `Monthly-Documents/suppliers/${companyName}/${year}/${month}/${file.name}`;
-  
-
       await supabase.storage.createBucket('Accounting-Portal', { public: false });
 
       const { error: storageError } = await supabase.storage
@@ -106,7 +121,8 @@ const UploadCell = React.memo(({ row }) => {
           docs_date_range_end: data.periodTo,
           closing_balance: data.closingBalance,
           balance_verification: false,
-          file_path: filePath
+          file_path: filePath,
+          upload_status: 'Uploaded' 
         });
   
       if (insertError) throw insertError;
@@ -116,6 +132,9 @@ const UploadCell = React.memo(({ row }) => {
     } catch (error) {
       console.error('Error uploading file:', error);
       alert(`Error uploading file: ${error.message || error.error}`);
+      setUploadStatus('Failed');
+    } finally {
+      setIsLoading(false);
     }
   }, [row.original.CompanyId]);
 
@@ -123,8 +142,13 @@ const UploadCell = React.memo(({ row }) => {
     <div className="text-center font-medium">
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" onClick={() => uploadStatus === 'Uploaded' ? handleViewUpload() : setIsDialogOpen(true)}>
-            {uploadStatus === 'Uploaded' ? '✅ View Upload' : 'Upload'}
+          <Button 
+            variant="outline" 
+            onClick={() => uploadStatus === 'Uploaded' ? handleViewUpload() : setIsDialogOpen(true)}
+            disabled={isLoading}
+          >
+            {uploadStatus === 'Uploaded' ? '✅ View Upload' : 
+             uploadStatus === 'Failed' ? '❌ Retry Upload' : 'Upload'}
           </Button>
         </DialogTrigger>
         <DialogContent>
@@ -190,7 +214,9 @@ const UploadCell = React.memo(({ row }) => {
                   </FormItem>
                 )}
               />
-              <Button type="submit">Submit</Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Uploading...' : 'Submit'}
+              </Button>
             </form>
           </Form>
         </DialogContent>
@@ -198,6 +224,8 @@ const UploadCell = React.memo(({ row }) => {
     </div>
   );
 });
+
+UploadCell.displayName = 'UploadCell';
 
 export const supplierColumns: ColumnDef<AllCompanies>[] = [
   {
