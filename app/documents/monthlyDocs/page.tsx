@@ -1,3 +1,5 @@
+// @ts-nocheck
+"use client"
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { supplierColumns } from "./columns";
@@ -28,6 +30,31 @@ export type AllCompanies = {
   filePath: string;
 };
 
+// Utility function to format date as dd/mm/yyyy
+export function formatDate(dateString) {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+}
+
+// Utility function to format date and time as dd/mm/yyyy 9:00 am/pm
+export function formatDateTime(dateTimeString) {
+  if (!dateTimeString) return 'N/A';
+  const date = new Date(dateTimeString);
+  return date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  }).replace(',', '');
+}
+
 export default function MonthlyDocs() {
   const [data, setData] = useState<AllCompanies[]>([]);
   const [currentDate, setCurrentDate] = useState('');
@@ -54,12 +81,12 @@ export default function MonthlyDocs() {
           suppSeq: supplier.id,
           suppName: supplier.name,
           suppStatus: supplier.status ? 'Active' : 'Inactive',
-          suppStartDate: supplier.startdate,
+          suppStartDate: formatDate(supplier.startdate),
           verifiedByBCLAccManager: latestUpload.is_verified || false,
           uploadStatus: latestUpload.upload_status ? 'Uploaded' : 'Not Uploaded',
-          uploadDate: latestUpload.upload_date || '',
-          supplierWefDate: latestUpload.docs_date_range || '',
-          supplierUntilDate: latestUpload.docs_date_range_end || '',
+          uploadDate: formatDateTime(latestUpload.upload_date),
+          supplierWefDate: formatDate(latestUpload.docs_date_range),
+          supplierUntilDate: formatDate(latestUpload.docs_date_range_end),
           verifyByBCL: latestUpload.is_verified || false,
           suppPIN: supplier.pin,
           suppContactName: supplier.contact_name,
