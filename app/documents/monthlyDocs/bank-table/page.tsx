@@ -1,12 +1,14 @@
 //@ts-nocheck
-import { columns } from "./columns"
-import { DataTable } from "../data-table"
-import { bankData } from "./data"
+"use client";
+
+import { columns } from "./columns";
+import { bankData } from "./data";
+import { DataTable } from "./data-table";
 
 export default function BankTable() {
   return (
-    <div className="container mx-auto py-10">
+    <div className="">
       <DataTable columns={columns} data={bankData} />
     </div>
-  )
+  );
 }
