@@ -239,7 +239,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div className="text-center font-medium">{row.getValue("suppSeq")}</div>,
+    cell: ({ row }) => <div className="text-center font-medium">SUP-{row.getValue("suppSeq")}</div>,
   },
   {
     accessorKey: "suppName",

@@ -1,17 +1,9 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 //@ts-nocheck
+
 "use client";
 
-import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal, Upload, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -19,229 +11,405 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useForm } from "react-hook-form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { createClient } from '@supabase/supabase-js';
+import { ColumnDef } from "@tanstack/react-table";
+import { ArrowUpDown, Info } from "lucide-react";
+import React, { useCallback, useEffect, useState } from 'react';
+import { useForm } from "react-hook-form";
+import { AllBanks } from './page';
 
-export type BankStatement = {
-  id: string;
-  accountNumber: string;
-  bankName: string;
-  statementDate: string;
-  balance: number;
-  currency: string;
-  uploadStatus: "Uploaded" | "Pending" | "Failed";
-  bankStatus: "Active" | "Inactive";
-  startDate: string;
-  bclVerification: boolean;
-  uploadDate: string;
-  periodFrom: string;
-  periodTo: string;
-  startRangeVerification: boolean;
-  closingBalance: number;
-  closingBalanceVerified: boolean;
-};
+const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const UploadDialog = ({ onSubmit }) => {
-  const { register, handleSubmit } = useForm();
+const UploadCell = React.memo(({ row }) => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState(row.getValue("uploadStatus"));
+  const [isLoading, setIsLoading] = useState(false);
+
+  const form = useForm({
+    defaultValues: {
+      periodFrom: '',
+      periodTo: '',
+      closingBalance: '',
+      file: null
+    }
+  });
+
+  useEffect(() => {
+    const fetchUploadStatus = async () => {
+      const { data, error } = await supabase
+        .from('acc_portal_monthly_files_upload')
+        .select('upload_status')
+        .eq('company_id', row.original.CompanyId)
+        .eq('document_type', 'bank statement')
+        .order('upload_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) {
+        console.error('Error fetching upload status:', error);
+      } else if (data) {
+        setUploadStatus(data.upload_status);
+      }
+    };
+
+    fetchUploadStatus();
+  }, [row.original.CompanyId]);
+
+  const handleViewUpload = useCallback(async () => {
+    if (row.original.filePath) {
+      try {
+        const { data, error } = await supabase.storage
+          .from('Bank-Statements')
+          .createSignedUrl(row.original.filePath, 60);
+
+        if (error) throw error;
+        window.open(data.signedUrl, '_blank');
+      } catch (error) {
+        console.error('Error viewing file:', error);
+        alert('Error viewing file. Please try again.');
+      }
+    } else {
+      alert('No file uploaded yet.');
+    }
+  }, [row.original.filePath]);
+
+  const onSubmit = useCallback(async (data) => {
+    setIsLoading(true);
+    try {
+      const file = data.file[0];
+      const currentDate = new Date();
+      const year = currentDate.getFullYear();
+      const month = currentDate.toLocaleString('default', { month: 'long' });
+
+      const { data: companyData, error: companyError } = await supabase
+        .from('acc_portal_company')
+        .select('company_name')
+        .eq('id', row.original.CompanyId)
+        .single();
+
+      if (companyError) throw companyError;
+
+      const filePath = `Accounting-Portal/banks/${year}/${month}/${companyData.company_name}/${file.name}`;
+
+      await supabase.storage.createBucket('Bank-Statements', { public: false });
+
+      const { error: storageError } = await supabase.storage
+        .from('Bank-Statements')
+        .upload(filePath, file);
+
+      if (storageError) throw storageError;
+
+      const { error: insertError } = await supabase
+        .from('acc_portal_monthly_files_upload')
+        .insert({
+          company_id: row.original.CompanyId,
+          document_type: 'bank statement',
+          upload_date: currentDate.toISOString(),
+          docs_date_range: data.periodFrom,
+          docs_date_range_end: data.periodTo,
+          closing_balance: data.closingBalance,
+          balance_verification: false,
+          file_path: filePath,
+          upload_status: 'Uploaded'
+        });
+
+      if (insertError) throw insertError;
+
+      setUploadStatus('Uploaded');
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      alert(`Error uploading file: ${error.message || error.error}`);
+      setUploadStatus('Failed');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [row.original.CompanyId]);
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Upload className="mr-2 h-4 w-4" />
-          Upload
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Upload Statement</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="periodFrom">Period From (SWEF Date)</Label>
-            <Input type="date" id="periodFrom" {...register("periodFrom")} />
-          </div>
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="periodTo">Period To</Label>
-            <Input type="date" id="periodTo" {...register("periodTo")} />
-          </div>
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="closingBalance">Closing Balance</Label>
-            <Input type="number" id="closingBalance" {...register("closingBalance")} />
-          </div>
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="file">Upload File</Label>
-            <Input type="file" id="file" {...register("file")} />
-          </div>
-          <Button type="submit">Submit</Button>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <div className="text-center font-medium">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogTrigger asChild>
+          <Button 
+            variant="outline" 
+            onClick={() => uploadStatus === 'Uploaded' ? handleViewUpload() : setIsDialogOpen(true)}
+            disabled={isLoading}
+          >
+            {uploadStatus === 'Uploaded' ? '✅ View Upload' : 
+             uploadStatus === 'Failed' ? '❌ Retry Upload' : 'Upload'}
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="periodFrom"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Period From</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="periodTo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Period To</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="closingBalance"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Closing Balance</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="file"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Upload File</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="file" 
+                        onChange={(e) => field.onChange(e.target.files)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Uploading...' : 'Submit'}
+              </Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
-};
+});
 
-export const columns: ColumnDef<BankStatement>[] = [
+UploadCell.displayName = 'UploadCell';
+
+export const bankColumns: ColumnDef<AllBanks>[] = [
   {
-    accessorKey: "accountNumber",
-    header: "Account Number",
+    accessorKey: "bankSeq",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Bank Acc Seq
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div className="text-center font-medium">BA-{row.getValue("bankSeq")}</div>,
   },
   {
     accessorKey: "bankName",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Bank Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
-  },
-  {
-    accessorKey: "statementDate",
-    header: "Statement Date",
-  },
-  {
-    accessorKey: "balance",
-    header: "Balance",
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("balance"));
-      const formatted = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: row.original.currency,
-      }).format(amount);
-      return <div className="font-medium">{formatted}</div>;
-    },
-  },
-  {
-    accessorKey: "uploadStatus",
-    header: "Upload Status",
-    cell: ({ row }) => {
-      const status = row.getValue("uploadStatus") as string;
-      return (
-        <div
-          className={`font-medium ${
-            status === "Uploaded"
-              ? "text-green-600"
-              : status === "Failed"
-              ? "text-red-600"
-              : "text-yellow-600"
-          }`}
-        >
-          {status}
-        </div>
-      );
-    },
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Bank Name
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div className="font-medium">{row.getValue("bankName")}</div>,
   },
   {
     accessorKey: "bankStatus",
-    header: "Bank Status",
-    cell: ({ row }) => {
-      const status = row.getValue("bankStatus") as string;
-      return (
-        <div
-          className={`font-medium ${
-            status === "Active" ? "text-green-600" : "text-red-600"
-          }`}
-        >
-          {status}
-        </div>
-      );
-    },
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Status
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div>{row.getValue("bankStatus")}</div>,
   },
   {
     accessorKey: "startDate",
-    header: "Start Date",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Start date
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div>{row.getValue("startDate")}</div>,
   },
   {
-    accessorKey: "bclVerification",
-    header: "BCL Verification",
-    cell: ({ row }) => {
-      const verified = row.getValue("bclVerification") as boolean;
-      return <Checkbox checked={verified} disabled />;
-    },
+    accessorKey: "verified",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Verified
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div>{row.getValue("verified") ? "✅" : "❌"}</div>,
   },
   {
-    id: "upload",
+    accessorKey: "uploadStatus",
     header: "Upload",
-    cell: ({ row }) => {
-      const onSubmit = (data) => {
-        console.log(data);
-        // Handle file upload logic here
-      };
-      return <UploadDialog onSubmit={onSubmit} />;
-    },
+    cell: UploadCell,
   },
   {
     accessorKey: "uploadDate",
-    header: "Upload Date",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Upload Date
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div>{row.getValue("uploadDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "periodFrom",
-    header: "Period From (SWEF Date)",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Period From
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div>{row.getValue("periodFrom") || 'N/A'}</div>,
   },
   {
     accessorKey: "periodTo",
-    header: "Period To",
-  },
-  {
-    accessorKey: "startRangeVerification",
-    header: "Start Range Verification",
-    cell: ({ row }) => {
-      const verified = row.getValue("startRangeVerification") as boolean;
-      return <Checkbox checked={verified} disabled />;
-    },
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Period To
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div>{row.getValue("periodTo") || 'N/A'}</div>,
   },
   {
     accessorKey: "closingBalance",
-    header: "Closing Balance",
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("closingBalance"));
-      const formatted = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: row.original.currency,
-      }).format(amount);
-      return <div className="font-medium">{formatted}</div>;
-    },
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Closing Balance
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div>{row.getValue("closingBalance") || 'N/A'}</div>,
   },
   {
     accessorKey: "closingBalanceVerified",
-    header: "Closing Balance Verified",
-    cell: ({ row }) => {
-      const verified = row.getValue("closingBalanceVerified") as boolean;
-      return <Checkbox checked={verified} disabled />;
-    },
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Closing Balance Verified
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div>{row.getValue("closingBalanceVerified") === "true" ? "✅" : "❌"}</div>,
   },
   {
-    id: "actions",
+    id: "profile",
+    header: "Profile",
     cell: ({ row }) => {
-      const bankStatement = row.original;
-
+      const bank = row.original;
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <Dialog>
+          <DialogTrigger asChild>
             <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">Open profile</span>
+              <Info className="h-4 w-4" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(bankStatement.id)}
-            >
-              Copy statement ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>View details</DropdownMenuItem>
-            <DropdownMenuItem>Download statement</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{bank.bankName} Profile</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Bank PIN:</span>
+                <span className="col-span-3">{bank.bankPIN}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Contact Name:</span>
+                <span className="col-span-3">{bank.bankContactName}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Contact Mobile:</span>
+                <span className="col-span-3">{bank.bankContactMobile}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Contact Email:</span>
+                <span className="col-span-3">{bank.bankContactEmail}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Start Date:</span>
+                <span className="col-span-3">{bank.startDate}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Status:</span>
+                <span className="col-span-3">{bank.bankStatus}</span>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       );
     },
   },
 ];
+
+export default bankColumns;
