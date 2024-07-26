@@ -5,7 +5,7 @@ import { otherDocsData } from "./data"
 
 export default function OtherDocs() {
   return (
-    <div className="container mx-auto py-10">
+    <div className="">
       <DataTable columns={columns} data={otherDocsData} />
     </div>
   )
