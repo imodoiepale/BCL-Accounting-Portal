@@ -20,32 +20,184 @@ import {
   FormMessage
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { createClient } from '@supabase/supabase-js';
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Info } from "lucide-react";
-import { useEffect, useState } from "react";
+import React, { useCallback, useState } from 'react';
 import { useForm } from "react-hook-form";
-import { DataTableRowActions } from "./data-table-row-actions";
-import { checkFileExists, handleDocumentUpdateOrDelete, handleDocumentUpload } from "./utils";
+import { AllCompanies } from './page';
 
-export type AllCompanies = {
-  CompanyId: string;
-  suppSeq: string;
-  suppName: string;
-  suppStatus: string;
-  suppStartDate: string;
-  verifiedByBCLAccManager: boolean;
-  uploadStatus: string;
-  uploadDate: string;
-  supplierWefDate: string;
-  supplierUntilDate: string;
-  verifyByBCL: boolean;
-  suppPIN: string;
-  suppContactName: string;
-  suppContactMobile: string;
-  suppContactEmail: string;
-  closingBalance: string;
-  closingBalanceVerify: string;
-};
+const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+const UploadCell = React.memo(({ row }) => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState(row.getValue("uploadStatus"));
+  
+  const handleViewUpload = useCallback(async () => {
+    if (row.original.filePath) {
+      try {
+        const { data, error } = await supabase.storage
+          .from('Accounting-Portal')
+          .createSignedUrl(row.original.filePath, 60);
+
+        if (error) throw error;
+        window.open(data.signedUrl, '_blank');
+      } catch (error) {
+        console.error('Error viewing file:', error);
+        alert('Error viewing file. Please try again.');
+      }
+    } else {
+      alert('No file uploaded yet.');
+    }
+  }, [row.original.filePath]);
+
+  const form = useForm({
+    defaultValues: {
+      periodFrom: '',
+      periodTo: '',
+      closingBalance: '',
+      file: null
+    }
+  });
+
+  const onSubmit = useCallback(async (data) => {
+    try {
+      const file = data.file[0];
+      const currentDate = new Date();
+      const year = currentDate.getFullYear();
+      const month = currentDate.toLocaleString('default', { month: 'long' });
+  
+      // Fetch the company name from acc_portal_company table
+      const { data: companyData, error: companyError } = await supabase
+        .from('acc_portal_company')
+        .select('company_name')
+        .eq('id', row.original.CompanyId);
+  
+      if (companyError) throw companyError;
+  
+      let companyName;
+      if (companyData && companyData.length > 0) {
+        companyName = companyData[0].company_name;
+      } else {
+        throw new Error('Company not found');
+      }
+  
+      const filePath = `Monthly-Documents/suppliers/${companyName}/${year}/${month}/${file.name}`;
+  
+
+      await supabase.storage.createBucket('Accounting-Portal', { public: false });
+
+      const { error: storageError } = await supabase.storage
+        .from('Accounting-Portal')
+        .upload(filePath, file);
+  
+      if (storageError) throw storageError;
+  
+      const { error: insertError } = await supabase
+        .from('acc_portal_monthly_files_upload')
+        .insert({
+          supplier_id: row.original.CompanyId,
+          company_id: row.original.CompanyId,
+          document_type: 'supplier statement',
+          upload_date: currentDate.toISOString(),
+          docs_date_range: data.periodFrom,
+          docs_date_range_end: data.periodTo,
+          closing_balance: data.closingBalance,
+          balance_verification: false,
+          file_path: filePath
+        });
+  
+      if (insertError) throw insertError;
+  
+      setUploadStatus('Uploaded');
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      alert(`Error uploading file: ${error.message || error.error}`);
+    }
+  }, [row.original.CompanyId]);
+
+  return (
+    <div className="text-center font-medium">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" onClick={() => uploadStatus === 'Uploaded' ? handleViewUpload() : setIsDialogOpen(true)}>
+            {uploadStatus === 'Uploaded' ? '✅ View Upload' : 'Upload'}
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="periodFrom"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Period From (SWEF Date)</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="periodTo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Period To</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="closingBalance"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Closing Balance</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="file"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Upload File</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="file" 
+                        onChange={(e) => field.onChange(e.target.files)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit">Submit</Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+});
 
 export const supplierColumns: ColumnDef<AllCompanies>[] = [
   {
@@ -115,135 +267,8 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
   },
   {
     accessorKey: "uploadStatus",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Upload
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const [status, setStatus] = useState('checking');
-      const [isDialogOpen, setIsDialogOpen] = useState(false);
-      
-      const form = useForm({
-        defaultValues: {
-          periodFrom: '',
-          periodTo: '',
-          closingBalance: '',
-          file: null
-        }
-      });
-
-      useEffect(() => {
-        const fetchData = async () => {
-          const fileExists = await checkFileExists(row.original.CompanyId, "PURCHASE");
-          setStatus(fileExists ? "true" : "false");
-        }
-        fetchData();
-      }, [row.original.CompanyId]);
-
-      const icon = status === "true" ? "✅" : status === "false" ? "" : "...";
-
-      const onSubmit = async (data) => {
-        await handleDocumentUpload(
-          data.file,
-          setStatus,
-          row.original.companyName,
-          "PURCHASE",
-          row.original.CompanyId,
-          data
-        );
-        setIsDialogOpen(false);
-      };
-
-      return (
-        <div className="text-center font-medium">
-          {status === "true" ? (
-            <Button variant="outline" onClick={() => handleDocumentUpdateOrDelete(row.original.CompanyId, documentId)}>
-              {icon} View Upload
-            </Button>
-          ) : (
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  {icon} Upload
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Upload Document</DialogTitle>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="periodFrom"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Period From</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="periodTo"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Period To</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <FormField
-                      control={form.control}
-                      name="closingBalance"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Closing Balance</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="file"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Upload File</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="file" 
-                              onChange={(e) => field.onChange(e.target.files[0])}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit">Submit</Button>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-      );
-    },
+    header: "Upload",
+    cell: UploadCell,
   },
   {
     accessorKey: "uploadDate",
@@ -256,7 +281,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div>{row.getValue("uploadDate")}</div>,
+    cell: ({ row }) => <div>{row.getValue("uploadDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "supplierWefDate",
@@ -265,11 +290,11 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Supplier W.E.F Date
+        Period From (SWEF Date)
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div>{row.getValue("supplierWefDate")}</div>,
+    cell: ({ row }) => <div>{row.getValue("supplierWefDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "supplierUntilDate",
@@ -278,11 +303,11 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Supplier Until date
+        Period To
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div>{row.getValue("supplierUntilDate")}</div>,
+    cell: ({ row }) => <div>{row.getValue("supplierUntilDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "verifyByBCL",
@@ -308,7 +333,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div>{row.getValue("closingBalance")}</div>,
+    cell: ({ row }) => <div>{row.getValue("closingBalance") || 'N/A'}</div>,
   },
   {
     accessorKey: "closingBalanceVerify",
@@ -371,8 +396,6 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
       );
     },
   },
-  {
-    id: "actions",
-    cell: ({ row }) => <DataTableRowActions row={row} companyId={row.original.CompanyId} />,
-  },
 ];
+
+export default supplierColumns
