@@ -25,11 +25,24 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Info } from "lucide-react";
 import React, { useCallback, useEffect, useState } from 'react';
 import { useForm } from "react-hook-form";
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 import { AllBanks } from './page';
 
 const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+const schema = yup.object().shape({
+  periodFrom: yup.date().required('Period From is required'),
+  periodTo: yup.date().required('Period To is required')
+    .min(
+      yup.ref('periodFrom'),
+      'Period To must be later than or equal to Period From'
+    ),
+  closingBalance: yup.number().required('Closing Balance is required'),
+  file: yup.mixed().required('File is required')
+});
 
 const UploadCell = React.memo(({ row }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -42,7 +55,8 @@ const UploadCell = React.memo(({ row }) => {
       periodTo: '',
       closingBalance: '',
       file: null
-    }
+    },
+    resolver: yupResolver(schema)
   });
 
   useEffect(() => {
@@ -225,7 +239,6 @@ const UploadCell = React.memo(({ row }) => {
 });
 
 UploadCell.displayName = 'UploadCell';
-
 
 const groupedHeaders = [
   {
