@@ -1,18 +1,13 @@
 //@ts-nocheck
 "use client";
 
-//@ts-nocheck
-"use client";
-
-import { useState, useEffect } from "react";
-import { createClient } from '@supabase/supabase-js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from '@supabase/supabase-js';
 import { useEffect, useState } from "react";
 import ReportTable from "./ReportTable";
 
-const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
-const url="https://zyszsqgdlrpnunkegipk.supabase.co"
+const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing";
+const url = "https://zyszsqgdlrpnunkegipk.supabase.co";
 
 const supabase = createClient(url, key);
 
@@ -47,22 +42,22 @@ export default function Reports() {
       .from('acc_portal_suppliers')
       .select('id, name, startdate')
       .order('id', { ascending: true });
-  
+
     if (supplierError) {
       console.error('Error fetching suppliers:', supplierError);
       return;
     }
-  
+
     const { data: reports, error: reportError } = await supabase
       .from('acc_portal_monthly_files_upload')
       .select('supplier_id, docs_date_range, docs_date_range_end, is_verified')
       .eq('document_type', 'supplier statement');
-  
+
     if (reportError) {
       console.error('Error fetching supplier reports:', reportError);
       return;
     }
-  
+
     const processedData = suppliers.map(supplier => {
       const supplierReports = reports.filter(report => report.supplier_id === supplier.id);
       const months = Array(12).fill(null).map((_, index) => {
@@ -72,7 +67,7 @@ export default function Reports() {
           const currentMonth = new Date(new Date().getFullYear(), index, 1);
           return currentMonth >= startDate && currentMonth <= endDate;
         });
-  
+
         if (report) {
           return {
             status: 'uploaded',
@@ -83,7 +78,7 @@ export default function Reports() {
         }
         return null;
       });
-  
+
       return {
         id: `S-${supplier.id}`,
         name: supplier.name,
@@ -91,7 +86,7 @@ export default function Reports() {
         months
       };
     });
-  
+
     setSupplierData(processedData);
   };
 
@@ -100,22 +95,22 @@ export default function Reports() {
       .from('acc_portal_banks')
       .select('id, name, startdate')
       .order('id', { ascending: true });
-  
+
     if (bankError) {
       console.error('Error fetching banks:', bankError);
       return;
     }
-  
+
     const { data: reports, error: reportError } = await supabase
       .from('acc_portal_monthly_files_upload')
       .select('bank_id, docs_date_range, docs_date_range_end, is_verified')
       .eq('document_type', 'bank statement');
-  
+
     if (reportError) {
       console.error('Error fetching bank reports:', reportError);
       return;
     }
-  
+
     const processedData = banks.map(bank => {
       const bankReports = reports.filter(report => report.bank_id === bank.id);
       const months = Array(12).fill(null).map((_, index) => {
@@ -125,7 +120,7 @@ export default function Reports() {
           const currentMonth = new Date(new Date().getFullYear(), index, 1);
           return currentMonth >= startDate && currentMonth <= endDate;
         });
-  
+
         if (report) {
           return {
             status: 'uploaded',
@@ -136,7 +131,7 @@ export default function Reports() {
         }
         return null;
       });
-  
+
       return {
         id: `B-${bank.id}`,
         name: bank.name,
@@ -144,7 +139,7 @@ export default function Reports() {
         months
       };
     });
-  
+
     setBankData(processedData);
   };
 
