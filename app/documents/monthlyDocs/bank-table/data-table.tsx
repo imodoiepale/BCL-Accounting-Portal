@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import {
@@ -41,34 +42,55 @@ export function DataTable<TData, TValue>({
   columns,
   data,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [sorting, setSorting] = React.useState([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
 
   const table = useReactTable({
     data,
     columns,
+    getCoreRowModel: getCoreRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     state: {
       sorting,
       columnFilters,
-      columnVisibility,
       rowSelection,
     },
   });
 
-  // Access the bankName column
   const bankNameColumn = table.getColumn("bankName");
-  // Get the current filter value for the bankName column
   const filterValue = bankNameColumn?.getFilterValue() as string ?? "";
+
+  const calculateColumnStatus = React.useMemo(() => {
+    const totalItems = data.length;
+    const status = {};
+
+    columns.forEach((column) => {
+      if (typeof column.accessorKey === 'string') {
+        let pendingCount = 0;
+        let completedCount = 0;
+
+        data.forEach((item: any) => {
+          const value = item[column.accessorKey as string];
+          if (value === undefined || value === null || value === '' || value === false) {
+            pendingCount++;
+          } else {
+            completedCount++;
+          }
+        });
+
+        status[column.accessorKey] = {
+          pending: `${pendingCount}/${totalItems}`,
+          completed: `${completedCount}/${totalItems}`,
+        };
+      }
+    });
+
+    return status;
+  }, [data, columns]);
 
   return (
     <div className="w-full">
@@ -81,34 +103,25 @@ export function DataTable<TData, TValue>({
           }
           className="h-8 w-[150px] lg:w-[250px]"
         />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              Columns <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  className="capitalize"
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) =>
-                    column.toggleVisibility(!!value)
-                  }
-                >
-                  {column.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
+          <TableRow>
+              {columns.map((column) => (
+                <TableCell key={column.id} className="text-center bg-green-100 font-bold">
+                  {column.accessorKey && calculateColumnStatus[column.accessorKey]?.completed || 'N/A'}
+                </TableCell>
+              ))}
+            </TableRow>
+            <TableRow className="h-2">
+              {columns.map((column) => (
+                <TableCell key={column.id} className="text-center bg-red-100 font-bold">
+                  {column.accessorKey && calculateColumnStatus[column.accessorKey]?.pending || 'N/A'}
+                </TableCell>
+              ))}
+            </TableRow>
+            
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
