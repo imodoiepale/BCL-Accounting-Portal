@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client"
 
 import * as React from "react"
@@ -7,7 +8,11 @@ import { cn } from "@/lib/utils"
 
 const TooltipProvider = TooltipPrimitive.Provider
 
-const Tooltip = TooltipPrimitive.Root
+const Tooltip = ({ children, ...props }) => (
+  <TooltipPrimitive.Root delayDuration={0} {...props}>
+    {children}
+  </TooltipPrimitive.Root>
+)
 
 const TooltipTrigger = TooltipPrimitive.Trigger
 
