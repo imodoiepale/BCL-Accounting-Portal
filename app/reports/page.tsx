@@ -1,11 +1,6 @@
 //@ts-nocheck
 "use client";
 
-<<<<<<< Updated upstream
-=======
-import { useState, useEffect } from "react";
-import { createClient } from '@supabase/supabase-js';
->>>>>>> Stashed changes
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReportTable from "./ReportTable";
 
