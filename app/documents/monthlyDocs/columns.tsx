@@ -269,8 +269,13 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </WrappedButton>
     ),
-    cell: ({ row }) => <div>{row.getValue("suppStatus")}</div>,
+    cell: ({ row }) => {
+      const status = row.getValue("suppStatus");
+      const statusClass = status === 'Active' ? 'text-green-500' : 'text-red-500';
+      return <div className={`font-medium ${statusClass}`}>{status}</div>;
+    },
   },
+  
   {
     accessorKey: "suppStartDate",
     header: ({ column }) => (
