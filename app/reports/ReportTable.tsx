@@ -1,30 +1,28 @@
 //@ts-nocheck
 "use client"
 
-import * as React from "react"
+import React, { useState, useEffect } from "react";
 import {
   ColumnDef,
-  ColumnFiltersState,
-  SortingState,
-  VisibilityState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
+  useReactTable,
   getPaginationRowModel,
   getSortedRowModel,
-  useReactTable,
-} from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown } from "lucide-react"
-
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+  getFilteredRowModel,
+  ColumnFiltersState,
+  SortingState,
+} from "@tanstack/react-table";
+import { ArrowUpDown, ChevronDown, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -32,132 +30,157 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Card, CardContent } from "@/components/ui/card"
+} from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 interface DataRow {
   id: string;
   name: string;
   startDate: string;
-  months: string[];
+  months: {
+    status: string;
+    isVerified: boolean;
+    startDate?: string;
+    endDate?: string;
+  }[];
 }
 
 interface ReportTableProps {
   data: DataRow[];
   title: string;
+  fetchData: () => Promise<void>;
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => {
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [rowSelection, setRowSelection] = useState({});
+  const [fromDate, setFromDate] = useState<string>("2024-01-01");
+  const [toDate, setToDate] = useState<string>("2024-12-31");
 
-const ReportTable: React.FC<ReportTableProps> = ({ data, title }) => {
-  const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
-  const [rowSelection, setRowSelection] = React.useState({})
-  const [fromDate, setFromDate] = React.useState<string>("2024-01-01")
-  const [toDate, setToDate] = React.useState<string>("2024-12-31")
+  const currentMonthIndex = new Date().getMonth();
 
-  const currentMonthIndex = React.useMemo(() => new Date().getMonth(), [])
+  useEffect(() => {
+    fetchData();
+  }, [fromDate, toDate]);
 
-  const columns: ColumnDef<DataRow>[] = React.useMemo(
-    () => [
-      {
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        ),
-        enableSorting: false,
-        enableHiding: false,
-      },
-      {
-        accessorKey: "id",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            >
-              ID
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          )
-        },
-        cell: ({ row }) => <div>{row.getValue("id")}</div>,
-      },
-      {
-        accessorKey: "name",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            >
-              Name
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          )
-        },
-        cell: ({ row }) => <div>{row.getValue("name")}</div>,
-      },
-      {
-        accessorKey: "startDate",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            >
-              Start Date
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          )
-        },
-        cell: ({ row }) => <div>{row.getValue("startDate")}</div>,
-      },
-      ...MONTHS.map((month, index) => ({
-        accessorKey: `months.${index}`,
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className={index === currentMonthIndex ? "bg-yellow-100" : ""}
-            >
-              {month}
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          )
-        },
-        cell: ({ row }) => (
-          <div className={index === currentMonthIndex ? "bg-yellow-100" : ""}>
-            {index <= currentMonthIndex ? row.getValue(`months.${index}`) || "" : ""}
+  const columns: ColumnDef<DataRow>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "id",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          ID
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => <div>{row.getValue("id")}</div>,
+    },
+    {
+      accessorKey: "name",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          Name
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => <div>{row.getValue("name")}</div>,
+    },
+    {
+      accessorKey: "startDate",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          Start Date
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => <div>{row.getValue("startDate")}</div>,
+    },
+    ...MONTHS.map((month, index) => ({
+      accessorKey: `months.${index}`,
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className={index === currentMonthIndex ? "bg-yellow-100" : ""}
+        >
+          {month}
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const monthData = row.original.months[index];
+        const cellContent = monthData ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <div
+                  className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                    monthData.status === 'uploaded'
+                      ? monthData.isVerified
+                        ? 'bg-green-200'
+                        : 'bg-yellow-200'
+                      : 'bg-red-200'
+                  }`}
+                >
+                  {monthData.status === 'uploaded' ? (
+                    monthData.isVerified ? '✅' : '⏳'
+                  ) : '❌'}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Status: {monthData.status}</p>
+                <p>Verified: {monthData.isVerified ? 'Yes' : 'No'}</p>
+                {monthData.startDate && <p>Start: {monthData.startDate}</p>}
+                {monthData.endDate && <p>End: {monthData.endDate}</p>}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          <div className="w-8 h-8"></div>
+        );
+        
+        return (
+          <div className={index === currentMonthIndex ? "flex justify-center" : ""}>
+            {cellContent}
           </div>
-        ),
-      })),
-    ],
-    [currentMonthIndex]
-  )
-
-  const filteredData = React.useMemo(() => {
-    return data.filter((row) => {
-      const rowDate = new Date(row.startDate);
-      return rowDate >= new Date(fromDate) && rowDate <= new Date(toDate);
-    });
-  }, [data, fromDate, toDate]);
+        );
+      },
+    })),
+  ];
 
   const table = useReactTable({
-    data: filteredData,
+    data,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -165,15 +188,13 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title }) => {
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     state: {
       sorting,
       columnFilters,
-      columnVisibility,
       rowSelection,
     },
-  })
+  });
 
   return (
     <div className="w-full">
@@ -312,7 +333,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title }) => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
 export default ReportTable;
