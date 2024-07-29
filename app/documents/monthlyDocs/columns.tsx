@@ -139,17 +139,17 @@ const UploadCell = React.memo(({ row }) => {
   }, [row.original.CompanyId]);
 
   return (
-    <div className="text-center font-medium">
+    <div className="text-center ">
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>
-          <Button 
+          <WrappedButton 
             variant="outline" 
             onClick={() => uploadStatus === 'Uploaded' ? handleViewUpload() : setIsDialogOpen(true)}
             disabled={isLoading}
           >
             {uploadStatus === 'Uploaded' ? '✅ View Upload' : 
              uploadStatus === 'Failed' ? '❌ Retry Upload' : 'Upload'}
-          </Button>
+          </WrappedButton>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
@@ -214,9 +214,9 @@ const UploadCell = React.memo(({ row }) => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={isLoading}>
+              <WrappedButton type="submit" disabled={isLoading}>
                 {isLoading ? 'Uploading...' : 'Submit'}
-              </Button>
+              </WrappedButton>
             </form>
           </Form>
         </DialogContent>
@@ -227,69 +227,73 @@ const UploadCell = React.memo(({ row }) => {
 
 UploadCell.displayName = 'UploadCell';
 
+const WrappedButton = ({ children, ...props }) => (
+  <Button
+    variant="ghost"
+    className="h-auto whitespace-break-spaces text-wrap"
+    {...props}
+  >
+    {children}
+  </Button>
+);
+
 export const supplierColumns: ColumnDef<AllCompanies>[] = [
   {
     accessorKey: "suppSeq",
     header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
+      <WrappedButton onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
         Supp Seq
         <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+      </WrappedButton>
     ),
-    cell: ({ row }) => <div className="text-center font-medium">SUP-{row.getValue("suppSeq")}</div>,
+    cell: ({ row }) => <div className="text-center ">SUP-{row.getValue("suppSeq")}</div>,
   },
   {
     accessorKey: "suppName",
     header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
+      <WrappedButton onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
         Supp Name
         <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+      </WrappedButton>
     ),
-    cell: ({ row }) => <div className="font-medium">{row.getValue("suppName")}</div>,
+    cell: ({ row }) => <div className="">{row.getValue("suppName")}</div>,
   },
   {
     accessorKey: "suppStatus",
     header: ({ column }) => (
-      <Button
+      <WrappedButton
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Status
         <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+      </WrappedButton>
     ),
     cell: ({ row }) => <div>{row.getValue("suppStatus")}</div>,
   },
   {
     accessorKey: "suppStartDate",
     header: ({ column }) => (
-      <Button
+      <WrappedButton
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Start date
         <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+      </WrappedButton>
     ),
     cell: ({ row }) => <div>{row.getValue("suppStartDate")}</div>,
   },
   {
     accessorKey: "verifiedByBCLAccManager",
     header: ({ column }) => (
-      <Button
+      <WrappedButton
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Verified by BCL
         <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+      </WrappedButton>
     ),
     cell: ({ row }) => <div>{row.getValue("verifiedByBCLAccManager") ? "✅" : "❌"}</div>,
   },
@@ -301,78 +305,78 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
   {
     accessorKey: "uploadDate",
     header: ({ column }) => (
-      <Button
+      <WrappedButton
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Upload Date
         <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+      </WrappedButton>
     ),
     cell: ({ row }) => <div>{row.getValue("uploadDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "supplierWefDate",
     header: ({ column }) => (
-      <Button
+      <WrappedButton
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Period From (SWEF Date)
         <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+      </WrappedButton>
     ),
     cell: ({ row }) => <div>{row.getValue("supplierWefDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "supplierUntilDate",
     header: ({ column }) => (
-      <Button
+      <WrappedButton
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Period To
         <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+      </WrappedButton>
     ),
     cell: ({ row }) => <div>{row.getValue("supplierUntilDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "verifyByBCL",
     header: ({ column }) => (
-      <Button
+      <WrappedButton
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Start Range Verification
         <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+      </WrappedButton>
     ),
     cell: ({ row }) => <div>{row.getValue("verifyByBCL") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "closingBalance",
     header: ({ column }) => (
-      <Button
+      <WrappedButton
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Closing Balance
         <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+      </WrappedButton>
     ),
     cell: ({ row }) => <div>{row.getValue("closingBalance") || 'N/A'}</div>,
   },
   {
     accessorKey: "closingBalanceVerify",
     header: ({ column }) => (
-      <Button
+      <WrappedButton
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Closing Balance Verified
         <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+      </WrappedButton>
     ),
     cell: ({ row }) => <div>{row.getValue("closingBalanceVerify") === "true" ? "✅" : "❌"}</div>,
   },
@@ -384,10 +388,10 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
       return (
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
+            <WrappedButton variant="ghost" className="h-8 w-8 p-0">
               <span className="sr-only">Open profile</span>
               <Info className="h-4 w-4" />
-            </Button>
+            </WrappedButton>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>

@@ -226,6 +226,20 @@ const UploadCell = React.memo(({ row }) => {
 
 UploadCell.displayName = 'UploadCell';
 
+
+const groupedHeaders = [
+  {
+    id: 'pending',
+    title: 'Pending',
+    columns: ['uploadStatus', 'uploadDate', 'periodFrom', 'periodTo'],
+  },
+  {
+    id: 'completed',
+    title: 'Completed',
+    columns: ['closingBalance', 'closingBalanceVerified'],
+  },
+];
+
 export const bankColumns: ColumnDef<AllBanks>[] = [
   {
     accessorKey: "bankSeq",

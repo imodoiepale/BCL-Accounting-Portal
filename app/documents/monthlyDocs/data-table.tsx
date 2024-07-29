@@ -66,18 +66,60 @@ export function DataTable<TData, TValue>({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
 
+  const calculateColumnStatus = React.useMemo(() => {
+    const totalItems = data.length;
+    const status = {};
+
+    columns.forEach((column) => {
+      if (typeof column.accessorKey === 'string') {
+        let pendingCount = 0;
+        let completedCount = 0;
+
+        data.forEach((item: any) => {
+          const value = item[column.accessorKey as string];
+          if (value === undefined || value === null || value === '' || value === false) {
+            pendingCount++;
+          } else {
+            completedCount++;
+          }
+        });
+
+        status[column.accessorKey] = {
+          pending: `${pendingCount}/${totalItems}`,
+          completed: `${completedCount}/${totalItems}`,
+        };
+      }
+    });
+
+    return status;
+  }, [data, columns]);
+
   return (
     <div className="space-y-4 w-full">
       <DataTableToolbar table={table} />
       <div className="rounded-md border">
         <Table>
-          <TableHeader>
+          <TableHeader className="text-wrap">
+            <TableRow>
+                {columns.map((column) => (
+                  <TableCell key={column.id} className="text-center bg-green-100 font-bold">
+                    {column.accessorKey && calculateColumnStatus[column.accessorKey]?.completed || 'N/A'}
+                  </TableCell>
+                ))}
+              </TableRow>
+              <TableRow className="h-2">
+                {columns.map((column) => (
+                  <TableCell key={column.id} className="text-center bg-red-100 font-bold">
+                    {column.accessorKey && calculateColumnStatus[column.accessorKey]?.pending || 'N/A'}
+                  </TableCell>
+                ))}
+              </TableRow>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header, index) => (
+                {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className={`text-xs font-extrabold `}
+                    className={`text-xs font-extrabold`}
                   >
                     {header.isPlaceholder
                       ? null
@@ -97,7 +139,7 @@ export function DataTable<TData, TValue>({
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                 >
-                  {row.getVisibleCells().map((cell, index) => (
+                  {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
                       className={`text-xs`}
@@ -109,7 +151,7 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-xs">
+                <TableCell colSpan={columns.length} className="h-24 text-center text-sm whitespace-nowrap">
                   No results.
                 </TableCell>
               </TableRow>

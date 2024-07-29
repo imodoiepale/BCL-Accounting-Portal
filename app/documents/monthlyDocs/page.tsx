@@ -121,8 +121,8 @@ export default function MonthlyDocs() {
   const memoizedColumns = useMemo(() => supplierColumns, []);
 
   return (
-    <main className="flex flex-col justify-start w-5/6">
-      <h1 className="text-2xl font-bold my-4">Monthly Documents</h1>
+    <main className="flex flex-col justify-start w-full">
+      {/* <h1 className="text-2xl font-bold my-4">Monthly Documents</h1> */}
       <p className="text-lg mb-4">
         <span className="font-semibold text-blue-700">{currentMonth}</span> Supplier Statements
       </p>
