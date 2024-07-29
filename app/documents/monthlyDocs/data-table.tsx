@@ -71,7 +71,7 @@ export function DataTable<TData, TValue>({
     const status = {};
 
     columns.forEach((column) => {
-      if (typeof column.accessorKey === 'string') {
+      if (typeof column.accessorKey === 'string' && column.accessorKey !== 'suppSeq' && column.accessorKey !== 'suppName' && column.accessorKey !== 'suppStartDate') {
         let pendingCount = 0;
         let completedCount = 0;
 
@@ -101,19 +101,29 @@ export function DataTable<TData, TValue>({
         <Table>
           <TableHeader className="text-wrap">
             <TableRow>
-                {columns.map((column) => (
+              <TableCell className="bg-green-100 font-bold uppercase pl-4">Completed</TableCell>
+              {columns.map((column) => (
+                column.accessorKey && calculateColumnStatus[column.accessorKey] ? (
                   <TableCell key={column.id} className="text-center bg-green-100 font-bold">
-                    {column.accessorKey && calculateColumnStatus[column.accessorKey]?.completed || 'N/A'}
+                    {calculateColumnStatus[column.accessorKey].completed}
                   </TableCell>
-                ))}
-              </TableRow>
-              <TableRow className="h-2">
-                {columns.map((column) => (
+                ) : (
+                  <TableCell key={column.id} className="bg-green-100"></TableCell>
+                )
+              ))}
+            </TableRow>
+            <TableRow>
+              <TableCell className="bg-red-100 font-bold uppercase pl-4">Pending</TableCell>
+              {columns.map((column) => (
+                column.accessorKey && calculateColumnStatus[column.accessorKey] ? (
                   <TableCell key={column.id} className="text-center bg-red-100 font-bold">
-                    {column.accessorKey && calculateColumnStatus[column.accessorKey]?.pending || 'N/A'}
+                    {calculateColumnStatus[column.accessorKey].pending}
                   </TableCell>
-                ))}
-              </TableRow>
+                ) : (
+                  <TableCell key={column.id} className="bg-red-100"></TableCell>
+                )
+              ))}
+            </TableRow>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
@@ -142,7 +152,7 @@ export function DataTable<TData, TValue>({
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className={`text-xs`}
+                      className={`text-sm`}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
@@ -151,7 +161,7 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-sm whitespace-nowrap">
+                <TableCell colSpan={columns.length} className="h-20 text-center text-sm whitespace-nowrap">
                   No results.
                 </TableCell>
               </TableRow>

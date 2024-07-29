@@ -139,9 +139,9 @@ const UploadCell = React.memo(({ row }) => {
   }, [row.original.CompanyId]);
 
   return (
-    <div className="text-center ">
+    <div className="text-center">
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
+        <DialogTrigger asChild className="whitespace-nowrap">
           <WrappedButton 
             variant="outline" 
             onClick={() => uploadStatus === 'Uploaded' ? handleViewUpload() : setIsDialogOpen(true)}
@@ -228,13 +228,15 @@ const UploadCell = React.memo(({ row }) => {
 UploadCell.displayName = 'UploadCell';
 
 const WrappedButton = ({ children, ...props }) => (
-  <Button
-    variant="ghost"
-    className="h-auto whitespace-break-spaces text-wrap"
-    {...props}
-  >
-    {children}
-  </Button>
+  <div className="text-center">
+    <Button
+      variant="ghost"
+      className="h-auto whitespace-break-spaces text-wrap"
+      {...props}
+    >
+      {children}
+    </Button>
+  </div>
 );
 
 export const supplierColumns: ColumnDef<AllCompanies>[] = [
@@ -256,7 +258,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </WrappedButton>
     ),
-    cell: ({ row }) => <div className="">{row.getValue("suppName")}</div>,
+    cell: ({ row }) => <div className="whitespace-nowrap">{row.getValue("suppName")}</div>,
   },
   {
     accessorKey: "suppStatus",
@@ -272,7 +274,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
     cell: ({ row }) => {
       const status = row.getValue("suppStatus");
       const statusClass = status === 'Active' ? 'text-green-500' : 'text-red-500';
-      return <div className={`font-medium ${statusClass}`}>{status}</div>;
+      return <div className={` text-center font-medium ${statusClass}`}>{status}</div>;
     },
   },
   
@@ -287,7 +289,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </WrappedButton>
     ),
-    cell: ({ row }) => <div>{row.getValue("suppStartDate")}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue("suppStartDate")}</div>,
   },
   {
     accessorKey: "verifiedByBCLAccManager",
@@ -300,11 +302,18 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </WrappedButton>
     ),
-    cell: ({ row }) => <div>{row.getValue("verifiedByBCLAccManager") ? "✅" : "❌"}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue("verifiedByBCLAccManager") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "uploadStatus",
-    header: "Upload",
+    header: ({ column }) => (
+      <WrappedButton
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Upload
+      </WrappedButton>
+    ),
     cell: UploadCell,
   },
   {
@@ -313,12 +322,13 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
       <WrappedButton
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        className="whitespace-nowrap"
       >
         Upload Date
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </WrappedButton>
     ),
-    cell: ({ row }) => <div>{row.getValue("uploadDate") || 'N/A'}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue("uploadDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "supplierWefDate",
@@ -331,7 +341,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </WrappedButton>
     ),
-    cell: ({ row }) => <div>{row.getValue("supplierWefDate") || 'N/A'}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue("supplierWefDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "supplierUntilDate",
@@ -344,7 +354,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </WrappedButton>
     ),
-    cell: ({ row }) => <div>{row.getValue("supplierUntilDate") || 'N/A'}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue("supplierUntilDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "verifyByBCL",
@@ -357,7 +367,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </WrappedButton>
     ),
-    cell: ({ row }) => <div>{row.getValue("verifyByBCL") ? "✅" : "❌"}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue("verifyByBCL") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "closingBalance",
@@ -370,7 +380,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </WrappedButton>
     ),
-    cell: ({ row }) => <div>{row.getValue("closingBalance") || 'N/A'}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue("closingBalance") || 'N/A'}</div>,
   },
   {
     accessorKey: "closingBalanceVerify",
@@ -383,7 +393,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </WrappedButton>
     ),
-    cell: ({ row }) => <div>{row.getValue("closingBalanceVerify") === "true" ? "✅" : "❌"}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue("closingBalanceVerify") === "true" ? "✅" : "❌"}</div>,
   },
   {
     id: "profile",
