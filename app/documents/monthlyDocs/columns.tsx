@@ -25,6 +25,8 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Info } from "lucide-react";
 import React, { useCallback, useEffect, useState } from 'react';
 import { useForm } from "react-hook-form";
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 import { AllCompanies } from './page';
 
 const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
@@ -36,13 +38,23 @@ const UploadCell = React.memo(({ row }) => {
   const [uploadStatus, setUploadStatus] = useState(row.getValue("uploadStatus"));
   const [isLoading, setIsLoading] = useState(false);
 
+  const schema = yup.object().shape({
+    periodFrom: yup.date().required("Period From is required"),
+    periodTo: yup.date()
+      .required("Period To is required")
+      .min(yup.ref('periodFrom'), "Period To must be later than Period From"),
+    closingBalance: yup.number().required("Closing Balance is required"),
+    file: yup.mixed().required("File is required")
+  });
+
   const form = useForm({
     defaultValues: {
       periodFrom: '',
       periodTo: '',
       closingBalance: '',
       file: null
-    }
+    },
+    resolver: yupResolver(schema),
   });
 
   useEffect(() => {
@@ -91,25 +103,25 @@ const UploadCell = React.memo(({ row }) => {
       const currentDate = new Date();
       const year = currentDate.getFullYear();
       const month = currentDate.toLocaleString('default', { month: 'long' });
-  
+
       const { data: companyData, error: companyError } = await supabase
         .from('acc_portal_company')
         .select('company_name')
         .eq('id', row.original.CompanyId)
         .single();
-  
+
       if (companyError) throw companyError;
-  
+
       const filePath = `Monthly-Documents/suppliers/${year}/${month}/${companyData.company_name}/${file.name}`;
-  
+
       await supabase.storage.createBucket('Accounting-Portal', { public: false });
 
       const { error: storageError } = await supabase.storage
         .from('Accounting-Portal')
         .upload(filePath, file);
-  
+
       if (storageError) throw storageError;
-  
+
       const { error: insertError } = await supabase
         .from('acc_portal_monthly_files_upload')
         .insert({
@@ -124,9 +136,9 @@ const UploadCell = React.memo(({ row }) => {
           file_path: filePath,
           upload_status: 'Uploaded' 
         });
-  
+
       if (insertError) throw insertError;
-  
+
       setUploadStatus('Uploaded');
       setIsDialogOpen(false);
     } catch (error) {
@@ -238,6 +250,7 @@ const WrappedButton = ({ children, ...props }) => (
     </Button>
   </div>
 );
+
 
 export const supplierColumns: ColumnDef<AllCompanies>[] = [
   {
