@@ -267,11 +267,11 @@ export default function Profile() {
                 <h3 className="text-lg font-medium">Fixed Assets Register</h3>
                 <Tabs defaultValue="computer-equipment">
                   <TabsList>
-                    <TabsTrigger value="computer-equipment">1.8.1 Computer & Equipments</TabsTrigger>
-                    <TabsTrigger value="furniture-fitting">1.8.2 Furniture Fitting & Equip 12.5%</TabsTrigger>
-                    <TabsTrigger value="land-building">1.8.3 Land & Building</TabsTrigger>
-                    <TabsTrigger value="plant-equipment">1.8.4 Plant & Equipment - 12.5 %</TabsTrigger>
-                    <TabsTrigger value="motor-vehicles">1.8.5 Motor Vehicles - 25 %</TabsTrigger>
+                    <TabsTrigger value="computer-equipment"> Computer & Equipments</TabsTrigger>
+                    <TabsTrigger value="furniture-fitting"> Furniture Fitting & Equip 12.5%</TabsTrigger>
+                    <TabsTrigger value="land-building">Land & Building</TabsTrigger>
+                    <TabsTrigger value="plant-equipment">Plant & Equipment - 12.5 %</TabsTrigger>
+                    <TabsTrigger value="motor-vehicles">Motor Vehicles - 25 %</TabsTrigger>
                   </TabsList>
                   <TabsContent value="computer-equipment">
                     <div className="space-y-4">
