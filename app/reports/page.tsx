@@ -1,6 +1,9 @@
 //@ts-nocheck
 "use client";
 
+//@ts-nocheck
+"use client";
+
 import { useState, useEffect } from "react";
 import { createClient } from '@supabase/supabase-js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,18 +14,20 @@ const url="https://zyszsqgdlrpnunkegipk.supabase.co"
 
 const supabase = createClient(url, key);
 
-const generateMonthsData = (startDate) => {
-  const months = [];
-  const start = new Date(startDate);
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    if (start <= now) {
-      months.push(Math.random() < 0.5 ? "✅" : "❌");
-    } else {
-      months.push("");
+const generateMonthsData = (reports) => {
+  const months = Array(12).fill("");
+  reports.forEach(report => {
+    const start = new Date(report.docs_date_range);
+    const end = new Date(report.docs_date_range_end);
+    const now = new Date();
+
+    for (let i = 0; i < 12; i++) {
+      const currentMonth = new Date(now.getFullYear(), i, 1);
+      if (currentMonth >= start && currentMonth <= end && currentMonth <= now) {
+        months[i] = report.is_verified ? "✅" : "❌";
+      }
     }
-    start.setMonth(start.getMonth() + 1);
-  }
+  });
   return months;
 };
 
@@ -36,31 +41,109 @@ export default function Reports() {
   }, []);
 
   const fetchSuppliers = async () => {
-    const { data, error } = await supabase
+    const { data: suppliers, error: supplierError } = await supabase
       .from('acc_portal_suppliers')
       .select('id, name, startdate')
       .order('id', { ascending: true });
-    if (error) console.error('Error fetching suppliers:', error);
-    else setSupplierData(data.map(supplier => ({
-      id: `SUPP-${supplier.id}`,
-      name: supplier.name,
-      startDate: supplier.startdate,
-      months: generateMonthsData(supplier.startdate),
-    })));
+  
+    if (supplierError) {
+      console.error('Error fetching suppliers:', supplierError);
+      return;
+    }
+  
+    const { data: reports, error: reportError } = await supabase
+      .from('acc_portal_monthly_files_upload')
+      .select('supplier_id, docs_date_range, docs_date_range_end, is_verified')
+      .eq('document_type', 'supplier statement');
+  
+    if (reportError) {
+      console.error('Error fetching supplier reports:', reportError);
+      return;
+    }
+  
+    const processedData = suppliers.map(supplier => {
+      const supplierReports = reports.filter(report => report.supplier_id === supplier.id);
+      const months = Array(12).fill(null).map((_, index) => {
+        const report = supplierReports.find(r => {
+          const startDate = new Date(r.docs_date_range);
+          const endDate = new Date(r.docs_date_range_end);
+          const currentMonth = new Date(new Date().getFullYear(), index, 1);
+          return currentMonth >= startDate && currentMonth <= endDate;
+        });
+  
+        if (report) {
+          return {
+            status: 'uploaded',
+            isVerified: report.is_verified,
+            startDate: report.docs_date_range,
+            endDate: report.docs_date_range_end
+          };
+        }
+        return null;
+      });
+  
+      return {
+        id: `S-${supplier.id}`,
+        name: supplier.name,
+        startDate: supplier.startdate,
+        months
+      };
+    });
+  
+    setSupplierData(processedData);
   };
 
   const fetchBanks = async () => {
-    const { data, error } = await supabase
+    const { data: banks, error: bankError } = await supabase
       .from('acc_portal_banks')
       .select('id, name, startdate')
       .order('id', { ascending: true });
-    if (error) console.error('Error fetching banks:', error);
-    else setBankData(data.map(bank => ({
-      id: `BANK-ACC-${bank.id}`,
-      name: bank.name,
-      startDate: bank.startdate,
-      months: generateMonthsData(bank.startdate),
-    })));
+  
+    if (bankError) {
+      console.error('Error fetching banks:', bankError);
+      return;
+    }
+  
+    const { data: reports, error: reportError } = await supabase
+      .from('acc_portal_monthly_files_upload')
+      .select('bank_id, docs_date_range, docs_date_range_end, is_verified')
+      .eq('document_type', 'bank statement');
+  
+    if (reportError) {
+      console.error('Error fetching bank reports:', reportError);
+      return;
+    }
+  
+    const processedData = banks.map(bank => {
+      const bankReports = reports.filter(report => report.bank_id === bank.id);
+      const months = Array(12).fill(null).map((_, index) => {
+        const report = bankReports.find(r => {
+          const startDate = new Date(r.docs_date_range);
+          const endDate = new Date(r.docs_date_range_end);
+          const currentMonth = new Date(new Date().getFullYear(), index, 1);
+          return currentMonth >= startDate && currentMonth <= endDate;
+        });
+  
+        if (report) {
+          return {
+            status: 'uploaded',
+            isVerified: report.is_verified,
+            startDate: report.docs_date_range,
+            endDate: report.docs_date_range_end
+          };
+        }
+        return null;
+      });
+  
+      return {
+        id: `B-${bank.id}`,
+        name: bank.name,
+        startDate: bank.startdate,
+        months
+      };
+    });
+  
+    setBankData(processedData);
   };
 
   const otherDocsData = [
@@ -79,14 +162,18 @@ export default function Reports() {
         </TabsList>
 
         <TabsContent value="suppliers">
-          <Tabs defaultValue="docs">
+          <Tabs defaultValue="suppliers">
             <TabsList>
-              <TabsTrigger value="docs">Suppliers Statement Documents</TabsTrigger>
+              <TabsTrigger value="suppliers">Suppliers Statement Documents</TabsTrigger>
               <TabsTrigger value="balance">Suppliers Statement Closing Balance</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="docs">
-              <ReportTable data={supplierData} title="Suppliers Report" />
+            <TabsContent value="suppliers">
+              <ReportTable 
+                data={supplierData} 
+                title="Suppliers Report" 
+                fetchData={fetchSuppliers} 
+              />
             </TabsContent>
 
             <TabsContent value="balance">
@@ -96,7 +183,7 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="banks">
-          <ReportTable data={bankData} title="Banks Report" />
+          <ReportTable data={bankData} title="Banks Report" fetchData={fetchBanks}  />
         </TabsContent>
 
         <TabsContent value="others">
