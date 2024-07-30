@@ -99,7 +99,7 @@ const BalanceTable: React.FC<BalanceTableProps> = ({ data, title, fetchData }) =
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           ID
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <ArrowUpDown className=" h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
@@ -112,7 +112,7 @@ const BalanceTable: React.FC<BalanceTableProps> = ({ data, title, fetchData }) =
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <ArrowUpDown className=" h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => <div className="text-left">{row.getValue("name")}</div>,
@@ -125,7 +125,7 @@ const BalanceTable: React.FC<BalanceTableProps> = ({ data, title, fetchData }) =
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           Start Date
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <ArrowUpDown className=" h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => <div className="text-center">{row.getValue("startDate")}</div>,
@@ -138,7 +138,7 @@ const BalanceTable: React.FC<BalanceTableProps> = ({ data, title, fetchData }) =
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           End Date
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <ArrowUpDown className=" h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => <div className="text-center">{row.getValue("endDate")}</div>,
@@ -152,7 +152,7 @@ const BalanceTable: React.FC<BalanceTableProps> = ({ data, title, fetchData }) =
           className={index === currentMonthIndex ? "bg-yellow-100" : ""}
         >
           {month}
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <ArrowUpDown className=" h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => {
@@ -284,7 +284,7 @@ return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="ml-auto h-full">
-            Columns <ChevronDown className="ml-2 h-4 w-4" />
+            Columns <ChevronDown className=" h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
