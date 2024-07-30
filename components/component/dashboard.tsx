@@ -148,7 +148,7 @@ export function Dashboard() {
                  <li>Paye submissions for employees should be done before the 20th.</li>
                  {/* Add any other deadlines or tasks here */}
                </ul>
-               <p className="mt-2">
+               <p className="mt-2 text-red-600 font-bold">
                  Additionally, make sure you check your notifications for any updates or further instructions.
                </p>
              </AlertDescription>
