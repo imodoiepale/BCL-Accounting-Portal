@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from 'next/navigation'
 import {
@@ -12,32 +13,31 @@ import {
   VoicemailIcon,
   ReceiptIcon,
   CoinsIcon,
-  SettingsIcon
+  SettingsIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
 } from "lucide-react"
 
 const navItems = [
   { href: "/", icon: LayoutDashboardIcon, label: "Dashboard" },
   { href: "/profile", icon: User2Icon, label: "Profile" },
-  // { href: "/customers", icon: UsersIcon, label: "Customers" },
   { href: "/documents", icon: FileIcon, label: "Monthly Documents" },
   { href: "/reports", icon: FileIcon, label: "Reports" },
   { href: "/checklist", icon: CheckIcon, label: "Checklist" },
   { href: "/communication", icon: VoicemailIcon, label: "Communication & Ticket" },
-  // { href: "/invoices", icon: ReceiptIcon, label: "Invoices" },
-  // { href: "/proforma-invoices", icon: ReceiptIcon, label: "Proforma Invoices" },
   { href: "/pettycash", icon: CoinsIcon, label: "Petty Cash" },
-  // { href: "/expenses", icon: ReceiptIcon, label: "Expenses" },
   { href: "/settings", icon: SettingsIcon, label: "Settings" },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
+  const [isExpanded, setIsExpanded] = useState(true)
 
   return (
     <div className="flex h-[150vh]">
-      <aside className="w-72 p-4 bg-gray-100 hidden md:block">
-        <div className="flex items-center mb-8">
-          <span className="text-xl font-bold">BCL Client Portal</span>
+      <aside className={`bg-gray-100 transition-all duration-300 ease-in-out ${isExpanded ? 'w-72' : 'w-20'} p-4 hidden md:block relative`}>
+        <div className={`flex items-center mb-8 ${isExpanded ? '' : 'justify-center'}`}>
+          {isExpanded && <span className="text-xl font-bold">BCL Client Portal</span>}
         </div>
         <nav className="space-y-2">
           {navItems.map((item) => (
@@ -48,14 +48,20 @@ export function Sidebar() {
                 pathname === item.href
                   ? "text-blue-600 bg-blue-100"
                   : "text-gray-700 hover:bg-gray-200"
-              }`}
+              } ${isExpanded ? '' : 'justify-center'}`}
               prefetch={false}
             >
               <item.icon className="w-5 h-5 mr-2" />
-              {item.label}
+              {isExpanded && item.label}
             </Link>
           ))}
         </nav>
+        <button
+          className="absolute top-2 right-2 p-2 rounded-full bg-gray-200 hover:bg-gray-300"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {isExpanded ? <ChevronLeftIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
+        </button>
       </aside>
     </div>
   )
