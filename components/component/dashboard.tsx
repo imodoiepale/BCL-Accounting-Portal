@@ -1,56 +1,34 @@
 // @ts-nocheck
 "use client"
 
-import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
-import { CartesianGrid, XAxis, Line, LineChart } from "recharts"
-import { ChartTooltipContent, ChartTooltip, ChartContainer } from "@/components/ui/chart"
-import Image from "next/image"
+import { useEffect, useState } from 'react';
+import { CartesianGrid, Line, LineChart, XAxis, Tooltip, Legend } from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+const sampleData = [
+  { month: "January", banks: 186, suppliers: 123, others: 45 },
+  { month: "February", banks: 305, suppliers: 234, others: 78 },
+  { month: "March", banks: 237, suppliers: 176, others: 56 },
+  { month: "April", banks: 73, suppliers: 95, others: 23 },
+  { month: "May", banks: 209, suppliers: 145, others: 67 },
+  { month: "June", banks: 214, suppliers: 198, others: 89 },
+];
 
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer"
-
-const url = "https://wcmrsrnjtkrmfcjxmxpc.supabase.co"
-const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjbXJzcm5qdGtybWZjanhteHBjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwMjcwNTA2NywiZXhwIjoyMDE4MjgxMDY3fQ.FNNRgt4R-lWE9OWRkO22DbdaKy9Y3HKYs2U1u6XvSXI"
-
-const supabase = createClient(url, key);
-
+const stats = [
+  { title: "Pending Verification", value: 10 },
+  { title: "Pending Monthly Documents", value: 5 },
+  { title: "Total Banks", value: 8 },
+  { title: "Employees", value: 20 },
+  { title: "Directors", value: 4 },
+  { title: "Suppliers", value: 15 },
+];
 
 export function Dashboard() {
   const [alienData, setAlienData] = useState(null);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
-    async function fetchData() {
-      const { data, error } = await supabase
-        .from('aaa_applications_alien_id')
-        .select('*');
-      
-      if (error) {
-        setError(error.message);
-      } else {
-        setAlienData(data);
-      }
-    }
-
-    fetchData();
+    // Using sample data instead of fetching from a database
+    setAlienData(sampleData);
   }, []);
 
   const currentDate = new Date().toLocaleDateString('en-US', {
@@ -63,254 +41,36 @@ export function Dashboard() {
   return (
     <div className="flex">
       <main className="flex-1 p-6 bg-gray-50 h-screen">
-        
-        {/* {error ? (
-          <div className="mb-6 text-red-600">Error: {error}</div>
-        ) : alienData ? (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Alien ID Data</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="overflow-auto max-h-60">{JSON.stringify(alienData, null, 2)}</pre>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="mb-6">Loading alien data...</div>
-        )} */}
-        {/* <header className="flex justify-end mb-6">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline">Main</Button>
-            <Select>
-              <SelectTrigger>
-                <SelectValue placeholder="KES" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="kes">KES</SelectItem>
-                <SelectItem value="US">USD</SelectItem>
-                <SelectItem value="eur">Euro</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select>
-              <SelectTrigger className="w-28">
-                <SelectValue placeholder="English" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="gr">Gujrati</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-        </header> */}
-        {/* <div className="grid grid-cols-1 gap-6 mb-6 lg:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invoices</CardTitle>
-              <CardDescription>This Month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="secondary">$13.00</Badge>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Proforma Invoices</CardTitle>
-              <CardDescription>This Month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="secondary">$0.00</Badge>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Petty Cash</CardTitle>
-              <CardDescription>This Month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="secondary">$0.00</Badge>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Unpaid</CardTitle>
-              <CardDescription>Not Paid</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="destructive">$13.00</Badge>
-            </CardContent>
-          </Card>
-        </div> */}
-        {/* <div className="grid grid-cols-1 gap-6 mb-6 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invoices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span>Draft</span>
-                  <span>100%</span>
-                </div>
-                <Progress value={100} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Pending</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Unpaid</span>
-                  <span>100%</span>
-                </div>
-                <Progress value={100} className="w-full bg-orange-500" />
-                <div className="flex items-center justify-between">
-                  <span>Overdue</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Partially</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Paid</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Proforma Invoices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span>Draft</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Pending</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Sent</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Declined</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Accepted</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Expired</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Petty Cash</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span>Draft</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Pending</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Sent</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Declined</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Accepted</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Expired</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-              </div>
-            </CardContent>
-          </Card>
+        <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
+        <div className="mb-6 text-lg">{currentDate}</div>
+        <div className="grid grid-cols-3 gap-6 mb-6">
+          {stats.map((stat) => (
+            <Card key={stat.title} className="bg-white shadow-md">
+              <CardHeader>
+                <CardTitle>{stat.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{stat.value}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Invoices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Number</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>1</TableCell>
-                    <TableCell>James epale</TableCell>
-                    <TableCell>$13.00</TableCell>
-                    <TableCell>Draft</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Quotes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Number</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center">
-                      No data
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div> */}
+        <div className="mb-6">
+          <h2 className="mb-4 text-xl font-semibold">Monthly Document Uploads</h2>
+          {alienData ? (
+            <LineChart width={600} height={300} data={alienData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="month" />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey="banks" stroke="#8884d8" />
+              <Line type="monotone" dataKey="suppliers" stroke="#82ca9d" />
+              <Line type="monotone" dataKey="others" stroke="#ffc658" />
+            </LineChart>
+          ) : (
+            <div>Loading data...</div>
+          )}
+        </div>
       </main>
     </div>
   )
@@ -335,7 +95,6 @@ function CheckIcon(props) {
   )
 }
 
-
 function CoinsIcon(props) {
   return (
     <svg
@@ -357,7 +116,6 @@ function CoinsIcon(props) {
     </svg>
   )
 }
-
 
 function GroupIcon(props) {
   return (
@@ -383,7 +141,6 @@ function GroupIcon(props) {
   )
 }
 
-
 function LayoutDashboardIcon(props) {
   return (
     <svg
@@ -406,7 +163,6 @@ function LayoutDashboardIcon(props) {
   )
 }
 
-
 function LeafIcon(props) {
   return (
     <svg
@@ -426,7 +182,6 @@ function LeafIcon(props) {
     </svg>
   )
 }
-
 
 function LinechartChart(props) {
   return (
@@ -470,7 +225,6 @@ function LinechartChart(props) {
   )
 }
 
-
 function OptionIcon(props) {
   return (
     <svg
@@ -490,7 +244,6 @@ function OptionIcon(props) {
     </svg>
   )
 }
-
 
 function ReceiptIcon(props) {
   return (
@@ -513,8 +266,7 @@ function ReceiptIcon(props) {
   )
 }
 
-
-function SettingsIcon(props) {
+function UndoIcon(props) {
   return (
     <svg
       {...props}
@@ -528,98 +280,8 @@ function SettingsIcon(props) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  )
-}
-
-
-function ShoppingCartIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="8" cy="21" r="1" />
-      <circle cx="19" cy="21" r="1" />
-      <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
-    </svg>
-  )
-}
-
-
-function StoreIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7" />
-      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-      <path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4" />
-      <path d="M2 7h20" />
-      <path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7" />
-    </svg>
-  )
-}
-
-
-function UsersIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  )
-}
-
-
-function XIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
+      <path d="m3 7 5-5v12" />
+      <path d="M21 20a11.05 11.05 0 0 0-11-11H8" />
     </svg>
   )
 }
