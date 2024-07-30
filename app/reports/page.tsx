@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReportTable from "./ReportTable";
 import { createClient } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
+import BalanceTable from "./BalanceTable";
 
 const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing";
 const url = "https://zyszsqgdlrpnunkegipk.supabase.co";
@@ -50,7 +51,7 @@ export default function Reports() {
 
     const { data: reports, error: reportError } = await supabase
       .from('acc_portal_monthly_files_upload')
-      .select('supplier_id, docs_date_range, docs_date_range_end, is_verified')
+      .select('supplier_id, docs_date_range, docs_date_range_end, is_verified,closing_balance')
       .eq('document_type', 'supplier statement');
 
     if (reportError) {
@@ -73,7 +74,8 @@ export default function Reports() {
             status: 'uploaded',
             isVerified: report.is_verified,
             startDate: report.docs_date_range,
-            endDate: report.docs_date_range_end
+            endDate: report.docs_date_range_end,
+            closingBalance :report.closing_balance
           };
         }
         return null;
@@ -103,7 +105,7 @@ export default function Reports() {
 
     const { data: reports, error: reportError } = await supabase
       .from('acc_portal_monthly_files_upload')
-      .select('bank_id, docs_date_range, docs_date_range_end, is_verified')
+      .select('bank_id, docs_date_range, docs_date_range_end, is_verified,closing_balance')
       .eq('document_type', 'bank statement');
 
     if (reportError) {
@@ -126,7 +128,8 @@ export default function Reports() {
             status: 'uploaded',
             isVerified: report.is_verified,
             startDate: report.docs_date_range,
-            endDate: report.docs_date_range_end
+            endDate: report.docs_date_range_end,
+            closingBalance :report.closing_balance
           };
         }
         return null;
@@ -174,13 +177,38 @@ export default function Reports() {
             </TabsContent>
 
             <TabsContent value="balance">
-              {/* Add content for balance tab if needed */}
+            <BalanceTable 
+                data={supplierData} 
+                title="Suppliers Report" 
+                fetchData={fetchSuppliers} 
+              />
             </TabsContent>
           </Tabs>
         </TabsContent>
 
         <TabsContent value="banks">
-          <ReportTable data={bankData} title="Banks Report" fetchData={fetchBanks}  />
+          <Tabs defaultValue="statements">
+            <TabsList>
+              <TabsTrigger value="statements">Banks Statement Documents</TabsTrigger>
+              <TabsTrigger value="balance">Banks Statement Closing Balance</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="statements">
+              <ReportTable 
+                data={bankData} 
+                title="Banks Report" 
+                fetchData={fetchBanks} 
+              />
+            </TabsContent>
+
+            <TabsContent value="balance">
+            <BalanceTable 
+                data={supplierData} 
+                title="Suppliers Report" 
+                fetchData={fetchBanks} 
+              />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="others">

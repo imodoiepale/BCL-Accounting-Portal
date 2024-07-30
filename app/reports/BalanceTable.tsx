@@ -31,31 +31,34 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+interface MonthData {
+  status: string;
+  isVerified: boolean;
+  closingBalance: number | null;
+  startDate?: string;
+  endDate?: string;
+}
+
 interface DataRow {
   id: string;
   name: string;
   startDate: string;
-  months: {
-    status: string;
-    isVerified: boolean;
-    startDate?: string;
-    endDate?: string;
-  }[];
+  endDate: string;
+  months: MonthData[];
 }
 
-interface ReportTableProps {
+interface BalanceTableProps {
   data: DataRow[];
   title: string;
   fetchData: () => Promise<void>;
 }
 
-const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => {
+const BalanceTable: React.FC<BalanceTableProps> = ({ data, title, fetchData }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
@@ -99,7 +102,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => <div>{row.getValue("id")}</div>,
+      cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
     },
     {
       accessorKey: "name",
@@ -153,10 +156,33 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
         </Button>
       ),
       cell: ({ row }) => {
-        const monthData = row.original.months[index];
+        const monthData: MonthData = row.original.months[index];
         const startDate = new Date(row.original.startDate);
         const cellDate = new Date(startDate.getFullYear(), index, 1);
         const currentDate = new Date();
+        
+        const formatCurrency = (amount) => {
+          // Check for null, undefined, or empty string
+          if (amount === null || amount === undefined || amount === '') {
+            return '-';
+          }
+        
+          // Convert to number if it's a string
+          const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+        
+          // Check if it's a valid number
+          if (isNaN(numAmount)) {
+            return '-';
+          }
+        
+          // Format the number with commas and two decimal places
+          return numAmount.toLocaleString('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          });
+        };
         
         let cellContent;
         let bgColor;
@@ -171,34 +197,34 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           bgColor = 'bg-gray-100';
           tooltipContent = <p>Future month</p>;
         } else if (monthData) {
+          cellContent = formatCurrency(monthData.closingBalance) !== null ? `${formatCurrency(monthData.closingBalance)}` : '-';
           if (monthData.status === 'uploaded') {
-            cellContent = monthData.isVerified ? '✅' : '⏳';
             bgColor = monthData.isVerified ? 'bg-green-200' : 'bg-yellow-200';
           } else {
-            cellContent = '❌';
             bgColor = 'bg-red-200';
           }
           tooltipContent = (
             <>
               <p>Status: {monthData.status}</p>
               <p>Verified: {monthData.isVerified ? 'Yes' : 'No'}</p>
+              <p>Closing Balance: {formatCurrency(monthData.closingBalance) !== null ? `${formatCurrency(monthData.closingBalance)}` : 'N/A'}</p>
               {monthData.startDate && <p>Start: {monthData.startDate}</p>}
               {monthData.endDate && <p>End: {monthData.endDate}</p>}
             </>
           );
         } else {
-          cellContent = '❌';
+          cellContent = '-';
           bgColor = 'bg-red-200';
           tooltipContent = <p>No data available</p>;
         }
 
         return (
-          <div className={index === currentMonthIndex ? "flex justify-center text-center" : ""}>
+          <div className={`flex justify-center text-center ${index === currentMonthIndex ? "font-bold" : ""}`}>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger>
                   <div
-                    className={`flex items-center justify-center w-8 h-8 rounded-full text-center ${bgColor}`}
+                    className={`flex items-center justify-center w-full h-8 px-2 rounded ${bgColor}`}
                   >
                     {cellContent}
                   </div>
@@ -230,6 +256,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
       rowSelection,
     },
   });
+
 return (
   <div className="w-full">
     <div className="flex items-start py-4">
@@ -353,4 +380,4 @@ return (
 );
 }
 
-export default ReportTable;
+export default BalanceTable;
