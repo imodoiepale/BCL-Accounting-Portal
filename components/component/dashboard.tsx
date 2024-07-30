@@ -1,17 +1,19 @@
 // @ts-nocheck
 "use client"
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { X } from "lucide-react";
 import { useEffect, useState } from 'react';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 const sampleData = [
-  { month: "January", banks: 186, suppliers: 123, others: 45 },
-  { month: "February", banks: 305, suppliers: 234, others: 78 },
-  { month: "March", banks: 237, suppliers: 176, others: 56 },
-  { month: "April", banks: 73, suppliers: 95, others: 23 },
-  { month: "May", banks: 209, suppliers: 145, others: 67 },
-  { month: "June", banks: 214, suppliers: 198, others: 89 },
+  { month: "January", banks_statements: 186, suppliers_statements : 123, others_docs: 45 },
+  { month: "February", banks_statements: 305, suppliers_statements: 234, others_docs: 78 },
+  { month: "March", banks_statements: 237, suppliers_statements: 176, others_docs: 56 },
+  { month: "April", banks_statements: 73, suppliers_statements: 95, others_docs: 23 },
+  { month: "May", banks_statements: 209, suppliers_statements: 145, others_docs: 67 },
+  { month: "June", banks_statements: 214, suppliers_statements: 198, others_docs: 89 },
 ];
 
 const stats = [
@@ -34,6 +36,7 @@ const iconMapping = {
 
 export function Dashboard() {
   const [alienData, setAlienData] = useState(null);
+  const [showReminder, setShowReminder] = useState(true);
 
   useEffect(() => {
     // Using sample data instead of fetching from a database
@@ -47,10 +50,31 @@ export function Dashboard() {
     day: 'numeric'
   });
 
+  const handleCloseReminder = () => {
+    setShowReminder(false);
+  };
+
   return (
     <div className="flex">
       <main className="flex-1 p-6 bg-gray-50 h-screen">
         <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
+        
+          {showReminder && (
+            <Alert className="relative mb-6 bg-teal-100 border border-teal-500 rounded-lg shadow-lg">
+              <AlertTitle className="text-purple-900 font-bold text-lg">Reminder</AlertTitle>
+              <AlertDescription className="text-purple-700 mt-2">
+                Please make sure to upload your monthly documents and any pending documents on time.
+              </AlertDescription>
+              <button
+                onClick={handleCloseReminder}
+                className="absolute top-2 right-2 p-2 bg-orange-500 text-white rounded-full hover:bg-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-300"
+              >
+                <X size={18} />
+              </button>
+            </Alert>
+          )}
+
+
         <div className="grid grid-cols-3 gap-6 mb-6">
           {stats.map((stat) => (
             <Card key={stat.title} className="bg-white shadow-md">
@@ -75,9 +99,9 @@ export function Dashboard() {
                 <XAxis dataKey="month" />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="banks" stroke="#8884d8" />
-                <Line type="monotone" dataKey="suppliers" stroke="#82ca9d" />
-                <Line type="monotone" dataKey="others" stroke="#ffc658" />
+                <Line type="monotone" dataKey="banks_statements" stroke="#8884d8" />
+                <Line type="monotone" dataKey="suppliers_statements" stroke="#82ca9d" />
+                <Line type="monotone" dataKey="others_docs" stroke="#ffc658" />
               </LineChart>
             </ResponsiveContainer>
           ) : (
@@ -107,6 +131,7 @@ function CheckIcon(props) {
     </svg>
   )
 }
+
 
 function CoinsIcon(props) {
   return (
