@@ -21,7 +21,6 @@ export default function RootLayout({
     <ClerkProvider>
     <html lang="en">
       <body className={inter.className}>
-      
         <div className="flex gap-4">
           <Sidebar/>
           <div className="flex flex-col w-full"> {/* Full height column */}

@@ -178,7 +178,7 @@ const BalanceTable: React.FC<BalanceTableProps> = ({ data, title, fetchData }) =
           // Format the number with commas and two decimal places
           return numAmount.toLocaleString('en-US', {
             style: 'currency',
-            currency: 'USD',
+            currency: 'KES',
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
           });
@@ -206,7 +206,7 @@ const BalanceTable: React.FC<BalanceTableProps> = ({ data, title, fetchData }) =
           tooltipContent = (
             <>
               <p>Status: {monthData.status}</p>
-              <p>Verified: {monthData.isVerified ? 'Yes' : 'No'}</p>
+              <p>Verified: {monthData.isVerified ? '✅' : '❌'}</p>
               <p>Closing Balance: {formatCurrency(monthData.closingBalance) !== null ? `${formatCurrency(monthData.closingBalance)}` : 'N/A'}</p>
               {monthData.startDate && <p>Start: {monthData.startDate}</p>}
               {monthData.endDate && <p>End: {monthData.endDate}</p>}

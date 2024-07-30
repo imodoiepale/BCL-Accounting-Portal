@@ -62,7 +62,7 @@ export function Dashboard() {
 
   return (
     <div className="flex">
-      <main className="flex-1 p-6 bg-gray-50 h-screen">
+      <main className="flex-1 p-6 bg-gray-50 h-[150vh]">
         
         {/* {error ? (
           <div className="mb-6 text-red-600">Error: {error}</div>
