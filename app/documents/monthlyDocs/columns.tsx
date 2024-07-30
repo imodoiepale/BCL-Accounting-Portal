@@ -258,7 +258,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
     header: ({ column }) => (
       <WrappedButton onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
         Supp Seq
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="2 h-4 w-4" />
       </WrappedButton>
     ),
     cell: ({ row }) => <div className="text-center ">SUP-{row.getValue("suppSeq")}</div>,
@@ -268,7 +268,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
     header: ({ column }) => (
       <WrappedButton onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
         Supp Name
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="2 h-4 w-4" />
       </WrappedButton>
     ),
     cell: ({ row }) => <div className="whitespace-nowrap">{row.getValue("suppName")}</div>,
@@ -281,7 +281,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Status
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="2 h-4 w-4" />
       </WrappedButton>
     ),
     cell: ({ row }) => {
@@ -299,7 +299,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Start date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="2 h-4 w-4" />
       </WrappedButton>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("suppStartDate")}</div>,
@@ -312,7 +312,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Verified by BCL
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="2 h-4 w-4" />
       </WrappedButton>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("verifiedByBCLAccManager") ? "✅" : "❌"}</div>,
@@ -338,7 +338,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         className="whitespace-nowrap"
       >
         Upload Date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="2 h-4 w-4" />
       </WrappedButton>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("uploadDate") || 'N/A'}</div>,
@@ -351,7 +351,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Period From (SWEF Date)
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="2 h-4 w-4" />
       </WrappedButton>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("supplierWefDate") || 'N/A'}</div>,
@@ -364,7 +364,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Period To
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="2 h-4 w-4" />
       </WrappedButton>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("supplierUntilDate") || 'N/A'}</div>,
@@ -377,7 +377,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Start Range Verification
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="2 h-4 w-4" />
       </WrappedButton>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("verifyByBCL") ? "✅" : "❌"}</div>,
@@ -390,7 +390,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Closing Balance
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="2 h-4 w-4" />
       </WrappedButton>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("closingBalance") || 'N/A'}</div>,
@@ -403,7 +403,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Closing Balance Verified
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="2 h-4 w-4" />
       </WrappedButton>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("closingBalanceVerify") === "true" ? "✅" : "❌"}</div>,

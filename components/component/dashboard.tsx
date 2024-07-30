@@ -2,18 +2,97 @@
 "use client"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { X } from "lucide-react";
+import { CoinsIcon, GroupIcon, LeafIcon, OptionIcon, ReceiptCentIcon, X } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  User as UserIcon,
+  Upload as UploadIcon,
+  Check as CheckIcon,
+  BarChart as BarChartIcon,
+  DollarSign as BanknoteIcon,
+  Settings as SettingsIcon,
+  Wallet as WalletIcon,
+  Users as UsersIcon,
+  ChevronRight as ChevronRightIcon,
+  Circle as CircleIcon
+} from "lucide-react";
 import { useEffect, useState } from 'react';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
-const sampleData = [
-  { month: "January", banks_statements: 186, suppliers_statements : 123, others_docs: 45 },
-  { month: "February", banks_statements: 305, suppliers_statements: 234, others_docs: 78 },
-  { month: "March", banks_statements: 237, suppliers_statements: 176, others_docs: 56 },
-  { month: "April", banks_statements: 73, suppliers_statements: 95, others_docs: 23 },
-  { month: "May", banks_statements: 209, suppliers_statements: 145, others_docs: 67 },
-  { month: "June", banks_statements: 214, suppliers_statements: 198, others_docs: 89 },
+const gettingStartedSteps = [
+  { 
+    id: 1, 
+    title: "Complete Profile", 
+    description: "Update company information", 
+    status: "Incomplete",
+    icon: UserIcon,
+    badgeColor: "border-red-600",
+    badgeTextColor: "fill-red-300 text-green-300"
+  },
+  { 
+    id: 2, 
+    title: "Upload Documents", 
+    description: "Submit monthly statements and receipts", 
+    status: "In Progress",
+    icon: UploadIcon,
+    badgeColor: "border-yellow-600",
+    badgeTextColor: "fill-yellow-300 text-yellow-300"
+  },
+  { 
+    id: 3, 
+    title: "Manage Suppliers", 
+    description: "Add or update suppliers", 
+    status: "In Progress",
+    icon: UsersIcon,
+    badgeColor: "border-yellow-600",
+    badgeTextColor: "fill-yellow-300 text-yellow-300"
+  },
+  { 
+    id: 5, 
+    title: "Manage Banks", 
+    description: "Add or update bank accounts", 
+    status: "In Progress",
+    icon: BanknoteIcon,
+    badgeColor: "border-yellow-600",
+    badgeTextColor: "fill-yellow-300 text-yellow-300"
+  },
+  { 
+    id: 4, 
+    title: "View Reports", 
+    description: "Access financial reports and analytics", 
+    status: "Complete",
+    icon: BarChartIcon,
+    badgeColor: "border-green-600",
+    badgeTextColor: "fill-green-300 text-green-300"
+  },
+  { 
+    id: 6, 
+    title: "Set Preferences", 
+    description: "Customize your account settings ", 
+    status: "Incomplete",
+    icon: SettingsIcon,
+    badgeColor: "border-red-600",
+    badgeTextColor: "fill-red-300 text-red-300"
+  },
+  { 
+    id: 7, 
+    title: "Track Expenses", 
+    description: "Log and categorize your business expenses", 
+    status: "Complete",
+    icon: WalletIcon,
+    badgeColor: "border-green-600",
+    badgeTextColor: "fill-green-300 text-green-300"
+  },
+  { 
+    id: 8, 
+    title: "Verify Transactions", 
+    description: "Review and approve pending transactions", 
+    status: "Complete",
+    icon: CheckIcon,
+    badgeColor: "border-green-600",
+    badgeTextColor: "fill-green-300 text-green-300"
+  },
 ];
 
 const stats = [
@@ -27,7 +106,7 @@ const stats = [
 
 const iconMapping = {
   "Pending Verification": <CheckIcon />,
-  "Pending Monthly Documents": <ReceiptIcon />,
+  "Pending Monthly Documents": <ReceiptCentIcon />,
   "Total Banks": <CoinsIcon />,
   "Employees": <GroupIcon />,
   "Directors": <OptionIcon />,
@@ -38,10 +117,6 @@ export function Dashboard() {
   const [alienData, setAlienData] = useState(null);
   const [showReminder, setShowReminder] = useState(true);
 
-  useEffect(() => {
-    // Using sample data instead of fetching from a database
-    setAlienData(sampleData);
-  }, []);
 
   const currentDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -56,186 +131,86 @@ export function Dashboard() {
 
   return (
     <div className="flex">
-      <main className="flex-1 p-6 bg-gray-50 h-screen">
+      <main className="flex-1 p-6 bg-gray-50 h-[100vh]">
         <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
         
           {showReminder && (
-            <Alert className="relative mb-6 bg-teal-100 border border-teal-500 rounded-lg shadow-lg">
-              <AlertTitle className="text-purple-900 font-bold text-lg">Reminder</AlertTitle>
-              <AlertDescription className="text-purple-700 mt-2">
-                Please make sure to upload your monthly documents and any pending documents on time.
-              </AlertDescription>
-              <button
-                onClick={handleCloseReminder}
-                className="absolute top-2 right-2 p-2 bg-orange-500 text-white rounded-full hover:bg-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-300"
-              >
-                <X size={18} />
-              </button>
-            </Alert>
+             <Alert className="relative mb-6 bg-teal-100 border border-teal-500 rounded-lg shadow-lg">
+             <AlertTitle className="text-purple-900 font-bold text-md">Reminder</AlertTitle>
+             <AlertDescription className="text-purple-700 mt-2 text-sm">
+               <p className="mb-2">
+                 Please make sure to keep up with the following deadlines:
+               </p>
+               <ul className="list-disc list-inside mb-2">
+                 <li>Submit monthly financial documents before the 5th.</li>
+                 <li>Upload bank statements before the 5th.</li>
+                 <li>Submit supplier statements before the 10th.</li>
+                 <li>Paye submissions for employees should be done before the 20th.</li>
+                 {/* Add any other deadlines or tasks here */}
+               </ul>
+               <p className="mt-2">
+                 Additionally, make sure you check your notifications for any updates or further instructions.
+               </p>
+             </AlertDescription>
+             <button
+               onClick={handleCloseReminder}
+               className="absolute top-2 right-2 p-2 bg-orange-500 text-white rounded-full hover:bg-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-300"
+             >
+               <X size={18} />
+             </button>
+           </Alert>
           )}
-
-
-        <div className="grid grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-6">
           {stats.map((stat) => (
-            <Card key={stat.title} className="bg-white shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  {iconMapping[stat.title]}
-                  <span>{stat.title}</span>
+            <Card key={stat.title} className={`bg-white shadow-md rounded-lg overflow-hidden border border-gray-200 transition-transform transform hover:scale-105 ${
+              stat.title === "Pending Verification" || stat.title === "Pending Monthly Documents"
+                ? "bg-red-100 border-e-destructive"
+                : ""
+            }`}
+          >
+              <CardHeader className="p-4 bg-gray-50 border-b border-gray-200">
+                <CardTitle className="flex items-center space-x-3 text-gray-800">
+                  <div className="flex-shrink-0">
+                    {iconMapping[stat.title]}
+                  </div>
+                  <span className="font-medium text-lg">{stat.title}</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{stat.value}</p>
+              <CardContent className="p-4">
+                <p className="text-2xl font-bold text-gray-900 text-center">{stat.value}</p>
               </CardContent>
             </Card>
           ))}
         </div>
-        <div className="mb-6">
-          <h2 className="mb-4 text-xl font-semibold">Monthly Document Uploads</h2>
-          {alienData ? (
-            <ResponsiveContainer width="65%" height={400}>
-              <LineChart data={alienData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="banks_statements" stroke="#8884d8" />
-                <Line type="monotone" dataKey="suppliers_statements" stroke="#82ca9d" />
-                <Line type="monotone" dataKey="others_docs" stroke="#ffc658" />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div>Loading data...</div>
-          )}
+        <div className="grid grid-cols-1 gap-4 bg-muted/40 p-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
+          {gettingStartedSteps.map(({ id, title, description, status, icon: Icon, badgeColor, badgeTextColor }) => (
+            <Card key={id} className="col-span-1">
+              <CardHeader>
+                <div className="flex justify-between">
+                  <CardTitle>{title}</CardTitle>
+                  <Badge variant="outline" className={`${badgeColor} bg-background`}>
+                    <CircleIcon className={`h-3 w-3 -translate-x-1 animate-pulse ${badgeTextColor}`} />
+                    {status}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                <div className="flex items-center justify-between rounded-lg bg-background p-4 transition-colors hover:bg-accent hover:text-accent-foreground">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="font-medium">{description}</div>
+                    </div>
+                  </div>
+                  <ChevronRightIcon className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </main>
     </div>
-  )
-}
-
-function CheckIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  )
-}
-
-
-function CoinsIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="8" cy="8" r="6" />
-      <path d="M18.09 10.37A6 6 0 1 1 10.34 18" />
-      <path d="M7 6h1v4" />
-      <path d="m16.71 13.88.7.71-2.82 2.82" />
-    </svg>
-  )
-}
-
-function GroupIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 7V5c0-1.1.9-2 2-2h2" />
-      <path d="M17 3h2c1.1 0 2 .9 2 2v2" />
-      <path d="M21 17v2c0 1.1-.9 2-2 2h-2" />
-      <path d="M7 21H5c-1.1 0-2-.9-2-2v-2" />
-      <rect width="7" height="5" x="7" y="7" rx="1" />
-      <rect width="7" height="5" x="10" y="12" rx="1" />
-    </svg>
-  )
-}
-
-function OptionIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 3h6l6 18h6" />
-      <path d="M14 3h7" />
-    </svg>
-  )
-}
-
-function LeafIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
-      <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
-    </svg>
-  )
-}
-
-function ReceiptIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
-      <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
-      <path d="M12 17.5v-11" />
-    </svg>
   )
 }
