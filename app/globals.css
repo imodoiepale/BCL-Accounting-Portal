@@ -62,10 +62,10 @@
 @layer base {
   body {
     @apply bg-background text-foreground;
-    transform: scale(0.8);
+    /* transform: scale(0.8);
     transform-origin: top left;
     width: 125%;
     height: 100vh;
-    overflow: hidden;
+    overflow: hidden; */
   }
 }
