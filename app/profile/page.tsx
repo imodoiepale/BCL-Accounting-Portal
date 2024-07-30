@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 //@ts-nocheck
 
 "use client";
@@ -267,8 +268,8 @@ export default function Profile() {
                 <h3 className="text-lg font-medium">Fixed Assets Register</h3>
                 <Tabs defaultValue="computer-equipment">
                   <TabsList>
-                    <TabsTrigger value="computer-equipment"> Computer & Equipments</TabsTrigger>
-                    <TabsTrigger value="furniture-fitting"> Furniture Fitting & Equip 12.5%</TabsTrigger>
+                    <TabsTrigger value="computer-equipment">Computer & Equipments</TabsTrigger>
+                    <TabsTrigger value="furniture-fitting">Furniture Fitting & Equip 12.5%</TabsTrigger>
                     <TabsTrigger value="land-building">Land & Building</TabsTrigger>
                     <TabsTrigger value="plant-equipment">Plant & Equipment - 12.5 %</TabsTrigger>
                     <TabsTrigger value="motor-vehicles">Motor Vehicles - 25 %</TabsTrigger>
