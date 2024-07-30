@@ -13,7 +13,7 @@ import {
   ColumnFiltersState,
   SortingState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown } from "lucide-react";
+import { ArrowUpDown, ChevronDown, InfoIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -31,6 +31,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 
@@ -110,7 +117,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           ID
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <ArrowUpDown className=" h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
@@ -123,7 +130,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <ArrowUpDown className=" h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => <div className="text-left">{row.getValue("name")}</div>,
@@ -137,7 +144,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           className="text-wrap"
         >
           Start Date
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <ArrowUpDown className=" h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => <div className="text-center">{row.getValue("startDate")}</div>,
@@ -151,7 +158,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           className="text-wrap"
         >
           End Date
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <ArrowUpDown className=" h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => <div className="text-center">{row.getValue("endDate")}</div>,
@@ -166,7 +173,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           className={monthData.date.getMonth() === currentMonthIndex && monthData.date.getFullYear() === currentYear ? "bg-yellow-100 text-wrap" : "text-wrap"}
         >
           {`${monthData.month} ${monthData.year}`}
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <ArrowUpDown className=" h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => {
@@ -229,6 +236,64 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
         );
       },
     })),
+    {
+      accessorKey: "missingDocs",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="text-wrap"
+        >
+         Missing Docs
+          <ArrowUpDown className=" h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const supplier = row.original;
+        return (
+          <div className="text-center">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open profile</span>
+                <InfoIcon className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{supplier.suppName} Profile</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <span className="font-bold">Supplier PIN:</span>
+                  <span className="col-span-3">{supplier.suppPIN}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <span className="font-bold">Contact Name:</span>
+                  <span className="col-span-3">{supplier.suppContactName}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <span className="font-bold">Contact Mobile:</span>
+                  <span className="col-span-3">{supplier.suppContactMobile}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <span className="font-bold">Contact Email:</span>
+                  <span className="col-span-3">{supplier.suppContactEmail}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <span className="font-bold">Start Date:</span>
+                  <span className="col-span-3">{supplier.suppStartDate}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <span className="font-bold">Status:</span>
+                  <span className="col-span-3">{supplier.suppStatus}</span>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog></div>
+        );
+      }
+    },
   ], [visibleMonths]);
 
   const table = useReactTable({
@@ -253,7 +318,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
   }, [fromDate, toDate]);
 
   return (
-    <div className="w-full">
+    <div className="w-[2000px]">
       <div className="flex items-start py-4">
         <div className="flex gap-4 items-center flex-grow">
         <DateRangePicker
@@ -283,7 +348,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto h-full">
-              Columns <ChevronDown className="ml-2 h-4 w-4" />
+              Columns <ChevronDown className=" h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
