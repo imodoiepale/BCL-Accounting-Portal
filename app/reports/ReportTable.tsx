@@ -219,6 +219,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
 
   return (
     <div className="w-full">
+      <div className="flex items-center py-4">
       <Card className="p-2 mb-4">
         <CardContent>
           <p className="flex text-lg font-bold pb-2">Choose Period to View Reports</p>
@@ -256,8 +257,6 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           </div>
         </CardContent>
       </Card>
-
-      <div className="flex items-center py-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto">
