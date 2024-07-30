@@ -1,7 +1,7 @@
 //@ts-nocheck
 "use client"
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   ColumnDef,
   flexRender,
@@ -13,7 +13,7 @@ import {
   ColumnFiltersState,
   SortingState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, Info } from "lucide-react";
+import { ArrowUpDown, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -31,7 +31,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 
@@ -52,23 +51,38 @@ interface DataRow {
 interface ReportTableProps {
   data: DataRow[];
   title: string;
-  fetchData: () => Promise<void>;
+  fetchData: (fromDate: string, toDate: string) => Promise<void>;
 }
 
 const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
-  const [fromDate, setFromDate] = useState<string>("2024-01-01");
-  const [toDate, setToDate] = useState<string>("2024-12-31");
+  const [fromDate, setFromDate] = useState<Date>(new Date("2024-01-01"));
+  const [toDate, setToDate] = useState<Date>(new Date("2024-12-31"));
 
   const currentMonthIndex = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
-    fetchData();
+    fetchData(fromDate.toISOString().split('T')[0], toDate.toISOString().split('T')[0]);
   }, [fromDate, toDate]);
 
-  const columns: ColumnDef<DataRow>[] = [
+  const visibleMonths = useMemo(() => {
+    const months = [];
+    let currentDate = new Date(fromDate);
+    while (currentDate <= toDate) {
+      months.push({
+        month: MONTHS[currentDate.getMonth()],
+        year: currentDate.getFullYear(),
+        date: new Date(currentDate)
+      });
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+    return months;
+  }, [fromDate, toDate]);
+
+  const columns: ColumnDef<DataRow>[] = useMemo(() => [
     {
       id: "select",
       header: ({ table }) => (
@@ -99,7 +113,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => <div>{row.getValue("id")}</div>,
+      cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
     },
     {
       accessorKey: "name",
@@ -120,6 +134,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="text-wrap"
         >
           Start Date
           <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -133,6 +148,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="text-wrap"
         >
           End Date
           <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -140,22 +156,23 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
       ),
       cell: ({ row }) => <div className="text-center">{row.getValue("endDate")}</div>,
     },
-    ...MONTHS.map((month, index) => ({
+    ...visibleMonths.map((monthData, index) => ({
+      id: `${monthData.month}-${monthData.year}`,
       accessorKey: `months.${index}`,
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className={index === currentMonthIndex ? "bg-yellow-100" : ""}
+          className={monthData.date.getMonth() === currentMonthIndex && monthData.date.getFullYear() === currentYear ? "bg-yellow-100 text-wrap" : "text-wrap"}
         >
-          {month}
+          {`${monthData.month} ${monthData.year}`}
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => {
         const monthData = row.original.months[index];
         const startDate = new Date(row.original.startDate);
-        const cellDate = new Date(startDate.getFullYear(), index, 1);
+        const cellDate = new Date(visibleMonths[index].date);
         const currentDate = new Date();
         
         let cellContent;
@@ -181,7 +198,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           tooltipContent = (
             <>
               <p>Status: {monthData.status}</p>
-              <p>Verified: {monthData.isVerified ? 'Yes' : 'No'}</p>
+              <p>Verified: {monthData.isVerified ? '✅' : '❌'}</p>
               {monthData.startDate && <p>Start: {monthData.startDate}</p>}
               {monthData.endDate && <p>End: {monthData.endDate}</p>}
             </>
@@ -193,7 +210,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
         }
 
         return (
-          <div className={index === currentMonthIndex ? "flex justify-center text-center" : ""}>
+          <div className={cellDate.getMonth() === currentMonthIndex && cellDate.getFullYear() === new Date().getFullYear() ? "flex justify-center text-center" : ""}>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger>
@@ -212,7 +229,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
         );
       },
     })),
-  ];
+  ], [visibleMonths]);
 
   const table = useReactTable({
     data,
@@ -230,57 +247,68 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
       rowSelection,
     },
   });
-return (
-  <div className="w-full">
-    <div className="flex items-start py-4">
-      <div className="flex gap-4 items-center flex-grow">
-        {/* <p className="text-md font-bold uppercase">Date Range</p> */}
+
+  useEffect(() => {
+    fetchData(fromDate.toISOString().split('T')[0], toDate.toISOString().split('T')[0]);
+  }, [fromDate, toDate]);
+
+  return (
+    <div className="w-full">
+      <div className="flex items-start py-4">
+        <div className="flex gap-4 items-center flex-grow">
         <DateRangePicker
-          onUpdate={(values) => console.log(values)}
-          initialDateFrom="2024-01-01"
-          initialDateTo="2024-12-31"
+          onUpdate={({ range }) => {
+            if (range.from && range.to) {
+              setFromDate(range.from);
+              setToDate(range.to);
+            }
+          }}
+          initialDateFrom={fromDate}
+          initialDateTo={toDate}
           align="start"
           locale="en-GB"
           showCompare={false}
         />
+        </div>
+        <div className="w-[250px] px-4">
+          <Input
+            placeholder="Filter names..."
+            value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("name")?.setFilterValue(event.target.value)
+            }
+            className="max-w-sm"
+          />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto h-full">
+              Columns <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => {
+                // Check if the column is a month column
+                const isMonthColumn = column.id.includes('-');
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {isMonthColumn ? column.id : column.id.replace(/([A-Z])/g, ' $1').trim()}
+                  </DropdownMenuCheckboxItem>
+                )
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-      <div className="w-[250px] px-4">
-        <Input
-          placeholder="Filter names..."
-          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("name")?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm"
-        />
-      </div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="ml-auto h-full">
-            Columns <ChevronDown className="ml-2 h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {table
-            .getAllColumns()
-            .filter((column) => column.getCanHide())
-            .map((column) => {
-              return (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  className="capitalize"
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) =>
-                    column.toggleVisibility(!!value)
-                  }
-                >
-                  {column.id}
-                </DropdownMenuCheckboxItem>
-              )
-            })}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
     <div className="rounded-md border">
       <Table>
         <TableHeader>

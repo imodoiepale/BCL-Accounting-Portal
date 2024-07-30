@@ -86,7 +86,6 @@ export function SupplierList() {
               <RefreshCwIcon className="w-4 h-4 mr-1" />
               Refresh
             </Button>
-
             <Sheet>
               <SheetTrigger asChild>
               <Button className="bg-blue-600 text-white">Add New Supplier</Button>

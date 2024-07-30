@@ -203,7 +203,7 @@ export default function Reports() {
 
             <TabsContent value="balance">
             <BalanceTable 
-                data={supplierData} 
+                data={bankData} 
                 title="Suppliers Report" 
                 fetchData={fetchBanks} 
               />
