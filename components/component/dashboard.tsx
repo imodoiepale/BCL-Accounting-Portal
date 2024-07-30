@@ -49,203 +49,40 @@ export function Dashboard() {
 
   return (
     <div className="flex">
-      <main className="flex-1 p-6 bg-gray-50 h-[150vh]">
-        
-        {/* {error ? (
-          <div className="mb-6 text-red-600">Error: {error}</div>
-        ) : alienData ? (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Alien ID Data</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="overflow-auto max-h-60">{JSON.stringify(alienData, null, 2)}</pre>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="mb-6">Loading alien data...</div>
-        )} */}
-        {/* <header className="flex justify-end mb-6">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline">Main</Button>
-            <Select>
-              <SelectTrigger>
-                <SelectValue placeholder="KES" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="kes">KES</SelectItem>
-                <SelectItem value="US">USD</SelectItem>
-                <SelectItem value="eur">Euro</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select>
-              <SelectTrigger className="w-28">
-                <SelectValue placeholder="English" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="gr">Gujrati</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-        </header> */}
-        {/* <div className="grid grid-cols-1 gap-6 mb-6 lg:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invoices</CardTitle>
-              <CardDescription>This Month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="secondary">$13.00</Badge>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Proforma Invoices</CardTitle>
-              <CardDescription>This Month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="secondary">$0.00</Badge>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Petty Cash</CardTitle>
-              <CardDescription>This Month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="secondary">$0.00</Badge>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Unpaid</CardTitle>
-              <CardDescription>Not Paid</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="destructive">$13.00</Badge>
-            </CardContent>
-          </Card>
-        </div> */}
-        {/* <div className="grid grid-cols-1 gap-6 mb-6 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invoices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span>Draft</span>
-                  <span>100%</span>
-                </div>
-                <Progress value={100} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Pending</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Unpaid</span>
-                  <span>100%</span>
-                </div>
-                <Progress value={100} className="w-full bg-orange-500" />
-                <div className="flex items-center justify-between">
-                  <span>Overdue</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Partially</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Paid</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Proforma Invoices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span>Draft</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Pending</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Sent</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Declined</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Accepted</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Expired</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Petty Cash</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span>Draft</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Pending</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Sent</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Declined</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Accepted</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-                <div className="flex items-center justify-between">
-                  <span>Expired</span>
-                  <span>0%</span>
-                </div>
-                <Progress value={0} className="w-full" />
-              </div>
-            </CardContent>
-          </Card>
+      <main className="flex-1 p-6 bg-gray-50 h-screen">
+        <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
+        <div className="grid grid-cols-3 gap-6 mb-6">
+          {stats.map((stat) => (
+            <Card key={stat.title} className="bg-white shadow-md">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  {iconMapping[stat.title]}
+                  <span>{stat.title}</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{stat.value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="mb-6">
+          <h2 className="mb-4 text-xl font-semibold">Monthly Document Uploads</h2>
+          {alienData ? (
+            <ResponsiveContainer width="65%" height={400}>
+              <LineChart data={alienData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="banks" stroke="#8884d8" />
+                <Line type="monotone" dataKey="suppliers" stroke="#82ca9d" />
+                <Line type="monotone" dataKey="others" stroke="#ffc658" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div>Loading data...</div>
+          )}
         </div>
       </main>
     </div>
