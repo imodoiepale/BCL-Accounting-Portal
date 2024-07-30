@@ -140,39 +140,60 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
       ),
       cell: ({ row }) => {
         const monthData = row.original.months[index];
-        const cellContent = monthData ? (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger>
-                <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                    monthData.status === 'uploaded'
-                      ? monthData.isVerified
-                        ? 'bg-green-200'
-                        : 'bg-yellow-200'
-                      : 'bg-red-200'
-                  }`}
-                >
-                  {monthData.status === 'uploaded' ? (
-                    monthData.isVerified ? '✅' : '⏳'
-                  ) : '❌'}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Status: {monthData.status}</p>
-                <p>Verified: {monthData.isVerified ? 'Yes' : 'No'}</p>
-                {monthData.startDate && <p>Start: {monthData.startDate}</p>}
-                {monthData.endDate && <p>End: {monthData.endDate}</p>}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        ) : (
-          <div className="w-8 h-8"></div>
-        );
+        const startDate = new Date(row.original.startDate);
+        const cellDate = new Date(startDate.getFullYear(), index, 1);
+        const currentDate = new Date();
         
+        let cellContent;
+        let bgColor;
+        let tooltipContent;
+
+        if (cellDate < startDate) {
+          cellContent = 'N/A';
+          bgColor = 'bg-gray-200';
+          tooltipContent = <p>Before start date</p>;
+        } else if (cellDate > currentDate) {
+          cellContent = '-';
+          bgColor = 'bg-gray-100';
+          tooltipContent = <p>Future month</p>;
+        } else if (monthData) {
+          if (monthData.status === 'uploaded') {
+            cellContent = monthData.isVerified ? '✅' : '⏳';
+            bgColor = monthData.isVerified ? 'bg-green-200' : 'bg-yellow-200';
+          } else {
+            cellContent = '❌';
+            bgColor = 'bg-red-200';
+          }
+          tooltipContent = (
+            <>
+              <p>Status: {monthData.status}</p>
+              <p>Verified: {monthData.isVerified ? 'Yes' : 'No'}</p>
+              {monthData.startDate && <p>Start: {monthData.startDate}</p>}
+              {monthData.endDate && <p>End: {monthData.endDate}</p>}
+            </>
+          );
+        } else {
+          cellContent = '❌';
+          bgColor = 'bg-red-200';
+          tooltipContent = <p>No data available</p>;
+        }
+
         return (
           <div className={index === currentMonthIndex ? "flex justify-center" : ""}>
-            {cellContent}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <div
+                    className={`flex items-center justify-center w-8 h-8 rounded-full ${bgColor}`}
+                  >
+                    {cellContent}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {tooltipContent}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         );
       },
