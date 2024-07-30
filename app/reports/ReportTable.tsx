@@ -13,7 +13,7 @@ import {
   ColumnFiltersState,
   SortingState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, InfoIcon } from "lucide-react";
+import { ArrowUpDown, ChevronDown, InfoIcon, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { PlusCircledIcon } from "@radix-ui/react-icons";
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -256,7 +257,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
             <DialogTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
                 <span className="sr-only">Open profile</span>
-                <InfoIcon className="h-4 w-4" />
+                <PlusCircle className="h-4 w-4" />
               </Button>
             </DialogTrigger>
             <DialogContent>

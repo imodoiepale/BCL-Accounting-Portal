@@ -34,7 +34,7 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="flex h-[150vh]">
+    <div className="flex h-screen">
       <aside className="w-72 p-4 bg-gray-100 hidden md:block">
         <div className="flex items-center mb-8">
           <span className="text-xl font-bold">BCL Client Portal</span>
