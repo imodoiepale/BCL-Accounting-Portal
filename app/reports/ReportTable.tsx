@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -39,7 +40,7 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, PlusCircle, Upload, Mail } from "lucide-react";
+import { ArrowUpDown, ChevronDown, PlusCircle, Upload, Mail, Phone } from "lucide-react";
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -47,6 +48,7 @@ interface DataRow {
   id: string;
   name: string;
   startDate: string;
+  phoneNumber: string;
   months: {
     status: string;
     isVerified: boolean;
@@ -106,6 +108,11 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
     }
 
     return missingDocs;
+  };
+
+  const sendWhatsAppMessage = (phoneNumber: string) => {
+    const message = encodeURIComponent(`Hello, you have missing documents. Please upload them as soon as possible.`);
+    window.open(`https://wa.me/${phoneNumber}?text=${message}`, '_blank');
   };
 
   const columns: ColumnDef<DataRow>[] = useMemo(() => [
@@ -264,40 +271,52 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
                   <PlusCircle className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-3xl">
+              <DialogContent className="max-w-4xl">
                 <DialogHeader>
-                  <DialogTitle>{supplier.name} - Missing Documents</DialogTitle>
+                  <DialogTitle className="text-2xl font-bold">{supplier.name} - Missing Documents</DialogTitle>
                 </DialogHeader>
-                <div className="mt-4">
-                  <h3 className="text-lg font-semibold mb-2">Missing Monthly Documents</h3>
-                  <ul className="space-y-2">
-                    {getMissingDocuments(supplier).map((doc) => (
-                      <li key={`${doc.month}-${doc.year}`} className="flex justify-between items-center">
-                        <span>{MONTHS[doc.month]} {doc.year}</span>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedSupplier(supplier);
-                            setSelectedMonth({ month: doc.month, year: doc.year });
-                            setUploadDialogOpen(true);
-                          }}
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
                 <div className="mt-6">
+                  <h3 className="text-xl font-semibold mb-4">Missing Monthly Documents</h3>
+                  <ScrollArea className="h-[300px] rounded-md border p-4">
+                    <ul className="grid grid-cols-2 gap-4">
+                      {getMissingDocuments(supplier).map((doc) => (
+                        <li key={`${doc.month}-${doc.year}`} className="flex justify-between items-center bg-gray-100 p-3 rounded-lg">
+                          <span className="font-medium">{MONTHS[doc.month]} {doc.year}</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedSupplier(supplier);
+                              setSelectedMonth({ month: doc.month, year: doc.year });
+                              setUploadDialogOpen(true);
+                            }}
+                            className="transition-colors hover:bg-primary hover:text-primary-foreground"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
+                </div>
+                <div className="mt-6 flex justify-between items-center">
                   <Button
                     onClick={() => {
                       // Here you would implement the logic to send an email request
                       console.log("Sending email request for missing documents");
                     }}
+                    className="flex-1 mr-2"
                   >
                     <Mail className="h-4 w-4 mr-2" />
-                    Request Missing Documents via Email
+                    Request via Email
+                  </Button>
+                  <Button
+                    onClick={() => sendWhatsAppMessage(supplier.phoneNumber)}
+                    className="flex-1 ml-2 bg-green-500 hover:bg-green-600"
+                  >
+                    <Phone className="h-4 w-4 mr-2" />
+                    Request via WhatsApp
                   </Button>
                 </div>
               </DialogContent>
@@ -344,6 +363,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
     },
   ], [visibleMonths, uploadDialogOpen, selectedMonth]);
 
+  
   const table = useReactTable({
     data,
     columns,
