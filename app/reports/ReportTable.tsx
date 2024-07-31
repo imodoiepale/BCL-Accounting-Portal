@@ -1,21 +1,17 @@
 //@ts-nocheck
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  getPaginationRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
-  ColumnFiltersState,
-  SortingState,
-} from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, InfoIcon, PlusCircle } from "lucide-react";
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -31,16 +27,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { PlusCircledIcon } from "@radix-ui/react-icons";
+import {
+  ColumnDef,
+  ColumnFiltersState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
+import { ArrowUpDown, ChevronDown, PlusCircle, Upload, Mail } from "lucide-react";
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -68,6 +67,9 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
   const [rowSelection, setRowSelection] = useState({});
   const [fromDate, setFromDate] = useState<Date>(new Date("2024-01-01"));
   const [toDate, setToDate] = useState<Date>(new Date("2024-12-31"));
+  const [selectedSupplier, setSelectedSupplier] = useState<DataRow | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<{ month: number, year: number } | null>(null);
 
   const currentMonthIndex = new Date().getMonth();
   const currentYear = new Date().getFullYear();
@@ -89,6 +91,22 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
     }
     return months;
   }, [fromDate, toDate]);
+
+  const getMissingDocuments = (supplier: DataRow) => {
+    const startDate = new Date(supplier.startDate);
+    const currentDate = new Date();
+    const missingDocs = [];
+
+    for (let d = new Date(startDate); d <= currentDate; d.setMonth(d.getMonth() + 1)) {
+      const month = d.getMonth();
+      const year = d.getFullYear();
+      if (!supplier.months[month] || supplier.months[month].status !== 'uploaded') {
+        missingDocs.push({ month, year });
+      }
+    }
+
+    return missingDocs;
+  };
 
   const columns: ColumnDef<DataRow>[] = useMemo(() => [
     {
@@ -118,7 +136,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           ID
-          <ArrowUpDown className=" h-4 w-4" />
+          <ArrowUpDown className="h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
@@ -131,7 +149,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           Name
-          <ArrowUpDown className=" h-4 w-4" />
+          <ArrowUpDown className="h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => <div className="text-left">{row.getValue("name")}</div>,
@@ -145,24 +163,10 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           className="text-wrap"
         >
           Start Date
-          <ArrowUpDown className=" h-4 w-4" />
+          <ArrowUpDown className="h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => <div className="text-center">{row.getValue("startDate")}</div>,
-    },
-    {
-      accessorKey: "endDate",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="text-wrap"
-        >
-          End Date
-          <ArrowUpDown className=" h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => <div className="text-center">{row.getValue("endDate")}</div>,
     },
     ...visibleMonths.map((monthData, index) => ({
       id: `${monthData.month}-${monthData.year}`,
@@ -174,7 +178,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           className={monthData.date.getMonth() === currentMonthIndex && monthData.date.getFullYear() === currentYear ? "bg-yellow-100 text-wrap" : "text-wrap"}
         >
           {`${monthData.month} ${monthData.year}`}
-          <ArrowUpDown className=" h-4 w-4" />
+          <ArrowUpDown className="h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => {
@@ -245,57 +249,100 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           className="text-wrap"
         >
-         Missing Docs
-          <ArrowUpDown className=" h-4 w-4" />
+          Missing Docs
+          <ArrowUpDown className="h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => {
         const supplier = row.original;
         return (
           <div className="text-center">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open profile</span>
-                <PlusCircle className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{supplier.suppName} Profile</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <span className="font-bold">Supplier PIN:</span>
-                  <span className="col-span-3">{supplier.suppPIN}</span>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open missing documents</span>
+                  <PlusCircle className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>{supplier.name} - Missing Documents</DialogTitle>
+                </DialogHeader>
+                <div className="mt-4">
+                  <h3 className="text-lg font-semibold mb-2">Missing Monthly Documents</h3>
+                  <ul className="space-y-2">
+                    {getMissingDocuments(supplier).map((doc) => (
+                      <li key={`${doc.month}-${doc.year}`} className="flex justify-between items-center">
+                        <span>{MONTHS[doc.month]} {doc.year}</span>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedSupplier(supplier);
+                            setSelectedMonth({ month: doc.month, year: doc.year });
+                            setUploadDialogOpen(true);
+                          }}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <span className="font-bold">Contact Name:</span>
-                  <span className="col-span-3">{supplier.suppContactName}</span>
+                <div className="mt-6">
+                  <Button
+                    onClick={() => {
+                      // Here you would implement the logic to send an email request
+                      console.log("Sending email request for missing documents");
+                    }}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Request Missing Documents via Email
+                  </Button>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <span className="font-bold">Contact Mobile:</span>
-                  <span className="col-span-3">{supplier.suppContactMobile}</span>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <span className="font-bold">Contact Email:</span>
-                  <span className="col-span-3">{supplier.suppContactEmail}</span>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <span className="font-bold">Start Date:</span>
-                  <span className="col-span-3">{supplier.suppStartDate}</span>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <span className="font-bold">Status:</span>
-                  <span className="col-span-3">{supplier.suppStatus}</span>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog></div>
+              </DialogContent>
+            </Dialog>
+            
+            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Upload Document for {selectedMonth ? `${MONTHS[selectedMonth.month]} ${selectedMonth.year}` : ''}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  // Here you would implement the logic to submit the form
+                  console.log("Submitting document upload form");
+                  setUploadDialogOpen(false);
+                }}>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="startDate">Start Date:</label>
+                      <Input id="startDate" value={selectedMonth ? `${selectedMonth.year}-${String(selectedMonth.month + 1).padStart(2, '0')}-01` : ''} readOnly className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="endDate">End Date:</label>
+                      <Input id="endDate" value={selectedMonth ? new Date(selectedMonth.year, selectedMonth.month + 1, 0).toISOString().split('T')[0] : ''} readOnly className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="closingBalance">Closing Balance:</label>
+                      <Input id="closingBalance" type="number" className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="document">Document:</label>
+                      <Input id="document" type="file" className="col-span-3" />
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-4">
+                    <Button type="submit">Submit</Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         );
       }
     },
-  ], [visibleMonths]);
+  ], [visibleMonths, uploadDialogOpen, selectedMonth]);
 
   const table = useReactTable({
     data,
@@ -314,32 +361,27 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
     },
   });
 
-  useEffect(() => {
-    fetchData(fromDate.toISOString().split('T')[0], toDate.toISOString().split('T')[0]);
-  }, [fromDate, toDate]);
-
   return (
     <div className="w-[2000px]">
       <div className="flex items-start py-4">
         <div className="flex gap-4 items-center flex-grow">
-        <DateRangePicker
-          onUpdate={({ range }) => {
-            if (range.from && range.to) {
-              setFromDate(range.from);
-              setToDate(range.to);
-            }
-          }}
-          initialDateFrom={fromDate}
-          initialDateTo={toDate}
-          align="start"
-          locale="en-GB"
-          showCompare={false}
-        />
+          <DateRangePicker
+            onUpdate={({ range }) => {
+              if (range.from && range.to) {
+                setFromDate(range.from);
+                setToDate(range.to);
+              }
+            }}
+            initialDateFrom={fromDate}
+            initialDateTo={toDate}
+            align="start"
+            locale="en-GB"
+            showCompare={false}
+          />
         </div>
         <div className="w-[250px] px-4">
           <Input
-            placeholder="Filter names..."
-            value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+            placeholder="Filter names..."value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
             onChange={(event) =>
               table.getColumn("name")?.setFilterValue(event.target.value)
             }
@@ -348,8 +390,8 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto h-full">
-              Columns <ChevronDown className=" h-4 w-4" />
+            <Button variant="outline" className="ml-auto">
+              Columns <ChevronDown className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -357,7 +399,6 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
               .getAllColumns()
               .filter((column) => column.getCanHide())
               .map((column) => {
-                // Check if the column is a month column
                 const isMonthColumn = column.id.includes('-');
                 return (
                   <DropdownMenuCheckboxItem
@@ -375,13 +416,12 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => {
-                return (
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
                   <TableHead key={header.id}>
                     {header.isPlaceholder
                       ? null
@@ -390,61 +430,60 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
                           header.getContext()
                         )}
                   </TableHead>
-                )
-              })}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                data-state={row.getIsSelected() && "selected"}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
                 ))}
               </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center">
-                No results.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
-    <div className="flex items-center justify-end space-x-2 py-4">
-      <div className="flex-1 text-sm text-muted-foreground">
-        {table.getFilteredSelectedRowModel().rows.length} of{" "}
-        {table.getFilteredRowModel().rows.length} row(s) selected.
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
-      <div className="space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          Next
-        </Button>
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <div className="flex-1 text-sm text-muted-foreground">
+          {table.getFilteredSelectedRowModel().rows.length} of{" "}
+          {table.getFilteredRowModel().rows.length} row(s) selected.
+        </div>
+        <div className="space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
 
 export default ReportTable;

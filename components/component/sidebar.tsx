@@ -32,10 +32,6 @@ export function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(true)
 
   return (
-    <div className="flex h-screen">
-      <aside className="w-72 p-4 bg-gray-100 hidden md:block">
-        <div className="flex items-center mb-8">
-          <span className="text-xl font-bold">BCL Client Portal</span>
     <div className="flex h-[150vh]">
       <aside className={`bg-gray-100 transition-all duration-300 ease-in-out ${isExpanded ? 'w-72' : 'w-20'} p-4 hidden md:block relative`}>
         <div className={`flex items-center mb-8 ${isExpanded ? '' : 'justify-center'}`}>
