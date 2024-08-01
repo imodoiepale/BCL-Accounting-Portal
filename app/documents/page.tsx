@@ -89,6 +89,7 @@ const DocumentCard = ({ doc, uploadedDocs, handleFileUpload }) => (
 const DocumentUpload = () => {
   const [uploadedDocs, setUploadedDocs] = useState({});
   const [activeTab, setActiveTab] = useState('current');
+  const [activeSubTab, setActiveSubTab] = useState('supplier');
 
   const handleFileUpload = (docId, file) => {
     setUploadedDocs(prev => ({ ...prev, [docId]: file }));
@@ -97,10 +98,29 @@ const DocumentUpload = () => {
   const uploadedCount = Object.keys(uploadedDocs).length;
   const progress = (uploadedCount / (documents.length + 2)) * 100; // +2 for the additional bank statement sub-documents
 
+  const handleAddDetails = () => {
+    if (activeSubTab === 'supplier') {
+      // Add Supplier logic here
+      console.log('Add Supplier');
+    } else if (activeSubTab === 'bank') {
+      // Add Bank logic here
+      console.log('Add Bank');
+    } else if (activeSubTab === 'other') {
+      // Add Other logic here
+      console.log('Add Other');
+    }
+  };
+
   return (
     <div className="p-4 space-y-4 w-full h-full">
       <h1 className="text-2xl font-bold mb-4">Monthly Document Upload</h1>
-      
+      <button 
+        className="mb-4 px-4 py-2 bg-blue-500 text-white rounded-md"
+        onClick={handleAddDetails}
+      >
+        {activeSubTab === 'supplier' ? 'Add Supplier' : activeSubTab === 'bank' ? 'Add Bank' : 'Add Other'}
+      </button>
+
       <Tabs defaultValue="current" className="w-full">
         <TabsList>
           <TabsTrigger value="current" onClick={() => setActiveTab('current')}>Current Month</TabsTrigger>
@@ -109,9 +129,9 @@ const DocumentUpload = () => {
         <TabsContent value="current">
           <Tabs defaultValue="supplier" className="w-full">
             <TabsList>
-              <TabsTrigger value="supplier">Supplier Statements</TabsTrigger>
-              <TabsTrigger value="bank">Bank Statements</TabsTrigger>
-              <TabsTrigger value="other">Other Docs</TabsTrigger>
+              <TabsTrigger value="supplier" onClick={() => setActiveSubTab('supplier')}>Supplier Statements</TabsTrigger>
+              <TabsTrigger value="bank" onClick={() => setActiveSubTab('bank')}>Bank Statements</TabsTrigger>
+              <TabsTrigger value="other" onClick={() => setActiveSubTab('other')}>Other Docs</TabsTrigger>
             </TabsList>
             <TabsContent value="supplier">
               <MonthlyDocs/>

@@ -1,6 +1,6 @@
 //@ts-nocheck
-import * as React from "react"
-
+import * as React from "react";
+import { createClient } from '@supabase/supabase-js';
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -14,7 +14,7 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-} from "@tanstack/react-table"
+} from "@tanstack/react-table";
 
 import {
   Table,
@@ -23,14 +23,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { DataTableToolbar } from "./data-table-toolbar"
-import { DataTablePagination } from "./data-table-pagination"
+} from "@/components/ui/table";
+import { DataTableToolbar } from "./data-table-toolbar";
+import { DataTablePagination } from "./data-table-pagination";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
 }
+
+const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export function DataTable<TData, TValue>({
   columns,
@@ -64,7 +68,7 @@ export function DataTable<TData, TValue>({
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-  })
+  });
 
   const calculateColumnStatus = React.useMemo(() => {
     const totalItems = data.length;
@@ -93,6 +97,22 @@ export function DataTable<TData, TValue>({
 
     return status;
   }, [data, columns]);
+
+  React.useEffect(() => {
+    const fetchDataFromDatabase = async () => {
+      const { data: dbData, error } = await supabase
+        .from('your_table_name')
+        .select('*');
+
+      if (error) {
+        console.error('Error fetching data:', error);
+      } else {
+        // process dbData and update the component state if needed
+      }
+    };
+
+    fetchDataFromDatabase();
+  }, []);
 
   return (
     <div className="space-y-4 w-full">
@@ -171,5 +191,5 @@ export function DataTable<TData, TValue>({
       </div>
       <DataTablePagination table={table} />
     </div>
-  )
+  );
 }

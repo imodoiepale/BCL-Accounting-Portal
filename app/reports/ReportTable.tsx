@@ -1,7 +1,6 @@
 //@ts-nocheck
 "use client"
 
-import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -19,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -28,7 +28,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -40,7 +39,8 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, PlusCircle, Upload, Mail, Phone } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Mail, Phone, PlusCircle, Upload } from "lucide-react";
+import React, { useEffect, useMemo, useState } from 'react';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -61,9 +61,10 @@ interface ReportTableProps {
   data: DataRow[];
   title: string;
   fetchData: (fromDate: string, toDate: string) => Promise<void>;
+  addButtonText: string;
 }
 
-const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => {
+const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addButtonText }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
@@ -363,7 +364,6 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
     },
   ], [visibleMonths, uploadDialogOpen, selectedMonth]);
 
-  
   const table = useReactTable({
     data,
     columns,
@@ -401,12 +401,18 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData }) => 
         </div>
         <div className="w-[250px] px-4">
           <Input
-            placeholder="Filter names..."value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+            placeholder="Filter names..."
+            value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
             onChange={(event) =>
               table.getColumn("name")?.setFilterValue(event.target.value)
             }
             className="max-w-sm"
           />
+        </div>
+        <div className="w-[250px] px-4">
+          <Button
+            className="max-w-sm"
+          >{addButtonText}</Button>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
