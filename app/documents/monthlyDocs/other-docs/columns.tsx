@@ -1,7 +1,5 @@
 //@ts-nocheck
 
-import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -11,6 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ColumnDef } from "@tanstack/react-table"
+import { ArrowUpDown, MoreHorizontal } from "lucide-react"
 
 export type OtherDocument = {
   id: string
@@ -69,6 +69,8 @@ export const columns: ColumnDef<OtherDocument>[] = [
       )
     },
   },
+
+ 
   {
     id: "actions",
     cell: ({ row }) => {
