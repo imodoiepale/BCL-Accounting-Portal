@@ -113,13 +113,15 @@ const DocumentUpload = () => {
 
   return (
     <div className="p-4 space-y-4 w-full h-full">
-      <h1 className="text-2xl font-bold mb-4">Monthly Document Upload</h1>
-      <button 
-        className="mb-4 px-4 py-2 bg-blue-500 text-white rounded-md"
-        onClick={handleAddDetails}
-      >
-        {activeSubTab === 'supplier' ? 'Add Supplier' : activeSubTab === 'bank' ? 'Add Bank' : 'Add Other'}
-      </button>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Monthly Document Upload</h1>
+        <button 
+          className="px-4 py-2 bg-blue-500 text-white rounded-md"
+          onClick={handleAddDetails}
+        >
+          {activeSubTab === 'supplier' ? 'Add Supplier' : activeSubTab === 'bank' ? 'Add Bank' : 'Add Other'}
+        </button>
+      </div>
 
       <Tabs defaultValue="current" className="w-full">
         <TabsList>
