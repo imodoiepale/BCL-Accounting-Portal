@@ -20,12 +20,12 @@ import {
   FormMessage
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { yupResolver } from '@hookform/resolvers/yup';
 import { createClient } from '@supabase/supabase-js';
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Info } from "lucide-react";
 import React, { useCallback, useEffect, useState } from 'react';
 import { useForm } from "react-hook-form";
-import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { AllCompanies } from './page';
 
@@ -151,6 +151,7 @@ const UploadCell = React.memo(({ row }) => {
   }, [row.original.CompanyId]);
 
   return (
+    
     <div className="text-center">
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild className="whitespace-nowrap">

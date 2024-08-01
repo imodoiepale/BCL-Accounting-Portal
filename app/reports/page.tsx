@@ -32,6 +32,7 @@ const generateMonthsData = (reports) => {
 export default function Reports() {
   const [supplierData, setSupplierData] = useState([]);
   const [bankData, setBankData] = useState([]);
+  const [currentTab, setCurrentTab] = useState("suppliers");
 
   useEffect(() => {
     fetchSuppliers();
@@ -75,7 +76,7 @@ export default function Reports() {
             isVerified: report.is_verified,
             startDate: report.docs_date_range,
             endDate: report.docs_date_range_end,
-            closingBalance :report.closing_balance
+            closingBalance: report.closing_balance
           };
         }
         return null;
@@ -129,7 +130,7 @@ export default function Reports() {
             isVerified: report.is_verified,
             startDate: report.docs_date_range,
             endDate: report.docs_date_range_end,
-            closingBalance :report.closing_balance
+            closingBalance: report.closing_balance
           };
         }
         return null;
@@ -151,10 +152,23 @@ export default function Reports() {
     { id: "DOC-2", name: "Document 2", startDate: "2024-02-01", months: ["❌", "✅", "✅", "✅", "✅", "✅", "✅", "✅", "✅", "✅", "✅", "✅"] },
   ];
 
+  const getAddButtonText = (tab) => {
+    switch (tab) {
+      case "suppliers":
+        return "Add Supplier";
+      case "banks":
+        return "Add Bank";
+      case "others":
+        return "Add Document";
+      default:
+        return "Add Details";
+    }
+  };
+
   return (
     <div className="p-4 w-full ">
       <h1 className="text-xl font-bold mb-4">Reports</h1>
-      <Tabs defaultValue="suppliers">
+      <Tabs defaultValue="suppliers" onValueChange={setCurrentTab}>
         <TabsList>
           <TabsTrigger value="suppliers">Suppliers Statement Reports</TabsTrigger>
           <TabsTrigger value="banks">Banks Statement Reports</TabsTrigger>
@@ -173,11 +187,12 @@ export default function Reports() {
                 data={supplierData} 
                 title="Suppliers Report" 
                 fetchData={fetchSuppliers} 
+                addButtonText={getAddButtonText(currentTab)}
               />
             </TabsContent>
 
             <TabsContent value="balance">
-            <BalanceTable 
+              <BalanceTable 
                 data={supplierData} 
                 title="Suppliers Report" 
                 fetchData={fetchSuppliers} 
@@ -198,13 +213,14 @@ export default function Reports() {
                 data={bankData} 
                 title="Banks Report" 
                 fetchData={fetchBanks} 
+                addButtonText={getAddButtonText(currentTab)}
               />
             </TabsContent>
 
             <TabsContent value="balance">
-            <BalanceTable 
+              <BalanceTable 
                 data={bankData} 
-                title="Suppliers Report" 
+                title="Banks Report" 
                 fetchData={fetchBanks} 
               />
             </TabsContent>
@@ -212,7 +228,11 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="others">
-          <ReportTable data={otherDocsData} title="Other Documents Report" />
+          <ReportTable 
+            data={otherDocsData} 
+            title="Other Documents Report" 
+            addButtonText={getAddButtonText(currentTab)}
+          />
         </TabsContent>
       </Tabs>
     </div>
