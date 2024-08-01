@@ -1,14 +1,31 @@
 // @ts-nocheck
 "use client"
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from 'lucide-react';
 import React, { useState } from 'react';
-import MonthlyDocs from './monthlyDocs/page';
 import BankTable from './monthlyDocs/bank-table/page';
 import OtherDocs from './monthlyDocs/other-docs/page';
+import MonthlyDocs from './monthlyDocs/page';
 
 const getCurrentMonth = () => {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -90,6 +107,22 @@ const DocumentUpload = () => {
   const [uploadedDocs, setUploadedDocs] = useState({});
   const [activeTab, setActiveTab] = useState('current');
   const [activeSubTab, setActiveSubTab] = useState('supplier');
+  const [newBank, setNewBank] = useState({
+    name: '',
+    account_number: '',
+    currency: '',
+    branch: '',
+    relationship_manager_name: '',
+    relationship_manager_mobile: '',
+    relationship_manager_email: '',
+  });
+  const [newSupplier, setNewSupplier] = useState({
+    name: '',
+    pin: '',
+    contact_name: '',
+    contact_mobile: '',
+    contact_email: '',
+  });
 
   const handleFileUpload = (docId, file) => {
     setUploadedDocs(prev => ({ ...prev, [docId]: file }));
@@ -98,15 +131,34 @@ const DocumentUpload = () => {
   const uploadedCount = Object.keys(uploadedDocs).length;
   const progress = (uploadedCount / (documents.length + 2)) * 100; // +2 for the additional bank statement sub-documents
 
+  const handleBankInputChange = (e) => {
+    setNewBank({ ...newBank, [e.target.id]: e.target.value });
+  };
+
+  const handleBankSelectChange = (value) => {
+    setNewBank({ ...newBank, currency: value });
+  };
+
+  const handleSupplierInputChange = (e) => {
+    setNewSupplier({ ...newSupplier, [e.target.id]: e.target.value });
+  };
+
+  const handleBankSubmit = () => {
+    console.log('Submitting bank:', newBank);
+    // Add your submission logic here
+  };
+
+  const handleSupplierSubmit = () => {
+    console.log('Submitting supplier:', newSupplier);
+    // Add your submission logic here
+  };
+
   const handleAddDetails = () => {
     if (activeSubTab === 'supplier') {
-      // Add Supplier logic here
       console.log('Add Supplier');
     } else if (activeSubTab === 'bank') {
-      // Add Bank logic here
       console.log('Add Bank');
     } else if (activeSubTab === 'other') {
-      // Add Other logic here
       console.log('Add Other');
     }
   };
@@ -115,12 +167,112 @@ const DocumentUpload = () => {
     <div className="p-4 space-y-4 w-full h-full">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Monthly Document Upload</h1>
-        <button 
-          className="px-4 py-2 bg-blue-500 text-white rounded-md"
-          onClick={handleAddDetails}
-        >
-          {activeSubTab === 'supplier' ? 'Add Supplier' : activeSubTab === 'bank' ? 'Add Bank' : 'Add Other'}
-        </button>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button 
+              className="bg-blue-600 text-white"
+              onClick={handleAddDetails}
+            >
+              {activeSubTab === 'supplier' ? 'Add Supplier' : activeSubTab === 'bank' ? 'Add Bank' : 'Add Other'}
+            </Button>
+          </SheetTrigger>
+          <SheetContent>
+            {activeSubTab === 'supplier' ? (
+              <>
+                <SheetHeader>
+                  <SheetTitle>Add Supplier</SheetTitle>
+                  <SheetDescription>
+                    This section includes adding all the details of a supplier to the system
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="flex flex-col pt-4 gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="name">Supplier Name</Label>
+                    <Input id="name" placeholder="XYZ Supplier" value={newSupplier.name} onChange={handleSupplierInputChange} required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="pin">Supplier Pin</Label>
+                    <Input id="pin" placeholder="P2288DNSK" value={newSupplier.pin} onChange={handleSupplierInputChange} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="contact_name">Supplier Contact Name</Label>
+                    <Input id="contact_name" placeholder="John Doe" value={newSupplier.contact_name} onChange={handleSupplierInputChange} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="contact_mobile">Supplier Contact Mobile</Label>
+                    <Input id="contact_mobile" placeholder="+25471234567" value={newSupplier.contact_mobile} onChange={handleSupplierInputChange} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="contact_email">Supplier Contact Email</Label>
+                    <Input id="contact_email" placeholder="john@example.com" value={newSupplier.contact_email} onChange={handleSupplierInputChange} />
+                  </div>
+                </div>
+                <div className="pt-4">
+                  <Button className="bg-blue-600 text-white" onClick={handleSupplierSubmit}>Submit</Button>
+                </div>
+              </>
+            ) : activeSubTab === 'bank' ? (
+              <>
+                <SheetHeader>
+                  <SheetTitle>Add Bank Account</SheetTitle>
+                  <SheetDescription>
+                    This section includes adding all the details of a bank account to the system
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="flex flex-col pt-4 gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="name">Bank Name</Label>
+                    <Input id="name" placeholder="XYZ Bank" value={newBank.name} onChange={handleBankInputChange} required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="account_number">Account Number</Label>
+                    <Input id="account_number" placeholder="011110001122" value={newBank.account_number} onChange={handleBankInputChange} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select onValueChange={handleBankSelectChange} value={newBank.currency}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose Currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="KES">KES</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="branch">Branch</Label>
+                    <Input id="branch" placeholder="Main Branch" value={newBank.branch} onChange={handleBankInputChange} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="relationship_manager_name">Relationship Manager Name</Label>
+                    <Input id="relationship_manager_name" placeholder="John Doe" value={newBank.relationship_manager_name} onChange={handleBankInputChange} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="relationship_manager_mobile">Relationship Manager Mobile</Label>
+                    <Input id="relationship_manager_mobile" placeholder="+25471234567" value={newBank.relationship_manager_mobile} onChange={handleBankInputChange} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="relationship_manager_email">Relationship Manager Email</Label>
+                    <Input id="relationship_manager_email" placeholder="john@example.com" value={newBank.relationship_manager_email} onChange={handleBankInputChange} />
+                  </div>
+                </div>
+                <div className="pt-4">
+                  <Button className="bg-blue-600 text-white" onClick={handleBankSubmit}>Submit</Button>
+                </div>
+              </>
+            ) : (
+              <SheetHeader>
+                <SheetTitle>Add Other</SheetTitle>
+                <SheetDescription>
+                  This section is for adding other types of documents or information.
+                </SheetDescription>
+              </SheetHeader>
+              // Add form fields for 'other' category if needed
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
 
       <Tabs defaultValue="current" className="w-full">

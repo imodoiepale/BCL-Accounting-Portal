@@ -29,8 +29,9 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { AllBanks } from './page';
 
-const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const schema = yup.object().shape({
@@ -38,7 +39,7 @@ const schema = yup.object().shape({
   periodTo: yup.date().required('Period To is required')
     .min(
       yup.ref('periodFrom'),
-      'Period To must be later than or equal to Period From'
+      'Period To must be later than Period From'
     ),
   closingBalance: yup.number().required('Closing Balance is required'),
   file: yup.mixed().required('File is required')
