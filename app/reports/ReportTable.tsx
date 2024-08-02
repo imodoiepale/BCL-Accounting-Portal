@@ -42,12 +42,16 @@ import {
 import { ArrowUpDown, ChevronDown, Mail, Phone, PlusCircle, Upload } from "lucide-react";
 import React, { useEffect, useMemo, useState } from 'react';
 
+import { Resend } from 'resend';
+
+const resend = new Resend('re_S4gVFB4Z_7oybM2W1XLtKLjdyZpp9hJ8v');
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 interface DataRow {
   id: string;
   name: string;
-  startDate: string;
+  email: string; 
   phoneNumber: string;
   months: {
     status: string;
@@ -73,6 +77,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
   const [selectedSupplier, setSelectedSupplier] = useState<DataRow | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<{ month: number, year: number } | null>(null);
+  const [emailSending, setEmailSending] = useState(false);
 
   const currentMonthIndex = new Date().getMonth();
   const currentYear = new Date().getFullYear();
@@ -114,6 +119,47 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
   const sendWhatsAppMessage = (phoneNumber: string) => {
     const message = encodeURIComponent(`Hello, you have missing documents. Please upload them as soon as possible.`);
     window.open(`https://wa.me/${phoneNumber}?text=${message}`, '_blank');
+  };
+
+  const sendEmailRequest = async (supplier: DataRow) => {
+    setEmailSending(true);
+    const missingDocs = getMissingDocuments(supplier);
+    const missingDocsText = missingDocs.map(doc => `${MONTHS[doc.month]} ${doc.year}`).join(', ');
+  
+    try {
+      const emailData = {
+        from: 'onboarding@resend.dev', // Use a verified sender email
+        to: supplier.contact_email,
+        subject: `Missing Documents Request for ${supplier.name}`,
+        html: `<p>Dear ${supplier.name},</p><p>We noticed that you have missing documents for the following months: ${missingDocsText}.</p><p>Please upload these documents as soon as possible.</p><p>Best regards,<br>Your Company Name</p>`,
+      };
+      console.log('Recipient email:', supplier);
+
+      console.log('Sending email with data:', emailData);
+
+      const response = await fetch('/api/sendEmail', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailData),
+      });
+  
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Email sent successfully:', result);
+        alert('Email sent successfully');
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to send email:', errorData);
+        alert(`Failed to send email: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      alert(`Error sending email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setEmailSending(false);
+    }
   };
 
   const columns: ColumnDef<DataRow>[] = useMemo(() => [
@@ -274,7 +320,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
               </DialogTrigger>
               <DialogContent className="max-w-4xl">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold">{supplier.name} - Missing Documents</DialogTitle>
+                  <DialogTitle className="text-2xl font-bold">{supplier.suppContactEmail} {supplier.name} - Missing Documents</DialogTitle>
                 </DialogHeader>
                 <div className="mt-6">
                   <h3 className="text-xl font-semibold mb-4">Missing Monthly Documents</h3>
@@ -303,14 +349,12 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
                 </div>
                 <div className="mt-6 flex justify-between items-center">
                   <Button
-                    onClick={() => {
-                      // Here you would implement the logic to send an email request
-                      console.log("Sending email request for missing documents");
-                    }}
+                    onClick={() => sendEmailRequest(supplier)}
                     className="flex-1 mr-2"
+                    disabled={emailSending}
                   >
                     <Mail className="h-4 w-4 mr-2" />
-                    Request via Email
+                    {emailSending ? 'Sending...' : 'Request via Email'}
                   </Button>
                   <Button
                     onClick={() => sendWhatsAppMessage(supplier.phoneNumber)}
@@ -362,7 +406,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         );
       }
     },
-  ], [visibleMonths, uploadDialogOpen, selectedMonth]);
+  ], [visibleMonths, uploadDialogOpen, selectedMonth, emailSending]);
 
   const table = useReactTable({
     data,
