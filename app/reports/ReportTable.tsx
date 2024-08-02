@@ -51,8 +51,9 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 interface DataRow {
   id: string;
   name: string;
-  email: string; 
+  email: string;
   phoneNumber: string;
+  startDate: string;
   months: {
     status: string;
     isVerified: boolean;
@@ -128,8 +129,8 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
   
     try {
       const emailData = {
-        from: 'onboarding@resend.dev', // Use a verified sender email
-        to: supplier.contact_email,
+        from: 'resend.no-replybcl.com', // Use a verified sender email
+        to: supplier.email,
         subject: `Missing Documents Request for ${supplier.name}`,
         html: `<p>Dear ${supplier.name},</p><p>We noticed that you have missing documents for the following months: ${missingDocsText}.</p><p>Please upload these documents as soon as possible.</p><p>Best regards,<br>Your Company Name</p>`,
       };
