@@ -17,23 +17,6 @@ const url = "https://zyszsqgdlrpnunkegipk.supabase.co";
 
 const supabase = createClient(url, key);
 
-const generateMonthsData = (reports) => {
-  const months = Array(12).fill("");
-  reports.forEach(report => {
-    const start = new Date(report.docs_date_range);
-    const end = new Date(report.docs_date_range_end);
-    const now = new Date();
-
-    for (let i = 0; i < 12; i++) {
-      const currentMonth = new Date(now.getFullYear(), i, 1);
-      if (currentMonth >= start && currentMonth <= end && currentMonth <= now) {
-        months[i] = report.is_verified ? "✅" : "❌";
-      }
-    }
-  });
-  return months;
-};
-
 export default function Reports() {
   const [supplierData, setSupplierData] = useState([]);
   const [bankData, setBankData] = useState([]);
@@ -64,7 +47,7 @@ export default function Reports() {
   const fetchSuppliers = async () => {
     const { data: suppliers, error: supplierError } = await supabase
       .from('acc_portal_suppliers')
-      .select('id, name, startdate')
+      .select('id, name, startdate, contact_email, contact_mobile')
       .order('id', { ascending: true });
 
     if (supplierError) {
@@ -108,6 +91,8 @@ export default function Reports() {
         id: `S-${supplier.id}`,
         name: supplier.name,
         startDate: supplier.startdate,
+        email: supplier.contact_email,
+        phoneNumber: supplier.contact_mobile,
         months
       };
     });
@@ -168,7 +153,6 @@ export default function Reports() {
 
     setBankData(processedData);
   };
-
   const handleAddDetails = async () => {
     if (activeTab === 'suppliers') {
       const { data, error } = await supabase
