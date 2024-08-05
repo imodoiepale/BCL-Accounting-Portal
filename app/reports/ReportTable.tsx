@@ -121,7 +121,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
     const message = encodeURIComponent(`Hello, you have missing documents. Please upload them as soon as possible.`);
     window.open(`https://wa.me/${phoneNumber}?text=${message}`, '_blank');
   };
-
+  
   const sendEmailRequest = async (supplier: DataRow) => {
     setEmailSending(true);
     const missingDocs = getMissingDocuments(supplier);
@@ -129,16 +129,12 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
   
     try {
       const emailData = {
-        from: 'resend.no-replybcl.com', // Use a verified sender email
         to: supplier.email,
         subject: `Missing Documents Request for ${supplier.name}`,
         html: `<p>Dear ${supplier.name},</p><p>We noticed that you have missing documents for the following months: ${missingDocsText}.</p><p>Please upload these documents as soon as possible.</p><p>Best regards,<br>Your Company Name</p>`,
       };
-      console.log('Recipient email:', supplier);
-
-      console.log('Sending email with data:', emailData);
-
-      const response = await fetch('/api/sendEmail', {
+      
+      const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -152,8 +148,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         alert('Email sent successfully');
       } else {
         const errorData = await response.json();
-        console.error('Failed to send email:', errorData);
-        alert(`Failed to send email: ${errorData.error || 'Unknown error'}`);
+        throw new Error(errorData.message);
       }
     } catch (error) {
       console.error('Error sending email:', error);
