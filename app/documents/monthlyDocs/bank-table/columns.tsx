@@ -241,19 +241,6 @@ const UploadCell = React.memo(({ row }) => {
 
 UploadCell.displayName = 'UploadCell';
 
-const groupedHeaders = [
-  {
-    id: 'pending',
-    title: 'Pending',
-    columns: ['uploadStatus', 'uploadDate', 'periodFrom', 'periodTo'],
-  },
-  {
-    id: 'completed',
-    title: 'Completed',
-    columns: ['closingBalance', 'closingBalanceVerified'],
-  },
-];
-
 export const bankColumns: ColumnDef<AllBanks>[] = [
   {
     accessorKey: "bankSeq",
@@ -314,7 +301,7 @@ export const bankColumns: ColumnDef<AllBanks>[] = [
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Verified
+        Verified by BCL
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
@@ -365,6 +352,19 @@ export const bankColumns: ColumnDef<AllBanks>[] = [
     cell: ({ row }) => <div>{row.getValue("periodTo") || 'N/A'}</div>,
   },
   {
+    accessorKey: "verifyByBCL",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Start Range Verification
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div>{row.getValue("verifyByBCL") ? "✅" : "❌"}</div>,
+  },
+  {
     accessorKey: "closingBalance",
     header: ({ column }) => (
       <Button
@@ -388,7 +388,8 @@ export const bankColumns: ColumnDef<AllBanks>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div>{row.getValue("closingBalanceVerified") === "true" ? "✅" : "❌"}</div>,
+    cell: ({ row }) => <div>{row.getValue("closingBalanceVerified") ? "✅" : "❌"}</div>,
+  
   },
   {
     id: "profile",
