@@ -3,6 +3,7 @@
 
 "use client";
 
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,7 +25,6 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { createClient } from '@supabase/supabase-js';
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Info } from "lucide-react";
-import React, { useCallback, useEffect, useState } from 'react';
 import { useForm } from "react-hook-form";
 import * as yup from 'yup';
 import { AllCompanies } from './page';
@@ -37,6 +37,7 @@ const UploadCell = React.memo(({ row }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(row.getValue("uploadStatus"));
   const [isLoading, setIsLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState('');
 
   const schema = yup.object().shape({
     periodFrom: yup.date().required("Period From is required"),
@@ -78,29 +79,28 @@ const UploadCell = React.memo(({ row }) => {
     fetchUploadStatus();
   }, [row.original.CompanyId]);
 
-  const handleViewUpload = useCallback(async () => {
-  if (row.original.filePath) {
-    try {
-      const { data, error } = await supabase.storage
-        .from('Accounting-Portal')
-        .createSignedUrl(row.original.filePath, 60);
+  const handleButtonClick = useCallback(async () => {
+    if (uploadStatus === 'Uploaded') {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.storage
+          .from('Accounting-Portal')
+          .createSignedUrl(row.original.filePath, 60);
 
-      if (error) throw error;
-      
-      // Open the file in a popup window
-      const popupWindow = window.open('', '_blank', 'width=800,height=600');
-      popupWindow.document.write(`
-        <iframe src="${data.signedUrl}" style="width:100%;height:100%;border:none;"></iframe>
-      `);
-    } catch (error) {
-      console.error('Error viewing file:', error);
-      alert('Error viewing file. Please try again.');
+        if (error) throw error;
+        
+        setPreviewUrl(data.signedUrl);
+        setIsDialogOpen(true);
+      } catch (error) {
+        console.error('Error viewing file:', error);
+        alert('Error viewing file. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setIsDialogOpen(true);
     }
-  } else {
-    alert('No file uploaded yet.');
-  }
-}, [row.original.filePath]);
-
+  }, [uploadStatus, row.original.filePath]);
 
   const onSubmit = useCallback(async (data) => {
     setIsLoading(true);
@@ -157,34 +157,65 @@ const UploadCell = React.memo(({ row }) => {
   }, [row.original.CompanyId]);
 
   return (
-    
     <div className="text-center">
+      <Button 
+        variant="outline" 
+        onClick={handleButtonClick}
+        disabled={isLoading}
+      >
+        {uploadStatus === 'Uploaded' ? '✅View Upload' : 
+         uploadStatus === 'Failed' ? '❌Retry Upload' : 'Upload'}
+      </Button>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild className="whitespace-nowrap">
-          <WrappedButton 
-            variant="outline" 
-            onClick={() => uploadStatus === 'Uploaded' ? handleViewUpload() : setIsDialogOpen(true)}
-            disabled={isLoading}
-          >
-            {uploadStatus === 'Uploaded' ? '✅ View Upload' : 
-             uploadStatus === 'Failed' ? '❌ Retry Upload' : 'Upload'}
-          </WrappedButton>
-        </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Upload Document</DialogTitle>
+            <DialogTitle>{uploadStatus === 'Uploaded' ? 'File Preview' : 'Upload Document'}</DialogTitle>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <div className="grid grid-cols-2 gap-4">
+          {uploadStatus === 'Uploaded' && previewUrl ? (
+            <iframe 
+              src={previewUrl} 
+              style={{width: '100%', height: '70vh', border: 'none'}}
+              title="File Preview"
+            />
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="periodFrom"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Period From (SWEF Date)</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="periodTo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Period To</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={form.control}
-                  name="periodFrom"
+                  name="closingBalance"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Period From (SWEF Date)</FormLabel>
+                      <FormLabel>Closing Balance</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="number" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -192,52 +223,26 @@ const UploadCell = React.memo(({ row }) => {
                 />
                 <FormField
                   control={form.control}
-                  name="periodTo"
+                  name="file"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Period To</FormLabel>
+                      <FormLabel>Upload File</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input 
+                          type="file" 
+                          onChange={(e) => field.onChange(e.target.files)}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
-              <FormField
-                control={form.control}
-                name="closingBalance"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Closing Balance</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="file"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Upload File</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="file" 
-                        onChange={(e) => field.onChange(e.target.files)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <WrappedButton type="submit" disabled={isLoading}>
-                {isLoading ? 'Uploading...' : 'Submit'}
-              </WrappedButton>
-            </form>
-          </Form>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? 'Uploading...' : 'Submit'}
+                </Button>
+              </form>
+            </Form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -246,172 +251,164 @@ const UploadCell = React.memo(({ row }) => {
 
 UploadCell.displayName = 'UploadCell';
 
-const WrappedButton = ({ children, ...props }) => (
-  <div className="text-center">
-    <Button
-      variant="ghost"
-      className="h-auto whitespace-break-spaces text-wrap"
-      {...props}
-    >
-      {children}
-    </Button>
-  </div>
-);
-
-
 export const supplierColumns: ColumnDef<AllCompanies>[] = [
   {
     accessorKey: "suppSeq",
     header: ({ column }) => (
-      <WrappedButton onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
         Supp Seq
-        <ArrowUpDown className="2 h-4 w-4" />
-      </WrappedButton>
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
-    cell: ({ row }) => <div className="text-center ">SUP-{row.getValue("suppSeq")}</div>,
+    cell: ({ row }) => <div className="text-center">SUP-{row.getValue("suppSeq")}</div>,
   },
   {
     accessorKey: "suppName",
     header: ({ column }) => (
-      <WrappedButton onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
         Supp Name
-        <ArrowUpDown className="2 h-4 w-4" />
-      </WrappedButton>
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
     cell: ({ row }) => <div className="whitespace-nowrap">{row.getValue("suppName")}</div>,
   },
   {
     accessorKey: "suppStatus",
     header: ({ column }) => (
-      <WrappedButton
+      <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Status
-        <ArrowUpDown className="2 h-4 w-4" />
-      </WrappedButton>
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
     cell: ({ row }) => {
       const status = row.getValue("suppStatus");
       const statusClass = status === 'Active' ? 'text-green-500' : 'text-red-500';
-      return <div className={` text-center font-medium ${statusClass}`}>{status}</div>;
+      return <div className={`text-center font-medium ${statusClass}`}>{status}</div>;
     },
   },
-  
   {
     accessorKey: "suppStartDate",
     header: ({ column }) => (
-      <WrappedButton
+      <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Start date
-        <ArrowUpDown className="2 h-4 w-4" />
-      </WrappedButton>
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("suppStartDate")}</div>,
   },
   {
     accessorKey: "verifiedByBCLAccManager",
     header: ({ column }) => (
-      <WrappedButton
+      <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Verified by BCL
-        <ArrowUpDown className="2 h-4 w-4" />
-      </WrappedButton>
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("verifiedByBCLAccManager") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "uploadStatus",
     header: ({ column }) => (
-      <WrappedButton
+      <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Upload
-      </WrappedButton>
+      </Button>
     ),
     cell: UploadCell,
   },
   {
     accessorKey: "uploadDate",
     header: ({ column }) => (
-      <WrappedButton
+      <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         className="whitespace-nowrap"
       >
         Upload Date
-        <ArrowUpDown className="2 h-4 w-4" />
-      </WrappedButton>
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("uploadDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "supplierWefDate",
     header: ({ column }) => (
-      <WrappedButton
+      <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Period From (SWEF Date)
-        <ArrowUpDown className="2 h-4 w-4" />
-      </WrappedButton>
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("supplierWefDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "supplierUntilDate",
     header: ({ column }) => (
-      <WrappedButton
+      <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Period To
-        <ArrowUpDown className="2 h-4 w-4" />
-      </WrappedButton>
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("supplierUntilDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "verifyByBCL",
     header: ({ column }) => (
-      <WrappedButton
+      <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Start Range Verification
-        <ArrowUpDown className="2 h-4 w-4" />
-      </WrappedButton>
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("verifyByBCL") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "closingBalance",
     header: ({ column }) => (
-      <WrappedButton
+      <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Closing Balance
-        <ArrowUpDown className="2 h-4 w-4" />
-      </WrappedButton>
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("closingBalance") || 'N/A'}</div>,
   },
   {
     accessorKey: "closingBalanceVerify",
     header: ({ column }) => (
-      <WrappedButton
+      <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Closing Balance Verified
-        <ArrowUpDown className="2 h-4 w-4" />
-      </WrappedButton>
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
     cell: ({ row }) => <div className="text-center">{row.getValue("closingBalanceVerify") === "true" ? "✅" : "❌"}</div>,
   },
@@ -423,10 +420,10 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
       return (
         <Dialog>
           <DialogTrigger asChild>
-            <WrappedButton variant="ghost" className="h-8 w-8 p-0">
+            <Button variant="ghost" className="h-8 w-8 p-0">
               <span className="sr-only">Open profile</span>
               <Info className="h-4 w-4" />
-            </WrappedButton>
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -465,4 +462,4 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
   },
 ];
 
-export default supplierColumns
+export default supplierColumns;
