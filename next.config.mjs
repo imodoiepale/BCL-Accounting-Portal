@@ -7,6 +7,7 @@ dotenvConfig();
 const nextConfig = {
   env: {
     CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
+    reactStrictMode: true,
   },
 };
 

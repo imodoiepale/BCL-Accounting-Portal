@@ -7,6 +7,7 @@ export default function Home() {
       <div className=" w-full items-center justify-between">
       <h1>Communication & Ticketing</h1>
        <Communication/>
+    
       </div>
     </main>
   );
