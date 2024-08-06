@@ -1,0 +1,1 @@
+export const CLERK_SECRET_KEY = 'sk_test_3MYT1uGEVjfYw3E7T8aXwzXmHjfDY9gt1YjqAJsUXf';
