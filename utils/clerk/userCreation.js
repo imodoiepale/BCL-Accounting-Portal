@@ -1,6 +1,9 @@
 // Install required packages:
 // npm install @clerk/clerk-sdk-node dotenv
 
+// NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_YWJsZS1jcmlja2V0LTY2LmNsZXJrLmFjY291bnRzLmRldiQ"
+// CLERK_SECRET_KEY="sk_test_3MYT1uGEVjfYw3E7T8aXwzXmHjfDY9gt1YjqAJsUXf"
+
 require('dotenv').config();
 const { clerkClient } = require('@clerk/clerk-sdk-node');
 const fs = require('fs');
