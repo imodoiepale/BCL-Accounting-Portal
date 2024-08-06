@@ -79,22 +79,28 @@ const UploadCell = React.memo(({ row }) => {
   }, [row.original.CompanyId]);
 
   const handleViewUpload = useCallback(async () => {
-    if (row.original.filePath) {
-      try {
-        const { data, error } = await supabase.storage
-          .from('Accounting-Portal')
-          .createSignedUrl(row.original.filePath, 60);
+  if (row.original.filePath) {
+    try {
+      const { data, error } = await supabase.storage
+        .from('Accounting-Portal')
+        .createSignedUrl(row.original.filePath, 60);
 
-        if (error) throw error;
-        window.open(data.signedUrl, '_blank');
-      } catch (error) {
-        console.error('Error viewing file:', error);
-        alert('Error viewing file. Please try again.');
-      }
-    } else {
-      alert('No file uploaded yet.');
+      if (error) throw error;
+      
+      // Open the file in a popup window
+      const popupWindow = window.open('', '_blank', 'width=800,height=600');
+      popupWindow.document.write(`
+        <iframe src="${data.signedUrl}" style="width:100%;height:100%;border:none;"></iframe>
+      `);
+    } catch (error) {
+      console.error('Error viewing file:', error);
+      alert('Error viewing file. Please try again.');
     }
-  }, [row.original.filePath]);
+  } else {
+    alert('No file uploaded yet.');
+  }
+}, [row.original.filePath]);
+
 
   const onSubmit = useCallback(async (data) => {
     setIsLoading(true);
