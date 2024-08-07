@@ -26,6 +26,7 @@ import React, { useState } from 'react';
 import BankTable from './monthlyDocs/bank-table/page';
 import OtherDocs from './monthlyDocs/other-docs/page';
 import MonthlyDocs from './monthlyDocs/page';
+import PreviousMonths from './PreviousMonths';
 
 const getCurrentMonth = () => {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -105,7 +106,6 @@ const DocumentCard = ({ doc, uploadedDocs, handleFileUpload }) => (
 
 const DocumentUpload = () => {
   const [uploadedDocs, setUploadedDocs] = useState({});
-  const [activeTab, setActiveTab] = useState('current');
   const [activeSubTab, setActiveSubTab] = useState('supplier');
   const [newBank, setNewBank] = useState({
     name: '',
@@ -275,19 +275,19 @@ const DocumentUpload = () => {
         </Sheet>
       </div>
 
-      <Tabs defaultValue="current" className="w-full">
+      <Tabs defaultValue="supplier" className="w-full">
         <TabsList>
-          <TabsTrigger value="current" onClick={() => setActiveTab('current')}>Current Month</TabsTrigger>
-          <TabsTrigger value="previous" onClick={() => setActiveTab('previous')}>Previous Months</TabsTrigger>
+          <TabsTrigger value="supplier" onClick={() => setActiveSubTab('supplier')}>Supplier Statements</TabsTrigger>
+          <TabsTrigger value="bank" onClick={() => setActiveSubTab('bank')}>Bank Statements</TabsTrigger>
+          <TabsTrigger value="other" onClick={() => setActiveSubTab('other')}>Other Docs</TabsTrigger>
         </TabsList>
-        <TabsContent value="current">
-          <Tabs defaultValue="supplier" className="w-full">
+        <TabsContent value="supplier">
+          <Tabs defaultValue="current" className="w-full">
             <TabsList>
-              <TabsTrigger value="supplier" onClick={() => setActiveSubTab('supplier')}>Supplier Statements</TabsTrigger>
-              <TabsTrigger value="bank" onClick={() => setActiveSubTab('bank')}>Bank Statements</TabsTrigger>
-              <TabsTrigger value="other" onClick={() => setActiveSubTab('other')}>Other Docs</TabsTrigger>
+              <TabsTrigger value="current">Current Month</TabsTrigger>
+              <TabsTrigger value="previous">Previous Months</TabsTrigger>
             </TabsList>
-            <TabsContent value="supplier">
+            <TabsContent value="current">
               <MonthlyDocs/>
               <div className="grid grid-cols-5 gap-4">
                 {documents.map((doc, index) => (
@@ -304,16 +304,38 @@ const DocumentUpload = () => {
                 ))}
               </div>
             </TabsContent>
-            <TabsContent value="bank">
-              <BankTable />
-            </TabsContent>
-            <TabsContent value="other">
-              <OtherDocs />
+            <TabsContent value="previous">
+              <PreviousMonths />
             </TabsContent>
           </Tabs>
         </TabsContent>
-        <TabsContent value="previous">
-          <p>Previous months documents would be displayed here.</p>
+        <TabsContent value="bank">
+          <Tabs defaultValue="current" className="w-full">
+            <TabsList>
+              <TabsTrigger value="current">Current Month</TabsTrigger>
+              <TabsTrigger value="previous">Previous Months</TabsTrigger>
+            </TabsList>
+            <TabsContent value="current">
+              <BankTable />
+            </TabsContent>
+            <TabsContent value="previous">
+              <PreviousMonths />
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+        <TabsContent value="other">
+          <Tabs defaultValue="current" className="w-full">
+            <TabsList>
+              <TabsTrigger value="current">Current Month</TabsTrigger>
+              <TabsTrigger value="previous">Previous Months</TabsTrigger>
+            </TabsList>
+            <TabsContent value="current">
+              <OtherDocs />
+            </TabsContent>
+            <TabsContent value="previous">
+              <PreviousMonths />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>
