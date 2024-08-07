@@ -37,6 +37,7 @@ import { BankList } from "@/components/component/BankList";
 import { CompanyInfoTab } from "@/components/component/companyInfo";
 import { EmployeeList } from "@/components/component/Employees";
 import { SupplierList } from "@/components/component/SupplierList";
+import { KYCDocumentsList } from "@/components/component/kycDocumentsList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const DataTable = ({ columns, data }) => {
@@ -193,12 +194,8 @@ export default function Profile() {
         <TabsList>
           <TabsTrigger value="company-info">Company Info</TabsTrigger>
           <TabsTrigger value="kyc-docs">KYC Documents</TabsTrigger>
-          <TabsTrigger value="employees">Employees</TabsTrigger>
-          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
-          <TabsTrigger value="banks">Banks</TabsTrigger>
         </TabsList>
-        <TabsContent value="company-info" className="px-8">
-          <h2 className="text-xl font-semibold mb-2">Company Info</h2>
+        <TabsContent value="company-info" className="px2">
           <Tabs defaultValue="company-info-tab">
             <TabsList>
               <TabsTrigger value="company-info-tab">Company's Information</TabsTrigger>
@@ -206,13 +203,13 @@ export default function Profile() {
               <TabsTrigger value="suppliers-info">Suppliers' Information</TabsTrigger>
               <TabsTrigger value="banks-info">Banks' Information</TabsTrigger>
               <TabsTrigger value="employee-info">Employees' Information</TabsTrigger>
-              <TabsTrigger value="insurances-info">Insurances' Information</TabsTrigger>
+              <TabsTrigger value="insurances-info">Insurance Policy Information</TabsTrigger>
               <TabsTrigger value="deposits-info">Deposits' Information</TabsTrigger>
               <TabsTrigger value="fixed-assets-info">Fixed Assets Register</TabsTrigger>
             </TabsList>
             <TabsContent value="company-info-tab">
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Company's Information</h3>
+                <h3 className="text-lg font-bold">Company's Information</h3>
                 <CompanyInfoTab />
               </div>
             </TabsContent>
@@ -225,12 +222,12 @@ export default function Profile() {
             <TabsContent value="employee-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Employees' Information</h3>
-                <DataTable columns={columns} data={employeeData} />
+                <h2 className="text-xl font-semibold mb-2">Employees</h2>
+                <EmployeeList />
               </div>
             </TabsContent>
             <TabsContent value="suppliers-info">
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Suppliers' Information</h3>
                 <Tabs defaultValue="trading-suppliers">
                   <TabsList>
                     <TabsTrigger value="trading-suppliers">Trading Suppliers - Information</TabsTrigger>
@@ -239,13 +236,14 @@ export default function Profile() {
                   <TabsContent value="trading-suppliers">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Trading Suppliers</h4>
-                      <DataTable columns={columns} data={generateMockData('Trading Supplier', 5)} />
+                      <SupplierList />
                     </div>
                   </TabsContent>
                   <TabsContent value="monthly-service-vendors">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Monthly Service Vendors</h4>
-                      <DataTable columns={columns} data={generateMockData('Service Vendor', 5)} />
+                      <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
+                      <SupplierList />
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -309,28 +307,17 @@ export default function Profile() {
             </TabsContent>
             <TabsContent value="banks-info">
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Banks' Information</h3>
-                <DataTable columns={columns} data={bankData} />
+              <h2 className="text-xl font-semibold mb-2">Banks</h2>
+              <BankList />
               </div>
             </TabsContent>
           </Tabs>
         </TabsContent>
         <TabsContent value="kyc-docs">
           <h2 className="text-xl font-semibold mb-2">KYC Documents</h2>
-          <DataTable columns={columns} data={kycData} />
+          <KYCDocumentsList/>
         </TabsContent>
-        <TabsContent value="employees" className="px-8">
-          <h2 className="text-xl font-semibold mb-2">Employees</h2>
-          <EmployeeList />
-        </TabsContent>
-        <TabsContent value="suppliers">
-          <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
-          <SupplierList />
-        </TabsContent>
-        <TabsContent value="banks">
-          <h2 className="text-xl font-semibold mb-2">Banks</h2>
-          <BankList />
-        </TabsContent>
+        
       </Tabs>
     </div>
   );
