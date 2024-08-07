@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,} from "@/components/ui/sheet"
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { ScrollArea } from '../ui/scroll-area'
 
 
 const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
@@ -127,6 +128,7 @@ export function SupplierList() {
         </div>
         <Card>
           <Table>
+            <ScrollArea className="h-[calc(100vh-200px)] w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>SUPP ID</TableHead>
@@ -140,23 +142,24 @@ export function SupplierList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {suppliers.map((supplier) => (
-                <TableRow key={supplier.id}>
-                  <TableCell>SUPP-{supplier.id}</TableCell>
-                  <TableCell>{supplier.name}</TableCell>
-                  <TableCell>{supplier.pin}</TableCell>
-                  <TableCell>{supplier.contact_name}</TableCell>
-                  <TableCell>{supplier.contact_mobile}</TableCell>
-                  <TableCell>{supplier.contact_email}</TableCell>
-                  <TableCell>{formatDate(supplier.startdate)}</TableCell>
-                  <TableCell className='text-center'>
-                    <Badge variant={supplier.status ? "success" : "destructive"}>
-                      {supplier.status ? "✔️" : "❌"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+                {suppliers.map((supplier) => (
+                  <TableRow key={supplier.id}>
+                    <TableCell>SUPP-{supplier.id}</TableCell>
+                    <TableCell>{supplier.name}</TableCell>
+                    <TableCell>{supplier.pin}</TableCell>
+                    <TableCell>{supplier.contact_name}</TableCell>
+                    <TableCell>{supplier.contact_mobile}</TableCell>
+                    <TableCell>{supplier.contact_email}</TableCell>
+                    <TableCell>{formatDate(supplier.startdate)}</TableCell>
+                    <TableCell className='text-center'>
+                      <Badge variant={supplier.status ? "success" : "destructive"}>
+                        {supplier.status ? "✔️" : "❌"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
+          </ScrollArea>
           </Table>
         </Card>
         <div className="flex justify-between items-center mt-4">
