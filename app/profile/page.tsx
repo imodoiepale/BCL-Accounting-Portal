@@ -32,13 +32,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { BankList } from "@/components/component/BankList";
+import { DirectorsList } from "@/components/component/DirectorsList";
 import { CompanyInfoTab } from "@/components/component/companyInfo";
 import { EmployeeList } from "@/components/component/Employees";
 import { SupplierList } from "@/components/component/SupplierList";
 import { KYCDocumentsList } from "@/components/component/kycDocumentsList";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InsurancePolicy } from "@/components/component/InsurancePolicy";
+import { DirectorsDocumentsList } from "@/components/component/DirectorsDocumentsList";
+
 
 const DataTable = ({ columns, data }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -215,8 +219,24 @@ export default function Profile() {
             </TabsContent>
             <TabsContent value="directors-info">
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Directors' Information</h3>
-                <DataTable columns={columns} data={directorData} />
+                <Tabs defaultValue="director-info">
+                  <TabsList>
+                    <TabsTrigger value="director-info">Directors' Information</TabsTrigger>
+                    <TabsTrigger value="directors-kyc">Directors' KYC Documents</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="director-info">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-bold">Directors' Information</h3>
+                      <DirectorsList />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="directors-kyc">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-bold">Directors' KYC Documents</h3>
+                      <DirectorsDocumentsList/>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             </TabsContent>
             <TabsContent value="employee-info">
@@ -252,7 +272,7 @@ export default function Profile() {
             <TabsContent value="insurances-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Insurances' Information</h3>
-                <DataTable columns={columns} data={insuranceData} />
+                <InsurancePolicy />
               </div>
             </TabsContent>
             <TabsContent value="deposits-info">
@@ -307,17 +327,16 @@ export default function Profile() {
             </TabsContent>
             <TabsContent value="banks-info">
               <div className="space-y-4">
-              <h2 className="text-xl font-semibold mb-2">Banks</h2>
-              <BankList />
+                <h2 className="text-xl font-semibold mb-2">Banks</h2>
+                <BankList />
               </div>
             </TabsContent>
           </Tabs>
         </TabsContent>
         <TabsContent value="kyc-docs">
           <h2 className="text-xl font-semibold mb-2">KYC Documents</h2>
-          <KYCDocumentsList/>
+          <KYCDocumentsList />
         </TabsContent>
-        
       </Tabs>
     </div>
   );

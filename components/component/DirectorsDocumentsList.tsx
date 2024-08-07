@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 // @ts-nocheck
 "use client"
 
@@ -16,6 +17,7 @@ import { RefreshCwIcon, PlusIcon, UploadIcon, EyeIcon } from 'lucide-react'
 const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
 const url="https://zyszsqgdlrpnunkegipk.supabase.co"
 
+// Initialize Supabase client
 const supabase = createClient(url, key)
 
 const formatDate = (dateString) => {
@@ -23,7 +25,7 @@ const formatDate = (dateString) => {
   return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
 };
 
-export function KYCDocumentsList() {
+export function DirectorsDocumentsList() {
   const [oneOffDocs, setOneOffDocs] = useState([])
   const [renewalDocs, setRenewalDocs] = useState([])
   const [newDocument, setNewDocument] = useState({
@@ -33,24 +35,27 @@ export function KYCDocumentsList() {
     expiry_date: '',
     description: '',
     file_path: '',
+    director_id: '', // Added director_id field
   })
   const [isAddingOneOff, setIsAddingOneOff] = useState(false)
   const [isAddingRenewal, setIsAddingRenewal] = useState(false)
   const [file, setFile] = useState(null)
+  const [directors, setDirectors] = useState([]) // State to store directors list
 
   useEffect(() => {
     fetchDocuments()
+    fetchDirectors()
   }, [])
 
   const fetchDocuments = async () => {
     const { data: oneOffData, error: oneOffError } = await supabase
-      .from('kyc_documents')
+      .from('directors_documents')
       .select('*')
       .eq('type', 'one-off')
       .order('id', { ascending: true });
 
     const { data: renewalData, error: renewalError } = await supabase
-      .from('kyc_documents')
+      .from('directors_documents')
       .select('*')
       .eq('type', 'renewal')
       .order('id', { ascending: true });
@@ -60,6 +65,16 @@ export function KYCDocumentsList() {
 
     if (renewalError) console.error('Error fetching renewal documents:', renewalError)
     else setRenewalDocs(renewalData)
+  }
+
+  const fetchDirectors = async () => {
+    const { data, error } = await supabase
+      .from('directors')
+      .select('id, full_name')
+      .order('full_name', { ascending: true });
+
+    if (error) console.error('Error fetching directors:', error)
+    else setDirectors(data)
   }
 
   const handleInputChange = (e) => {
@@ -79,7 +94,7 @@ export function KYCDocumentsList() {
       const fileExt = file.name.split('.').pop()
       const fileName = `${Math.random()}.${fileExt}`
       const { data, error } = await supabase.storage
-        .from('kyc-documents')
+        .from('directors-documents')
         .upload(fileName, file)
 
       if (error) {
@@ -91,7 +106,7 @@ export function KYCDocumentsList() {
     }
 
     const { data, error } = await supabase
-      .from('kyc_documents')
+      .from('directors_documents')
       .insert([newDocument])
     if (error) console.error('Error adding document:', error)
     else {
@@ -103,6 +118,7 @@ export function KYCDocumentsList() {
         expiry_date: '',
         description: '',
         file_path: '',
+        director_id: '',
       })
       setFile(null)
       setIsAddingOneOff(false)
@@ -113,7 +129,7 @@ export function KYCDocumentsList() {
   const handleViewUpload = async (doc) => {
     if (doc.file_path) {
       const { data, error } = await supabase.storage
-        .from('kyc-documents')
+        .from('directors-documents')
         .createSignedUrl(doc.file_path, 60)
 
       if (error) {
@@ -134,7 +150,7 @@ export function KYCDocumentsList() {
       const fileExt = file.name.split('.').pop()
       const fileName = `${Math.random()}.${fileExt}`
       const { data, error } = await supabase.storage
-        .from('kyc-documents')
+        .from('directors-documents')
         .upload(fileName, file)
 
       if (error) {
@@ -143,7 +159,7 @@ export function KYCDocumentsList() {
       }
 
       const { error: updateError } = await supabase
-        .from('kyc_documents')
+        .from('directors_documents')
         .update({ file_path: data.path })
         .eq('id', doc.id)
 
@@ -172,6 +188,7 @@ export function KYCDocumentsList() {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[50px]">No.</TableHead>
+            <TableHead>Director</TableHead>
             <TableHead>Document Name</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Description</TableHead>
@@ -184,6 +201,7 @@ export function KYCDocumentsList() {
             <TableRow key={doc.id}>
               <TableCell>{index + 1}</TableCell>
               <TableCell>{doc.name}</TableCell>
+              <TableCell>{directors.find(d => d.id === doc.director_id)?.full_name || 'Unknown'}</TableCell>
               <TableCell>
                 <Badge variant={doc.status === 'complete' ? "success" : "warning"}>
                   {doc.status === 'complete' ? "Complete" : "Pending"}
@@ -214,16 +232,29 @@ export function KYCDocumentsList() {
     <Sheet open={isOneOff ? isAddingOneOff : isAddingRenewal} onOpenChange={isOneOff ? setIsAddingOneOff : setIsAddingRenewal}>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>Add {isOneOff ? "One-off" : "Renewal"} KYC Document</SheetTitle>
+          <SheetTitle>Add {isOneOff ? "One-off" : "Renewal"} Director Document</SheetTitle>
           <SheetDescription>
-            Add a new {isOneOff ? "one-off" : "renewal"} KYC document to the system
+            Add a new {isOneOff ? "one-off" : "renewal"} document for a director
           </SheetDescription>
         </SheetHeader>
 
         <div className="flex flex-col pt-4 gap-4">
           <div className="space-y-1">
+            <Label htmlFor="director_id">Director</Label>
+            <Select onValueChange={(value) => handleSelectChange(value, 'director_id')} value={newDocument.director_id}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select director" />
+              </SelectTrigger>
+              <SelectContent>
+                {directors.map((director) => (
+                  <SelectItem key={director.id} value={director.id}>{director.full_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
             <Label htmlFor="name">Document Name</Label>
-            <Input id="name" placeholder="e.g., Tax Compliance Certificate" value={newDocument.name} onChange={handleInputChange} required />
+            <Input id="name" placeholder="e.g., Director's Name" value={newDocument.name} onChange={handleInputChange} required />
           </div>
           <div className="space-y-1">
             <Label htmlFor="status">Status</Label>
@@ -263,7 +294,7 @@ export function KYCDocumentsList() {
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-semibold">KYC Documents List</h1>
+          <h1 className="text-xl font-semibold">Directors' Documents List</h1>
           <div className="flex items-center space-x-2">
             <Input type="search" placeholder="Search documents" className="w-48" />
             <Button variant="outline" className="flex items-center" onClick={fetchDocuments}>
