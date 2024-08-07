@@ -24,7 +24,7 @@ const PreviousMonths = () => {
 
   return (
     <div className="flex">
-      <div className="w-48 p-4 border-r">
+      <div className="w-1/8 p-4 border-r">
         <h2 className="text-xl font-bold mb-4 text-center">Months</h2>
         <div className="space-y-2 ">
           {months.map((month) => (
@@ -39,7 +39,7 @@ const PreviousMonths = () => {
           ))}
         </div>
       </div>
-      <div className="w-full  p-4">
+      <div className="w-7/8 p-4">
         {selectedMonth ? (
           <MonthlyDocs selectedMonth={selectedMonth} isCurrentMonth={false} />
         ) : (

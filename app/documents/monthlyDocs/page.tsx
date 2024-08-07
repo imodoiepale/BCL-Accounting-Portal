@@ -55,25 +55,73 @@ function formatDateTime(dateTimeString) {
   }).replace(',', '');
 }
 
-export default function MonthlyDocs() {
+interface MonthlyDocsProps {
+  selectedMonth?: string;
+  isCurrentMonth?: boolean;
+}
+
+export default function MonthlyDocs({ selectedMonth, isCurrentMonth = true }: MonthlyDocsProps) {
   const [data, setData] = useState<AllCompanies[]>([]);
   const [currentDate, setCurrentDate] = useState('');
-  const [currentMonth, setCurrentMonth] = useState('');
+  const [displayMonth, setDisplayMonth] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (month?: string) => {
     try {
       setIsLoading(true);
+      console.log('Fetching data for month:', month || 'Current Month');
+  
+      let supplierQuery = supabase
+        .from('acc_portal_suppliers')
+        .select('*')
+        .order('id', { ascending: true });
+  
+      let uploadQuery = supabase
+        .from('acc_portal_monthly_files_upload')
+        .select('*');
+  
+      if (month) {
+        const [monthName, year] = month.split(' ');
+        const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth() + 1;
+        
+        const startDate = `${year}-${monthNumber.toString().padStart(2, '0')}-01`;
+        const endDate = new Date(parseInt(year), monthNumber, 0).toISOString().split('T')[0];
+        
+        console.log('Date range:', startDate, 'to', endDate);
+        
+        uploadQuery = uploadQuery
+          .gte('upload_date', startDate)
+          .lte('upload_date', endDate);
+      } else {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1;
+        const startDate = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-01`;
+        const endDate = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
+        
+        console.log('Current month date range:', startDate, 'to', endDate);
+        
+        uploadQuery = uploadQuery
+          .gte('upload_date', startDate)
+          .lte('upload_date', endDate);
+      }
+  
+      console.log('Supplier query:', supplierQuery);
+      console.log('Upload query:', uploadQuery);
+  
       const [{ data: supplierData, error: supplierError }, { data: uploadData, error: uploadError }] = await Promise.all([
-        supabase.from('acc_portal_suppliers').select('*').order('id', { ascending: true }),
-        supabase.from('acc_portal_monthly_files_upload').select('*')
+        supplierQuery,
+        uploadQuery
       ]);
-
+  
+      console.log('Supplier data:', supplierData);
+      console.log('Upload data:', uploadData);
+  
       if (supplierError) throw new Error(`Error fetching supplier data: ${supplierError.message}`);
       if (uploadError) throw new Error(`Error fetching upload data: ${uploadError.message}`);
-
+  
       const uploadMap = new Map(uploadData.map(item => [item.supplier_id, item]));
-
+  
       const transformedData: AllCompanies[] = supplierData.map(supplier => {
         const latestUpload = uploadMap.get(supplier.id) || {};
         return {
@@ -97,7 +145,9 @@ export default function MonthlyDocs() {
           filePath: latestUpload.file_path || '',
         };
       });
-
+  
+      console.log('Transformed data:', transformedData);
+  
       setData(transformedData);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -114,17 +164,22 @@ export default function MonthlyDocs() {
       month: 'numeric',
       day: 'numeric'
     }));
-    setCurrentMonth(date.toLocaleDateString('en-US', { month: 'long' }));
-    fetchData();
-  }, [fetchData]);
+
+    if (isCurrentMonth) {
+      setDisplayMonth(date.toLocaleDateString('en-US', { month: 'long' }));
+      fetchData();
+    } else if (selectedMonth) {
+      setDisplayMonth(selectedMonth);
+      fetchData(selectedMonth);
+    }
+  }, [fetchData, isCurrentMonth, selectedMonth]);
 
   const memoizedColumns = useMemo(() => supplierColumns, []);
 
   return (
     <main className="flex flex-col justify-start w-full">
-      {/* <h1 className="text-2xl font-bold my-4">Monthly Documents</h1> */}
       <p className="text-lg mb-4">
-        <span className="font-semibold text-blue-700">{currentMonth}</span> Supplier Statements
+        <span className="font-semibold text-blue-700">{displayMonth}</span> Supplier Statements
       </p>
       <div className="">
         <div className="inline-block min-w-full align-middle">

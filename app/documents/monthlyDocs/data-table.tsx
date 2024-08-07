@@ -88,12 +88,29 @@ export function DataTable<TData, TValue>({
     return counts;
   }, [data]);
 
-  const getColumnCount = (columnId: string) => {
+  const getColumnCount = React.useCallback((columnId: string) => {
     const count = statusCounts[columnId];
     if (!count) return '';
     const total = count.completed + count.pending;
     return `${count.completed}/${total}`;
-  };
+  }, [statusCounts]);
+
+  const renderHeaderRows = React.useCallback(() => (
+    <>
+      <TableRow>
+        <TableCell className="bg-green-100 font-bold uppercase pl-4">COMPLETED</TableCell>
+        {['suppName', 'suppStatus', '', 'verifiedByBCLAccManager', 'uploadStatus', '', '', '', 'verifyByBCL', '', 'closingBalanceVerify', ''].map((columnId, index) => (
+          <TableCell key={index} className="text-center bg-green-100 font-bold">{getColumnCount(columnId)}</TableCell>
+        ))}
+      </TableRow>
+      <TableRow>
+        <TableCell className="bg-red-100 font-bold uppercase pl-4">PENDING</TableCell>
+        {['suppName', 'suppStatus', '', 'verifiedByBCLAccManager', 'uploadStatus', '', '', '', 'verifyByBCL', '', 'closingBalanceVerify', ''].map((columnId, index) => (
+          <TableCell key={index} className="text-center bg-red-100 font-bold">{statusCounts[columnId]?.pending || ''}</TableCell>
+        ))}
+      </TableRow>
+    </>
+  ), [statusCounts, getColumnCount]);
 
   return (
     <div className="space-y-4 w-full">
@@ -101,36 +118,7 @@ export function DataTable<TData, TValue>({
       <div className="rounded-md border">
         <Table>
           <TableHeader className="text-wrap">
-            <TableRow>
-              <TableCell className="bg-green-100 font-bold uppercase pl-4">COMPLETED</TableCell>
-              <TableCell className="text-center bg-green-100 font-bold">{getColumnCount('suppName')}</TableCell>
-              <TableCell className="text-center bg-green-100 font-bold">{getColumnCount('suppStatus')}</TableCell>
-              <TableCell className="text-center bg-green-100 font-bold"></TableCell>
-              <TableCell className="text-center bg-green-100 font-bold">{getColumnCount('verifiedByBCLAccManager')}</TableCell>
-              <TableCell className="text-center bg-green-100 font-bold">{getColumnCount('uploadStatus')}</TableCell>
-              <TableCell className="text-center bg-green-100 font-bold"></TableCell>
-              <TableCell className="text-center bg-green-100 font-bold"></TableCell>
-              <TableCell className="text-center bg-green-100 font-bold"></TableCell>
-              <TableCell className="text-center bg-green-100 font-bold">{getColumnCount('verifyByBCL')}</TableCell>
-              <TableCell className="text-center bg-green-100 font-bold"></TableCell>
-              <TableCell className="text-center bg-green-100 font-bold">{getColumnCount('closingBalanceVerify')}</TableCell>
-              <TableCell className="text-center bg-green-100 font-bold"></TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="bg-red-100 font-bold uppercase pl-4">PENDING</TableCell>
-              <TableCell className="text-center bg-red-100 font-bold">{statusCounts.suppName?.pending || ''}</TableCell>
-              <TableCell className="text-center bg-red-100 font-bold">{statusCounts.suppStatus?.pending || ''}</TableCell>
-              <TableCell className="text-center bg-red-100 font-bold"></TableCell>
-              <TableCell className="text-center bg-red-100 font-bold">{statusCounts.verifiedByBCLAccManager?.pending || ''}</TableCell>
-              <TableCell className="text-center bg-red-100 font-bold">{statusCounts.uploadStatus?.pending || ''}</TableCell>
-              <TableCell className="text-center bg-red-100 font-bold"></TableCell>
-              <TableCell className="text-center bg-red-100 font-bold"></TableCell>
-              <TableCell className="text-center bg-red-100 font-bold"></TableCell>
-              <TableCell className="text-center bg-red-100 font-bold">{statusCounts.verifyByBCL?.pending || ''}</TableCell>
-              <TableCell className="text-center bg-red-100 font-bold"></TableCell>
-              <TableCell className="text-center bg-red-100 font-bold">{statusCounts.closingBalanceVerify?.pending || ''}</TableCell>
-              <TableCell className="text-center bg-red-100 font-bold"></TableCell>
-            </TableRow>
+            {renderHeaderRows()}
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
