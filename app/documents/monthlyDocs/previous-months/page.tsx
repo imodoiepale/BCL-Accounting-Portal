@@ -2,7 +2,7 @@
 "use client"
 import React, { useState, useMemo, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import MonthlyDocs from './monthlyDocs/page';
+import MonthlyDocs from '../page';
 
 const PreviousMonths = () => {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
