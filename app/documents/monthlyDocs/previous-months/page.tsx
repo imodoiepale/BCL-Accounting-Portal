@@ -4,6 +4,11 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import MonthlyDocs from '../page';
 
+interface MonthlyDocsProps {
+  selectedMonth: string;
+  isCurrentMonth: boolean;
+}
+
 const PreviousMonths = () => {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
@@ -19,7 +24,7 @@ const PreviousMonths = () => {
 
   const months = useMemo(() => generateMonths(), [generateMonths]);
 
-  const handleMonthSelect = useCallback((month) => {
+  const handleMonthSelect = useCallback((month: string) => {
     setSelectedMonth(month);
   }, []);
 
