@@ -1,4 +1,5 @@
 //@ts-nocheck
+"use client"
 import React, { useState, useMemo, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import MonthlyDocs from './monthlyDocs/page';
