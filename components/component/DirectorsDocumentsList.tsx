@@ -14,11 +14,13 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { RefreshCwIcon, PlusIcon, UploadIcon, EyeIcon } from 'lucide-react'
 
-const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
-const url="https://zyszsqgdlrpnunkegipk.supabase.co"
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
-// Initialize Supabase client
-const supabase = createClient(url, key)
+const BUCKET_NAME = 'directors-documents'
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);
@@ -35,27 +37,54 @@ export function DirectorsDocumentsList() {
     expiry_date: '',
     description: '',
     file_path: '',
-    director_id: '', // Added director_id field
+    director_id: '',
   })
   const [isAddingOneOff, setIsAddingOneOff] = useState(false)
   const [isAddingRenewal, setIsAddingRenewal] = useState(false)
   const [file, setFile] = useState(null)
-  const [directors, setDirectors] = useState([]) // State to store directors list
+  const [directors, setDirectors] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
+    initializeBucket()
     fetchDocuments()
     fetchDirectors()
   }, [])
 
+  const initializeBucket = async () => {
+    const { data: buckets, error } = await supabase.storage.listBuckets()
+    
+    if (error) {
+      console.error('Error listing buckets:', error)
+      return
+    }
+
+    const bucketExists = buckets.some(bucket => bucket.name === BUCKET_NAME)
+
+    if (!bucketExists) {
+      const { data, error } = await supabase.storage.createBucket(BUCKET_NAME, {
+        public: false,
+        fileSizeLimit: MAX_FILE_SIZE
+      })
+
+      if (error) {
+        console.error('Error creating bucket:', error)
+        alert(`Failed to create storage bucket. Please contact support.`)
+      } else {
+        console.log('Bucket created successfully:', data)
+      }
+    }
+  }
+
   const fetchDocuments = async () => {
     const { data: oneOffData, error: oneOffError } = await supabase
-      .from('directors_documents')
+      .from('acc_portal_directors_documents')
       .select('*')
       .eq('type', 'one-off')
       .order('id', { ascending: true });
 
     const { data: renewalData, error: renewalError } = await supabase
-      .from('directors_documents')
+      .from('acc_portal_directors_documents')
       .select('*')
       .eq('type', 'renewal')
       .order('id', { ascending: true });
@@ -69,8 +98,8 @@ export function DirectorsDocumentsList() {
 
   const fetchDirectors = async () => {
     const { data, error } = await supabase
-      .from('directors')
-      .select('id, full_name')
+      .from('acc_portal_directors')
+      .select('id, full_name, first_name, middle_name, last_name, email_address, passport_number, id_number')
       .order('full_name', { ascending: true });
 
     if (error) console.error('Error fetching directors:', error)
@@ -86,30 +115,56 @@ export function DirectorsDocumentsList() {
   }
 
   const handleFileChange = (e) => {
-    setFile(e.target.files[0])
+    const selectedFile = e.target.files[0]
+    if (selectedFile && selectedFile.size <= MAX_FILE_SIZE) {
+      setFile(selectedFile)
+    } else {
+      alert("File is too large. Maximum size is 5MB.")
+      e.target.value = null
+    }
   }
 
   const handleSubmit = async () => {
-    if (file) {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Math.random()}.${fileExt}`
-      const { data, error } = await supabase.storage
-        .from('directors-documents')
-        .upload(fileName, file)
+    setIsLoading(true)
+    try {
+      if (file) {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Math.random()}.${fileExt}`
+        const folderPath = newDocument.type === 'one-off' ? 'one-off/' : 'renewal/'
+        const filePath = `${folderPath}${fileName}`
+        
+        const { data, error } = await supabase.storage
+          .from(BUCKET_NAME)
+          .upload(filePath, file)
 
-      if (error) {
-        console.error('Error uploading file:', error)
-        return
+        if (error) {
+          if (error.statusCode === '404') {
+            throw new Error(`Bucket not found. Please refresh the page and try again.`)
+          } else {
+            throw new Error(`Error uploading file: ${error.message}`)
+          }
+        }
+
+        const { data: publicUrlData, error: publicUrlError } = supabase
+          .storage
+          .from(BUCKET_NAME)
+          .getPublicUrl(data.path)
+
+        if (publicUrlError) {
+          throw new Error(`Error getting public URL: ${publicUrlError.message}`)
+        }
+
+        newDocument.file_path = publicUrlData.publicUrl
       }
 
-      newDocument.file_path = data.path
-    }
+      const { data, error } = await supabase
+        .from('acc_portal_directors_documents')
+        .insert([newDocument])
+      
+      if (error) {
+        throw new Error(`Error adding document: ${error.message}`)
+      }
 
-    const { data, error } = await supabase
-      .from('directors_documents')
-      .insert([newDocument])
-    if (error) console.error('Error adding document:', error)
-    else {
       fetchDocuments()
       setNewDocument({
         name: '',
@@ -123,52 +178,68 @@ export function DirectorsDocumentsList() {
       setFile(null)
       setIsAddingOneOff(false)
       setIsAddingRenewal(false)
+    } catch (error) {
+      console.error('Error:', error)
+      alert(error.message)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleViewUpload = async (doc) => {
     if (doc.file_path) {
-      const { data, error } = await supabase.storage
-        .from('directors-documents')
-        .createSignedUrl(doc.file_path, 60)
-
-      if (error) {
-        console.error('Error creating signed URL:', error)
-        return
-      }
-
-      window.open(data.signedUrl, '_blank')
+      window.open(doc.file_path, '_blank')
     } else {
-      // Open file upload dialog
       document.getElementById(`file-upload-${doc.id}`).click()
     }
   }
 
   const handleFileUpload = async (e, doc) => {
     const file = e.target.files[0]
-    if (file) {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Math.random()}.${fileExt}`
-      const { data, error } = await supabase.storage
-        .from('directors-documents')
-        .upload(fileName, file)
+    if (file && file.size <= MAX_FILE_SIZE) {
+      setIsLoading(true)
+      try {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Math.random()}.${fileExt}`
+        const folderPath = doc.type === 'one-off' ? 'one-off/' : 'renewal/'
+        const filePath = `${folderPath}${fileName}`
+        
+        const { data, error } = await supabase.storage
+          .from(BUCKET_NAME)
+          .upload(filePath, file)
 
-      if (error) {
-        console.error('Error uploading file:', error)
-        return
+        if (error) {
+          throw new Error(`Error uploading file: ${error.message}`)
+        }
+
+        const { data: publicUrlData, error: publicUrlError } = supabase
+          .storage
+          .from(BUCKET_NAME)
+          .getPublicUrl(data.path)
+
+        if (publicUrlError) {
+          throw new Error(`Error getting public URL: ${publicUrlError.message}`)
+        }
+
+        const { error: updateError } = await supabase
+          .from('acc_portal_directors_documents')
+          .update({ file_path: publicUrlData.publicUrl })
+          .eq('id', doc.id)
+
+        if (updateError) {
+          throw new Error(`Error updating document: ${updateError.message}`)
+        }
+
+        fetchDocuments()
+      } catch (error) {
+        console.error('Error:', error)
+        alert(error.message)
+      } finally {
+        setIsLoading(false)
       }
-
-      const { error: updateError } = await supabase
-        .from('directors_documents')
-        .update({ file_path: data.path })
-        .eq('id', doc.id)
-
-      if (updateError) {
-        console.error('Error updating document:', updateError)
-        return
-      }
-
-      fetchDocuments()
+    } else {
+      alert("File is too large. Maximum size is 5MB.")
+      e.target.value = null
     }
   }
 
@@ -200,8 +271,8 @@ export function DirectorsDocumentsList() {
           {documents.map((doc, index) => (
             <TableRow key={doc.id}>
               <TableCell>{index + 1}</TableCell>
-              <TableCell>{doc.name}</TableCell>
               <TableCell>{directors.find(d => d.id === doc.director_id)?.full_name || 'Unknown'}</TableCell>
+              <TableCell>{doc.name}</TableCell>
               <TableCell>
                 <Badge variant={doc.status === 'complete' ? "success" : "warning"}>
                   {doc.status === 'complete' ? "Complete" : "Pending"}
@@ -247,7 +318,12 @@ export function DirectorsDocumentsList() {
               </SelectTrigger>
               <SelectContent>
                 {directors.map((director) => (
-                  <SelectItem key={director.id} value={director.id}>{director.full_name}</SelectItem>
+                  <SelectItem key={director.id} value={director.id}>
+                    {director.full_name || `${director.first_name} ${director.middle_name || ''} ${director.last_name}`} 
+                    {director.email_address && ` - ${director.email_address}`}
+                    {director.passport_number && ` - Passport: ${director.passport_number}`}
+                    {director.id_number && ` - ID: ${director.id_number}`}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -284,7 +360,13 @@ export function DirectorsDocumentsList() {
           )}
         </div>
         <div className="pt-4">
-          <Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button>
+          <Button 
+            className="bg-blue-600 text-white" 
+            onClick={handleSubmit}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Submitting...' : 'Submit'}
+          </Button>
         </div>
       </SheetContent>
     </Sheet>
