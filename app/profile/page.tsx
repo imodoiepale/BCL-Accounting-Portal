@@ -1,3 +1,5 @@
+
+
 /* eslint-disable react/no-unescaped-entities */
 //@ts-nocheck
 
@@ -349,71 +351,44 @@ export default function Profile() {
             <TabsContent value="company-info-tab">
               <div className="space-y-4">
                 <h3 className="text-lg font-bold">Company's Documents</h3>
-                <KYCDocumentsList />
+                <KYCDocumentsList category="company" />
               </div>
             </TabsContent>
             <TabsContent value="directors-info">
               <div className="space-y-4">
-                <Tabs defaultValue="director-info">
-                  <TabsList>
-                    <TabsTrigger value="director-info">Directors' Documents</TabsTrigger>
-                    <TabsTrigger value="directors-kyc">Directors' KYC Documents</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="director-info">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-bold">Directors' Documents</h3>
-                      <KYCDocumentsList />
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="directors-kyc">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-bold">Directors' KYC Documents</h3>
-                      <DirectorsDocumentsList/>
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                <h3 className="text-lg font-bold">Directors' Documents</h3>
+                <KYCDocumentsList category="directors" />
+              </div>
+            </TabsContent>
+            <TabsContent value="suppliers-info">
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold">Suppliers' Documents</h3>
+                <KYCDocumentsList category="suppliers" />
+              </div>
+            
+            </TabsContent>
+            <TabsContent value="banks-info">
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold">Banks' Documents</h3>
+                <KYCDocumentsList category="banks" />
               </div>
             </TabsContent>
             <TabsContent value="employee-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Employees' Documents</h3>
-                <h2 className="text-xl font-semibold mb-2">Employees</h2>
-                <KYCDocumentsList />
-              </div>
-            </TabsContent>
-            <TabsContent value="suppliers-info">
-              <div className="space-y-4">
-                <Tabs defaultValue="trading-suppliers">
-                  <TabsList>
-                    <TabsTrigger value="trading-suppliers">Trading Suppliers - Documents</TabsTrigger>
-                    <TabsTrigger value="monthly-service-vendors">Monthly Service Vendors - Documents</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="trading-suppliers">
-                    <div className="space-y-4">
-                      <h4 className="text-md font-medium">Trading Suppliers</h4>
-                      <KYCDocumentsList />
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="monthly-service-vendors">
-                    <div className="space-y-4">
-                      <h4 className="text-md font-medium">Monthly Service Vendors</h4>
-                      <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
-                      <KYCDocumentsList />
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                <KYCDocumentsList category="employees" />
               </div>
             </TabsContent>
             <TabsContent value="insurances-info">
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Insurances' Documents</h3>
-                <KYCDocumentsList />
+                <h3 className="text-lg font-medium">Insurance Policy Documents</h3>
+                <KYCDocumentsList category="insurance" />
               </div>
             </TabsContent>
             <TabsContent value="deposits-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Deposits' Documents</h3>
-                <KYCDocumentsList />
+                <KYCDocumentsList category="deposits" />
               </div>
             </TabsContent>
             <TabsContent value="fixed-assets-info">
@@ -430,47 +405,41 @@ export default function Profile() {
                   <TabsContent value="computer-equipment">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Computer & Equipments</h4>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="fixed-assets-computer" />
                     </div>
                   </TabsContent>
                   <TabsContent value="furniture-fitting">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Furniture Fitting & Equip 12.5%</h4>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="fixed-assets-furniture" />
                     </div>
                   </TabsContent>
                   <TabsContent value="land-building">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Land & Building</h4>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="fixed-assets-land" />
                     </div>
                   </TabsContent>
                   <TabsContent value="plant-equipment">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Plant & Equipment - 12.5 %</h4>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="fixed-assets-plant" />
                     </div>
                   </TabsContent>
                   <TabsContent value="motor-vehicles">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Motor Vehicles - 25 %</h4>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="fixed-assets-vehicles" />
                     </div>
                   </TabsContent>
                 </Tabs>
               </div>
             </TabsContent>
-            <TabsContent value="banks-info">
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold mb-2">Banks</h2>
-                <KYCDocumentsList />
-              </div>
-            </TabsContent>
           </Tabs>
         </TabsContent>
+        
       </Tabs>
     </div>
   );
-
-
 }
+
