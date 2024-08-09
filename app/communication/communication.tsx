@@ -10,12 +10,15 @@ import { createClient } from '@supabase/supabase-js';
 import { DataTable } from './data-table';
 import { Pencil, Trash2, Info, Upload, MessageSquare, CheckCircle, Star } from "lucide-react";
 import Link from 'next/link';
+import { useUser } from '@clerk/nextjs';
 
 const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function TicketSystem() {
+  const { user } = useUser();
+
   const [tickets, setTickets] = useState([]);
   const [editFormFields, setEditFormFields] = useState(null);
   const [formFields, setFormFields] = useState({
@@ -43,6 +46,7 @@ export default function TicketSystem() {
       const { data, error } = await supabase
         .from('acc_portal_tickets')
         .select('*')
+        .eq('userid', user?.id)
         .order('id', { ascending: true });
 
       if (error) throw error;
@@ -67,11 +71,13 @@ export default function TicketSystem() {
   };
 
   const handleSubmit = async () => {
-    try {
+      try {
+        try {
       const now = new Date();
       const newTicket = {
         ...formFields,
         date_submitted: now.toISOString(),
+        userid: user?.id, 
       };
 
       if (isEditing) {
@@ -88,7 +94,8 @@ export default function TicketSystem() {
             ticket.id === editingTicketId ? {
               ...data[0],
               date_submitted: now.toLocaleDateString(),
-              time_submitted: now.toLocaleTimeString()
+              time_submitted: now.toLocaleTimeString(),
+              userid: user?.id,
             } : ticket
           );
           setTickets(updatedTickets);
@@ -158,7 +165,8 @@ export default function TicketSystem() {
         const { error } = await supabase
           .from('acc_portal_tickets')
           .delete()
-          .eq('id', id);
+          .eq('id', id)
+          .eq('userid', user?.id);
   
         if (error) throw error;
   

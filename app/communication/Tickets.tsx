@@ -38,6 +38,7 @@ const Tickets = () => {
 
   useEffect(() => {
     fetchTickets();
+    console.log(userId)
   }, [userId]);
 
   useEffect(() => {
@@ -129,7 +130,7 @@ const Tickets = () => {
     
     const newMsg = {
       ticket_id: selectedTicket.id,
-      sender_id: userId, // This should be the authenticated user's ID
+      sender_id: userId, 
       content: newMessage,
       is_admin: false
     };
