@@ -38,6 +38,7 @@ const Tickets = () => {
 
   useEffect(() => {
     fetchTickets();
+    console.log(userId)
   }, [userId]);
 
   useEffect(() => {
@@ -62,77 +63,56 @@ const Tickets = () => {
     }
   };
 
-  // const handleTicketSelect = (ticket) => {
-  //   setSelectedTicket(ticket);
-  //   setMessages([
-  //     {
-  //       id: 1,
-  //       sender: 'system',
-  //       content: `Ticket #${ticket.id}: ${ticket.subject}`,
-  //       timestamp: new Date(ticket.date_submitted).toLocaleString(),
-  //     },
-  //   ]);
-  // };
-
   const handleTicketSelect = async (ticket) => {
     setSelectedTicket(ticket);
-    // Fetch messages for this ticket
     const { data, error } = await supabase
       .from('ticket_messages')
       .select('*')
       .eq('ticket_id', ticket.id)
       .order('created_at', { ascending: true });
-
+  
     if (error) {
       console.error('Error fetching messages:', error);
     } else {
       setMessages(data);
     }
   };
+  
 
   useEffect(() => {
-    // Set up real-time subscription for new messages
-    const channel = supabase
-      .channel('public:ticket_messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ticket_messages' }, handleNewMessage)
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // const handleSendMessage = () => {
-  //   if (newMessage.trim() === '') return;
-    
-  //   setMessages([
-  //     ...messages,
-  //     {
-  //       id: messages.length + 1,
-  //       sender: 'client',
-  //       content: newMessage,
-  //       timestamp: new Date().toLocaleTimeString(),
-  //     },
-  //   ]);
-  //   setNewMessage('');
-  // };
-
-  const handleNewMessage = (payload) => {
-    if (payload.new && payload.new.ticket_id === selectedTicket?.id) {
-      setMessages(prevMessages => [...prevMessages, payload.new]);
+    if (selectedTicket) {
+      const channel = supabase
+        .channel(`public:ticket_messages:${selectedTicket.id}`)
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'ticket_messages',
+          filter: `ticket_id=eq.${selectedTicket.id}`
+        }, handleNewMessage)
+        .subscribe();
+  
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
+  }, [selectedTicket]);  
+  
+  const handleNewMessage = (payload) => {
+    setMessages(prevMessages => [...prevMessages, payload.new]);
   };
-
   
   const handleSendMessage = async () => {
     if (newMessage.trim() === '') return;
     
     const newMsg = {
       ticket_id: selectedTicket.id,
-      sender_id: userId, // This should be the authenticated user's ID
+      sender_id: userId, 
       content: newMessage,
-      is_admin: false
+      is_admin: false,
+      created_at: new Date().toISOString()
     };
+
+    setNewMessage('');
 
     const { data, error } = await supabase
       .from('ticket_messages')
