@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,} from "@/components/ui/sheet"
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { useUser } from '@clerk/clerk-react'
 
 const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
 const url="https://zyszsqgdlrpnunkegipk.supabase.co"
@@ -29,6 +30,8 @@ const formatDate = (dateString) => {
 };
 
 export function BankList() {
+  const { user } = useUser();
+
   const [banks, setBanks] = useState([])
   const [newBank, setNewBank] = useState({
     name: '',
@@ -48,10 +51,12 @@ export function BankList() {
     const { data, error } = await supabase
       .from('acc_portal_banks')
       .select('*')
+      .eq('userid', user?.id)
       .order('id', { ascending: true });
     if (error) console.error('Error fetching banks:', error)
     else setBanks(data)
   }
+  
 
   const handleInputChange = (e) => {
     setNewBank({ ...newBank, [e.target.id]: e.target.value })
@@ -64,7 +69,7 @@ export function BankList() {
   const handleSubmit = async () => {
     const { data, error } = await supabase
       .from('acc_portal_banks')
-      .insert([newBank])
+      .insert([{ ...newBank, userid: user?.id }])
     if (error) console.error('Error adding bank:', error)
     else {
       fetchBanks()
@@ -80,6 +85,27 @@ export function BankList() {
     }
   }
 
+  const updateBank = async (id, updatedData) => {
+    const { data, error } = await supabase
+      .from('acc_portal_banks')
+      .update(updatedData)
+      .eq('id', id)
+      .eq('userid', user?.id)
+    if (error) console.error('Error updating bank:', error)
+    else fetchBanks()
+  }
+  
+  const deleteBank = async (id) => {
+    const { data, error } = await supabase
+      .from('acc_portal_banks')
+      .delete()
+      .eq('id', id)
+      .eq('userid', user?.id)
+    if (error) console.error('Error deleting bank:', error)
+    else fetchBanks()
+  }
+  
+  
   return (
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">

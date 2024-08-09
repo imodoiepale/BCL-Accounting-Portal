@@ -13,6 +13,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,} from "@/components/ui/sheet"
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { ScrollArea } from '../ui/scroll-area'
+import { useUser } from '@clerk/clerk-react'
 
 
 const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
@@ -32,6 +33,10 @@ const formatDate = (dateString) => {
 };
 
 export function SupplierList() {
+
+  const { user } = useUser();
+
+
   const [suppliers, setSuppliers] = useState([])
   const [newSupplier, setNewSupplier] = useState({
     name: '',
@@ -44,15 +49,17 @@ export function SupplierList() {
   useEffect(() => {
     fetchSuppliers()
   }, [])
-
+  
   const fetchSuppliers = async () => {
     const { data, error } = await supabase
-      .from('acc_portal_suppliers')
+    .from('acc_portal_suppliers')
       .select('*')
+      .eq('userid', user?.id)
       .order('id', { ascending: true });
-    if (error) console.error('Error fetching suppliers:', error)
+      if (error) console.error('Error fetching suppliers:', error)
     else setSuppliers(data)
   }
+  
 
   const handleInputChange = (e) => {
     setNewSupplier({ ...newSupplier, [e.target.id]: e.target.value })
@@ -62,7 +69,7 @@ export function SupplierList() {
   const handleSubmit = async () => {
     const { data, error } = await supabase
       .from('acc_portal_suppliers')
-      .insert([newSupplier])
+      .insert([{ ...newSupplier, userid: user?.id }])
     if (error) console.error('Error adding supplier:', error)
     else {
       fetchSuppliers()
@@ -75,6 +82,7 @@ export function SupplierList() {
       })
     }
   }
+  
 
   return (
     <div className="flex w-full bg-gray-100">

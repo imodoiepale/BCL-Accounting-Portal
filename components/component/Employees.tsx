@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,} from "@/components/ui/sheet"
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { useUser } from '@clerk/clerk-react'
 
 
 const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
@@ -31,11 +32,13 @@ const formatDate = (dateString) => {
 };
 
 export function EmployeeList() {
+
+  const { user } = useUser();
+
   const [employees, setEmployees] = useState([])
   const [newEmployee, setNewEmployee] = useState({
     name: '',
     id_number: '',
-    company_id: '',
     kra_pin: '',
     email: '',
     mobile: '',
@@ -52,10 +55,12 @@ export function EmployeeList() {
     const { data, error } = await supabase
       .from('acc_portal_employees')
       .select('*')
+      .eq('userid', user?.id)
       .order('id', { ascending: true });
     if (error) console.error('Error fetching employees:', error)
     else setEmployees(data)
   }
+  
 
   const handleInputChange = (e) => {
     setNewEmployee({ ...newEmployee, [e.target.id]: e.target.value })
@@ -65,14 +70,13 @@ export function EmployeeList() {
   const handleSubmit = async () => {
     const { data, error } = await supabase
       .from('acc_portal_employees')
-      .insert([newEmployee])
+      .insert([{ ...newEmployee, userid: user?.id }])
     if (error) console.error('Error adding employee:', error)
     else {
       fetchEmployees()
       setNewEmployee({
         name: '',
         id_number: '',
-        company_id: '',
         kra_pin: '',
         email: '',
         mobile: '',
@@ -115,10 +119,6 @@ export function EmployeeList() {
                   <div className="space-y-1">
                     <Label htmlFor="id_number">ID Number</Label>
                     <Input id="id_number" placeholder="12345678" value={newEmployee.id_number} onChange={handleInputChange} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="company_id">Company ID</Label>
-                    <Input id="company_id" placeholder="1" value={newEmployee.company_id} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="kra_pin">KRA PIN</Label>
@@ -173,7 +173,6 @@ export function EmployeeList() {
                   <TableCell>EMP-{employee.id}</TableCell>
                   <TableCell>{employee.name}</TableCell>
                   <TableCell>{employee.id_number}</TableCell>
-                  {/* <TableCell>{employee.company_id}</TableCell> */}
                   <TableCell>{employee.kra_pin}</TableCell>
                   <TableCell>{employee.email}</TableCell>
                   <TableCell>{employee.mobile}</TableCell>

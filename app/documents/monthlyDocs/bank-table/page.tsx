@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { bankColumns } from "./columns";
 import { DataTable } from "./data-table";
+import { useAuth } from '@clerk/clerk-react';
 
 const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
@@ -54,6 +55,8 @@ function formatDateTime(dateTimeString) {
 }
 
 export default function BankStatements() {
+  const { userId } = useAuth();
+
   const [data, setData] = useState<AllBanks[]>([]);
   const [currentDate, setCurrentDate] = useState('');
   const [currentMonth, setCurrentMonth] = useState('');
@@ -63,8 +66,8 @@ export default function BankStatements() {
     try {
       setIsLoading(true);
       const [{ data: bankData, error: bankError }, { data: uploadData, error: uploadError }] = await Promise.all([
-        supabase.from('acc_portal_banks').select('*').order('id', { ascending: true }),
-        supabase.from('acc_portal_monthly_files_upload').select('*')
+        supabase.from('acc_portal_banks').select('*').eq('userid', userId).order('id', { ascending: true }),
+        supabase.from('acc_portal_monthly_files_upload').select('*').eq('userid', userId)
       ]);
 
       if (bankError) throw new Error(`Error fetching bank data: ${bankError.message}`);

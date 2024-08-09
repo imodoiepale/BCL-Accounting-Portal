@@ -3,6 +3,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { supplierColumns } from "./columns";
 import { DataTable } from "./data-table";
+import { useAuth } from '@clerk/clerk-react';
 
 
 const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
@@ -62,6 +63,8 @@ interface MonthlyDocsClientProps {
 }
 
 export function MonthlyDocsClient({ selectedMonth, isCurrentMonth = true }: MonthlyDocsClientProps) {
+  const { userId } = useAuth();
+
   const [data, setData] = useState<AllCompanies[]>([]);
   const [currentDate, setCurrentDate] = useState('');
   const [displayMonth, setDisplayMonth] = useState('');
@@ -73,13 +76,17 @@ export function MonthlyDocsClient({ selectedMonth, isCurrentMonth = true }: Mont
       console.log('Fetching data for month:', month || 'Current Month');
   
       let supplierQuery = supabase
-        .from('acc_portal_suppliers')
-        .select('*')
-        .order('id', { ascending: true });
+      .from('acc_portal_suppliers')
+      .select('*')
+      .eq('userid', userId)
+      .order('id', { ascending: true });
+
   
       let uploadQuery = supabase
         .from('acc_portal_monthly_files_upload')
-        .select('*');
+        .select('*')
+        .eq('userid', userId);
+
   
       if (month) {
         const [monthName, year] = month.split(' ');

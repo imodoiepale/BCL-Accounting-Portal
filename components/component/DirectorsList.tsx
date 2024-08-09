@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
+import { useUser } from '@clerk/clerk-react'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -101,6 +102,8 @@ const directorFields = {
 }
 
 export function DirectorsList() {
+  const { userId } = useAuth();
+
   const [directors, setDirectors] = useState([])
   const [newDirector, setNewDirector] = useState({})
   const [isAddingDirector, setIsAddingDirector] = useState(false)
@@ -118,6 +121,7 @@ export function DirectorsList() {
     const { data, error } = await supabase
       .from('acc_portal_directors')
       .select('*')
+      .eq('userid', user?.id)
       .order('id', { ascending: true })
     setIsLoading(false)
     if (error) {
@@ -130,7 +134,8 @@ export function DirectorsList() {
     } else {
       setDirectors(data)
     }
-  }, [toast])
+  }, [toast, user?.id])
+  
 
   useEffect(() => {
     fetchDirectors()
@@ -157,7 +162,10 @@ export function DirectorsList() {
 
   const handleSubmit = async () => {
     setIsLoading(true)
-    const { data, error } = await supabase.from('acc_portal_directors').insert([newDirector]).select()
+    const { data, error } = await supabase
+      .from('acc_portal_directors')
+      .insert([{ ...newDirector, userid: user?.id }])
+      .select()
     setIsLoading(false)
     if (error) {
       console.error('Error adding director:', error)
@@ -176,6 +184,7 @@ export function DirectorsList() {
       })
     }
   }
+  
 
   const handleMissingFieldsSubmit = async () => {
     if (Object.keys(changedFields).length === 0) {
@@ -185,15 +194,16 @@ export function DirectorsList() {
       })
       return
     }
-
+  
     setIsLoading(true)
     const { data, error } = await supabase
       .from('acc_portal_directors')
       .update(changedFields)
       .eq('id', selectedDirector.id)
+      .eq('userid', user?.id)
       .select()
     setIsLoading(false)
-
+  
     if (error) {
       console.error('Error updating director:', error)
       toast({
@@ -216,6 +226,7 @@ export function DirectorsList() {
       })
     }
   }
+  
 
   const getDirectorStatus = (director) => {
     const missingFields = fields.filter(field => !director[field] || director[field] === '')

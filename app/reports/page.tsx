@@ -11,7 +11,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { createClient } from "@supabase/supabase-js";
 import ReportTable from "./ReportTable";
 import BalanceTable from "./BalanceTable";
-import { useUser } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react'
 
 const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing";
 const url = "https://zyszsqgdlrpnunkegipk.supabase.co";
@@ -19,7 +19,10 @@ const url = "https://zyszsqgdlrpnunkegipk.supabase.co";
 const supabase = createClient(url, key);
 
 export default function Reports() {
-  const user = useUser()
+  const { user } = useUser();
+  const { userId } = useAuth();
+
+  const [isLoading, setIsLoading] = useState(true);
 
   const [supplierData, setSupplierData] = useState([]);
   const [bankData, setBankData] = useState([]);
@@ -43,17 +46,21 @@ export default function Reports() {
   });
 
   useEffect(() => {
-    fetchSuppliers();
-    fetchBanks();
-  }, []);
+    if (user) {
+      fetchSuppliers();
+      fetchBanks();
+      setIsLoading(false);
+    }
+  }, [user]);
+  console.log(user.id)
+  
 
   const fetchSuppliers = async () => {
     const { data: suppliers, error: supplierError } = await supabase
       .from('acc_portal_suppliers')
       .select('id, name, startdate, contact_email, contact_mobile')
-      .eq('userid', user?.id)
-      .order('id', { ascending: true });
-
+      .order('id', { ascending: true })
+      .eq('userid', userId)
 
     if (supplierError) {
       console.error('Error fetching suppliers:', supplierError);
@@ -109,8 +116,10 @@ export default function Reports() {
     const { data: banks, error: bankError } = await supabase
       .from('acc_portal_banks')
       .select('id, name, startdate')
-      .eq('userid', user?.id)
+      .eq('userid', userId)
       .order('id', { ascending: true });
+
+      console.log(banks)
 
 
     if (bankError) {
@@ -164,7 +173,7 @@ export default function Reports() {
     if (activeTab === 'suppliers') {
       const { data, error } = await supabase
       .from('acc_portal_suppliers')
-      .insert([{ ...newSupplier, startdate: new Date().toISOString(), userid: user?.id }]);
+      .insert([{ ...newSupplier, startdate: new Date().toISOString(), userid: userId }]);
 
       
       if (error) {
@@ -184,7 +193,7 @@ export default function Reports() {
     } else if (activeTab === 'banks') {
       const { data, error } = await supabase
         .from('acc_portal_banks')
-        .insert([{ ...newBank, startdate: new Date().toISOString(), userid: user?.id }]);
+        .insert([{ ...newBank, startdate: new Date().toISOString(), userid: userId }]);
 
       
       if (error) {
@@ -366,9 +375,9 @@ export default function Reports() {
           </Tabs>
         </TabsContent>
 
-        <TabsContent value="others">
+        {/* <TabsContent value="others">
           <ReportTable data={otherDocsData} title="Other Documents Report" />
-        </TabsContent>
+        </TabsContent> */}
       </Tabs>
     </div>
   );
