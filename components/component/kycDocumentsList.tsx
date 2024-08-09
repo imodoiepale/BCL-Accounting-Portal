@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { RefreshCwIcon, PlusIcon, UploadIcon, EyeIcon } from 'lucide-react'
+import { RefreshCwIcon, PlusIcon, UploadIcon, EyeIcon, ArrowUpDown } from 'lucide-react'
+import { toast } from 'sonner'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -20,14 +21,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
   return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
 };
 
-
-export function KYCDocumentsList() {
+export function KYCDocumentsList({ category }) {
   const [oneOffDocs, setOneOffDocs] = useState([])
   const [renewalDocs, setRenewalDocs] = useState([])
   const [newDocument, setNewDocument] = useState({
@@ -37,19 +38,23 @@ export function KYCDocumentsList() {
     expiry_date: '',
     description: '',
     file_path: '',
+    category: category,
   })
   const [isAddingOneOff, setIsAddingOneOff] = useState(false)
   const [isAddingRenewal, setIsAddingRenewal] = useState(false)
   const [file, setFile] = useState(null)
+  const [sortColumn, setSortColumn] = useState(null)
+  const [sortDirection, setSortDirection] = useState('asc')
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     createBucketAndFolders().then(() => {
       fetchDocuments()
     })
-  }, [])
+  }, [category])
+
 
   const createBucketAndFolders = async () => {
-    // Create the main bucket
     const { data: bucketData, error: bucketError } = await supabase.storage.createBucket('kyc-documents', {
       public: false,
       allowedMimeTypes: ['application/pdf', 'image/png', 'image/jpeg'],
@@ -61,12 +66,11 @@ export function KYCDocumentsList() {
       return
     }
 
-    // Create subfolders
     const folders = ['one-off', 'renewal']
     for (const folder of folders) {
       const { data, error } = await supabase.storage
         .from('kyc-documents')
-        .upload(`${folder}/.keep`, new Blob([''])) // Create an empty file to ensure folder creation
+        .upload(`${folder}/.keep`, new Blob(['']))
 
       if (error && error.message !== 'The resource already exists') {
         console.error(`Error creating ${folder} folder:`, error)
@@ -79,12 +83,14 @@ export function KYCDocumentsList() {
       .from('acc_portal_kyc_docs')
       .select('*')
       .eq('document_type', 'one_off')
+      .eq('category', category)
       .order('id', { ascending: true });
   
     const { data: renewalData, error: renewalError } = await supabase
       .from('acc_portal_kyc_docs')
       .select('*')
       .eq('document_type', 'renewal')
+      .eq('category', category)
       .order('id', { ascending: true });
   
     if (oneOffError) console.error('Error fetching one-off documents:', oneOffError)
@@ -108,31 +114,13 @@ export function KYCDocumentsList() {
 
   const handleSubmit = async (isOneOff) => {
     try {
-      console.log('Current newDocument state:', newDocument);
-  
-      // Check if the table exists
-      const { data: tableExists, error: tableCheckError } = await supabase
-        .from('acc_portal_kyc_docs')
-        .select('id')
-        .limit(1);
-  
-      if (tableCheckError) {
-        console.error('Error checking table existence:', tableCheckError);
-        throw new Error(`Table check failed: ${tableCheckError.message || 'Unknown error'}`);
-      }
-  
-      if (!tableExists) {
-        console.error('acc_portal_kyc_docs table does not exist');
-        throw new Error('acc_portal_kyc_docs table does not exist in the database');
-      }
-  
       let file_path = '';
       if (file) {
         const fileExt = file.name.split('.').pop()
         const fileName = `${Math.random()}.${fileExt}`
         const { data, error } = await supabase.storage
           .from('kyc-documents')
-          .upload(`${isOneOff ? 'one_off' : 'renewal'}/${fileName}`, file)
+          .upload(`${category}/${isOneOff ? 'one_off' : 'renewal'}/${fileName}`, file)
   
         if (error) {
           console.error('Error uploading file:', error)
@@ -144,20 +132,17 @@ export function KYCDocumentsList() {
   
       const documentToInsert = {
         name: newDocument.name,
-        category: newDocument.type, // Assuming 'type' in newDocument corresponds to 'category' in the table
+        category: category,
         document_type: isOneOff ? 'one_off' : 'renewal',
         status: newDocument.status,
         description: newDocument.description,
         expiry_date: isOneOff ? null : newDocument.expiry_date,
         document_url: file_path,
         upload_date: new Date().toISOString(),
-        // You need to provide these values:
-        user_id: null, // Replace with actual user_id if available
-        entity_id: null, // Replace with actual entity_id if available
-        entity_type: '', // Replace with actual entity_type if available
+        user_id: null,
+        entity_id: null,
+        entity_type: '',
       }
-  
-      console.log('Attempting to insert document:', documentToInsert);
   
       const { data, error } = await supabase
         .from('acc_portal_kyc_docs')
@@ -165,16 +150,13 @@ export function KYCDocumentsList() {
         .select()
   
       if (error) {
-        console.error('Supabase insertion error:', error)
         throw new Error(`Document insertion failed: ${error.message || 'Unknown error'}`)
       }
   
-      if (!data || data.length === 0) {
-        console.error('No data returned from insert operation')
-        throw new Error('Document insertion failed: No data returned')
-      }
-  
-      console.log('Document added successfully:', data)
+      toast({
+        title: "Success",
+        description: "Document added successfully",
+      })
       
       fetchDocuments()
       setNewDocument({
@@ -183,24 +165,34 @@ export function KYCDocumentsList() {
         status: 'pending',
         expiry_date: '',
         description: '',
+        category: category,
       })
       setFile(null)
       setIsAddingOneOff(false)
       setIsAddingRenewal(false)
     } catch (error) {
       console.error('Error in handleSubmit:', error)
-      alert(`Failed to add document: ${error.message}`);
+      toast({
+        title: "Error",
+        description: `Failed to add document: ${error.message}`,
+        variant: "destructive",
+      })
     }
   }
 
   const handleViewUpload = async (doc) => {
-    if (doc.file_path) {
+    if (doc.document_url) {
       const { data, error } = await supabase.storage
         .from('kyc-documents')
-        .createSignedUrl(doc.file_path, 60)
+        .createSignedUrl(doc.document_url, 60)
 
       if (error) {
         console.error('Error creating signed URL:', error)
+        toast({
+          title: "Error",
+          description: "Failed to retrieve document. Please try again.",
+          variant: "destructive",
+        })
         return
       }
 
@@ -217,25 +209,70 @@ export function KYCDocumentsList() {
       const fileName = `${Math.random()}.${fileExt}`
       const { data, error } = await supabase.storage
         .from('kyc-documents')
-        .upload(`${doc.type}/${fileName}`, file)
+        .upload(`${doc.document_type}/${fileName}`, file)
 
       if (error) {
         console.error('Error uploading file:', error)
+        toast({
+          title: "Error",
+          description: "Failed to upload file. Please try again.",
+          variant: "destructive",
+        })
         return
       }
 
       const { error: updateError } = await supabase
-        .from('kyc_documents')
-        .update({ file_path: data.path })
+        .from('acc_portal_kyc_docs')
+        .update({ document_url: data.path })
         .eq('id', doc.id)
 
       if (updateError) {
         console.error('Error updating document:', updateError)
+        toast({
+          title: "Error",
+          description: "Failed to update document. Please try again.",
+          variant: "destructive",
+        })
         return
       }
 
       fetchDocuments()
     }
+  }
+
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortDocuments = (docs) => {
+    if (!sortColumn) return docs
+
+    return [...docs].sort((a, b) => {
+      let aValue = a[sortColumn]
+      let bValue = b[sortColumn]
+
+      if (sortColumn === 'expiry_date') {
+        aValue = aValue ? new Date(aValue) : new Date(0)
+        bValue = bValue ? new Date(bValue) : new Date(0)
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
+  const filterDocuments = (docs) => {
+    if (!searchTerm) return docs
+    return docs.filter(doc => 
+      doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.description.toLowerCase().includes(searchTerm.toLowerCase())
+    )
   }
 
   const renderDocumentTable = (documents, title, isOneOff) => (
@@ -254,15 +291,25 @@ export function KYCDocumentsList() {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[50px]">No.</TableHead>
-            <TableHead>Document Name</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Description</TableHead>
+            <TableHead onClick={() => handleSort('name')} className="cursor-pointer">
+              Document Name {sortColumn === 'name' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+            </TableHead>
+            <TableHead onClick={() => handleSort('status')} className="cursor-pointer">
+              Status {sortColumn === 'status' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+            </TableHead>
+            <TableHead onClick={() => handleSort('description')} className="cursor-pointer">
+              Description {sortColumn === 'description' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+            </TableHead>
             <TableHead>View/Upload</TableHead>
-            {!isOneOff && <TableHead>Expiry Date</TableHead>}
+            {!isOneOff && (
+              <TableHead onClick={() => handleSort('expiry_date')} className="cursor-pointer">
+                Expiry Date {sortColumn === 'expiry_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+              </TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {documents.map((doc, index) => (
+          {filterDocuments(sortDocuments(documents)).map((doc, index) => (
             <TableRow key={doc.id}>
               <TableCell>{index + 1}</TableCell>
               <TableCell>{doc.name}</TableCell>
@@ -274,8 +321,8 @@ export function KYCDocumentsList() {
               <TableCell>{doc.description}</TableCell>
               <TableCell>
                 <Button variant="outline" onClick={() => handleViewUpload(doc)}>
-                  {doc.file_path ? <EyeIcon className="w-4 h-4 mr-2" /> : <UploadIcon className="w-4 h-4 mr-2" />}
-                  {doc.file_path ? "View" : "Upload"}
+                  {doc.document_url ? <EyeIcon className="w-4 h-4 mr-2" /> : <UploadIcon className="w-4 h-4 mr-2" />}
+                  {doc.document_url ? "View" : "Upload"}
                 </Button>
                 <input
                   id={`file-upload-${doc.id}`}
@@ -345,9 +392,15 @@ export function KYCDocumentsList() {
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-semibold">KYC Documents List</h1>
+          <h1 className="text-xl font-semibold">{category} KYC Documents</h1>
           <div className="flex items-center space-x-2">
-            <Input type="search" placeholder="Search documents" className="w-48" />
+            <Input 
+              type="search" 
+              placeholder="Search documents" 
+              className="w-48" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
             <Button variant="outline" className="flex items-center" onClick={fetchDocuments}>
               <RefreshCwIcon className="w-4 h-4 mr-1" />
               Refresh
