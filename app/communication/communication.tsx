@@ -71,8 +71,7 @@ export default function TicketSystem() {
   };
 
   const handleSubmit = async () => {
-      try {
-        try {
+    try {
       const now = new Date();
       const newTicket = {
         ...formFields,
