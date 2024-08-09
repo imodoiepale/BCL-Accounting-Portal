@@ -2,15 +2,14 @@
 // @ts-nocheck
 "use client"
 
-import React, { useState } from 'react'
-// import { createClient } from '@supabase/supabase-js'
+import React, { useState, useEffect } from 'react'
+import { createClient } from '@supabase/supabase-js'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { PlusIcon, RefreshCwIcon } from 'lucide-react'
 import { Badge } from '../ui/badge'
@@ -23,10 +22,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-
-// const key="your-supabase-key"
-// const url="your-supabase-url"
-// const supabase = createClient(url, key)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 const directorFields = {
   "1. Director's Personal Details": [
@@ -51,7 +50,6 @@ const directorFields = {
   ],
   "3. Director's Identification Details": [
     { id: 'id_number', label: 'ID Number', type: 'text' },
-    { id: 'alien_number', label: 'Alien Number', type: 'text' },
     { id: 'tax_pin', label: 'KRA PIN', type: 'text' },
   ],
   "4. Director's Physical Attributes": [
@@ -102,66 +100,26 @@ const directorFields = {
   ],
 }
 
-// Dummy data for 5 directors
-const dummyDirectors = [
-  {
-    id: 1,
-    full_name: "John Doe",
-    nationality: "Kenyan",
-    id_passport_number: "A12345678",
-    date_of_birth: "1980-05-15",
-    phone_number: "+254 712 345 678",
-    email: "john.doe@example.com",
-    physical_address: "123 Nairobi St, Nairobi",
-    postal_address: "P.O. Box 12345, Nairobi",
-    tax_pin: "A123456789B",
-    shares_held: 1000,
-    occupation: "Business Executive",
-    education_level: "Master's Degree",
-    marital_status: "Married",
-    dependents: 2,
-    annual_income: 5000000,
-    other_directorships: "ABC Ltd, XYZ Corp",
-    criminal_record: "None",
-    bankruptcy_history: "None",
-    professional_memberships: "Kenya Institute of Management",
-    languages_spoken: "English, Swahili",
-    university_name : "UON",
-    languages_spoken : "English / Kiswahili"
-  },
-  {
-    id: 2,
-    full_name: "Jane Smith",
-    nationality: "Ugandan",
-    id_passport_number: "B87654321",
-    date_of_birth: "1985-08-22",
-    phone_number: "+256 775 432 109",
-    email: "jane.smith@example.com",
-    physical_address: "456 Kampala Rd, Kampala",
-    postal_address: "P.O. Box 54321, Kampala",
-    tax_pin: "B987654321C",
-    shares_held: 800,
-    occupation: "Lawyer",
-    education_level: "Juris Doctor",
-    marital_status: "Single",
-    dependents: 0,
-    annual_income: 4000000,
-    other_directorships: "Legal Eagles LLP",
-    criminal_record: "None",
-    bankruptcy_history: "None",
-    professional_memberships: "Uganda Law Society",
-    languages_spoken: "English, Luganda"
-  },
-];
-
 export function DirectorsList() {
-  const [directors, setDirectors] = useState(dummyDirectors)
+  const [directors, setDirectors] = useState([])
   const [newDirector, setNewDirector] = useState({})
   const [isAddingDirector, setIsAddingDirector] = useState(false)
   const [selectedDirector, setSelectedDirector] = useState(null)
   const [isEditingMissingFields, setIsEditingMissingFields] = useState(false)
 
   const fields = Object.values(directorFields).flatMap(category => category.map(field => field.id))
+
+  useEffect(() => {
+    const fetchDirectors = async () => {
+      const { data, error } = await supabase.from('acc_portal_directors').select('*')
+      if (error) {
+        console.error('Error fetching directors:', error)
+      } else {
+        setDirectors(data)
+      }
+    }
+    fetchDirectors()
+  }, [])
 
   const handleInputChange = (e, directorId = null) => {
     if (directorId) {
@@ -173,19 +131,134 @@ export function DirectorsList() {
     }
   }
 
-  const handleSubmit = () => {
-    setDirectors([...directors, { ...newDirector, id: directors.length + 1 }])
-    setNewDirector({})
-    setIsAddingDirector(false)
+  const handleSubmit = async () => {
+    const { error } = await supabase.from('acc_portal_directors').insert([
+      {
+        first_name: newDirector.first_name,
+        middle_name: newDirector.middle_name,
+        last_name: newDirector.last_name,
+        other_names: newDirector.other_names,
+        full_name: newDirector.full_name,
+        gender: newDirector.gender,
+        place_of_birth: newDirector.place_of_birth,
+        country_of_birth: newDirector.country_of_birth,
+        nationality: newDirector.nationality,
+        marital_status: newDirector.marital_status,
+        date_of_birth: newDirector.date_of_birth,
+        passport_number: newDirector.passport_number,
+        passport_place_of_issue: newDirector.passport_place_of_issue,
+        passport_issue_date: newDirector.passport_issue_date,
+        passport_expiry_date: newDirector.passport_expiry_date,
+        passport_file_number: newDirector.passport_file_number,
+        id_number: newDirector.id_number,
+        tax_pin: newDirector.tax_pin,
+        eye_color: newDirector.eye_color,
+        hair_color: newDirector.hair_color,
+        height: newDirector.height,
+        special_marks: newDirector.special_marks,
+        mobile_number: newDirector.mobile_number,
+        email_address: newDirector.email_address,
+        alternative_email: newDirector.alternative_email,
+        building_name: newDirector.building_name,
+        floor_number: newDirector.floor_number,
+        block_number: newDirector.block_number,
+        road_name: newDirector.road_name,
+        area_name: newDirector.area_name,
+        town: newDirector.town,
+        country: newDirector.country,
+        full_residential_address: newDirector.full_residential_address,
+        residential_county: newDirector.residential_county,
+        sub_county: newDirector.sub_county,
+        postal_address: newDirector.postal_address,
+        postal_code: newDirector.postal_code,
+        postal_town: newDirector.postal_town,
+        full_postal_address: newDirector.full_postal_address,
+        university_name: newDirector.university_name,
+        course_name: newDirector.course_name,
+        course_start_date: newDirector.course_start_date,
+        course_end_date: newDirector.course_end_date,
+        job_position: newDirector.job_position,
+        job_description: newDirector.job_description,
+        shares_held: newDirector.shares_held,
+        other_directorships: newDirector.other_directorships,
+        dependents: newDirector.dependents,
+        annual_income: newDirector.annual_income,
+        languages_spoken: newDirector.languages_spoken,
+      },
+    ])
+    if (error) {
+      console.error('Error adding director:', error)
+    } else {
+      setDirectors([...directors, { ...newDirector, id: directors.length + 1 }])
+      setNewDirector({})
+      setIsAddingDirector(false)
+    }
   }
 
-  const handleMissingFieldsSubmit = () => {
-    // In a real application, you would save to the database here
-    setIsEditingMissingFields(false)
-    setSelectedDirector(null)
+  const handleMissingFieldsSubmit = async () => {
+    const { error } = await supabase
+      .from('acc_portal_directors')
+      .update({
+        first_name: selectedDirector.first_name,
+        middle_name: selectedDirector.middle_name,
+        last_name: selectedDirector.last_name,
+        other_names: selectedDirector.other_names,
+        full_name: selectedDirector.full_name,
+        gender: selectedDirector.gender,
+        place_of_birth: selectedDirector.place_of_birth,
+        country_of_birth: selectedDirector.country_of_birth,
+        nationality: selectedDirector.nationality,
+        marital_status: selectedDirector.marital_status,
+        date_of_birth: selectedDirector.date_of_birth,
+        passport_number: selectedDirector.passport_number,
+        passport_place_of_issue: selectedDirector.passport_place_of_issue,
+        passport_issue_date: selectedDirector.passport_issue_date,
+        passport_expiry_date: selectedDirector.passport_expiry_date,
+        passport_file_number: selectedDirector.passport_file_number,
+        id_number: selectedDirector.id_number,
+        tax_pin: selectedDirector.tax_pin,
+        eye_color: selectedDirector.eye_color,
+        hair_color: selectedDirector.hair_color,
+        height: selectedDirector.height,
+        special_marks: selectedDirector.special_marks,
+        mobile_number: selectedDirector.mobile_number,
+        email_address: selectedDirector.email_address,
+        alternative_email: selectedDirector.alternative_email,
+        building_name: selectedDirector.building_name,
+        floor_number: selectedDirector.floor_number,
+        block_number: selectedDirector.block_number,
+        road_name: selectedDirector.road_name,
+        area_name: selectedDirector.area_name,
+        town: selectedDirector.town,
+        country: selectedDirector.country,
+        full_residential_address: selectedDirector.full_residential_address,
+        residential_county: selectedDirector.residential_county,
+        sub_county: selectedDirector.sub_county,
+        postal_address: selectedDirector.postal_address,
+        postal_code: selectedDirector.postal_code,
+        postal_town: selectedDirector.postal_town,
+        full_postal_address: selectedDirector.full_postal_address,
+        university_name: selectedDirector.university_name,
+        course_name: selectedDirector.course_name,
+        course_start_date: selectedDirector.course_start_date,
+        course_end_date: selectedDirector.course_end_date,
+        job_position: selectedDirector.job_position,
+        job_description: selectedDirector.job_description,
+        shares_held: selectedDirector.shares_held,
+        other_directorships: selectedDirector.other_directorships,
+        dependents: selectedDirector.dependents,
+        annual_income: selectedDirector.annual_income,
+        languages_spoken: selectedDirector.languages_spoken,
+      })
+      .eq('id', selectedDirector.id)
+    if (error) {
+      console.error('Error updating director:', error)
+    } else {
+      setIsEditingMissingFields(false)
+      setSelectedDirector(null)
+    }
   }
 
-  // Helper function to determine director status and missing fields count
   const getDirectorStatus = (director) => {
     const missingFields = fields.filter(field => !director[field] || director[field] === '')
     return {
@@ -202,19 +275,25 @@ export function DirectorsList() {
           <div className="grid grid-cols-4 gap-4 border rounded-lg p-4 mb-4 shadow-sm">
             {fields.map((field) => (
               <div key={field.id} className="col-span-1 space-y-1">
-                <label htmlFor={field.id} className="text-sm font-medium">{field.label}</label>
+                <Label htmlFor={field.id} className="text-sm font-medium">{field.label}</Label>
                 {field.type === 'select' ? (
-                  <select
-                    id={field.id}
-                    value={directorData[field.id] || ''}
-                    onChange={(e) => onChangeHandler(e, directorId)}
-                    className="w-full p-2 border rounded"
-                  >
-                    <option value="">Select {field.label}</option>
-                    {field.options.map(option => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
+                  <Select>
+                    <SelectTrigger className="w-full p-2 border rounded">
+                      <SelectValue placeholder={`Select ${field.label}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {field.options.map(option => (
+                        <SelectItem
+                          key={option}
+                          className="hover:bg-gray-100"
+                          value={option}
+                          onClick={() => handleInputChange({ target: { id: field.id, value: option } }, directorId)}
+                        >
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : field.type === 'textarea' ? (
                   <textarea
                     id={field.id}
@@ -319,8 +398,7 @@ export function DirectorsList() {
                       ))}
                     </TableRow>
                   ))}
-                </TableBody>
-              </Table>
+                </TableBody></Table>
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
