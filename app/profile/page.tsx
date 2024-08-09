@@ -335,7 +335,138 @@ export default function Profile() {
         </TabsContent>
         <TabsContent value="kyc-docs">
           <h2 className="text-xl font-semibold mb-2">KYC Documents</h2>
-          <KYCDocumentsList />
+          <Tabs defaultValue="company-info-tab">
+            <TabsList>
+              <TabsTrigger value="company-info-tab">Company's Documents</TabsTrigger>
+              <TabsTrigger value="directors-info">Directors' Documents</TabsTrigger>
+              <TabsTrigger value="suppliers-info">Suppliers' Documents</TabsTrigger>
+              <TabsTrigger value="banks-info">Banks' Documents</TabsTrigger>
+              <TabsTrigger value="employee-info">Employees' Documents</TabsTrigger>
+              <TabsTrigger value="insurances-info">Insurance Policy Documents</TabsTrigger>
+              <TabsTrigger value="deposits-info">Deposits' Documents</TabsTrigger>
+              <TabsTrigger value="fixed-assets-info">Fixed Assets Register</TabsTrigger>
+            </TabsList>
+            <TabsContent value="company-info-tab">
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold">Company's Documents</h3>
+                <KYCDocumentsList />
+              </div>
+            </TabsContent>
+            <TabsContent value="directors-info">
+              <div className="space-y-4">
+                <Tabs defaultValue="director-info">
+                  <TabsList>
+                    <TabsTrigger value="director-info">Directors' Documents</TabsTrigger>
+                    <TabsTrigger value="directors-kyc">Directors' KYC Documents</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="director-info">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-bold">Directors' Documents</h3>
+                      <KYCDocumentsList />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="directors-kyc">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-bold">Directors' KYC Documents</h3>
+                      <DirectorsDocumentsList/>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </TabsContent>
+            <TabsContent value="employee-info">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Employees' Documents</h3>
+                <h2 className="text-xl font-semibold mb-2">Employees</h2>
+                <KYCDocumentsList />
+              </div>
+            </TabsContent>
+            <TabsContent value="suppliers-info">
+              <div className="space-y-4">
+                <Tabs defaultValue="trading-suppliers">
+                  <TabsList>
+                    <TabsTrigger value="trading-suppliers">Trading Suppliers - Documents</TabsTrigger>
+                    <TabsTrigger value="monthly-service-vendors">Monthly Service Vendors - Documents</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="trading-suppliers">
+                    <div className="space-y-4">
+                      <h4 className="text-md font-medium">Trading Suppliers</h4>
+                      <KYCDocumentsList />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="monthly-service-vendors">
+                    <div className="space-y-4">
+                      <h4 className="text-md font-medium">Monthly Service Vendors</h4>
+                      <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
+                      <KYCDocumentsList />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </TabsContent>
+            <TabsContent value="insurances-info">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Insurances' Documents</h3>
+                <KYCDocumentsList />
+              </div>
+            </TabsContent>
+            <TabsContent value="deposits-info">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Deposits' Documents</h3>
+                <KYCDocumentsList />
+              </div>
+            </TabsContent>
+            <TabsContent value="fixed-assets-info">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Fixed Assets Register</h3>
+                <Tabs defaultValue="computer-equipment">
+                  <TabsList>
+                    <TabsTrigger value="computer-equipment">Computer & Equipments</TabsTrigger>
+                    <TabsTrigger value="furniture-fitting">Furniture Fitting & Equip 12.5%</TabsTrigger>
+                    <TabsTrigger value="land-building">Land & Building</TabsTrigger>
+                    <TabsTrigger value="plant-equipment">Plant & Equipment - 12.5 %</TabsTrigger>
+                    <TabsTrigger value="motor-vehicles">Motor Vehicles - 25 %</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="computer-equipment">
+                    <div className="space-y-4">
+                      <h4 className="text-md font-medium">Computer & Equipments</h4>
+                      <KYCDocumentsList />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="furniture-fitting">
+                    <div className="space-y-4">
+                      <h4 className="text-md font-medium">Furniture Fitting & Equip 12.5%</h4>
+                      <KYCDocumentsList />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="land-building">
+                    <div className="space-y-4">
+                      <h4 className="text-md font-medium">Land & Building</h4>
+                      <KYCDocumentsList />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="plant-equipment">
+                    <div className="space-y-4">
+                      <h4 className="text-md font-medium">Plant & Equipment - 12.5 %</h4>
+                      <KYCDocumentsList />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="motor-vehicles">
+                    <div className="space-y-4">
+                      <h4 className="text-md font-medium">Motor Vehicles - 25 %</h4>
+                      <KYCDocumentsList />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </TabsContent>
+            <TabsContent value="banks-info">
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold mb-2">Banks</h2>
+                <KYCDocumentsList />
+              </div>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>

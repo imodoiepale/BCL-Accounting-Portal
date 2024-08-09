@@ -2,8 +2,11 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Users, Mail, Phone, Globe, MapPin, CreditCard, FileText, Calendar } from 'lucide-react';
+import { useUser } from '@clerk/nextjs';
 
 export function CompanyInfoTab() {
+  const { user } = useUser();
+  
   const companyData = {
     name: "ABC Solutions Ltd",
     type: "Private Limited Company",
