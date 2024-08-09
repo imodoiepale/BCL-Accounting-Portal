@@ -49,7 +49,7 @@ const calculateFloatData = () => {
 
 export function PettyCash() {
   const { userId } = useUser();
-  const userId = user?.id;
+  // const userId = user?.id;
 
   const [pettyCashEntries, setPettyCashEntries] = useState([]);
   const [floatData, setFloatData] = useState(calculateFloatData());
