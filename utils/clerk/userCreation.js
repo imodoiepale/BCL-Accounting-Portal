@@ -14,6 +14,7 @@ const fs = require('fs');
 // Array of client credentials
 const clientCredentials = [
     { username: 'BclTest123', password: 'BclTest123' },
+    { username: 'Agrolt', password: 'Agroltbcl1*' },
     // { username: 'Akash', password: 'Akashbcl1*' },
     // { username: 'Ambe', password: 'Ambebcl1*' },
     // { username: 'Anamaya', password: 'Anamayabcl1*' },

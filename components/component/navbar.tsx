@@ -6,9 +6,10 @@ import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { useUser } from '@clerk/nextjs';
 
 export function Navbar() {
-
+  const { user } = useUser();
   const currentDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -20,7 +21,7 @@ export function Navbar() {
     <div className="flex flex-col w-full sticky top-0 z-10 bg-white border-b border-b-gray-200">
       <header className="flex items-center h-16 px-4 border-b shrink-0 md:px-6 shadow-sm">
         <div className="flex items-center gap-6 text-lg font-semibold whitespace-nowrap justify-between md:gap-5 md:text-sm lg:gap-6">
-          <p className='text-xl'>ABC Limited</p>
+          <p className='text-xl capitalize'>{`Welcome `}{ user?.username || user?.firstName + " "+  user?.lastName || 'User'}</p>
         </div>
         <div className="flex items-center w-full gap-4 ml-auto md:gap-2 lg:gap-4">
         <p className="flex-1 ml-auto sm:flex-initial font-semibold gradient-text">{currentDate}</p>
@@ -42,6 +43,7 @@ export function Navbar() {
             <SignedIn>
               <UserButton />
             </SignedIn>
+            <p className="capitalize">{ user?.username || user?.firstName + " "+  user?.lastName || 'User'}</p>
         </div>
       </header>
     </div>
