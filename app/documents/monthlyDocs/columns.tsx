@@ -28,10 +28,13 @@ import { ArrowUpDown, Info } from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as yup from 'yup';
 import { AllCompanies } from './page';
+import { useAuth } from '@clerk/clerk-react';
 
 const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+
 
 const UploadCell = React.memo(({ row }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -60,11 +63,13 @@ const UploadCell = React.memo(({ row }) => {
 
   useEffect(() => {
     const fetchUploadStatus = async () => {
+      const { userId } = useAuth();
       const { data, error } = await supabase
         .from('acc_portal_monthly_files_upload')
         .select('upload_status')
         .eq('company_id', row.original.CompanyId)
         .eq('document_type', 'supplier statement')
+        .eq('userid', userId)
         .order('upload_date', { ascending: false })
         .limit(1)
         .single();
@@ -129,19 +134,21 @@ const UploadCell = React.memo(({ row }) => {
       if (storageError) throw storageError;
 
       const { error: insertError } = await supabase
-        .from('acc_portal_monthly_files_upload')
-        .insert({
-          supplier_id: row.original.CompanyId,
-          company_id: row.original.CompanyId,
-          document_type: 'supplier statement',
-          upload_date: currentDate.toISOString(),
-          docs_date_range: data.periodFrom,
-          docs_date_range_end: data.periodTo,
-          closing_balance: data.closingBalance,
-          balance_verification: false,
-          file_path: filePath,
-          upload_status: 'Uploaded' 
-        });
+      .from('acc_portal_monthly_files_upload')
+      .insert({
+        supplier_id: row.original.CompanyId,
+        company_id: row.original.CompanyId,
+        document_type: 'supplier statement',
+        upload_date: currentDate.toISOString(),
+        docs_date_range: data.periodFrom,
+        docs_date_range_end: data.periodTo,
+        closing_balance: data.closingBalance,
+        balance_verification: false,
+        file_path: filePath,
+        upload_status: 'Uploaded',
+        userId: userId
+      });
+
 
       if (insertError) throw insertError;
 

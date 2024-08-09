@@ -361,7 +361,7 @@ export default function Profile() {
                   </TabsList>
                   <TabsContent value="director-info">
                     <div className="space-y-4">
-                      <h3 className="text-lg font-bold">Directors' Documents</h3>
+                      <h3 className="text-xl ">Directors' Documents</h3>
                       <KYCDocumentsList />
                     </div>
                   </TabsContent>
@@ -377,7 +377,6 @@ export default function Profile() {
             <TabsContent value="employee-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Employees' Documents</h3>
-                <h2 className="text-xl font-semibold mb-2">Employees</h2>
                 <KYCDocumentsList />
               </div>
             </TabsContent>
@@ -390,14 +389,13 @@ export default function Profile() {
                   </TabsList>
                   <TabsContent value="trading-suppliers">
                     <div className="space-y-4">
-                      <h4 className="text-md font-medium">Trading Suppliers</h4>
+                      <h4 className="text-xl font-medium">Trading Suppliers Documents</h4>
                       <KYCDocumentsList />
                     </div>
                   </TabsContent>
                   <TabsContent value="monthly-service-vendors">
                     <div className="space-y-4">
-                      <h4 className="text-md font-medium">Monthly Service Vendors</h4>
-                      <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
+                      <h2 className="text-xl font-medium">Monthly Service Vendors Documents</h2>
                       <KYCDocumentsList />
                     </div>
                   </TabsContent>
@@ -462,7 +460,7 @@ export default function Profile() {
             </TabsContent>
             <TabsContent value="banks-info">
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold mb-2">Banks</h2>
+                <h2 className="text-xl  mb-2">Bank Documents</h2>
                 <KYCDocumentsList />
               </div>
             </TabsContent>
