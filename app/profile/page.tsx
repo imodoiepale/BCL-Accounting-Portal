@@ -1,3 +1,5 @@
+
+
 /* eslint-disable react/no-unescaped-entities */
 //@ts-nocheck
 
@@ -349,7 +351,7 @@ export default function Profile() {
             <TabsContent value="company-info-tab">
               <div className="space-y-4">
                 <h3 className="text-lg font-bold">Company's Documents</h3>
-                <KYCDocumentsList />
+                <KYCDocumentsList category="company" />
               </div>
             </TabsContent>
             <TabsContent value="directors-info">
@@ -404,14 +406,14 @@ export default function Profile() {
             </TabsContent>
             <TabsContent value="insurances-info">
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Insurances' Documents</h3>
-                <KYCDocumentsList />
+                <h3 className="text-lg font-medium">Insurance Policy Documents</h3>
+                <KYCDocumentsList category="insurance" />
               </div>
             </TabsContent>
             <TabsContent value="deposits-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Deposits' Documents</h3>
-                <KYCDocumentsList />
+                <KYCDocumentsList category="deposits" />
               </div>
             </TabsContent>
             <TabsContent value="fixed-assets-info">
@@ -428,31 +430,31 @@ export default function Profile() {
                   <TabsContent value="computer-equipment">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Computer & Equipments</h4>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="fixed-assets-computer" />
                     </div>
                   </TabsContent>
                   <TabsContent value="furniture-fitting">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Furniture Fitting & Equip 12.5%</h4>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="fixed-assets-furniture" />
                     </div>
                   </TabsContent>
                   <TabsContent value="land-building">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Land & Building</h4>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="fixed-assets-land" />
                     </div>
                   </TabsContent>
                   <TabsContent value="plant-equipment">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Plant & Equipment - 12.5 %</h4>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="fixed-assets-plant" />
                     </div>
                   </TabsContent>
                   <TabsContent value="motor-vehicles">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Motor Vehicles - 25 %</h4>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="fixed-assets-vehicles" />
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -466,9 +468,9 @@ export default function Profile() {
             </TabsContent>
           </Tabs>
         </TabsContent>
+        
       </Tabs>
     </div>
   );
-
-
 }
+
