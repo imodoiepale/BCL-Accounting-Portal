@@ -1,6 +1,5 @@
 // @ts-nocheck
 "use client"
-
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
@@ -13,15 +12,20 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { RefreshCwIcon, PlusIcon, UploadIcon, EyeIcon } from 'lucide-react'
 
-const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
-const url="https://zyszsqgdlrpnunkegipk.supabase.co"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-const supabase = createClient(url, key)
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Supabase URL or Anon Key is missing in environment variables.')
+}
 
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
   const date = new Date(dateString);
   return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
 };
+
 
 export function KYCDocumentsList() {
   const [oneOffDocs, setOneOffDocs] = useState([])
@@ -39,25 +43,53 @@ export function KYCDocumentsList() {
   const [file, setFile] = useState(null)
 
   useEffect(() => {
-    fetchDocuments()
+    createBucketAndFolders().then(() => {
+      fetchDocuments()
+    })
   }, [])
+
+  const createBucketAndFolders = async () => {
+    // Create the main bucket
+    const { data: bucketData, error: bucketError } = await supabase.storage.createBucket('kyc-documents', {
+      public: false,
+      allowedMimeTypes: ['application/pdf', 'image/png', 'image/jpeg'],
+      fileSizeLimit: 5 * 1024 * 1024, // 5MB limit
+    })
+
+    if (bucketError && bucketError.message !== 'Bucket already exists') {
+      console.error('Error creating bucket:', bucketError)
+      return
+    }
+
+    // Create subfolders
+    const folders = ['one-off', 'renewal']
+    for (const folder of folders) {
+      const { data, error } = await supabase.storage
+        .from('kyc-documents')
+        .upload(`${folder}/.keep`, new Blob([''])) // Create an empty file to ensure folder creation
+
+      if (error && error.message !== 'The resource already exists') {
+        console.error(`Error creating ${folder} folder:`, error)
+      }
+    }
+  }
 
   const fetchDocuments = async () => {
     const { data: oneOffData, error: oneOffError } = await supabase
-      .from('kyc_documents')
+      .from('acc_portal_kyc_docs')
       .select('*')
-      .eq('type', 'one-off')
+      .eq('document_type', 'one_off')
       .order('id', { ascending: true });
-
+  
     const { data: renewalData, error: renewalError } = await supabase
-      .from('kyc_documents')
+      .from('acc_portal_kyc_docs')
       .select('*')
-      .eq('type', 'renewal')
+      .eq('document_type', 'renewal')
       .order('id', { ascending: true });
-
+  
     if (oneOffError) console.error('Error fetching one-off documents:', oneOffError)
     else setOneOffDocs(oneOffData)
-
+  
     if (renewalError) console.error('Error fetching renewal documents:', renewalError)
     else setRenewalDocs(renewalData)
   }
@@ -74,39 +106,90 @@ export function KYCDocumentsList() {
     setFile(e.target.files[0])
   }
 
-  const handleSubmit = async () => {
-    if (file) {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Math.random()}.${fileExt}`
-      const { data, error } = await supabase.storage
-        .from('kyc-documents')
-        .upload(fileName, file)
-
-      if (error) {
-        console.error('Error uploading file:', error)
-        return
+  const handleSubmit = async (isOneOff) => {
+    try {
+      console.log('Current newDocument state:', newDocument);
+  
+      // Check if the table exists
+      const { data: tableExists, error: tableCheckError } = await supabase
+        .from('acc_portal_kyc_docs')
+        .select('id')
+        .limit(1);
+  
+      if (tableCheckError) {
+        console.error('Error checking table existence:', tableCheckError);
+        throw new Error(`Table check failed: ${tableCheckError.message || 'Unknown error'}`);
       }
-
-      newDocument.file_path = data.path
-    }
-
-    const { data, error } = await supabase
-      .from('kyc_documents')
-      .insert([newDocument])
-    if (error) console.error('Error adding document:', error)
-    else {
+  
+      if (!tableExists) {
+        console.error('acc_portal_kyc_docs table does not exist');
+        throw new Error('acc_portal_kyc_docs table does not exist in the database');
+      }
+  
+      let file_path = '';
+      if (file) {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Math.random()}.${fileExt}`
+        const { data, error } = await supabase.storage
+          .from('kyc-documents')
+          .upload(`${isOneOff ? 'one_off' : 'renewal'}/${fileName}`, file)
+  
+        if (error) {
+          console.error('Error uploading file:', error)
+          throw new Error(`File upload failed: ${error.message}`)
+        }
+  
+        file_path = data.path;
+      }
+  
+      const documentToInsert = {
+        name: newDocument.name,
+        category: newDocument.type, // Assuming 'type' in newDocument corresponds to 'category' in the table
+        document_type: isOneOff ? 'one_off' : 'renewal',
+        status: newDocument.status,
+        description: newDocument.description,
+        expiry_date: isOneOff ? null : newDocument.expiry_date,
+        document_url: file_path,
+        upload_date: new Date().toISOString(),
+        // You need to provide these values:
+        user_id: null, // Replace with actual user_id if available
+        entity_id: null, // Replace with actual entity_id if available
+        entity_type: '', // Replace with actual entity_type if available
+      }
+  
+      console.log('Attempting to insert document:', documentToInsert);
+  
+      const { data, error } = await supabase
+        .from('acc_portal_kyc_docs')
+        .insert([documentToInsert])
+        .select()
+  
+      if (error) {
+        console.error('Supabase insertion error:', error)
+        throw new Error(`Document insertion failed: ${error.message || 'Unknown error'}`)
+      }
+  
+      if (!data || data.length === 0) {
+        console.error('No data returned from insert operation')
+        throw new Error('Document insertion failed: No data returned')
+      }
+  
+      console.log('Document added successfully:', data)
+      
       fetchDocuments()
       setNewDocument({
         name: '',
-        type: 'one-off',
+        type: '',
         status: 'pending',
         expiry_date: '',
         description: '',
-        file_path: '',
       })
       setFile(null)
       setIsAddingOneOff(false)
       setIsAddingRenewal(false)
+    } catch (error) {
+      console.error('Error in handleSubmit:', error)
+      alert(`Failed to add document: ${error.message}`);
     }
   }
 
@@ -123,7 +206,6 @@ export function KYCDocumentsList() {
 
       window.open(data.signedUrl, '_blank')
     } else {
-      // Open file upload dialog
       document.getElementById(`file-upload-${doc.id}`).click()
     }
   }
@@ -135,7 +217,7 @@ export function KYCDocumentsList() {
       const fileName = `${Math.random()}.${fileExt}`
       const { data, error } = await supabase.storage
         .from('kyc-documents')
-        .upload(fileName, file)
+        .upload(`${doc.type}/${fileName}`, file)
 
       if (error) {
         console.error('Error uploading file:', error)
@@ -202,7 +284,7 @@ export function KYCDocumentsList() {
                   onChange={(e) => handleFileUpload(e, doc)}
                 />
               </TableCell>
-              {!isOneOff && <TableCell>{doc.expiry_date ? formatDate(doc.expiry_date) : 'N/A'}</TableCell>}
+              {!isOneOff && <TableCell>{formatDate(doc.expiry_date)}</TableCell>}
             </TableRow>
           ))}
         </TableBody>
@@ -253,7 +335,7 @@ export function KYCDocumentsList() {
           )}
         </div>
         <div className="pt-4">
-          <Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button>
+          <Button className="bg-blue-600 text-white" onClick={() => handleSubmit(isOneOff)}>Submit</Button>
         </div>
       </SheetContent>
     </Sheet>
