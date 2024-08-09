@@ -1,8 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 // @ts-nocheck
 "use client"
-
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
@@ -11,8 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
-import { PlusIcon, RefreshCwIcon } from 'lucide-react'
-import { Badge } from '../ui/badge'
+import { PlusIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -21,6 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { useToast } from "@/components/ui/use-toast"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -106,156 +106,114 @@ export function DirectorsList() {
   const [isAddingDirector, setIsAddingDirector] = useState(false)
   const [selectedDirector, setSelectedDirector] = useState(null)
   const [isEditingMissingFields, setIsEditingMissingFields] = useState(false)
+  const [changedFields, setChangedFields] = useState({})
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
 
   const fields = Object.values(directorFields).flatMap(category => category.map(field => field.id))
 
-  useEffect(() => {
-    const fetchDirectors = async () => {
-      const { data, error } = await supabase.from('acc_portal_directors').select('*')
-      if (error) {
-        console.error('Error fetching directors:', error)
-      } else {
-        setDirectors(data)
-      }
+  const fetchDirectors = useCallback(async () => {
+    setIsLoading(true)
+    const { data, error } = await supabase
+      .from('acc_portal_directors')
+      .select('*')
+      .order('id', { ascending: true })
+    setIsLoading(false)
+    if (error) {
+      console.error('Error fetching directors:', error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch directors. Please try again.",
+        variant: "destructive",
+      })
+    } else {
+      setDirectors(data)
     }
+  }, [toast])
+
+  useEffect(() => {
     fetchDirectors()
-  }, [])
+  }, [fetchDirectors])
 
   const handleInputChange = (e, directorId = null) => {
+    const { id, value } = e.target
     if (directorId) {
-      setDirectors(directors.map(director => 
-        director.id === directorId ? { ...director, [e.target.id]: e.target.value } : director
-      ))
+      setSelectedDirector(prevDirector => ({
+        ...prevDirector,
+        [id]: value
+      }))
+      setChangedFields(prevFields => ({
+        ...prevFields,
+        [id]: value
+      }))
     } else {
-      setNewDirector({ ...newDirector, [e.target.id]: e.target.value })
+      setNewDirector(prevDirector => ({
+        ...prevDirector,
+        [id]: value
+      }))
     }
   }
 
   const handleSubmit = async () => {
-    const { error } = await supabase.from('acc_portal_directors').insert([
-      {
-        first_name: newDirector.first_name,
-        middle_name: newDirector.middle_name,
-        last_name: newDirector.last_name,
-        other_names: newDirector.other_names,
-        full_name: newDirector.full_name,
-        gender: newDirector.gender,
-        place_of_birth: newDirector.place_of_birth,
-        country_of_birth: newDirector.country_of_birth,
-        nationality: newDirector.nationality,
-        marital_status: newDirector.marital_status,
-        date_of_birth: newDirector.date_of_birth,
-        passport_number: newDirector.passport_number,
-        passport_place_of_issue: newDirector.passport_place_of_issue,
-        passport_issue_date: newDirector.passport_issue_date,
-        passport_expiry_date: newDirector.passport_expiry_date,
-        passport_file_number: newDirector.passport_file_number,
-        id_number: newDirector.id_number,
-        tax_pin: newDirector.tax_pin,
-        eye_color: newDirector.eye_color,
-        hair_color: newDirector.hair_color,
-        height: newDirector.height,
-        special_marks: newDirector.special_marks,
-        mobile_number: newDirector.mobile_number,
-        email_address: newDirector.email_address,
-        alternative_email: newDirector.alternative_email,
-        building_name: newDirector.building_name,
-        floor_number: newDirector.floor_number,
-        block_number: newDirector.block_number,
-        road_name: newDirector.road_name,
-        area_name: newDirector.area_name,
-        town: newDirector.town,
-        country: newDirector.country,
-        full_residential_address: newDirector.full_residential_address,
-        residential_county: newDirector.residential_county,
-        sub_county: newDirector.sub_county,
-        postal_address: newDirector.postal_address,
-        postal_code: newDirector.postal_code,
-        postal_town: newDirector.postal_town,
-        full_postal_address: newDirector.full_postal_address,
-        university_name: newDirector.university_name,
-        course_name: newDirector.course_name,
-        course_start_date: newDirector.course_start_date,
-        course_end_date: newDirector.course_end_date,
-        job_position: newDirector.job_position,
-        job_description: newDirector.job_description,
-        shares_held: newDirector.shares_held,
-        other_directorships: newDirector.other_directorships,
-        dependents: newDirector.dependents,
-        annual_income: newDirector.annual_income,
-        languages_spoken: newDirector.languages_spoken,
-      },
-    ])
+    setIsLoading(true)
+    const { data, error } = await supabase.from('acc_portal_directors').insert([newDirector]).select()
+    setIsLoading(false)
     if (error) {
       console.error('Error adding director:', error)
+      toast({
+        title: "Error",
+        description: "Failed to add director. Please try again.",
+        variant: "destructive",
+      })
     } else {
-      setDirectors([...directors, { ...newDirector, id: directors.length + 1 }])
+      setDirectors(prevDirectors => [...prevDirectors, data[0]])
       setNewDirector({})
       setIsAddingDirector(false)
+      toast({
+        title: "Success",
+        description: "Director added successfully.",
+      })
     }
   }
 
   const handleMissingFieldsSubmit = async () => {
-    const { error } = await supabase
-      .from('acc_portal_directors')
-      .update({
-        first_name: selectedDirector.first_name,
-        middle_name: selectedDirector.middle_name,
-        last_name: selectedDirector.last_name,
-        other_names: selectedDirector.other_names,
-        full_name: selectedDirector.full_name,
-        gender: selectedDirector.gender,
-        place_of_birth: selectedDirector.place_of_birth,
-        country_of_birth: selectedDirector.country_of_birth,
-        nationality: selectedDirector.nationality,
-        marital_status: selectedDirector.marital_status,
-        date_of_birth: selectedDirector.date_of_birth,
-        passport_number: selectedDirector.passport_number,
-        passport_place_of_issue: selectedDirector.passport_place_of_issue,
-        passport_issue_date: selectedDirector.passport_issue_date,
-        passport_expiry_date: selectedDirector.passport_expiry_date,
-        passport_file_number: selectedDirector.passport_file_number,
-        id_number: selectedDirector.id_number,
-        tax_pin: selectedDirector.tax_pin,
-        eye_color: selectedDirector.eye_color,
-        hair_color: selectedDirector.hair_color,
-        height: selectedDirector.height,
-        special_marks: selectedDirector.special_marks,
-        mobile_number: selectedDirector.mobile_number,
-        email_address: selectedDirector.email_address,
-        alternative_email: selectedDirector.alternative_email,
-        building_name: selectedDirector.building_name,
-        floor_number: selectedDirector.floor_number,
-        block_number: selectedDirector.block_number,
-        road_name: selectedDirector.road_name,
-        area_name: selectedDirector.area_name,
-        town: selectedDirector.town,
-        country: selectedDirector.country,
-        full_residential_address: selectedDirector.full_residential_address,
-        residential_county: selectedDirector.residential_county,
-        sub_county: selectedDirector.sub_county,
-        postal_address: selectedDirector.postal_address,
-        postal_code: selectedDirector.postal_code,
-        postal_town: selectedDirector.postal_town,
-        full_postal_address: selectedDirector.full_postal_address,
-        university_name: selectedDirector.university_name,
-        course_name: selectedDirector.course_name,
-        course_start_date: selectedDirector.course_start_date,
-        course_end_date: selectedDirector.course_end_date,
-        job_position: selectedDirector.job_position,
-        job_description: selectedDirector.job_description,
-        shares_held: selectedDirector.shares_held,
-        other_directorships: selectedDirector.other_directorships,
-        dependents: selectedDirector.dependents,
-        annual_income: selectedDirector.annual_income,
-        languages_spoken: selectedDirector.languages_spoken,
+    if (Object.keys(changedFields).length === 0) {
+      toast({
+        title: "No Changes",
+        description: "No fields were changed.",
       })
+      return
+    }
+
+    setIsLoading(true)
+    const { data, error } = await supabase
+      .from('acc_portal_directors')
+      .update(changedFields)
       .eq('id', selectedDirector.id)
+      .select()
+    setIsLoading(false)
+
     if (error) {
       console.error('Error updating director:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update director. Please try again.",
+        variant: "destructive",
+      })
     } else {
+      setDirectors(prevDirectors =>
+        prevDirectors.map(director =>
+          director.id === selectedDirector.id ? { ...director, ...data[0] } : director
+        )
+      )
       setIsEditingMissingFields(false)
       setSelectedDirector(null)
+      setChangedFields({})
+      toast({
+        title: "Success",
+        description: "Director updated successfully.",
+      })
     }
   }
 
@@ -277,18 +235,13 @@ export function DirectorsList() {
               <div key={field.id} className="col-span-1 space-y-1">
                 <Label htmlFor={field.id} className="text-sm font-medium">{field.label}</Label>
                 {field.type === 'select' ? (
-                  <Select>
+                  <Select onValueChange={(value) => onChangeHandler({ target: { id: field.id, value } }, directorId)}>
                     <SelectTrigger className="w-full p-2 border rounded">
                       <SelectValue placeholder={`Select ${field.label}`} />
                     </SelectTrigger>
                     <SelectContent>
                       {field.options.map(option => (
-                        <SelectItem
-                          key={option}
-                          className="hover:bg-gray-100"
-                          value={option}
-                          onClick={() => handleInputChange({ target: { id: field.id, value: option } }, directorId)}
-                        >
+                        <SelectItem key={option} value={option}>
                           {option}
                         </SelectItem>
                       ))}
@@ -318,15 +271,30 @@ export function DirectorsList() {
     </div>
   )
 
+  const filteredDirectors = directors.filter(director =>
+    Object.values(director).some(value =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  )
+
   return (
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-semibold">Directors List</h1>
           <div className="flex items-center space-x-2">
-            <Input type="search" placeholder="Search directors" className="w-48" />
-            <Button variant="outline" className="flex items-center">
-              <RefreshCwIcon className="w-4 h-4 mr-1" />
+            <div className="relative">
+              <SearchIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Input
+                type="search"
+                placeholder="Search directors"
+                className="pl-8 w-64"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button variant="outline" className="flex items-center" onClick={fetchDirectors} disabled={isLoading}>
+              <RefreshCwIcon className={`w-4 h-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
             <Dialog open={isAddingDirector} onOpenChange={setIsAddingDirector}>
@@ -347,7 +315,9 @@ export function DirectorsList() {
                   {renderFormFields(newDirector, handleInputChange)}
                 </ScrollArea>
                 <div className="mt-4 flex justify-end">
-                  <Button onClick={handleSubmit}>Add Director</Button>
+                  <Button onClick={handleSubmit} disabled={isLoading}>
+                    {isLoading ? 'Adding...' : 'Add Director'}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -361,23 +331,22 @@ export function DirectorsList() {
                 <TableHeader className="sticky top-0 z-10 bg-white">
                   <TableRow>
                     <TableHead className="sticky left-0 z-20 bg-white border">Field</TableHead>
-                    {directors.map((director, index) => (
+                    {filteredDirectors.map((director, index) => (
                       <TableHead key={director.id} className="text-center border">Director {index + 1}</TableHead>
                     ))}
                   </TableRow>
                   <TableRow>
                     <TableHead className="sticky left-0 z-20 bg-white border">Status</TableHead>
-                    {directors.map((director) => {
+                    {filteredDirectors.map((director) => {
                       const { status, missingCount } = getDirectorStatus(director)
                       return (
                         <TableHead key={director.id} className="text-center border">
                           <Badge 
                             className={`cursor-pointer ${status === 'complete' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}
                             onClick={() => {
-                              if (status === 'pending') {
-                                setSelectedDirector(director)
-                                setIsEditingMissingFields(true)
-                              }
+                              setSelectedDirector(director)
+                              setIsEditingMissingFields(true)
+                              setChangedFields({})
                             }}
                           >
                             {status === 'complete' ? 'Complete' : `Pending (${missingCount})`}
@@ -393,12 +362,13 @@ export function DirectorsList() {
                       <TableCell className="sticky left-0 z-10 bg-inherit font-medium border">
                         {Object.values(directorFields).flat().find(f => f.id === field)?.label || field}
                       </TableCell>
-                      {directors.map((director) => (
+                      {filteredDirectors.map((director) => (
                         <TableCell key={director.id} className="border">{director[field] || '-'}</TableCell>
                       ))}
                     </TableRow>
                   ))}
-                </TableBody></Table>
+                </TableBody>
+              </Table>
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -407,16 +377,18 @@ export function DirectorsList() {
         <Dialog open={isEditingMissingFields} onOpenChange={setIsEditingMissingFields}>
           <DialogContent className="max-w-[95vw] w-[1400px]">
             <DialogHeader>
-              <DialogTitle>Fill Missing Fields for Director {selectedDirector?.id}</DialogTitle>
+              <DialogTitle>Edit Director Information</DialogTitle>
               <DialogDescription>
-                Complete the missing information for this director.
+                Update the information for this director. Only changed fields will be submitted.
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[80vh] px-4">
               {selectedDirector && renderFormFields(selectedDirector, handleInputChange, selectedDirector.id)}
             </ScrollArea>
             <div className="mt-4 flex justify-end">
-              <Button onClick={handleMissingFieldsSubmit}>Save Changes</Button>
+              <Button onClick={handleMissingFieldsSubmit} disabled={isLoading}>
+                {isLoading ? 'Saving...' : 'Save Changes'}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
