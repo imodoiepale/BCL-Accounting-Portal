@@ -1,7 +1,6 @@
 /* eslint-disable react/no-unescaped-entities */
 // @ts-nocheck
 "use client"
-
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
@@ -23,6 +22,7 @@ const BUCKET_NAME = 'directors-documents'
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
   const date = new Date(dateString);
   return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
 };
@@ -77,23 +77,17 @@ export function DirectorsDocumentsList() {
   }
 
   const fetchDocuments = async () => {
-    const { data: oneOffData, error: oneOffError } = await supabase
+    const { data, error } = await supabase
       .from('acc_portal_directors_documents')
       .select('*')
-      .eq('type', 'one-off')
       .order('id', { ascending: true });
 
-    const { data: renewalData, error: renewalError } = await supabase
-      .from('acc_portal_directors_documents')
-      .select('*')
-      .eq('type', 'renewal')
-      .order('id', { ascending: true });
-
-    if (oneOffError) console.error('Error fetching one-off documents:', oneOffError)
-    else setOneOffDocs(oneOffData)
-
-    if (renewalError) console.error('Error fetching renewal documents:', renewalError)
-    else setRenewalDocs(renewalData)
+    if (error) {
+      console.error('Error fetching documents:', error);
+    } else {
+      setOneOffDocs(data.filter(doc => doc.type === 'one-off'));
+      setRenewalDocs(data.filter(doc => doc.type === 'renewal'));
+    }
   }
 
   const fetchDirectors = async () => {
@@ -125,47 +119,50 @@ export function DirectorsDocumentsList() {
   }
 
   const handleSubmit = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
+      const documentType = isAddingOneOff ? 'one-off' : 'renewal';
+      const newDoc = {
+        ...newDocument,
+        type: documentType,
+        expiry_date: documentType === 'one-off' ? null : newDocument.expiry_date,
+      };
+
       if (file) {
-        const fileExt = file.name.split('.').pop()
-        const fileName = `${Math.random()}.${fileExt}`
-        const folderPath = newDocument.type === 'one-off' ? 'one-off/' : 'renewal/'
-        const filePath = `${folderPath}${fileName}`
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const folderPath = `${documentType}/`;
+        const filePath = `${folderPath}${fileName}`;
         
         const { data, error } = await supabase.storage
           .from(BUCKET_NAME)
-          .upload(filePath, file)
-
+          .upload(filePath, file);
+  
         if (error) {
-          if (error.statusCode === '404') {
-            throw new Error(`Bucket not found. Please refresh the page and try again.`)
-          } else {
-            throw new Error(`Error uploading file: ${error.message}`)
-          }
+          throw new Error(`Error uploading file: ${error.message}`);
         }
-
+  
         const { data: publicUrlData, error: publicUrlError } = supabase
           .storage
           .from(BUCKET_NAME)
-          .getPublicUrl(data.path)
-
+          .getPublicUrl(data.path);
+  
         if (publicUrlError) {
-          throw new Error(`Error getting public URL: ${publicUrlError.message}`)
+          throw new Error(`Error getting public URL: ${publicUrlError.message}`);
         }
-
-        newDocument.file_path = publicUrlData.publicUrl
+  
+        newDoc.file_path = publicUrlData.publicUrl;
       }
-
+  
       const { data, error } = await supabase
         .from('acc_portal_directors_documents')
-        .insert([newDocument])
+        .insert([newDoc]);
       
       if (error) {
-        throw new Error(`Error adding document: ${error.message}`)
+        throw new Error(`Error adding document: ${error.message}`);
       }
-
-      fetchDocuments()
+  
+      fetchDocuments();
       setNewDocument({
         name: '',
         type: 'one-off',
@@ -174,17 +171,17 @@ export function DirectorsDocumentsList() {
         description: '',
         file_path: '',
         director_id: '',
-      })
-      setFile(null)
-      setIsAddingOneOff(false)
-      setIsAddingRenewal(false)
+      });
+      setFile(null);
+      setIsAddingOneOff(false);
+      setIsAddingRenewal(false);
     } catch (error) {
-      console.error('Error:', error)
-      alert(error.message)
+      console.error('Error:', error);
+      alert(error.message);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleViewUpload = async (doc) => {
     if (doc.file_path) {
@@ -291,7 +288,7 @@ export function DirectorsDocumentsList() {
                   onChange={(e) => handleFileUpload(e, doc)}
                 />
               </TableCell>
-              {!isOneOff && <TableCell>{doc.expiry_date ? formatDate(doc.expiry_date) : 'N/A'}</TableCell>}
+              {!isOneOff && <TableCell>{formatDate(doc.expiry_date)}</TableCell>}
             </TableRow>
           ))}
         </TableBody>
@@ -374,8 +371,7 @@ export function DirectorsDocumentsList() {
 
   return (
     <div className="flex w-full bg-gray-100">
-      <main className="flex-1 p-6 w-full">
-        <div className="flex justify-between items-center mb-4">
+      <main className="flex-1 p-6 w-full"><div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-semibold">Directors' Documents List</h1>
           <div className="flex items-center space-x-2">
             <Input type="search" placeholder="Search documents" className="w-48" />
