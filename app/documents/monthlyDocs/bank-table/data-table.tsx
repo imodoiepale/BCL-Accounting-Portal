@@ -68,29 +68,63 @@ export function DataTable<TData, TValue>({
     const totalItems = data.length;
     const status = {};
 
-    columns.forEach((column) => {
-      if (typeof column.accessorKey === 'string') {
-        let pendingCount = 0;
-        let completedCount = 0;
+    const columnsToCalculate = [
+      "bankName",
+      "bankStatus",
+      "verifiedByBCL",
+      "uploadStatus",
+      "startRangeVerification",
+      "startDateVerification",
+      "closingBalanceVerified"
+    ];
 
-        data.forEach((item: any) => {
-          const value = item[column.accessorKey as string];
-          if (value === undefined || value === null || value === '' || value === false) {
-            pendingCount++;
-          } else {
+    columnsToCalculate.forEach((columnKey) => {
+      let pendingCount = 0;
+      let completedCount = 0;
+
+      data.forEach((item: any) => {
+        const value = item[columnKey];
+        if (columnKey === "bankStatus") {
+          if (value === "Active") {
             completedCount++;
+          } else {
+            pendingCount++;
           }
-        });
+        } else if (columnKey === "verifiedByBCL" || columnKey === "closingBalanceVerified") {
+          if (value === true) {
+            completedCount++;
+          } else {
+            pendingCount++;
+          }
+        } else if (columnKey === "uploadStatus") {
+          if (value === "Completed") {
+            completedCount++;
+          } else {
+            pendingCount++;
+          }
+        } else if (columnKey === "startRangeVerification" || columnKey === "startDateVerification") {
+          if (value === "Verified") {
+            completedCount++;
+          } else {
+            pendingCount++;
+          }
+        } else {
+          if (value && value !== "") {
+            completedCount++;
+          } else {
+            pendingCount++;
+          }
+        }
+      });
 
-        status[column.accessorKey] = {
-          pending: `${pendingCount}/${totalItems}`,
-          completed: `${completedCount}/${totalItems}`,
-        };
-      }
+      status[columnKey] = {
+        pending: `${pendingCount}/${totalItems}`,
+        completed: `${completedCount}/${totalItems}`,
+      };
     });
 
     return status;
-  }, [data, columns]);
+  }, [data]);
 
   return (
     <div className="w-full">
@@ -107,21 +141,30 @@ export function DataTable<TData, TValue>({
       <div className="rounded-md border">
         <Table>
           <TableHeader>
-          <TableRow>
+            <TableRow>
+              <TableCell className="text-center font-bold">Status</TableCell>
+              {columns.map((column) => (
+                <TableCell key={column.id} className="text-center font-bold">
+                  {column.header}
+                </TableCell>
+              ))}
+            </TableRow>
+            <TableRow>
+              <TableCell className="text-center bg-green-100 font-bold">Completed</TableCell>
               {columns.map((column) => (
                 <TableCell key={column.id} className="text-center bg-green-100 font-bold">
-                  {column.accessorKey && calculateColumnStatus[column.accessorKey]?.completed || 'N/A'}
+                  {column.accessorKey && calculateColumnStatus[column.accessorKey]?.completed || ''}
                 </TableCell>
               ))}
             </TableRow>
-            <TableRow className="h-2">
+            <TableRow>
+              <TableCell className="text-center bg-red-100 font-bold">Pending</TableCell>
               {columns.map((column) => (
                 <TableCell key={column.id} className="text-center bg-red-100 font-bold">
-                  {column.accessorKey && calculateColumnStatus[column.accessorKey]?.pending || 'N/A'}
+                  {column.accessorKey && calculateColumnStatus[column.accessorKey]?.pending || ''}
                 </TableCell>
               ))}
             </TableRow>
-            
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (

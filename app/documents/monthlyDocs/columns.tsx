@@ -61,29 +61,33 @@ const UploadCell = React.memo(({ row }) => {
     resolver: yupResolver(schema),
   });
 
+  const { userId } = useAuth();
+
   useEffect(() => {
-    const fetchUploadStatus = async () => {
-      const { userId } = useAuth();
-      const { data, error } = await supabase
-        .from('acc_portal_monthly_files_upload')
-        .select('upload_status')
-        .eq('company_id', row.original.CompanyId)
-        .eq('document_type', 'supplier statement')
-        .eq('userid', userId)
-        .order('upload_date', { ascending: false })
-        .limit(1)
-        .single();
+     if (row.original.userId && userId) {
+        const fetchUploadStatus = async () => {
+          const { data, error } = await supabase
+            .from('acc_portal_monthly_files_upload')
+            .select('upload_status')
+            .eq('company_id', row.original.userId)
+            .eq('document_type', 'supplier statement')
+            .eq('userid', userId)
+            .order('upload_date', { ascending: false })
+            .limit(1)
+            .single();
+  
+          if (error) {
+            console.error('Error fetching upload status:', error);
+          } else if (data) {
+            setUploadStatus(data.upload_status);
+          }
+        };
+  
+        fetchUploadStatus();
+     }
+  }, [row.original.userId, userId]);
 
-      if (error) {
-        console.error('Error fetching upload status:', error);
-      } else if (data) {
-        setUploadStatus(data.upload_status);
-      }
-    };
-
-    fetchUploadStatus();
-  }, [row.original.CompanyId]);
-
+  
   const handleButtonClick = useCallback(async () => {
     if (uploadStatus === 'Uploaded') {
       setIsLoading(true);
@@ -114,44 +118,46 @@ const UploadCell = React.memo(({ row }) => {
       const currentDate = new Date();
       const year = currentDate.getFullYear();
       const month = currentDate.toLocaleString('default', { month: 'long' });
-
+  
       const { data: companyData, error: companyError } = await supabase
         .from('acc_portal_company')
         .select('company_name')
-        .eq('id', row.original.CompanyId)
+        .eq('id', row.original.userId)
         .single();
-
+  
       if (companyError) throw companyError;
-
+  
       const filePath = `Monthly-Documents/suppliers/${year}/${month}/${companyData.company_name}/${file.name}`;
-
+  
       await supabase.storage.createBucket('Accounting-Portal', { public: false });
-
+  
       const { error: storageError } = await supabase.storage
         .from('Accounting-Portal')
         .upload(filePath, file);
-
+  
       if (storageError) throw storageError;
-
+  
       const { error: insertError } = await supabase
       .from('acc_portal_monthly_files_upload')
       .insert({
-        supplier_id: row.original.CompanyId,
-        company_id: row.original.CompanyId,
+        supplier_id: row.original.userId || null,
+        company_id: row.original.userId || null,
         document_type: 'supplier statement',
         upload_date: currentDate.toISOString(),
-        docs_date_range: data.periodFrom,
-        docs_date_range_end: data.periodTo,
-        closing_balance: data.closingBalance,
+        docs_date_range: data.periodFrom || null,
+        docs_date_range_end: data.periodTo || null,
+        closing_balance: parseFloat(data.closingBalance) || 0,
         balance_verification: false,
-        file_path: filePath,
+        file_path: filePath || '',
         upload_status: 'Uploaded',
-        userId: userId
+        userid: userId || null
       });
 
 
+      
+  
       if (insertError) throw insertError;
-
+  
       setUploadStatus('Uploaded');
       setIsDialogOpen(false);
     } catch (error) {
@@ -161,7 +167,8 @@ const UploadCell = React.memo(({ row }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [row.original.CompanyId]);
+  }, [row.original.userId, userId]);
+
 
   return (
     <div className="text-center">
