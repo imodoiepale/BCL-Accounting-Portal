@@ -42,9 +42,8 @@ import {
 import { ArrowUpDown, ChevronDown, Mail, Phone, PlusCircle, Upload } from "lucide-react";
 import React, { useEffect, useMemo, useState } from 'react';
 
-import { Resend } from 'resend';
-
-const resend = new Resend('re_S4gVFB4Z_7oybM2W1XLtKLjdyZpp9hJ8v');
+// CHANGE: Removed unused Resend import
+import { useUser } from '@clerk/clerk-react';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -82,6 +81,8 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
 
   const currentMonthIndex = new Date().getMonth();
   const currentYear = new Date().getFullYear();
+
+  const { user } = useUser();
 
   useEffect(() => {
     fetchData(fromDate.toISOString().split('T')[0], toDate.toISOString().split('T')[0]);
@@ -126,12 +127,15 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
     setEmailSending(true);
     const missingDocs = getMissingDocuments(supplier);
     const missingDocsText = missingDocs.map(doc => `${MONTHS[doc.month]} ${doc.year}`).join(', ');
-  
+    
+    const username = user?.username || 'User';
+
     try {
       const emailData = {
         to: supplier.email,
         subject: `Missing Documents Request for ${supplier.name}`,
-        html: `<p>Dear ${supplier.name},</p><p>We noticed that you have missing documents for the following months: ${missingDocsText}.</p><p>Please upload these documents as soon as possible.</p><p>Best regards,<br>Your Company Name</p>`,
+        html: `<p>Dear ${supplier.name},</p><p>We noticed that you have missing documents for the following months:</p> ${missingDocsText}.</p><p>Please upload these documents as soon as possible.</p>
+        <p>Best regards,<br>${username}<br></p>`,
       };
       
       const response = await fetch('/api/send-email', {
@@ -189,7 +193,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
           <ArrowUpDown className="h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
+      cell: ({ row }) => <div className="text-center">{row.getValue("id") ?? 'N/A'}</div>,
     },
     {
       accessorKey: "name",
@@ -232,6 +236,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         </Button>
       ),
       cell: ({ row }) => {
+        // CHANGE: Added null check for row.original.months[index]
         const monthData = row.original.months[index];
         const startDate = new Date(row.original.startDate);
         const cellDate = new Date(visibleMonths[index].date);
@@ -316,7 +321,8 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
               </DialogTrigger>
               <DialogContent className="max-w-4xl">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold">{supplier.suppContactEmail} {supplier.name} - Missing Documents</DialogTitle>
+                  {/* CHANGE: Updated to use supplier.email instead of supplier.suppContactEmail */}
+                  <DialogTitle className="text-2xl font-bold">{supplier.email} | {supplier.name} - Missing Documents</DialogTitle>
                 </DialogHeader>
                 <div className="mt-6">
                   <h3 className="text-xl font-semibold mb-4">Missing Monthly Documents</h3>
