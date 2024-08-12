@@ -21,7 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
-import { useUser } from '@clerk/clerk-react'
+import { useAuth } from '@clerk/clerk-react';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -121,7 +121,7 @@ export function DirectorsList() {
     const { data, error } = await supabase
       .from('acc_portal_directors')
       .select('*')
-      .eq('userid', user?.id)
+      .eq('userid', userId)
       .order('id', { ascending: true })
     setIsLoading(false)
     if (error) {
@@ -134,7 +134,7 @@ export function DirectorsList() {
     } else {
       setDirectors(data)
     }
-  }, [toast, user?.id])
+  }, [toast, userId])
   
 
   useEffect(() => {
@@ -164,7 +164,7 @@ export function DirectorsList() {
     setIsLoading(true)
     const { data, error } = await supabase
       .from('acc_portal_directors')
-      .insert([{ ...newDirector, userid: user?.id }])
+      .insert([{ ...newDirector, userid: userId }])
       .select()
     setIsLoading(false)
     if (error) {
@@ -200,7 +200,7 @@ export function DirectorsList() {
       .from('acc_portal_directors')
       .update(changedFields)
       .eq('id', selectedDirector.id)
-      .eq('userid', user?.id)
+      .eq('userid', userId)
       .select()
     setIsLoading(false)
   
