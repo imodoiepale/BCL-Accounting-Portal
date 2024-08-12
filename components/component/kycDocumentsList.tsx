@@ -12,6 +12,12 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { RefreshCwIcon, PlusIcon, UploadIcon, EyeIcon, ArrowUpDown } from 'lucide-react'
 import { toast } from 'sonner'
+import dynamic from 'next/dynamic'
+
+const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => mod.Dialog), { ssr: false })
+const DialogContent = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogContent), { ssr: false })
+const DialogHeader = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogHeader), { ssr: false })
+const DialogTitle = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogTitle), { ssr: false })
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -27,6 +33,19 @@ const formatDate = (dateString) => {
   const date = new Date(dateString);
   return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
 };
+
+const FileViewer = ({ url, onClose }) => {
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[90%] sm:max-h-[90%]">
+        <DialogHeader>
+          <DialogTitle>Document Viewer</DialogTitle>
+        </DialogHeader>
+        <iframe src={url} style={{ width: '100%', height: '80vh' }} />
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export function KYCDocumentsList({ category }) {
   const [oneOffDocs, setOneOffDocs] = useState([])
@@ -46,13 +65,13 @@ export function KYCDocumentsList({ category }) {
   const [sortColumn, setSortColumn] = useState(null)
   const [sortDirection, setSortDirection] = useState('asc')
   const [searchTerm, setSearchTerm] = useState('')
+  const [viewerUrl, setViewerUrl] = useState(null)
 
   useEffect(() => {
     createBucketAndFolders().then(() => {
       fetchDocuments()
     })
   }, [category])
-
 
   const createBucketAndFolders = async () => {
     const { data: bucketData, error: bucketError } = await supabase.storage.createBucket('kyc-documents', {
@@ -196,7 +215,7 @@ export function KYCDocumentsList({ category }) {
         return
       }
 
-      window.open(data.signedUrl, '_blank')
+      setViewerUrl(data.signedUrl)
     } else {
       document.getElementById(`file-upload-${doc.id}`).click()
     }
@@ -419,6 +438,8 @@ export function KYCDocumentsList({ category }) {
 
         {renderAddDocumentSheet(true)}
         {renderAddDocumentSheet(false)}
+        
+        {viewerUrl && <FileViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />}
       </main>
     </div>
   )
