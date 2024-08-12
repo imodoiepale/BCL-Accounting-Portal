@@ -111,63 +111,68 @@ const UploadCell = React.memo(({ row }) => {
     }
   }, [uploadStatus, row.original.filePath]);
 
-  const onSubmit = useCallback(async (data) => {
-    setIsLoading(true);
-    try {
-      const file = data.file[0];
-      const currentDate = new Date();
-      const year = currentDate.getFullYear();
-      const month = currentDate.toLocaleString('default', { month: 'long' });
-  
-      const { data: companyData, error: companyError } = await supabase
-        .from('acc_portal_company')
-        .select('company_name')
-        .eq('id', row.original.userId)
-        .single();
-  
-      if (companyError) throw companyError;
-  
-      const filePath = `Monthly-Documents/suppliers/${year}/${month}/${companyData.company_name}/${file.name}`;
-  
-      await supabase.storage.createBucket('Accounting-Portal', { public: false });
-  
-      const { error: storageError } = await supabase.storage
-        .from('Accounting-Portal')
-        .upload(filePath, file);
-  
-      if (storageError) throw storageError;
-  
-      const { error: insertError } = await supabase
+ const onSubmit = useCallback(async (data) => {
+  setIsLoading(true);
+  try {
+    const file = data.file[0];
+    const currentDate = new Date();
+    const year = currentDate.getFullYear();
+    const month = currentDate.toLocaleString('default', { month: 'long' });
+
+    const { data: companyData, error: companyError } = await supabase
+      .from('acc_portal_company')
+      .select('company_name')
+      .eq('id', row.original.userId)
+      .single();
+
+    if (companyError) throw new Error(`Error fetching company data: ${companyError.message}`);
+    if (!companyData || !companyData.company_name) throw new Error('Company name not found');
+
+    const filePath = `Monthly-Documents/suppliers/${year}/${month}/${companyData.company_name}/${file.name}`;
+
+    const { error: storageError } = await supabase.storage
+      .from('Accounting-Portal')
+      .upload(filePath, file);
+
+    if (storageError) throw new Error(`Error uploading file: ${storageError.message}`);
+
+    // Ensure userId row.original.userId are valid
+    const supplierId = row.original.userId;
+    const userIdValue = userId;
+
+    if (!supplierId || !userIdValue) {
+      throw new Error('Invalid supplier ID or user ID');
+    }
+
+    const { error: insertError } = await supabase
       .from('acc_portal_monthly_files_upload')
       .insert({
-        supplier_id: row.original.userId || null,
-        company_id: row.original.userId || null,
+        supplier_id: supplierId,
+        company_id: supplierId,
         document_type: 'supplier statement',
         upload_date: currentDate.toISOString(),
         docs_date_range: data.periodFrom || null,
         docs_date_range_end: data.periodTo || null,
         closing_balance: parseFloat(data.closingBalance) || 0,
         balance_verification: false,
-        file_path: filePath || '',
+        file_path: filePath,
         upload_status: 'Uploaded',
-        userid: userId || null
+        userid: userIdValue
       });
 
+    if (insertError) throw new Error(`Error inserting data: ${insertError.message}`);
 
-      
-  
-      if (insertError) throw insertError;
-  
-      setUploadStatus('Uploaded');
-      setIsDialogOpen(false);
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      alert(`Error uploading file: ${error.message || error.error}`);
-      setUploadStatus('Failed');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [row.original.userId, userId]);
+    setUploadStatus('Uploaded');
+    setIsDialogOpen(false);
+  } catch (error) {
+    console.error('Error:', error);
+    alert(`Error: ${error.message}`);
+    setUploadStatus('Failed');
+  } finally {
+    setIsLoading(false);
+  }
+}, [row.original.userId, userId, supabase]);
+
 
 
   return (
