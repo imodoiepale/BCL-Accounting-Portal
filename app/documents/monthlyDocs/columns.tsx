@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -35,12 +36,14 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 
-
 const UploadCell = React.memo(({ row }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(row.getValue("uploadStatus"));
   const [isLoading, setIsLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [supplierData, setSupplierData] = useState(null);
+
+  const { userId } = useAuth();
 
   const schema = yup.object().shape({
     periodFrom: yup.date().required("Period From is required"),
@@ -61,33 +64,50 @@ const UploadCell = React.memo(({ row }) => {
     resolver: yupResolver(schema),
   });
 
-  const { userId } = useAuth();
+  useEffect(() => {
+    if (row.original) {
+      setSupplierData({
+        suppSeq: row.original.suppSeq,
+        suppName: row.original.suppName,
+        CompanyId: row.original.CompanyId
+      });
+    }
+  }, [row.original]);
 
   useEffect(() => {
-     if (row.original.userId && userId) {
-        const fetchUploadStatus = async () => {
+    if (supplierData && userId) {
+      const fetchUploadStatus = async () => {
+        try {
           const { data, error } = await supabase
             .from('acc_portal_monthly_files_upload')
             .select('upload_status')
-            .eq('company_id', row.original.userId)
+            .eq('supplier_id', supplierData.suppSeq)
             .eq('document_type', 'supplier statement')
             .eq('userid', userId)
             .order('upload_date', { ascending: false })
-            .limit(1)
-            .single();
+            .limit(1);
   
           if (error) {
-            console.error('Error fetching upload status:', error);
-          } else if (data) {
-            setUploadStatus(data.upload_status);
+            throw error;
           }
-        };
   
-        fetchUploadStatus();
-     }
-  }, [row.original.userId, userId]);
+          if (data && data.length > 0) {
+            setUploadStatus(data[0].upload_status);
+          } else {
+            // No upload record found, set status to 'Not Uploaded'
+            setUploadStatus('Not Uploaded');
+          }
+        } catch (error) {
+          console.error('Error fetching upload status:', error);
+          // In case of error, we'll assume 'Not Uploaded' status
+          setUploadStatus('Not Uploaded');
+        }
+      };
+  
+      fetchUploadStatus();
+    }
+  }, [supplierData, userId]);
 
-  
   const handleButtonClick = useCallback(async () => {
     if (uploadStatus === 'Uploaded') {
       setIsLoading(true);
@@ -111,69 +131,55 @@ const UploadCell = React.memo(({ row }) => {
     }
   }, [uploadStatus, row.original.filePath]);
 
- const onSubmit = useCallback(async (data) => {
-  setIsLoading(true);
-  try {
-    const file = data.file[0];
-    const currentDate = new Date();
-    const year = currentDate.getFullYear();
-    const month = currentDate.toLocaleString('default', { month: 'long' });
+  const onSubmit = useCallback(async (data) => {
+    setIsLoading(true);
+    try {
+      if (!supplierData || !supplierData.suppSeq) {
+        throw new Error('Supplier data is not available. Please try again.');
+      }
 
-    const { data: companyData, error: companyError } = await supabase
-      .from('acc_portal_company')
-      .select('company_name')
-      .eq('id', row.original.userId)
-      .single();
+      console.log('Submitting for supplier:', supplierData);
 
-    if (companyError) throw new Error(`Error fetching company data: ${companyError.message}`);
-    if (!companyData || !companyData.company_name) throw new Error('Company name not found');
+      const file = data.file[0];
+      const currentDate = new Date();
+      const year = currentDate.getFullYear();
+      const month = currentDate.toLocaleString('default', { month: 'long' });
 
-    const filePath = `Monthly-Documents/suppliers/${year}/${month}/${companyData.company_name}/${file.name}`;
+      const filePath = `Monthly-Documents/suppliers/${year}/${month}/${supplierData.suppName}/${file.name}`;
 
-    const { error: storageError } = await supabase.storage
-      .from('Accounting-Portal')
-      .upload(filePath, file);
+      const { error: storageError } = await supabase.storage
+        .from('Accounting-Portal')
+        .upload(filePath, file);
 
-    if (storageError) throw new Error(`Error uploading file: ${storageError.message}`);
+      if (storageError) throw new Error(`Error uploading file: ${storageError.message}`);
 
-    // Ensure userId row.original.userId are valid
-    const supplierId = row.original.userId;
-    const userIdValue = userId;
+      const { error: insertError } = await supabase
+        .from('acc_portal_monthly_files_upload')
+        .insert({
+          supplier_id: supplierData.suppSeq,
+          document_type: 'supplier statement',
+          upload_date: currentDate.toISOString(),
+          docs_date_range: data.periodFrom,
+          docs_date_range_end: data.periodTo,
+          closing_balance: parseFloat(data.closingBalance) || 0,
+          balance_verification: false,
+          file_path: filePath,
+          upload_status: 'Uploaded',
+          userid: userId
+        });
 
-    if (!supplierId || !userIdValue) {
-      throw new Error('Invalid supplier ID or user ID');
+      if (insertError) throw new Error(`Error inserting data: ${insertError.message}`);
+
+      setUploadStatus('Uploaded');
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Error:', error);
+      alert(`Error: ${error.message}`);
+      setUploadStatus('Failed');
+    } finally {
+      setIsLoading(false);
     }
-
-    const { error: insertError } = await supabase
-      .from('acc_portal_monthly_files_upload')
-      .insert({
-        supplier_id: supplierId,
-        company_id: supplierId,
-        document_type: 'supplier statement',
-        upload_date: currentDate.toISOString(),
-        docs_date_range: data.periodFrom || null,
-        docs_date_range_end: data.periodTo || null,
-        closing_balance: parseFloat(data.closingBalance) || 0,
-        balance_verification: false,
-        file_path: filePath,
-        upload_status: 'Uploaded',
-        userid: userIdValue
-      });
-
-    if (insertError) throw new Error(`Error inserting data: ${insertError.message}`);
-
-    setUploadStatus('Uploaded');
-    setIsDialogOpen(false);
-  } catch (error) {
-    console.error('Error:', error);
-    alert(`Error: ${error.message}`);
-    setUploadStatus('Failed');
-  } finally {
-    setIsLoading(false);
-  }
-}, [row.original.userId, userId, supabase]);
-
-
+  }, [userId, supplierData]);
 
   return (
     <div className="text-center">
@@ -183,12 +189,19 @@ const UploadCell = React.memo(({ row }) => {
         disabled={isLoading}
       >
         {uploadStatus === 'Uploaded' ? '✅View Upload' : 
-         uploadStatus === 'Failed' ? '❌Retry Upload' : 'Upload'}
+        uploadStatus === 'Failed' ? '❌Retry Upload' : 'Upload'}
       </Button>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{uploadStatus === 'Uploaded' ? 'File Preview' : 'Upload Document'}</DialogTitle>
+            <DialogTitle>
+              {uploadStatus === 'Uploaded' ? 'File Preview' : `Upload Document for ${supplierData?.suppName || 'Supplier'}`}
+            </DialogTitle>
+            <DialogDescription>
+              {uploadStatus === 'Uploaded' 
+                ? 'Preview of the uploaded document' 
+                : 'Upload a new document for the selected supplier'}
+            </DialogDescription>
           </DialogHeader>
           {uploadStatus === 'Uploaded' && previewUrl ? (
             <iframe 
@@ -328,6 +341,19 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
     cell: ({ row }) => <div className="text-center">{row.getValue("suppStartDate")}</div>,
   },
   {
+    accessorKey: "suppEndDate",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        End date
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div className="text-center">{row.getValue("suppEndDate")}</div>,
+  },
+  {
     accessorKey: "verifiedByBCLAccManager",
     header: ({ column }) => (
       <Button
@@ -446,7 +472,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{supplier.suppName} Profile</DialogTitle>
+              <DialogTitle>{supplier.name} Profile</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">

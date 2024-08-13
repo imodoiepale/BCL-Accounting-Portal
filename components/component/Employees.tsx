@@ -164,6 +164,8 @@ export function EmployeeList() {
                 <TableHead>NHIF</TableHead>
                 <TableHead>NSSF</TableHead>
                 <TableHead>Start Date</TableHead>
+                
+                <TableHead>End Date</TableHead>
                 <TableHead>Approved by BCL</TableHead>
               </TableRow>
             </TableHeader>
@@ -179,6 +181,7 @@ export function EmployeeList() {
                   <TableCell>{employee.nhif}</TableCell>
                   <TableCell>{employee.mnssf}</TableCell>
                   <TableCell>{formatDate(employee.startdate)}</TableCell>
+                  <TableCell></TableCell>
                   <TableCell className='text-center'>
                     <Badge variant={employee.status ? "success" : "destructive"}>
                       {employee.status ? "✔️" : "❌"}

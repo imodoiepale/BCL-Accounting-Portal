@@ -28,6 +28,7 @@ import { useForm } from "react-hook-form";
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { AllBanks } from './page';
+import { useAuth } from "@clerk/clerk-react";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -49,6 +50,9 @@ const UploadCell = React.memo(({ row }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(row.getValue("uploadStatus"));
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const { userId } = useAuth();
 
   const form = useForm({
     defaultValues: {
@@ -62,24 +66,34 @@ const UploadCell = React.memo(({ row }) => {
 
   useEffect(() => {
     const fetchUploadStatus = async () => {
-      const { data, error } = await supabase
-        .from('acc_portal_monthly_files_upload')
-        .select('upload_status')
-        .eq('company_id', row.original.CompanyId)
-        .eq('document_type', 'bank statement')
-        .order('upload_date', { ascending: false })
-        .limit(1)
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('acc_portal_monthly_files_upload')
+          .select('upload_status')
+          .eq('userid', userId)
+          .eq('document_type', 'bank statement')
+          .eq('bank_id', row.original.bankSeq)  // Add this line
+          .order('upload_date', { ascending: false })
+          .limit(1);
 
-      if (error) {
+        if (error) {
+          throw error;
+        }
+
+        if (data && data.length > 0) {
+          setUploadStatus(data[0].upload_status);
+        } else {
+          setUploadStatus('Not Uploaded');
+        }
+      } catch (error) {
         console.error('Error fetching upload status:', error);
-      } else if (data) {
-        setUploadStatus(data.upload_status);
+        setUploadStatus('Not Uploaded');
+        setErrorMessage('Unable to fetch upload status. Please try again later.');
       }
     };
 
     fetchUploadStatus();
-  }, [row.original.CompanyId]);
+  }, [userId, row.original.bankSeq]); 
 
   const handleViewUpload = useCallback(async () => {
     if (row.original.filePath) {
@@ -92,43 +106,63 @@ const UploadCell = React.memo(({ row }) => {
         window.open(data.signedUrl, '_blank');
       } catch (error) {
         console.error('Error viewing file:', error);
-        alert('Error viewing file. Please try again.');
+        setErrorMessage('Error viewing file. Please try again.');
       }
     } else {
-      alert('No file uploaded yet.');
+      setErrorMessage('No file uploaded yet.');
     }
   }, [row.original.filePath]);
 
   const onSubmit = useCallback(async (data) => {
     setIsLoading(true);
+    setErrorMessage('');
     try {
       const file = data.file[0];
       const currentDate = new Date();
       const year = currentDate.getFullYear();
       const month = currentDate.toLocaleString('default', { month: 'long' });
-
+  
+      // Fetch company data
       const { data: companyData, error: companyError } = await supabase
         .from('acc_portal_company')
         .select('company_name')
-        .eq('id', row.original.CompanyId)
-        .single();
-
-      if (companyError) throw companyError;
-
-      const filePath = `Accounting-Portal/banks/${year}/${month}/${companyData.company_name}/${file.name}`;
-
-      await supabase.storage.createBucket('Bank-Statements', { public: false });
-
+        .eq('userid', userId);
+  
+      if (companyError) {
+        throw new Error(`Error fetching company data: ${companyError.message}`);
+      }
+  
+      if (!companyData || companyData.length === 0) {
+        throw new Error(`No company found for user: ${userId}`);
+      }
+  
+      const companyName = companyData[0].company_name;
+  
+      const filePath = `Accounting-Portal/banks/${year}/${month}/${companyName}/${file.name}`;
+  
+      // Ensure the bucket exists
+      const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('Bank-Statements');
+      if (bucketError && bucketError.statusCode === '404') {
+        await supabase.storage.createBucket('Bank-Statements', { public: false });
+      } else if (bucketError) {
+        throw new Error(`Error checking/creating bucket: ${bucketError.message}`);
+      }
+  
+      // Upload file
       const { error: storageError } = await supabase.storage
         .from('Bank-Statements')
         .upload(filePath, file);
-
-      if (storageError) throw storageError;
-
+  
+      if (storageError) {
+        throw new Error(`Error uploading file: ${storageError.message}`);
+      }
+  
+      // Insert record
       const { error: insertError } = await supabase
         .from('acc_portal_monthly_files_upload')
         .insert({
-          company_id: row.original.CompanyId,
+          userid: userId,
+          bank_id: row.original.bankSeq,  // Add this line
           document_type: 'bank statement',
           upload_date: currentDate.toISOString(),
           docs_date_range: data.periodFrom,
@@ -138,19 +172,21 @@ const UploadCell = React.memo(({ row }) => {
           file_path: filePath,
           upload_status: 'Uploaded'
         });
-
-      if (insertError) throw insertError;
-
+  
+      if (insertError) {
+        throw new Error(`Error inserting data: ${insertError.message}`);
+      }
+  
       setUploadStatus('Uploaded');
       setIsDialogOpen(false);
     } catch (error) {
-      console.error('Error uploading file:', error);
-      alert(`Error uploading file: ${error.message || error.error}`);
+      console.error('Error in upload process:', error);
+      setErrorMessage(`Upload failed: ${error.message}`);
       setUploadStatus('Failed');
     } finally {
       setIsLoading(false);
     }
-  }, [row.original.CompanyId]);
+  }, [userId, row.original.bankSeq]);
 
   return (
     <div className="text-center font-medium">

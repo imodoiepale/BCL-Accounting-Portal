@@ -1,6 +1,8 @@
 // @ts-nocheck
 "use client"
 
+import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CoinsIcon, GroupIcon, LeafIcon, OptionIcon, ReceiptCentIcon, X } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -15,10 +17,16 @@ import {
   Wallet as WalletIcon,
   Users as UsersIcon,
   ChevronRight as ChevronRightIcon,
-  Circle as CircleIcon
+  Circle as CircleIcon,
+  AlertTriangle as AlertTriangleIcon
 } from "lucide-react";
-import { useEffect, useState } from 'react';
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { useAuth } from '@clerk/nextjs';
+import Link from 'next/link';
+
+const supabase = createClient(
+  "https://zyszsqgdlrpnunkegipk.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
+);
 
 const gettingStartedSteps = [
   { 
@@ -27,7 +35,7 @@ const gettingStartedSteps = [
     description: "Update company information", 
     status: "Incomplete",
     icon: UserIcon,
-    badgeColor: "border-red-600",
+    badgeColor: "border-red-800",
     badgeTextColor: "fill-red-300 text-green-300"
   },
   { 
@@ -114,9 +122,46 @@ const iconMapping = {
 };
 
 export function Dashboard() {
-  const [alienData, setAlienData] = useState(null);
+  const { userId } = useAuth();
   const [showReminder, setShowReminder] = useState(true);
+  const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
+  const [missingFields, setMissingFields] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  useEffect(() => {
+    const fetchCompanyData = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('acc_portal_company')
+          .select('*')
+          .eq('userid', userId)
+          .single();
+
+        if (error) throw error;
+
+        const requiredFields = [
+          'company_name', 'company_type', 'description', 'registration_number', 'date_established', 'kra_pin_number',
+          'industry', 'employees', 'annual_revenue', 'fiscal_year', 'website',
+          'email', 'phone', 'street', 'city', 'postal_code', 'country'
+        ];
+
+        const missing = requiredFields.filter(field => !data[field]);
+        setMissingFields(missing);
+        setIsProfileIncomplete(missing.length > 0);
+      } catch (error) {
+        console.error('Error fetching company data:', error);
+        setIsProfileIncomplete(true);
+        setMissingFields(['Unable to fetch company data']);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (userId) {
+      fetchCompanyData();
+    }
+  }, [userId]);
 
   const currentDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -133,6 +178,26 @@ export function Dashboard() {
     <div className="flex">
       <main className="flex-1 p-6 bg-gray-50 h-[100vh]">
         <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
+        
+        {isProfileIncomplete && (
+            <Alert className="mb-6 bg-yellow-100 border border-yellow-500 rounded-lg shadow-lg">
+              <AlertTriangleIcon className="h-5 w-5 text-yellow-600 mr-2" />
+              <AlertTitle className="text-yellow-900 font-bold text-md">Incomplete Company Profile</AlertTitle>
+              <AlertDescription className="text-yellow-700 mt-2 text-sm">
+                <p>Your company profile is incomplete. The following information is missing:</p>
+                <ul className="list-disc list-inside mt-2">
+                  {missingFields.map((field, index) => (
+                    <li key={index}>{field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</li>
+                  ))}
+                </ul>
+                <p className="mt-2">
+                  <Link href="/profile" className="text-blue-600 hover:underline">
+                    Click here to complete your profile
+                  </Link>
+                </p>
+              </AlertDescription>
+            </Alert>
+          )}
         
           {showReminder && (
              <Alert className="relative mb-6 bg-teal-100 border border-teal-500 rounded-lg shadow-lg">
@@ -160,6 +225,7 @@ export function Dashboard() {
              </button>
            </Alert>
           )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-6">
           {stats.map((stat) => (
             <Card key={stat.title} className={`bg-white shadow-md rounded-lg overflow-hidden border border-gray-200 transition-transform transform hover:scale-105 ${
