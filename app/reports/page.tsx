@@ -336,7 +336,7 @@ export default function Reports() {
               <ReportTable 
                 data={supplierData} 
                 title="Suppliers Report" 
-                fetchData={fetchSuppliers} 
+                fetchData={fetchSuppliers}  
               />
             </TabsContent>
 

@@ -455,11 +455,6 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
             className="max-w-sm"
           />
         </div>
-        <div className="w-[250px] px-4">
-          <Button
-            className="max-w-sm"
-          >{addButtonText}</Button>
-        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto">
