@@ -146,6 +146,7 @@ export function SupplierList() {
                 <TableHead>Contact Mobile</TableHead>
                 <TableHead>Contact Email</TableHead>
                 <TableHead>Start Date</TableHead>
+                <TableHead>End Date</TableHead>
                 <TableHead>Approved by BCL</TableHead>
               </TableRow>
             </TableHeader>
@@ -159,6 +160,7 @@ export function SupplierList() {
                     <TableCell>{supplier.contact_mobile}</TableCell>
                     <TableCell>{supplier.contact_email}</TableCell>
                     <TableCell>{formatDate(supplier.startdate)}</TableCell>
+                    <TableCell></TableCell>
                     <TableCell className='text-center'>
                       <Badge variant={supplier.status ? "success" : "destructive"}>
                         {supplier.status ? "✔️" : "❌"}

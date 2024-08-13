@@ -187,6 +187,7 @@ export function BankList() {
                 <TableHead>RM Mobile</TableHead>
                 <TableHead>RM Email</TableHead>
                 <TableHead>Start Date</TableHead>
+                <TableHead>End Date</TableHead>
                 <TableHead>Approved by BCL</TableHead>
               </TableRow>
             </TableHeader>
@@ -202,6 +203,7 @@ export function BankList() {
                   <TableCell>{bank.relationship_manager_mobile}</TableCell>
                   <TableCell>{bank.relationship_manager_email}</TableCell>
                   <TableCell>{formatDate(bank.startdate)}</TableCell>
+                  <TableCell></TableCell>
                   <TableCell className='text-center'>
                     <Badge variant={bank.status ? "success" : "destructive"}>
                       {bank.status ? "✔️" : "❌"}

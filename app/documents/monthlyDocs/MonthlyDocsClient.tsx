@@ -183,7 +183,7 @@ export function MonthlyDocsClient({ selectedMonth, isCurrentMonth = true }: Mont
         <span className="font-semibold text-blue-700">{displayMonth}</span> Supplier Statements
       </p>
       <div className="">
-        <div className="inline-block min-w-full align-middle">
+        <div className=" align-middle">
           <div className="border-b border-gray-200 shadow sm:rounded-lg">
             {isLoading ? (
               <p>Loading...</p>

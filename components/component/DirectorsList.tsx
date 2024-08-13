@@ -184,6 +184,36 @@ export function DirectorsList() {
       })
     }
   }
+
+  const handleEdit = (director) => {
+    setSelectedDirector(director)
+    setIsEditingMissingFields(true)
+    setChangedFields({})
+  }
+
+  const handleDelete = async (directorId) => {
+    setIsLoading(true)
+    const { error } = await supabase
+      .from('acc_portal_directors')
+      .delete()
+      .eq('id', directorId)
+      .eq('userid', userId)
+    setIsLoading(false)
+    if (error) {
+      console.error('Error deleting director:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete director. Please try again.",
+        variant: "destructive",
+      })
+    } else {
+      setDirectors(prevDirectors => prevDirectors.filter(d => d.id !== directorId))
+      toast({
+        title: "Success",
+        description: "Director deleted successfully.",
+      })
+    }
+  }
   
 
   const handleMissingFieldsSubmit = async () => {
@@ -346,6 +376,19 @@ export function DirectorsList() {
                       <TableHead key={director.id} className="text-center border">Director {index + 1}</TableHead>
                     ))}
                   </TableRow>
+                  <TableRow>
+                  <TableHead className="sticky left-0 z-20 bg-white border">Actions</TableHead>
+                  {filteredDirectors.map((director) => (
+                    <TableHead key={director.id} className="text-center border">
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(director)} className="mr-2">
+                        Edit
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(director.id)}>
+                        Delete
+                      </Button>
+                    </TableHead>
+                  ))}
+                </TableRow>
                   <TableRow>
                     <TableHead className="sticky left-0 z-20 bg-white border">Status</TableHead>
                     {filteredDirectors.map((director) => {

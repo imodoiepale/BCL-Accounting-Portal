@@ -97,19 +97,24 @@ export function DataTable<TData, TValue>({
 
   const renderHeaderRows = React.useCallback(() => (
     <>
-      <TableRow>
-        <TableCell className="bg-green-100 font-bold uppercase pl-4">COMPLETED</TableCell>
+      <TableRow className="h-10">
+        <TableCell className="bg-green-100 font-bold uppercase pl-2 py-1 leading-tight">COMPLETED</TableCell>
         {['suppName', 'suppStatus', '', 'verifiedByBCLAccManager', 'uploadStatus', '', '', '', 'verifyByBCL', '', 'closingBalanceVerify', ''].map((columnId, index) => (
-          <TableCell key={index} className="text-center bg-green-100 font-bold">{getColumnCount(columnId)}</TableCell>
+          <TableCell key={index} className="text-center bg-green-100 font-bold py-1 leading-tight">
+            {getColumnCount(columnId)}
+          </TableCell>
         ))}
       </TableRow>
-      <TableRow>
-        <TableCell className="bg-red-100 font-bold uppercase pl-4">PENDING</TableCell>
+      <TableRow className="h-10">
+        <TableCell className="bg-red-100 font-bold uppercase pl-2 py-1 leading-tight">PENDING</TableCell>
         {['suppName', 'suppStatus', '', 'verifiedByBCLAccManager', 'uploadStatus', '', '', '', 'verifyByBCL', '', 'closingBalanceVerify', ''].map((columnId, index) => (
-          <TableCell key={index} className="text-center bg-red-100 font-bold">{statusCounts[columnId]?.pending || ''}</TableCell>
+          <TableCell key={index} className="text-center bg-red-100 font-bold py-1 leading-tight">
+            {statusCounts[columnId]?.pending || ''}
+          </TableCell>
         ))}
       </TableRow>
     </>
+
   ), [statusCounts, getColumnCount]);
 
   return (
