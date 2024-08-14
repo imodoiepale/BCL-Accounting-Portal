@@ -222,6 +222,20 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
       ),
       cell: ({ row }) => <div className="text-center">{row.getValue("startDate")}</div>,
     },
+    {
+      accessorKey: "endDate",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="text-wrap"
+        >
+          End Date
+          <ArrowUpDown className="h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => <div className="text-center">{row.getValue("endDate")}</div>,
+    },
     ...visibleMonths.map((monthData, index) => ({
       id: `${monthData.month}-${monthData.year}`,
       accessorKey: `months.${index}`,
@@ -321,7 +335,6 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
               </DialogTrigger>
               <DialogContent className="max-w-4xl">
                 <DialogHeader>
-                  {/* CHANGE: Updated to use supplier.email instead of supplier.suppContactEmail */}
                   <DialogTitle className="text-2xl font-bold">{supplier.email} | {supplier.name} - Missing Documents</DialogTitle>
                 </DialogHeader>
                 <div className="mt-6">
@@ -408,7 +421,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         );
       }
     },
-  ], [visibleMonths, uploadDialogOpen, selectedMonth, emailSending]);
+  ], [visibleMonths, currentMonthIndex, currentYear, emailSending, uploadDialogOpen, selectedMonth, sendEmailRequest]);
 
   const table = useReactTable({
     data,

@@ -45,14 +45,25 @@ export default function Reports() {
     contact_email: ''
   });
 
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).replace(/\//g, '.');
+  };
+
   useEffect(() => {
-    if (user) {
+    if (userId) {
       fetchSuppliers();
       fetchBanks();
       setIsLoading(false);
     }
-  }, [user]);
-  console.log(user.id)
+  }, [userId]);
+  console.log(userId)
   
 
   const fetchSuppliers = async () => {
@@ -79,32 +90,30 @@ export default function Reports() {
 
     const processedData = suppliers.map(supplier => {
       const supplierReports = reports.filter(report => report.supplier_id === supplier.id);
-      const months = Array(12).fill(null).map((_, index) => {
-        const report = supplierReports.find(r => {
-          const startDate = new Date(r.docs_date_range);
-          const endDate = new Date(r.docs_date_range_end);
-          const currentMonth = new Date(new Date().getFullYear(), index, 1);
-          return currentMonth >= startDate && currentMonth <= endDate;
-        });
-
-        if (report) {
-          return {
-            status: 'uploaded',
-            isVerified: report.is_verified,
-            startDate: report.docs_date_range,
-            endDate: report.docs_date_range_end,
-            closingBalance: report.closing_balance
-          };
-        }
-        return null;
+      
+      // Initialize all months as null
+      const months = Array(12).fill(null);
+    
+      // Process each report and place it in the correct month
+      supplierReports.forEach(report => {
+        const startDate = new Date(report.docs_date_range);
+        const monthIndex = startDate.getMonth();
+        
+        months[monthIndex] = {
+          status: 'uploaded',
+          isVerified: report.is_verified,
+          startDate: formatDate(report.docs_date_range),
+          endDate: formatDate(report.docs_date_range_end),
+          closingBalance: report.closing_balance
+        };
       });
-
+    
       return {
         id: `S-${supplier.id}`,
         name: supplier.name,
-        startDate: supplier.startdate,
         email: supplier.contact_email,
         phoneNumber: supplier.contact_mobile,
+        startDate: formatDate(supplier.startdate),
         months
       };
     });
@@ -139,30 +148,26 @@ export default function Reports() {
 
     const processedData = banks.map(bank => {
       const bankReports = reports.filter(report => report.bank_id === bank.id);
-      const months = Array(12).fill(null).map((_, index) => {
-        const report = bankReports.find(r => {
-          const startDate = new Date(r.docs_date_range);
-          const endDate = new Date(r.docs_date_range_end);
-          const currentMonth = new Date(new Date().getFullYear(), index, 1);
-          return currentMonth >= startDate && currentMonth <= endDate;
-        });
-
-        if (report) {
-          return {
-            status: 'uploaded',
-            isVerified: report.is_verified,
-            startDate: report.docs_date_range,
-            endDate: report.docs_date_range_end,
-            closingBalance: report.closing_balance
-          };
-        }
-        return null;
+      
+      const months = Array(12).fill(null);
+    
+      bankReports.forEach(report => {
+        const startDate = new Date(report.docs_date_range);
+        const monthIndex = startDate.getMonth();
+        
+        months[monthIndex] = {
+          status: 'uploaded',
+          isVerified: report.is_verified,
+          startDate: formatDate(report.docs_date_range),
+          endDate: formatDate(report.docs_date_range_end),
+          closingBalance: report.closing_balance
+        };
       });
-
+    
       return {
         id: `B-${bank.id}`,
         name: bank.name,
-        startDate: bank.startdate,
+        startDate: formatDate(bank.startdate),
         months
       };
     });
