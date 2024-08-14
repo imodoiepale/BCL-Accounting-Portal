@@ -54,12 +54,8 @@ function formatDateTime(dateTimeString) {
   }).replace(',', '');
 }
 
-interface MonthlyDocsClientProps {
-  selectedMonth?: string | null;
-  isCurrentMonth: boolean;
-}
 
-export default function BankStatements({ selectedMonth, isCurrentMonth }: MonthlyDocsClientProps) {
+export default function BankStatements() {
   const { userId } = useAuth();
 
   const [data, setData] = useState<AllBanks[]>([]);
@@ -125,7 +121,7 @@ export default function BankStatements({ selectedMonth, isCurrentMonth }: Monthl
       fetchData(selectedMonth);
     }
   }, [fetchData, isCurrentMonth, selectedMonth]);
-  
+
 
   useEffect(() => {
     const date = new Date();
