@@ -34,13 +34,15 @@ import {
 } from "@/components/ui/table";
 
 interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[];
-  data: TData[];
+  columns: ColumnDef<TData, TValue>[]
+  data: TData[]
+  selectedMonth: string;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  selectedMonth
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -58,6 +60,9 @@ export function DataTable<TData, TValue>({
       sorting,
       columnFilters,
       rowSelection,
+    },
+    meta: {
+      selectedMonth,
     },
   });
 
