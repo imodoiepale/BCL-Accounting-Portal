@@ -63,7 +63,7 @@ export default function Reports() {
       setIsLoading(false);
     }
   }, [userId]);
-  console.log(userId)
+  // console.log(userId)
   
 
   const fetchSuppliers = async () => {
@@ -72,42 +72,46 @@ export default function Reports() {
       .select('id, name, startdate, contact_email, contact_mobile')
       .order('id', { ascending: true })
       .eq('userid', userId)
-
     if (supplierError) {
       console.error('Error fetching suppliers:', supplierError);
       return;
     }
-
+  
     const { data: reports, error: reportError } = await supabase
       .from('acc_portal_monthly_files_upload')
       .select('supplier_id, docs_date_range, docs_date_range_end, is_verified, closing_balance')
-      .eq('document_type', 'supplier statement');
+      .eq('document_type', 'supplier statement', 'supplier_id');
 
+    
+
+      console.log(reports)
+  
     if (reportError) {
       console.error('Error fetching supplier reports:', reportError);
       return;
     }
-
+  
     const processedData = suppliers.map(supplier => {
       const supplierReports = reports.filter(report => report.supplier_id === supplier.id);
       
-      // Initialize all months as null
-      const months = Array(12).fill(null);
-    
-      // Process each report and place it in the correct month
-      supplierReports.forEach(report => {
-        const startDate = new Date(report.docs_date_range);
-        const monthIndex = startDate.getMonth();
-        
-        months[monthIndex] = {
-          status: 'uploaded',
-          isVerified: report.is_verified,
-          startDate: formatDate(report.docs_date_range),
-          endDate: formatDate(report.docs_date_range_end),
-          closingBalance: report.closing_balance
-        };
+      const months = Array(12).fill(null).map((_, index) => {
+        const reportForMonth = supplierReports.find(report => {
+          const reportDate = new Date(report.docs_date_range);
+          return reportDate.getMonth() === index;
+        });
+  
+        if (reportForMonth) {
+          return {
+            status: 'uploaded',
+            isVerified: reportForMonth.is_verified,
+            startDate: formatDate(reportForMonth.docs_date_range),
+            endDate: formatDate(reportForMonth.docs_date_range_end),
+            closingBalance: reportForMonth.closing_balance
+          };
+        }
+        return null;
       });
-    
+  
       return {
         id: `S-${supplier.id}`,
         name: supplier.name,
@@ -117,7 +121,6 @@ export default function Reports() {
         months
       };
     });
-
     setSupplierData(processedData);
   };
 
@@ -128,8 +131,6 @@ export default function Reports() {
       .eq('userid', userId)
       .order('id', { ascending: true });
 
-      console.log(banks)
-
 
     if (bankError) {
       console.error('Error fetching banks:', bankError);
@@ -139,7 +140,7 @@ export default function Reports() {
     const { data: reports, error: reportError } = await supabase
       .from('acc_portal_monthly_files_upload')
       .select('bank_id, docs_date_range, docs_date_range_end, is_verified, closing_balance')
-      .eq('document_type', 'bank statement');
+      .eq('document_type', 'bank statement','bank_id');
 
     if (reportError) {
       console.error('Error fetching bank reports:', reportError);

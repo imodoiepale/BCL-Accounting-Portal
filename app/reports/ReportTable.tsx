@@ -102,8 +102,25 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
     return months;
   }, [fromDate, toDate]);
 
+  const parseDate = (dateString: string): Date | null => {
+    const parsedDate = new Date(dateString);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate;
+    }
+    // Try DD.MM.YYYY format
+    const [day, month, year] = dateString.split('.');
+    if (day && month && year) {
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    return null;
+  };
+
   const getMissingDocuments = (supplier: DataRow) => {
-    const startDate = new Date(supplier.startDate);
+    const startDate = parseDate(supplier.startDate);
+    if (!startDate) {
+      console.error(`Invalid start date for supplier ${supplier.name}: ${supplier.startDate}`);
+      return [];
+    }
     const currentDate = new Date();
     const missingDocs = [];
 
@@ -250,17 +267,37 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         </Button>
       ),
       cell: ({ row }) => {
-        // CHANGE: Added null check for row.original.months[index]
         const monthData = row.original.months[index];
-        const startDate = new Date(row.original.startDate);
+        const startDateString = row.original.startDate;
         const cellDate = new Date(visibleMonths[index].date);
         const currentDate = new Date();
+        
+        let startDate: Date | null = null;
+        if (startDateString) {
+          // Try to parse the date, accounting for different formats
+          const parsedDate = new Date(startDateString);
+          if (!isNaN(parsedDate.getTime())) {
+            startDate = parsedDate;
+          } else {
+            // If standard parsing fails, try DD.MM.YYYY format
+            const [day, month, year] = startDateString.split('.');
+            if (day && month && year) {
+              startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            }
+          }
+        }
+
+        console.log("START DATE IS ", startDate);
         
         let cellContent;
         let bgColor;
         let tooltipContent;
-
-        if (cellDate < startDate) {
+      
+        if (!startDate) {
+          cellContent = '❓';
+          bgColor = 'bg-gray-300';
+          tooltipContent = <p>Invalid start date</p>;
+        } else if (cellDate < new Date(startDate.getFullYear(), startDate.getMonth(), 1)) {
           cellContent = 'N/A';
           bgColor = 'bg-gray-200';
           tooltipContent = <p>Before start date</p>;
@@ -287,9 +324,9 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         } else {
           cellContent = '❌';
           bgColor = 'bg-red-200';
-          tooltipContent = <p>No data available</p>;
+          tooltipContent = <p>Missing document</p>;
         }
-
+      
         return (
           <div className={cellDate.getMonth() === currentMonthIndex && cellDate.getFullYear() === new Date().getFullYear() ? "flex justify-center text-center" : ""}>
             <TooltipProvider>
@@ -421,7 +458,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         );
       }
     },
-  ], [visibleMonths, currentMonthIndex, currentYear, emailSending, uploadDialogOpen, selectedMonth, sendEmailRequest]);
+  ], [visibleMonths, uploadDialogOpen, selectedMonth, emailSending]);
 
   const table = useReactTable({
     data,
