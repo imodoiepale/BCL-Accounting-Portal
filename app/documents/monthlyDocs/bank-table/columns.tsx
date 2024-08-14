@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -46,13 +47,23 @@ const schema = yup.object().shape({
   file: yup.mixed().required('File is required')
 });
 
-const UploadCell = React.memo(({ row }) => {
+const UploadCell = React.memo(({ row, selectedMonth }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(row.getValue("uploadStatus"));
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [bankData, setBankData] = useState(null);
 
   const { userId } = useAuth();
+
+  const schema = yup.object().shape({
+    periodFrom: yup.date().required("Period From is required"),
+    periodTo: yup.date()
+      .required("Period To is required")
+      .min(yup.ref('periodFrom'), "Period To must be later than Period From"),
+    closingBalance: yup.number().required("Closing Balance is required"),
+    file: yup.mixed().required("File is required")
+  });
 
   const form = useForm({
     defaultValues: {
@@ -61,161 +72,212 @@ const UploadCell = React.memo(({ row }) => {
       closingBalance: '',
       file: null
     },
-    resolver: yupResolver(schema)
+    resolver: yupResolver(schema),
   });
 
   useEffect(() => {
-    const fetchUploadStatus = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('acc_portal_monthly_files_upload')
-          .select('upload_status')
-          .eq('userid', userId)
-          .eq('document_type', 'bank statement')
-          .eq('bank_id', row.original.bankSeq)  // Add this line
-          .order('upload_date', { ascending: false })
-          .limit(1);
+    if (selectedMonth) {
+      const [monthName, year] = selectedMonth.split(' ');
+      const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
+      const startDate = new Date(parseInt(year), monthIndex, 1);
+      const endDate = new Date(parseInt(year), monthIndex + 1, 0);
 
-        if (error) {
-          throw error;
-        }
+      form.setValue('periodFrom', startDate.toISOString().split('T')[0]);
+      form.setValue('periodTo', endDate.toISOString().split('T')[0]);
+    }
+  }, [selectedMonth, form]);
 
-        if (data && data.length > 0) {
-          setUploadStatus(data[0].upload_status);
-        } else {
+  useEffect(() => {
+    if (row.original) {
+      setBankData({
+        bankSeq: row.original.bankSeq,
+        bankName: row.original.bankName
+      });
+    }
+  }, [row.original]);
+
+  useEffect(() => {
+    if (bankData && userId && selectedMonth) {
+      const fetchUploadStatus = async () => {
+        try {
+          const [monthName, year] = selectedMonth.split(' ');
+          const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth() + 1;
+          const startDate = `${year}-${monthNumber.toString().padStart(2, '0')}-01`;
+          const endDate = new Date(parseInt(year), monthNumber, 0).toISOString().split('T')[0];
+
+          const { data, error } = await supabase
+            .from('acc_portal_monthly_files_upload')
+            .select('upload_status, file_path')
+            .eq('bank_id', bankData.bankSeq)
+            .eq('document_type', 'bank statement')
+            .eq('userid', userId)
+            .gte('upload_date', startDate)
+            .lte('upload_date', endDate)
+            .order('upload_date', { ascending: false })
+            .limit(1);
+  
+          if (error) {
+            throw error;
+          }
+  
+          if (data && data.length > 0) {
+            setUploadStatus(data[0].upload_status);
+            row.original.filePath = data[0].file_path;
+          } else {
+            setUploadStatus('Not Uploaded');
+            row.original.filePath = null;
+          }
+        } catch (error) {
+          console.error('Error fetching upload status:', error);
           setUploadStatus('Not Uploaded');
         }
-      } catch (error) {
-        console.error('Error fetching upload status:', error);
-        setUploadStatus('Not Uploaded');
-        setErrorMessage('Unable to fetch upload status. Please try again later.');
-      }
-    };
+      };
+  
+      fetchUploadStatus();
+    }
+  }, [bankData, userId, selectedMonth, row]);
 
-    fetchUploadStatus();
-  }, [userId, row.original.bankSeq]); 
-
-  const handleViewUpload = useCallback(async () => {
-    if (row.original.filePath) {
+  const handleButtonClick = useCallback(async () => {
+    if (uploadStatus === 'Uploaded' && row.original.filePath) {
+      setIsLoading(true);
       try {
         const { data, error } = await supabase.storage
           .from('Bank-Statements')
           .createSignedUrl(row.original.filePath, 60);
 
         if (error) throw error;
-        window.open(data.signedUrl, '_blank');
+        
+        setPreviewUrl(data.signedUrl);
+        setIsDialogOpen(true);
       } catch (error) {
         console.error('Error viewing file:', error);
-        setErrorMessage('Error viewing file. Please try again.');
+        alert('Error viewing file. Please try again.');
+      } finally {
+        setIsLoading(false);
       }
     } else {
-      setErrorMessage('No file uploaded yet.');
+      setIsDialogOpen(true);
     }
-  }, [row.original.filePath]);
+  }, [uploadStatus, row.original.filePath]);
 
   const onSubmit = useCallback(async (data) => {
     setIsLoading(true);
-    setErrorMessage('');
     try {
+      if (!bankData || !bankData.bankSeq) {
+        throw new Error('Bank data is not available. Please try again.');
+      }
+
+      if (!selectedMonth) {
+        throw new Error('Selected month is not available. Please try again.');
+      }
+
       const file = data.file[0];
-      const currentDate = new Date();
-      const year = currentDate.getFullYear();
-      const month = currentDate.toLocaleString('default', { month: 'long' });
-  
-      // Fetch company data
-      const { data: companyData, error: companyError } = await supabase
-        .from('acc_portal_company')
-        .select('company_name')
-        .eq('userid', userId);
-  
-      if (companyError) {
-        throw new Error(`Error fetching company data: ${companyError.message}`);
-      }
-  
-      if (!companyData || companyData.length === 0) {
-        throw new Error(`No company found for user: ${userId}`);
-      }
-  
-      const companyName = companyData[0].company_name;
-  
-      const filePath = `Accounting-Portal/banks/${year}/${month}/${companyName}/${file.name}`;
-  
-      // Ensure the bucket exists
-      const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('Bank-Statements');
-      if (bucketError && bucketError.statusCode === '404') {
-        await supabase.storage.createBucket('Bank-Statements', { public: false });
-      } else if (bucketError) {
-        throw new Error(`Error checking/creating bucket: ${bucketError.message}`);
-      }
-  
-      // Upload file
+      const [monthName, year] = selectedMonth.split(' ');
+
+      const filePath = `Accounting-Portal/banks/${year}/${monthName}/${bankData.bankName}/${file.name}`;
+
       const { error: storageError } = await supabase.storage
         .from('Bank-Statements')
         .upload(filePath, file);
-  
-      if (storageError) {
-        throw new Error(`Error uploading file: ${storageError.message}`);
-      }
-  
-      // Insert record
+
+      if (storageError) throw new Error(`Error uploading file: ${storageError.message}`);
+
       const { error: insertError } = await supabase
         .from('acc_portal_monthly_files_upload')
         .insert({
-          userid: userId,
-          bank_id: row.original.bankSeq,  // Add this line
+          bank_id: bankData.bankSeq,
           document_type: 'bank statement',
-          upload_date: currentDate.toISOString(),
+          upload_date: new Date().toISOString(),
           docs_date_range: data.periodFrom,
           docs_date_range_end: data.periodTo,
-          closing_balance: data.closingBalance,
+          closing_balance: parseFloat(data.closingBalance) || 0,
           balance_verification: false,
           file_path: filePath,
-          upload_status: 'Uploaded'
+          upload_status: 'Uploaded',
+          userid: userId
         });
-  
-      if (insertError) {
-        throw new Error(`Error inserting data: ${insertError.message}`);
-      }
-  
+
+      if (insertError) throw new Error(`Error inserting data: ${insertError.message}`);
+
       setUploadStatus('Uploaded');
+      row.original.filePath = filePath;
       setIsDialogOpen(false);
     } catch (error) {
-      console.error('Error in upload process:', error);
-      setErrorMessage(`Upload failed: ${error.message}`);
+      console.error('Error:', error);
+      alert(`Error: ${error.message}`);
       setUploadStatus('Failed');
     } finally {
       setIsLoading(false);
     }
-  }, [userId, row.original.bankSeq]);
+  }, [bankData, selectedMonth, userId, row.original]);
 
   return (
-    <div className="text-center font-medium">
+    <div className="text-center">
+      <Button 
+        variant="outline" 
+        onClick={handleButtonClick}
+        disabled={isLoading}
+      >
+        {uploadStatus === 'Uploaded' ? '✅View Upload' : 
+        uploadStatus === 'Failed' ? '❌Retry Upload' : 'Upload'}
+      </Button>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <Button 
-            variant="outline" 
-            onClick={() => uploadStatus === 'Uploaded' ? handleViewUpload() : setIsDialogOpen(true)}
-            disabled={isLoading}
-          >
-            {uploadStatus === 'Uploaded' ? '✅ View Upload' : 
-             uploadStatus === 'Failed' ? '❌ Retry Upload' : 'Upload'}
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Upload Document</DialogTitle>
+            <DialogTitle>
+              {uploadStatus === 'Uploaded' ? 'File Preview' : `Upload Document for ${bankData?.bankName || 'Bank'}`}
+            </DialogTitle>
+            <DialogDescription>
+              {uploadStatus === 'Uploaded' 
+                ? 'Preview of the uploaded document' 
+                : `Upload a new document for ${selectedMonth}`}
+            </DialogDescription>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <div className="grid grid-cols-2 gap-4">
+          {uploadStatus === 'Uploaded' && previewUrl ? (
+            <iframe 
+              src={previewUrl} 
+              style={{width: '100%', height: '70vh', border: 'none'}}
+              title="File Preview"
+            />
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="periodFrom"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Period From</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="periodTo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Period To</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={form.control}
-                  name="periodFrom"
+                  name="closingBalance"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Period From</FormLabel>
+                      <FormLabel>Closing Balance</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="number" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -223,52 +285,26 @@ const UploadCell = React.memo(({ row }) => {
                 />
                 <FormField
                   control={form.control}
-                  name="periodTo"
+                  name="file"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Period To</FormLabel>
+                      <FormLabel>Upload File</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input 
+                          type="file" 
+                          onChange={(e) => field.onChange(e.target.files)}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
-              <FormField
-                control={form.control}
-                name="closingBalance"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Closing Balance</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="file"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Upload File</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="file" 
-                        onChange={(e) => field.onChange(e.target.files)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Uploading...' : 'Submit'}
-              </Button>
-            </form>
-          </Form>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? 'Uploading...' : 'Submit'}
+                </Button>
+              </form>
+            </Form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -276,6 +312,7 @@ const UploadCell = React.memo(({ row }) => {
 });
 
 UploadCell.displayName = 'UploadCell';
+
 
 export const bankColumns: ColumnDef<AllBanks>[] = [
   {

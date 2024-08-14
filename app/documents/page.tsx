@@ -26,7 +26,8 @@ import React, { useState } from 'react';
 import BankTable from './monthlyDocs/bank-table/page';
 import OtherDocs from './monthlyDocs/other-docs/page';
 import MonthlyDocs from './monthlyDocs/page';
-import PreviousMonths from './PreviousMonths';
+import PreviousMonths from './monthlyDocs/previous-months/page';
+import PreviousMonthsBanks from './monthlyDocs/previous-months/banks';
 
 const getCurrentMonth = () => {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -289,20 +290,6 @@ const DocumentUpload = () => {
             </TabsList>
             <TabsContent value="current">
               <MonthlyDocs/>
-              <div className="grid grid-cols-5 gap-4">
-                {documents.map((doc, index) => (
-                  <React.Fragment key={doc.id}>
-                    {/* Commented out code left intact */}
-                    {/* {index === 0 ? (
-                      <div className="col-span-3">
-                        <DocumentCard doc={doc} uploadedDocs={uploadedDocs} handleFileUpload={handleFileUpload} />
-                      </div>
-                    ) : ( */}
-                      {/* <DocumentCard doc={doc} uploadedDocs={uploadedDocs} handleFileUpload={handleFileUpload} /> */}
-                    {/* )} */}
-                  </React.Fragment>
-                ))}
-              </div>
             </TabsContent>
             <TabsContent value="previous">
               <PreviousMonths />
@@ -319,7 +306,7 @@ const DocumentUpload = () => {
               <BankTable />
             </TabsContent>
             <TabsContent value="previous">
-              <PreviousMonths />
+              <PreviousMonthsBanks />
             </TabsContent>
           </Tabs>
         </TabsContent>

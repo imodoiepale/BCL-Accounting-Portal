@@ -29,11 +29,13 @@ import { DataTablePagination } from "./data-table-pagination";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+  selectedMonth: string;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  selectedMonth
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
@@ -60,7 +62,10 @@ export function DataTable<TData, TValue>({
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-  });
+    meta: {
+      selectedMonth,
+    },
+  })
 
   const statusCounts = React.useMemo(() => {
     const counts = {
