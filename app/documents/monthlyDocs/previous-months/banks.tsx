@@ -1,9 +1,10 @@
 //@ts-nocheck
-import React, { useState, useMemo, useCallback } from 'react';
+"use client"
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import MonthlyDocs from './monthlyDocs/page';
+import { BankStatementsClient} from '../bank-table/MonthlyDocsBanks';
 
-const PreviousMonths = () => {
+const PreviousMonthsBanks = () => {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const generateMonths = useCallback(() => {
@@ -18,36 +19,39 @@ const PreviousMonths = () => {
 
   const months = useMemo(() => generateMonths(), [generateMonths]);
 
-  const handleMonthSelect = useCallback((month) => {
+  const handleMonthSelect = useCallback((month: string) => {
+    console.log('PreviousMonths - Month selected:', month);
     setSelectedMonth(month);
   }, []);
 
+  useEffect(() => {
+    console.log('PreviousMonths - Effect - Selected Month:', selectedMonth);
+  }, [selectedMonth]);
+
   return (
-    <div className="flex">
-      <div className="w-48 p-4 border-r">
-        <h2 className="text-xl font-bold mb-4 text-center">Months</h2>
-        <div className="space-y-2 ">
+    <div className="flex flex-col md:flex-row">
+      <div className="w-44 p-4 border-b md:border-b-0 md:border-r">
+        <h2 className="text-md font-bold mb-4 text-center">Previous Months</h2>
+        <div className="space-y-2">
           {months.map((month) => (
             <Button
               key={month}
               variant={selectedMonth === month ? "default" : "outline"}
               onClick={() => handleMonthSelect(month)}
-              className="w-full "
+              className="w-full"
             >
               {month}
             </Button>
           ))}
         </div>
       </div>
-      <div className="w-full  p-4">
-        {selectedMonth ? (
-          <MonthlyDocs selectedMonth={selectedMonth} isCurrentMonth={false} />
-        ) : (
-          <p>Please select a month to view supplier statements.</p>
-        )}
+      <div className="w-full md:w-3/4 lg:w-4/5 p-4">
+        <BankStatementsClient
+          selectedMonth={selectedMonth}
+        />
       </div>
     </div>
   );
 };
 
-export default PreviousMonths;
+export default PreviousMonthsBanks;

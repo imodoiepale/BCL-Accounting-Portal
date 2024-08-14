@@ -1,8 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 //@ts-nocheck
 
-"use client";
-
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import {
@@ -35,8 +33,7 @@ const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-
-const UploadCell = React.memo(({ row }) => {
+const UploadCell = React.memo(({ row, selectedMonth }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(row.getValue("uploadStatus"));
   const [isLoading, setIsLoading] = useState(false);
@@ -65,6 +62,18 @@ const UploadCell = React.memo(({ row }) => {
   });
 
   useEffect(() => {
+    if (selectedMonth) {
+      const [monthName, year] = selectedMonth.split(' ');
+      const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
+      const startDate = new Date(parseInt(year), monthIndex, 1);
+      const endDate = new Date(parseInt(year), monthIndex + 1, 0);
+
+      form.setValue('periodFrom', startDate.toISOString().split('T')[0]);
+      form.setValue('periodTo', endDate.toISOString().split('T')[0]);
+    }
+  }, [selectedMonth, form]);
+
+  useEffect(() => {
     if (row.original) {
       setSupplierData({
         suppSeq: row.original.suppSeq,
@@ -75,15 +84,22 @@ const UploadCell = React.memo(({ row }) => {
   }, [row.original]);
 
   useEffect(() => {
-    if (supplierData && userId) {
+    if (supplierData && userId && selectedMonth) {
       const fetchUploadStatus = async () => {
         try {
+          const [monthName, year] = selectedMonth.split(' ');
+          const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth() + 1;
+          const startDate = `${year}-${monthNumber.toString().padStart(2, '0')}-01`;
+          const endDate = new Date(parseInt(year), monthNumber, 0).toISOString().split('T')[0];
+
           const { data, error } = await supabase
             .from('acc_portal_monthly_files_upload')
-            .select('upload_status')
+            .select('upload_status, file_path')
             .eq('supplier_id', supplierData.suppSeq)
             .eq('document_type', 'supplier statement')
             .eq('userid', userId)
+            .gte('upload_date', startDate)
+            .lte('upload_date', endDate)
             .order('upload_date', { ascending: false })
             .limit(1);
   
@@ -93,23 +109,23 @@ const UploadCell = React.memo(({ row }) => {
   
           if (data && data.length > 0) {
             setUploadStatus(data[0].upload_status);
+            row.original.filePath = data[0].file_path;
           } else {
-            // No upload record found, set status to 'Not Uploaded'
             setUploadStatus('Not Uploaded');
+            row.original.filePath = null;
           }
         } catch (error) {
           console.error('Error fetching upload status:', error);
-          // In case of error, we'll assume 'Not Uploaded' status
           setUploadStatus('Not Uploaded');
         }
       };
   
       fetchUploadStatus();
     }
-  }, [supplierData, userId]);
+  }, [supplierData, userId, selectedMonth, row]);
 
   const handleButtonClick = useCallback(async () => {
-    if (uploadStatus === 'Uploaded') {
+    if (uploadStatus === 'Uploaded' && row.original.filePath) {
       setIsLoading(true);
       try {
         const { data, error } = await supabase.storage
@@ -134,18 +150,23 @@ const UploadCell = React.memo(({ row }) => {
   const onSubmit = useCallback(async (data) => {
     setIsLoading(true);
     try {
+      console.log('onSubmit - supplierData:', supplierData);
+      console.log('onSubmit - selectedMonth:', selectedMonth);
+
       if (!supplierData || !supplierData.suppSeq) {
         throw new Error('Supplier data is not available. Please try again.');
+      }
+
+      if (!selectedMonth) {
+        throw new Error('Selected month is not available. Please try again.');
       }
 
       console.log('Submitting for supplier:', supplierData);
 
       const file = data.file[0];
-      const currentDate = new Date();
-      const year = currentDate.getFullYear();
-      const month = currentDate.toLocaleString('default', { month: 'long' });
+      const [monthName, year] = selectedMonth.split(' ');
 
-      const filePath = `Monthly-Documents/suppliers/${year}/${month}/${supplierData.suppName}/${file.name}`;
+      const filePath = `Monthly-Documents/suppliers/${year}/${monthName}/${supplierData.suppName}/${file.name}`;
 
       const { error: storageError } = await supabase.storage
         .from('Accounting-Portal')
@@ -158,7 +179,7 @@ const UploadCell = React.memo(({ row }) => {
         .insert({
           supplier_id: supplierData.suppSeq,
           document_type: 'supplier statement',
-          upload_date: currentDate.toISOString(),
+          upload_date: new Date().toISOString(),
           docs_date_range: data.periodFrom,
           docs_date_range_end: data.periodTo,
           closing_balance: parseFloat(data.closingBalance) || 0,
@@ -171,6 +192,7 @@ const UploadCell = React.memo(({ row }) => {
       if (insertError) throw new Error(`Error inserting data: ${insertError.message}`);
 
       setUploadStatus('Uploaded');
+      row.original.filePath = filePath;
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error:', error);
@@ -179,7 +201,7 @@ const UploadCell = React.memo(({ row }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, supplierData]);
+  }, [userId, supplierData, selectedMonth]);
 
   return (
     <div className="text-center">
@@ -200,7 +222,7 @@ const UploadCell = React.memo(({ row }) => {
             <DialogDescription>
               {uploadStatus === 'Uploaded' 
                 ? 'Preview of the uploaded document' 
-                : 'Upload a new document for the selected supplier'}
+                : `Upload a new document for ${selectedMonth}`}
             </DialogDescription>
           </DialogHeader>
           {uploadStatus === 'Uploaded' && previewUrl ? (
@@ -376,7 +398,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         Upload
       </Button>
     ),
-    cell: UploadCell,
+    cell: ({ row, table }) => <UploadCell row={row} selectedMonth={table.options.meta?.selectedMonth} />,
   },
   {
     accessorKey: "uploadDate",
