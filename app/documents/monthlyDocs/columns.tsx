@@ -201,7 +201,7 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, supplierData, selectedMonth]);
+  }, [supplierData, selectedMonth, userId, row.original]);
 
   return (
     <div className="text-center">

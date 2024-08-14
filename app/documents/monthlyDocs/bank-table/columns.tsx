@@ -163,16 +163,19 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
   const onSubmit = useCallback(async (data) => {
     setIsLoading(true);
     try {
+
+      console.log('onSubmit - supplierData:', bankData);
+      console.log('onSubmit - selectedMonth:', selectedMonth);
       if (!bankData || !bankData.bankSeq) {
         throw new Error('Bank data is not available. Please try again.');
       }
 
       if (!selectedMonth) {
         throw new Error('Selected month is not available. Please try again.');
-      }
+      }3
 
       const file = data.file[0];
-      const [monthName, year] = selectedMonth.split(' ');
+      const [monthName, year] = ss3.split(' ');
 
       const filePath = `Accounting-Portal/banks/${year}/${monthName}/${bankData.bankName}/${file.name}`;
 
@@ -383,7 +386,7 @@ export const bankColumns: ColumnDef<AllBanks>[] = [
   {
     accessorKey: "uploadStatus",
     header: "Upload",
-    cell: UploadCell,
+    cell: ({ row, table }) => <UploadCell row={row} selectedMonth={table.options.meta?.selectedMonth} />,
   },
   {
     accessorKey: "uploadDate",

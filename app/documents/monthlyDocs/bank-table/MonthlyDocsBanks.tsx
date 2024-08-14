@@ -109,16 +109,17 @@ export function BankStatementsClient({ selectedMonth }: BankStatementsClientProp
   }, [userId]);
 
   useEffect(() => {
-    console.log('BankStatementsClient - Selected Month:', selectedMonth);
+    console.log('MonthlyDocsClient - Selected Month:', selectedMonth);
+    console.log('MonthlyDocsClient - Is Current Month:', isCurrentMonth);
 
-    if (selectedMonth) {
-      setDisplayMonth(selectedMonth);
-      fetchData(selectedMonth);
-    } else {
+    if (isCurrentMonth) {
       const currentDate = new Date();
       const currentMonthDisplay = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
       setDisplayMonth(currentMonthDisplay);
-      fetchData(currentMonthDisplay);
+      fetchData();
+    } else if (selectedMonth) {
+      setDisplayMonth(selectedMonth);
+      fetchData(selectedMonth);
     }
   }, [fetchData, selectedMonth]);
 

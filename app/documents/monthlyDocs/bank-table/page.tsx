@@ -54,7 +54,12 @@ function formatDateTime(dateTimeString) {
   }).replace(',', '');
 }
 
-export default function BankStatements() {
+interface MonthlyDocsClientProps {
+  selectedMonth?: string | null;
+  isCurrentMonth: boolean;
+}
+
+export default function BankStatements({ selectedMonth, isCurrentMonth }: MonthlyDocsClientProps) {
   const { userId } = useAuth();
 
   const [data, setData] = useState<AllBanks[]>([]);
@@ -107,6 +112,22 @@ export default function BankStatements() {
   }, []);
 
   useEffect(() => {
+    console.log('MonthlyDocsClient - Selected Month:', selectedMonth);
+    console.log('MonthlyDocsClient - Is Current Month:', isCurrentMonth);
+
+    if (isCurrentMonth) {
+      const currentDate = new Date();
+      const currentMonthDisplay = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+      setDisplayMonth(currentMonthDisplay);
+      fetchData();
+    } else if (selectedMonth) {
+      setDisplayMonth(selectedMonth);
+      fetchData(selectedMonth);
+    }
+  }, [fetchData, isCurrentMonth, selectedMonth]);
+  
+
+  useEffect(() => {
     const date = new Date();
     setCurrentDate(date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -133,9 +154,10 @@ export default function BankStatements() {
               <p>Loading...</p>
             ) : (
               <DataTable 
-                columns={memoizedColumns} 
-                data={data}
-              />
+              columns={memoizedColumns} 
+              data={data}
+              selectedMonth={selectedMonth }
+            />
             )}
           </div>
         </div>
