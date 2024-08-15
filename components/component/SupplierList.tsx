@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card"
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, UploadIcon } from 'lucide-react'
 import { ScrollArea } from '../ui/scroll-area'
@@ -188,17 +189,17 @@ export function SupplierList() {
                 </div>
               </DialogContent>
             </Dialog>
-            <Dialog>
-              <DialogTrigger asChild>
+            <Sheet>
+              <SheetTrigger asChild>
                 <Button className="bg-blue-600 text-white">Add New Supplier</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add Supplier</DialogTitle>
-                  <DialogDescription>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Add Supplier</SheetTitle>
+                  <SheetDescription>
                     This section includes adding all the details of a supplier to the system
-                  </DialogDescription>
-                </DialogHeader>
+                  </SheetDescription>
+                </SheetHeader>
                 <div className="flex flex-col pt-4 gap-4">
                   <div className="space-y-1">
                     <Label htmlFor="name">Supplier Name</Label>
@@ -222,8 +223,8 @@ export function SupplierList() {
                   </div>
                 </div>
                 <div className="pt-4"><Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button></div>
-              </DialogContent>
-            </Dialog>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
         <Card>
