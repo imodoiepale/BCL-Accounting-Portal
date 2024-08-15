@@ -61,7 +61,7 @@ export function SupplierList() {
   const handleSubmit = async () => {
     const { data, error } = await supabase
       .from('acc_portal_suppliers')
-      .insert([{ ...newSupplier, userid: user?.id }])
+      .insert([{ ...newSupplier, userid: user?.id , status: 'true' }])
     if (error) console.error('Error adding supplier:', error)
     else {
       fetchSuppliers()
@@ -71,6 +71,7 @@ export function SupplierList() {
         contact_name: '',
         contact_mobile: '',
         contact_email: '',
+        
       })
     }
   }
@@ -239,6 +240,7 @@ export function SupplierList() {
                   <TableHead>Contact Email</TableHead>
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Approved by BCL</TableHead>
                 </TableRow>
               </TableHeader>
@@ -253,11 +255,16 @@ export function SupplierList() {
                     <TableCell>{supplier.contact_email}</TableCell>
                     <TableCell>{formatDate(supplier.startdate)}</TableCell>
                     <TableCell></TableCell>
-                    <TableCell className='text-center'>
-                      <Badge variant={supplier.status ? "success" : "destructive"}>
-                        {supplier.status ? "✔️" : "❌"}
-                      </Badge>
-                    </TableCell>
+                    <TableCell>
+                    <span className={`font-bold capitalize ${supplier.status === 'true' ? 'text-green-600' : 'text-red-600'}`}>
+                      {supplier.status === 'true' ? 'Active' : 'Inactive'}
+                    </span>
+                  </TableCell>
+                  <TableCell className='text-center'>
+                    <Badge variant={supplier.verified ? "success" : "destructive"}>
+                      {supplier.verified ? "✔️" : "❌"}
+                    </Badge>
+                  </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
