@@ -357,8 +357,8 @@ export function BankList() {
                   <TableCell>{bank.startdate ? formatDate(bank.startdate) : ''}</TableCell>
                   <TableCell>{bank.enddate ? formatDate(bank.enddate) : ''}</TableCell>
                   <TableCell>
-                    <span className={`font-bold capitalize ${bank.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
-                      {bank.status}
+                  <span className={`font-bold capitalize ${bank.status ? 'text-green-600' : 'text-red-600'}`}>
+                      {bank.status ? 'Active' : 'Inactive'}
                     </span>
                   </TableCell>
                   <TableCell className='text-center'>

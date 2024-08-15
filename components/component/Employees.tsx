@@ -302,8 +302,8 @@ export function EmployeeList() {
                   <TableCell>{formatDate(employee.startdate)}</TableCell>
                   <TableCell></TableCell>
                   <TableCell>
-                    <span className={`font-bold capitalize ${employee.status === 'true' ? 'text-green-600' : 'text-red-600'}`}>
-                      {employee.status === 'true' ? 'Active' : 'Inactive'}
+                    <span className={`font-bold capitalize ${employee.status ? 'text-green-600' : 'text-red-600'}`}>
+                      {employee.status ? 'Active' : 'Inactive'}
                     </span>
                   </TableCell>
                   <TableCell className='text-center'>
