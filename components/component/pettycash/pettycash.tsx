@@ -24,8 +24,8 @@ const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhb
 
 export function PettyCashManager() {
   const { userId } = useUser();
-  const [currentTab, setCurrentTab] = useState('branches');
-  const [currentSettingsTab, setCurrentSettingsTab] = useState('branches');
+  const [currentTab, setCurrentTab] = useState('accounts');
+  const [currentSettingsTab, setCurrentSettingsTab] = useState('accounts');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [accountsToReplenish, setAccountsToReplenish] = useState([]);
   const [settings, setSettings] = useState({
@@ -40,6 +40,7 @@ export function PettyCashManager() {
     accounts: {
       enableMultiCurrency: true,
       defaultCurrency: 'KES',
+      userLimits: [],
     },
     transactions: {
       requireApproval: true,
@@ -49,6 +50,41 @@ export function PettyCashManager() {
 
   useEffect(() => {
     fetchAccountsToReplenish();
+  }, []);
+
+  const handleUserLimitChange = useCallback((index, field, value) => {
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      accounts: {
+        ...prevSettings.accounts,
+        userLimits: prevSettings.accounts.userLimits.map((limit, i) => 
+          i === index ? { ...limit, [field]: value } : limit
+        ),
+      },
+    }));
+  }, []);
+  
+  const handleAddUserLimit = useCallback(() => {
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      accounts: {
+        ...prevSettings.accounts,
+        userLimits: [
+          ...prevSettings.accounts.userLimits,
+          { userName: '', accountType: '', limit: 0 },
+        ],
+      },
+    }));
+  }, []);
+  
+  const handleRemoveUserLimit = useCallback((index) => {
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      accounts: {
+        ...prevSettings.accounts,
+        userLimits: prevSettings.accounts.userLimits.filter((_, i) => i !== index),
+      },
+    }));
   }, []);
 
   const fetchAccountsToReplenish = async () => {
@@ -65,15 +101,15 @@ export function PettyCashManager() {
     }
   };
 
-  const handleSettingChange = useCallback((tab, setting, value) => {
-    setSettings(prevSettings => ({
-      ...prevSettings,
-      [tab]: {
-        ...prevSettings[tab],
-        [setting]: value,
-      },
-    }));
-  }, []);
+  // const handleSettingChange = useCallback((tab, setting, value) => {
+  //   setSettings(prevSettings => ({
+  //     ...prevSettings,
+  //     [tab]: {
+  //       ...prevSettings[tab],
+  //       [setting]: value,
+  //     },
+  //   }));
+  // }, []);
 
   const handleReplenishAll = () => {
     // Implement the logic to replenish all accounts
@@ -107,9 +143,9 @@ export function PettyCashManager() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 flex overflow-hidden">
-          <Tabs defaultValue={currentSettingsTab} onValueChange={setCurrentSettingsTab} className="flex w-full">
-              <TabsList className="flex flex-col w-36 space-y-1.5 mt-24 border-r">
-                {['branches', 'users', 'accounts', 'transactions', 'replenishment'].map((tab) => (
+          <Tabs defaultValue={currentSettingsTab}  className="flex w-full">
+              <TabsList className="flex flex-col w-36 space-y-1.5 mt-14 border-r gap-2">
+                {['accounts', 'transactions', 'replenishment'].map((tab) => (
                   <TabsTrigger 
                     key={tab} 
                     value={tab} 
@@ -123,76 +159,83 @@ export function PettyCashManager() {
 
               <div className="flex-1 overflow-auto">
                 <ScrollArea className="h-full p-4">
-                  <TabsContent value="branches">
-                    <Card>
-                      <CardContent className="space-y-3 pt-4">
-                        <h3 className="text-base font-medium">Branch Settings</h3>
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="enableGeoTagging">Enable Geo-tagging</Label>
-                          <Switch
-                            id="enableGeoTagging"
-                            checked={settings.branches.enableGeoTagging}
-                            onCheckedChange={(checked) => handleSettingChange('branches', 'enableGeoTagging', checked)}
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="branchCodePrefix">Branch Code Prefix</Label>
-                          <Input
-                            id="branchCodePrefix"
-                            value={settings.branches.branchCodePrefix}
-                            onChange={(e) => handleSettingChange('branches', 'branchCodePrefix', e.target.value)}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                  <TabsContent value="users">
-                    <Card>
-                      <CardContent className="space-y-3 pt-4">
-                        <h3 className="text-base font-medium">User Settings</h3>
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="enableTwoFactorAuth">Enable Two-Factor Authentication</Label>
-                          <Switch
-                            id="enableTwoFactorAuth"
-                            checked={settings.users.enableTwoFactorAuth}
-                            onCheckedChange={(checked) => handleSettingChange('users', 'enableTwoFactorAuth', checked)}
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="passwordExpiryDays">Password Expiry (days)</Label>
-                          <Input
-                            id="passwordExpiryDays"
-                            type="number"
-                            value={settings.users.passwordExpiryDays}
-                            onChange={(e) => handleSettingChange('users', 'passwordExpiryDays', parseInt(e.target.value))}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                  <TabsContent value="accounts">
-                    <Card>
-                      <CardContent className="space-y-3 pt-4">
-                        <h3 className="text-base font-medium">Account Settings</h3>
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="enableMultiCurrency">Enable Multi-Currency Support</Label>
-                          <Switch
-                            id="enableMultiCurrency"
-                            checked={settings.accounts.enableMultiCurrency}
-                            onCheckedChange={(checked) => handleSettingChange('accounts', 'enableMultiCurrency', checked)}
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="defaultCurrency">Default Currency</Label>
-                          <Input
-                            id="defaultCurrency"
-                            value={settings.accounts.defaultCurrency}
-                            onChange={(e) => handleSettingChange('accounts', 'defaultCurrency', e.target.value)}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
+                <TabsContent value="accounts" className="space-y-4">
+  <Card className="p-4">
+    <h3 className="text-sm font-medium mb-2">General Account Settings</h3>
+    <div className="grid grid-cols-2 gap-4">
+      <div className="flex items-center justify-between">
+        <Label htmlFor="enableMultiCurrency" className="text-xs">Multi-Currency Support</Label>
+        <Switch
+          id="enableMultiCurrency"
+          checked={settings.accounts.enableMultiCurrency}
+          onCheckedChange={(checked) => handleSettingChange('accounts', 'enableMultiCurrency', checked)}
+        />
+      </div>
+      <div className="flex items-center space-x-2">
+        <Label htmlFor="defaultCurrency" className="text-xs whitespace-nowrap">Default Currency</Label>
+        <Input
+          id="defaultCurrency"
+          value={settings.accounts.defaultCurrency}
+          onChange={(e) => handleSettingChange('accounts', 'defaultCurrency', e.target.value)}
+          className="h-8 text-sm"
+        />
+      </div>
+    </div>
+  </Card>
+
+  <Card className="p-4">
+    <h3 className="text-sm font-medium mb-2">User Account Limits</h3>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="text-xs">User</TableHead>
+          <TableHead className="text-xs">Account Type</TableHead>
+          <TableHead className="text-xs">Limit</TableHead>
+          <TableHead className="text-xs w-20">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {settings.accounts.userLimits?.map((limit, index) => (
+          <TableRow key={index}>
+            <TableCell className="py-2">
+              <Input
+                value={limit.userName}
+                onChange={(e) => handleUserLimitChange(index, 'userName', e.target.value)}
+                className="h-7 text-xs"
+              />
+            </TableCell>
+            <TableCell className="py-2">
+              <Input
+                value={limit.accountType}
+                onChange={(e) => handleUserLimitChange(index, 'accountType', e.target.value)}
+                className="h-7 text-xs"
+              />
+            </TableCell>
+            <TableCell className="py-2">
+              <Input
+                type="number"
+                value={limit.limit}
+                onChange={(e) => handleUserLimitChange(index, 'limit', e.target.value)}
+                className="h-7 text-xs w-20"
+              />
+            </TableCell>
+            <TableCell className="py-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => handleRemoveUserLimit(index)}
+                className="h-7 text-xs px-2"
+              >
+                Remove
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+    <Button onClick={handleAddUserLimit} className="mt-2 h-7 text-xs">Add User Limit</Button>
+  </Card>
+</TabsContent>
                   <TabsContent value="transactions">
                     <Card>
                       <CardContent className="space-y-3 pt-4">
@@ -202,7 +245,7 @@ export function PettyCashManager() {
                           <Switch
                             id="requireApproval"
                             checked={settings.transactions.requireApproval}
-                            onCheckedChange={(checked) => handleSettingChange('transactions', 'requireApproval', checked)}
+                            // onCheckedChange={(checked) => handleSettingChange('transactions', 'requireApproval', checked)}
                           />
                         </div>
                         <div className="flex items-center justify-between">
@@ -210,7 +253,7 @@ export function PettyCashManager() {
                           <Switch
                             id="attachmentRequired"
                             checked={settings.transactions.attachmentRequired}
-                            onCheckedChange={(checked) => handleSettingChange('transactions', 'attachmentRequired', checked)}
+                            // onCheckedChange={(checked) => handleSettingChange('transactions', 'attachmentRequired', checked)}
                           />
                         </div>
                       </CardContent>
@@ -275,7 +318,10 @@ export function PettyCashManager() {
               Manage your company's petty cash, branches, users, accounts, and transactions.
             </CardDescription>
           </CardHeader>
-          <SettingsDialog />
+          <SettingsDialog 
+          handleUserLimitChange={handleUserLimitChange}
+          handleAddUserLimit={handleAddUserLimit}
+          handleRemoveUserLimit={handleRemoveUserLimit}/>
         </Card>
 
         <Tabs defaultValue="transactions" onValueChange={setCurrentTab}>
