@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 // @ts-nocheck
 "use client"
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
-import { PlusIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
+import { PlusIcon, RefreshCwIcon, SearchIcon, UploadIcon, DownloadIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -20,8 +20,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { useToast } from "@/components/ui/use-toast"
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react'
+import toast, { Toaster } from 'react-hot-toast'
+
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -100,171 +101,326 @@ const directorFields = {
     { id: 'languages_spoken', label: 'Languages Spoken', type: 'text' },
   ],
 }
+const CSVUploadDialog = ({ isOpen, onClose, onUpload }) => {
+  const [file, setFile] = useState(null);
+
+  const handleFileChange = (event) => {
+    setFile(event.target.files[0]);
+  };
+
+  const handleSubmit = () => {
+    if (file) {
+      onUpload(file);
+      setFile(null);
+      onClose();
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Upload CSV File</DialogTitle>
+          <DialogDescription>
+            Choose a CSV file to upload directors' information.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="mt-4">
+          <Input
+            type="file"
+            accept=".csv"
+            onChange={handleFileChange}
+            className="mb-4"
+          />
+          <Button onClick={handleSubmit} disabled={!file}>
+            <UploadIcon className="w-4 h-4 mr-2" />
+            Upload CSV
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 export function DirectorsList() {
   const { userId } = useAuth();
+  const [directors, setDirectors] = useState([]);
+  const [newDirector, setNewDirector] = useState({});
+  const [isAddingDirector, setIsAddingDirector] = useState(false);
+  const [selectedDirector, setSelectedDirector] = useState(null);
+  const [isEditingMissingFields, setIsEditingMissingFields] = useState(false);
+  const [changedFields, setChangedFields] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCSVUploadDialogOpen, setIsCSVUploadDialogOpen] = useState(false);
+  const fileInputRef = useRef(null);
 
-  const [directors, setDirectors] = useState([])
-  const [newDirector, setNewDirector] = useState({})
-  const [isAddingDirector, setIsAddingDirector] = useState(false)
-  const [selectedDirector, setSelectedDirector] = useState(null)
-  const [isEditingMissingFields, setIsEditingMissingFields] = useState(false)
-  const [changedFields, setChangedFields] = useState({})
-  const [searchTerm, setSearchTerm] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const { toast } = useToast()
-
-  const fields = Object.values(directorFields).flatMap(category => category.map(field => field.id))
+  const fields = Object.values(directorFields).flatMap(category => category.map(field => field.id));
 
   const fetchDirectors = useCallback(async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     const { data, error } = await supabase
       .from('acc_portal_directors')
       .select('*')
       .eq('userid', userId)
-      .order('id', { ascending: true })
-    setIsLoading(false)
+      .order('id', { ascending: true });
+    setIsLoading(false);
     if (error) {
-      console.error('Error fetching directors:', error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch directors. Please try again.",
-        variant: "destructive",
-      })
+      console.error('Error fetching directors:', error);
+      toast.error("Failed to fetch directors. Please try again.");
     } else {
-      setDirectors(data)
+      setDirectors(data);
     }
-  }, [toast, userId])
-  
+  }, [userId]);
 
   useEffect(() => {
-    fetchDirectors()
-  }, [fetchDirectors])
+    fetchDirectors();
+  }, [fetchDirectors]);
 
   const handleInputChange = (e, directorId = null) => {
-    const { id, value } = e.target
+    const { id, value } = e.target;
     if (directorId) {
       setSelectedDirector(prevDirector => ({
         ...prevDirector,
         [id]: value
-      }))
+      }));
       setChangedFields(prevFields => ({
         ...prevFields,
         [id]: value
-      }))
+      }));
     } else {
       setNewDirector(prevDirector => ({
         ...prevDirector,
         [id]: value
-      }))
+      }));
     }
-  }
+  };
 
   const handleSubmit = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     const { data, error } = await supabase
       .from('acc_portal_directors')
       .insert([{ ...newDirector, userid: userId }])
-      .select()
-    setIsLoading(false)
+      .select();
+    setIsLoading(false);
     if (error) {
-      console.error('Error adding director:', error)
-      toast({
-        title: "Error",
-        description: "Failed to add director. Please try again.",
-        variant: "destructive",
-      })
+      console.error('Error adding director:', error);
+      toast.error("Failed to add director. Please try again.");
     } else {
-      setDirectors(prevDirectors => [...prevDirectors, data[0]])
-      setNewDirector({})
-      setIsAddingDirector(false)
-      toast({
-        title: "Success",
-        description: "Director added successfully.",
-      })
+      setDirectors(prevDirectors => [...prevDirectors, data[0]]);
+      setNewDirector({});
+      setIsAddingDirector(false);
+      toast.success("Director added successfully.");
     }
-  }
+  };
 
   const handleEdit = (director) => {
-    setSelectedDirector(director)
-    setIsEditingMissingFields(true)
-    setChangedFields({})
-  }
+    setSelectedDirector(director);
+    setIsEditingMissingFields(true);
+    setChangedFields({});
+  };
 
   const handleDelete = async (directorId) => {
-    setIsLoading(true)
+    setIsLoading(true);
     const { error } = await supabase
       .from('acc_portal_directors')
       .delete()
       .eq('id', directorId)
-      .eq('userid', userId)
-    setIsLoading(false)
+      .eq('userid', userId);
+    setIsLoading(false);
     if (error) {
-      console.error('Error deleting director:', error)
-      toast({
-        title: "Error",
-        description: "Failed to delete director. Please try again.",
-        variant: "destructive",
-      })
+      console.error('Error deleting director:', error);
+      toast.error("Failed to delete director. Please try again.");
     } else {
-      setDirectors(prevDirectors => prevDirectors.filter(d => d.id !== directorId))
-      toast({
-        title: "Success",
-        description: "Director deleted successfully.",
-      })
+      setDirectors(prevDirectors => prevDirectors.filter(d => d.id !== directorId));
+      toast.success("Director deleted successfully.");
     }
-  }
-  
+  };
 
   const handleMissingFieldsSubmit = async () => {
     if (Object.keys(changedFields).length === 0) {
-      toast({
-        title: "No Changes",
-        description: "No fields were changed.",
-      })
-      return
+      toast.error("No fields were changed.");
+      return;
     }
   
-    setIsLoading(true)
+    setIsLoading(true);
     const { data, error } = await supabase
       .from('acc_portal_directors')
       .update(changedFields)
       .eq('id', selectedDirector.id)
       .eq('userid', userId)
-      .select()
-    setIsLoading(false)
+      .select();
+    setIsLoading(false);
   
     if (error) {
-      console.error('Error updating director:', error)
-      toast({
-        title: "Error",
-        description: "Failed to update director. Please try again.",
-        variant: "destructive",
-      })
+      console.error('Error updating director:', error);
+      toast.error("Failed to update director. Please try again.");
     } else {
       setDirectors(prevDirectors =>
         prevDirectors.map(director =>
           director.id === selectedDirector.id ? { ...director, ...data[0] } : director
         )
-      )
-      setIsEditingMissingFields(false)
-      setSelectedDirector(null)
-      setChangedFields({})
-      toast({
-        title: "Success",
-        description: "Director updated successfully.",
-      })
+      );
+      setIsEditingMissingFields(false);
+      setSelectedDirector(null);
+      setChangedFields({});
+      toast.success("Director updated successfully.");
     }
-  }
+  };
+
+  const handleCSVDownload = () => {
+    const headers = fields.join(',');
+    const csv = [headers];
+    csv.push(fields.map(() => '').join(','));
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'directors_template.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleCSVUpload = async (file) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const text = e.target.result;
+        const rows = text.split('\n').filter(row => row.trim() !== ''); // Remove empty rows
+        const headers = rows[0].split(',').map(header => header.trim());
+        const directors = rows.slice(1).map(row => {
+          const rowData = row.split(',');
+          const director = {};
+  
+          headers.forEach((header, index) => {
+            let value = rowData[index] ? rowData[index].trim() : '';
+            // Convert empty strings to null for numeric fields
+            if (['shares_held', 'dependents', 'annual_income'].includes(header) && value === '') {
+              value = null;
+            }
+            director[header] = value;
+          });
+  
+          // Filter out rows that are completely empty
+          return Object.values(director).some(value => value !== '') ? director : null;
+        }).filter(director => director !== null); // Remove null directors
+    
+        setIsLoading(true);
+        let successCount = 0;
+        let errorCount = 0;
+        let skippedCount = 0;
+    
+        console.log("Parsed Directors Data:", directors);
+    
+        for (const director of directors) {
+          // Check if either id_number or full_name is missing
+          if (!director.id_number || !director.full_name) {
+            // Proceed to insert a new director if either id_number or full_name is missing
+            try {
+              console.log("Inserting new director due to missing id_number or full_name:", director);
+              const { data, error } = await supabase
+                .from('acc_portal_directors')
+                .insert([{ ...director, userid: userId }])
+                .select();
+  
+              if (error) {
+                console.error('Error adding director:', error);
+                errorCount++;
+              } else {
+                successCount++;
+                setDirectors(prevDirectors => [...prevDirectors, data[0]]);
+              }
+            } catch (error) {
+              console.error('Unexpected error during insertion:', error);
+              errorCount++;
+            }
+            continue; // Skip to the next director after insert
+          }
+  
+          try {
+            // Fetch existing directors based on both id_number and full_name
+            const { data: existingDirectors, error: fetchError } = await supabase
+              .from('acc_portal_directors')
+              .select('*')
+              .eq('userid', userId)
+              .eq('id_number', director.id_number)
+              .eq('full_name', director.full_name);
+  
+            if (fetchError) {
+              console.error('Error fetching existing directors:', fetchError);
+              errorCount++;
+              continue;
+            }
+  
+            if (existingDirectors.length > 0) {
+              // Update existing director
+              console.log("Updating existing director:", existingDirectors[0].id);
+              const { data, error } = await supabase
+                .from('acc_portal_directors')
+                .update(director)
+                .eq('id', existingDirectors[0].id)
+                .eq('userid', userId)
+                .select();
+  
+              if (error) {
+                console.error('Error updating director:', error);
+                errorCount++;
+              } else {
+                successCount++;
+                setDirectors(prevDirectors => 
+                  prevDirectors.map(d => d.id === existingDirectors[0].id ? data[0] : d)
+                );
+              }
+            } else {
+              // Insert new director if no existing match found
+              console.log("Inserting new director:", director);
+              const { data, error } = await supabase
+                .from('acc_portal_directors')
+                .insert([{ ...director, userid: userId }])
+                .select();
+  
+              if (error) {
+                console.error('Error adding director:', error);
+                errorCount++;
+              } else {
+                successCount++;
+                setDirectors(prevDirectors => [...prevDirectors, data[0]]);
+              }
+            }
+          } catch (error) {
+            console.error('Unexpected error during update or insertion:', error);
+            errorCount++;
+          }
+        }
+  
+        setIsLoading(false);
+  
+        if (successCount > 0) {
+          toast.success(`Successfully added/updated ${successCount} director${successCount > 1 ? 's' : ''}.`);
+        }
+        if (errorCount > 0) {
+          toast.error(`Failed to add/update ${errorCount} director${errorCount > 1 ? 's' : ''}.`);
+        }
+        if (skippedCount > 0) {
+          toast.info(`Skipped ${skippedCount} row${skippedCount > 1 ? 's' : ''}.`);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
   
 
   const getDirectorStatus = (director) => {
-    const missingFields = fields.filter(field => !director[field] || director[field] === '')
+    const missingFields = fields.filter(field => !director[field] || director[field] === '');
     return {
       status: missingFields.length === 0 ? 'complete' : 'pending',
       missingCount: missingFields.length
-    }
-  }
+    };
+  };
 
   const renderFormFields = (directorData, onChangeHandler, directorId = null) => (
     <div className="grid grid-cols-6 gap-4 px-4">
@@ -310,16 +466,17 @@ export function DirectorsList() {
         </div>
       ))}
     </div>
-  )
+  );
 
   const filteredDirectors = directors.filter(director =>
     Object.values(director).some(value =>
       String(value).toLowerCase().includes(searchTerm.toLowerCase())
     )
-  )
+  );
 
   return (
     <div className="flex w-full bg-gray-100">
+      <Toaster position="top-right" />
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-semibold">Directors List</h1>
@@ -337,6 +494,14 @@ export function DirectorsList() {
             <Button variant="outline" className="flex items-center" onClick={fetchDirectors} disabled={isLoading}>
               <RefreshCwIcon className={`w-4 h-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button variant="outline" onClick={handleCSVDownload}>
+              <DownloadIcon className="w-4 h-4 mr-2" />
+              Download CSV Template
+            </Button>
+            <Button variant="outline" onClick={() => setIsCSVUploadDialogOpen(true)}>
+              <UploadIcon className="w-4 h-4 mr-2" />
+              Upload CSV
             </Button>
             <Dialog open={isAddingDirector} onOpenChange={setIsAddingDirector}>
               <DialogTrigger asChild>
@@ -377,18 +542,18 @@ export function DirectorsList() {
                     ))}
                   </TableRow>
                   <TableRow>
-                  <TableHead className="sticky left-0 z-20 bg-white border">Actions</TableHead>
-                  {filteredDirectors.map((director) => (
-                    <TableHead key={director.id} className="text-center border">
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(director)} className="mr-2">
-                        Edit
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => handleDelete(director.id)}>
-                        Delete
-                      </Button>
-                    </TableHead>
-                  ))}
-                </TableRow>
+                    <TableHead className="sticky left-0 z-20 bg-white border">Actions</TableHead>
+                    {filteredDirectors.map((director) => (
+                      <TableHead key={director.id} className="text-center border">
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(director)} className="mr-2">
+                          Edit
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => handleDelete(director.id)}>
+                          Delete
+                        </Button>
+                      </TableHead>
+                    ))}
+                  </TableRow>
                   <TableRow>
                     <TableHead className="sticky left-0 z-20 bg-white border">Status</TableHead>
                     {filteredDirectors.map((director) => {
@@ -446,7 +611,13 @@ export function DirectorsList() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <CSVUploadDialog
+          isOpen={isCSVUploadDialogOpen}
+          onClose={() => setIsCSVUploadDialogOpen(false)}
+          onUpload={handleCSVUpload}
+        />
       </main>
     </div>
-  )
+  );
 }
