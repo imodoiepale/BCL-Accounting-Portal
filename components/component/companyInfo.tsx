@@ -43,10 +43,18 @@ export function CompanyInfoTab() {
         .single()
         .eq("userid", userId)
 
-      if (error) throw error;
-
-      setCompanyData(data || {});
-      checkMissingFields(data || {});
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No data found for the user, likely a new company
+          setCompanyData({});
+          checkMissingFields({});
+        } else {
+          throw error;
+        }
+      } else {
+        setCompanyData(data || {});
+        checkMissingFields(data || {});
+      }
     } catch (error) {
       console.error('Error fetching company data:', error);
       setCompanyData({});
@@ -90,10 +98,18 @@ export function CompanyInfoTab() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    
     try {
+      // Exclude the 'id' field from the upsert operation
+      const { id, ...companyDataWithoutId } = companyData;
+      const { id: formDataId, ...formDataWithoutId } = formData;
+  
       const { data, error } = await supabase
         .from('acc_portal_company')
-        .upsert({ ...companyData, ...formData, userid: userId })
+        .upsert(
+          { ...companyDataWithoutId, ...formDataWithoutId, userid: userId },
+          { onConflict: 'userid' }  // This tells Supabase to update the record with the existing userid
+        )
         .select()
         .single();
   
@@ -108,6 +124,7 @@ export function CompanyInfoTab() {
       setIsLoading(false);
     }
   };
+  
 
   if (isLoading) {
     return <div>Loading...</div>;
