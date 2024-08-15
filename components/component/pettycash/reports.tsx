@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, FileDown, Printer, ChevronDown } from "lucide-react";
 import { format, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import * as XLSX from 'xlsx';
 
 export default function PettyCashReportsTab() {
   const [selectedReport, setSelectedReport] = useState('expenditure-summary');
@@ -135,19 +136,57 @@ export default function PettyCashReportsTab() {
     });
   };
 
-  const exportReport = () => {
-    console.log('Exporting petty cash report...');
-  };
+const exportToExcel = () => {
+      console.log('Exporting petty cash report...');
+      const table = document.querySelector('table');
+      const ws = XLSX.utils.table_to_sheet(table);
+      const wb = XLSX.utils.book_new();
 
-  const printReport = () => {
+      // Apply styling
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell_address = {c: C, r: R};
+          const cell_ref = XLSX.utils.encode_cell(cell_address);
+          if (!ws[cell_ref]) continue;
+          ws[cell_ref].s = {
+            font: { bold: R === 0, color: { rgb: R === 0 ? "FFFFFF" : "000000" } },
+            fill: { fgColor: { rgb: R === 0 ? "4F81BD" : "FFFFFF" } },
+            alignment: { horizontal: "center", vertical: "center" },
+            border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+          };
+        }
+      }
+
+      // Auto-adjust column widths
+      const colWidths = [];
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        let maxWidth = 0;
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+          const cell_address = {c: C, r: R};
+          const cell_ref = XLSX.utils.encode_cell(cell_address);
+          if (ws[cell_ref] && ws[cell_ref].v) {
+            const cellWidth = ws[cell_ref].v.toString().length;
+            maxWidth = Math.max(maxWidth, cellWidth);
+          }
+        }
+        colWidths[C] = maxWidth + 2; // Add some padding
+      }
+      ws['!cols'] = colWidths.map(w => ({ wch: w }));
+
+      XLSX.utils.book_append_sheet(wb, ws, "Report");
+      XLSX.writeFile(wb, `${reportData.title}.xlsx`);
+};
+const printReport = () => {
     console.log('Printing petty cash report...');
+    window.print();
   };
 
   const renderTable = () => {
     switch (selectedReport) {
       case 'expenditure-summary':
         return (
-          <Table className="border-collapse border border-gray-300 w-full">
+            <Table className="border-collapse border border-gray-300 w-full">
             <TableHeader className="sticky top-0 bg-white z-10">
               <TableRow>
                 <TableHead className="border border-gray-300 w-[200px] left-0 z-20 bg-white sticky">Category</TableHead>
@@ -174,7 +213,7 @@ export default function PettyCashReportsTab() {
                   </TableCell>
                   {reportData.periods.map((period, periodIndex) => (
                     <TableCell key={periodIndex} className="border border-gray-300 text-right">
-                      ${row[period].toFixed(2)}
+                      ${row[period] !== undefined ? row[period].toFixed(2) : '0.00'}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -183,7 +222,7 @@ export default function PettyCashReportsTab() {
                 <TableCell colSpan={2} className="border border-gray-300 left-0 z-10 bg-green-200 sticky">Total</TableCell>
                 {reportData.periods.map((period, periodIndex) => (
                   <TableCell key={periodIndex} className="border border-gray-300 text-right">
-                    ${reportData.rows.reduce((sum, row) => sum + row[period], 0).toFixed(2)}
+                    ${reportData.rows.reduce((sum, row) => sum + (row[period] || 0), 0).toFixed(2)}
                   </TableCell>
                 ))}
               </TableRow>
@@ -291,6 +330,7 @@ export default function PettyCashReportsTab() {
     }
   };
 
+
   return (
     <div className="space-y-4">
       <Card>
@@ -359,9 +399,9 @@ export default function PettyCashReportsTab() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>{reportData.title}</CardTitle>
             <div className="flex space-x-2">
-              <Button variant="outline" size="sm" onClick={exportReport}>
+              <Button variant="outline" size="sm" onClick={exportToExcel}>
                 <FileDown className="mr-2 h-4 w-4" />
-                Export
+                Export to Excel
               </Button>
               <Button variant="outline" size="sm" onClick={printReport}>
                 <Printer className="mr-2 h-4 w-4" />
