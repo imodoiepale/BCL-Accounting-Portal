@@ -171,7 +171,7 @@ export function TransactionsTab() {
     { label: 'Invoice Date', key: 'invoice_date', format: (date) => formatDate(date) },
     { label: 'Description', key: 'description' },
     { label: 'Payment Type', key: 'payment_type' },
-    { label: 'Expense Type', key: 'expense_type' },
+    { label: 'Expense Category', key: 'expense_type' },
     { label: 'Checked By', key: 'checked_by' },
     { label: 'Approved By', key: 'approved_by' }, // Add payment type to table
     {
@@ -201,18 +201,18 @@ export function TransactionsTab() {
   return (
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
-              <h1 className="text-xl font-semibold mb-2">Monthly Petty Cash Entries</h1>
-            <div className="flex justify-between space-x-4">
-                {Object.keys(floatData).map((type) => (
-                  <FloatCard
-                    key={type}
-                    title={type.charAt(0).toUpperCase() + type.slice(1)}
-                    allocated={floatData[type].allocated}
-                    used={floatData[type].used}
-                    balance={floatData[type].balance}
-                  />
-                ))}
-              </div>
+        <h1 className="text-xl font-semibold mb-2">Monthly Petty Cash Entries</h1>
+        <div className="flex justify-between space-x-4">
+            {Object.keys(floatData).map((type) => (
+              <FloatCard
+                key={type}
+                title={type.charAt(0).toUpperCase() + type.slice(1)}
+                allocated={floatData[type].allocated}
+                used={floatData[type].used}
+                balance={floatData[type].balance}
+              />
+            ))}
+          </div>
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center space-x-2">
 
@@ -265,10 +265,10 @@ export function TransactionsTab() {
                     <Input id="receipt" type="file" accept="image/*" onChange={handleFileChange} />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="expense_type">Expense Type</Label>
+                    <Label htmlFor="expense_type">Expense Category</Label>
                     <Select onValueChange={handleExpenseTypeChange} defaultValue="">
                       <SelectTrigger>
-                        <SelectValue placeholder="Select Expense Type" />
+                        <SelectValue placeholder="Select Expense Category" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="motor_vehicle_running_exp">Motor Vehicle Running Exp</SelectItem>
