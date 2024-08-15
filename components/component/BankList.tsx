@@ -11,27 +11,26 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,} from "@/components/ui/sheet"
-import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, UploadIcon, DownloadIcon } from 'lucide-react'
 import { useUser } from '@clerk/clerk-react'
+import toast from 'react-hot-toast'
 
 const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
 const url="https://zyszsqgdlrpnunkegipk.supabase.co"
 
-// Initialize Supabase client
 const supabase = createClient(url, key)
 
-// Utility function to format date
 const formatDate = (dateString) => {
   const date = new Date(dateString);
   const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+  const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();
   return `${day}/${month}/${year}`;
 };
 
 export function BankList() {
   const { user } = useUser();
-
   const [banks, setBanks] = useState([])
   const [newBank, setNewBank] = useState({
     name: '',
@@ -42,21 +41,26 @@ export function BankList() {
     relationship_manager_mobile: '',
     relationship_manager_email: '',
   })
+  const [isLoading, setIsLoading] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   useEffect(() => {
     fetchBanks()
-  }, [])
+  }, [user])
 
   const fetchBanks = async () => {
+    if (!user) return;
     const { data, error } = await supabase
       .from('acc_portal_banks')
       .select('*')
-      .eq('userid', user?.id)
+      .eq('userid', user.id)
       .order('id', { ascending: true });
-    if (error) console.error('Error fetching banks:', error)
+    if (error) {
+      console.error('Error fetching banks:', error)
+      toast.error('Failed to fetch banks')
+    }
     else setBanks(data)
   }
-  
 
   const handleInputChange = (e) => {
     setNewBank({ ...newBank, [e.target.id]: e.target.value })
@@ -67,10 +71,17 @@ export function BankList() {
   }
 
   const handleSubmit = async () => {
+    if (!user) {
+      toast.error('User not authenticated')
+      return;
+    }
     const { data, error } = await supabase
       .from('acc_portal_banks')
-      .insert([{ ...newBank, userid: user?.id }])
-    if (error) console.error('Error adding bank:', error)
+      .insert([{ ...newBank, userid: user.id }])
+    if (error) {
+      console.error('Error adding bank:', error)
+      toast.error('Failed to add bank')
+    }
     else {
       fetchBanks()
       setNewBank({
@@ -82,29 +93,133 @@ export function BankList() {
         relationship_manager_mobile: '',
         relationship_manager_email: '',
       })
+      toast.success('Bank added successfully')
     }
   }
 
   const updateBank = async (id, updatedData) => {
+    if (!user) {
+      toast.error('User not authenticated')
+      return;
+    }
     const { data, error } = await supabase
       .from('acc_portal_banks')
       .update(updatedData)
       .eq('id', id)
-      .eq('userid', user?.id)
-    if (error) console.error('Error updating bank:', error)
-    else fetchBanks()
+      .eq('userid', user.id)
+    if (error) {
+      console.error('Error updating bank:', error)
+      toast.error('Failed to update bank')
+    }
+    else {
+      fetchBanks()
+      toast.success('Bank updated successfully')
+    }
   }
   
   const deleteBank = async (id) => {
+    if (!user) {
+      toast.error('User not authenticated')
+      return;
+    }
     const { data, error } = await supabase
       .from('acc_portal_banks')
       .delete()
       .eq('id', id)
-      .eq('userid', user?.id)
-    if (error) console.error('Error deleting bank:', error)
-    else fetchBanks()
+      .eq('userid', user.id)
+    if (error) {
+      console.error('Error deleting bank:', error)
+      toast.error('Failed to delete bank')
+    }
+    else {
+      fetchBanks()
+      toast.success('Bank deleted successfully')
+    }
   }
-  
+
+  const handleCSVUpload = async (file) => {
+    if (!user) {
+      toast.error('User not authenticated')
+      return;
+    }
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const text = e.target.result;
+        const rows = text.split('\n').filter(row => row.trim() !== '');
+        const headers = rows[0].split(',').map(header => header.trim());
+        const banks = rows.slice(1).map(row => {
+          const rowData = row.split(',');
+          const bank = {};
+          headers.forEach((header, index) => {
+            if (header) {  // Only process non-empty headers
+              bank[header] = rowData[index] ? rowData[index].trim() : '';
+            }
+          });
+          return Object.values(bank).some(value => value !== '') ? bank : null;
+        }).filter(bank => bank !== null);
+    
+        setIsLoading(true);
+        let successCount = 0;
+        let errorCount = 0;
+    
+        for (const bank of banks) {
+          try {
+            const { data, error } = await supabase
+              .from('acc_portal_banks')
+              .insert([{ ...bank, userid: user.id }])
+              .select();
+
+            if (error) {
+              console.error('Error adding bank:', error);
+              errorCount++;
+            } else {
+              successCount++;
+              setBanks(prevBanks => [...prevBanks, data[0]]);
+            }
+          } catch (error) {
+            console.error('Unexpected error during insertion:', error);
+            errorCount++;
+          }
+        }
+    
+        setIsLoading(false);
+        setIsDialogOpen(false);
+    
+        if (successCount > 0) {
+          toast.success(`Successfully added ${successCount} bank${successCount > 1 ? 's' : ''}.`);
+        }
+        if (errorCount > 0) {
+          toast.error(`Failed to add ${errorCount} bank${errorCount > 1 ? 's' : ''}.`);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const downloadCSVTemplate = () => {
+    const headers = [
+      'name',
+      'account_number',
+      'currency',
+      'branch',
+      'relationship_manager_name',
+      'relationship_manager_mobile',
+      'relationship_manager_email'
+    ];
+    const csvContent = headers.join(',') + '\n';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'bank_template.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
   
   return (
     <div className="flex w-full bg-gray-100">
@@ -117,10 +232,13 @@ export function BankList() {
               <RefreshCwIcon className="w-4 h-4 mr-1" />
               Refresh
             </Button>
-
+            <Button variant="outline" className="flex items-center" onClick={downloadCSVTemplate}>
+              <DownloadIcon className="w-4 h-4 mr-1" />
+              Download CSV Template
+            </Button>
             <Sheet>
               <SheetTrigger asChild>
-              <Button className="bg-blue-600 text-white">Add New Bank Account</Button>
+                <Button className="bg-blue-600 text-white">Add New Bank Account</Button>
               </SheetTrigger>
               <SheetContent>
                 <SheetHeader>
@@ -169,16 +287,48 @@ export function BankList() {
                     <Input id="relationship_manager_email" placeholder="john@example.com" value={newBank.relationship_manager_email} onChange={handleInputChange} />
                   </div>
                 </div>
-                <div className="pt-4"><Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button></div>
+                <div className="pt-4">
+                  <Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button>
+                </div>
               </SheetContent>
             </Sheet>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-green-600 text-white flex items-center">
+                  <UploadIcon className="w-4 h-4 mr-1" />
+                  Upload CSV
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Upload CSV</DialogTitle>
+                  <DialogDescription>
+                    Upload a CSV file to add multiple bank accounts at once
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col pt-4 gap-4">
+                  <Input 
+                    type="file" 
+                    accept=".csv" 
+                    onChange={(e) => handleCSVUpload(e.target.files[0])}
+                  />
+                  <Button 
+                    className="bg-green-600 text-white" 
+                    onClick={() => document.querySelector('input[type="file"]').click()}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Uploading...' : 'Choose File and Upload'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
         <Card>
           <Table>
             <TableHeader>
               <TableRow>
-              <TableHead>BANK ACC ID</TableHead>
+                <TableHead>BANK ACC ID</TableHead>
                 <TableHead>Bank Name</TableHead>
                 <TableHead>Account Number</TableHead>
                 <TableHead>Currency</TableHead>
@@ -202,8 +352,8 @@ export function BankList() {
                   <TableCell>{bank.relationship_manager_name}</TableCell>
                   <TableCell>{bank.relationship_manager_mobile}</TableCell>
                   <TableCell>{bank.relationship_manager_email}</TableCell>
-                  <TableCell>{formatDate(bank.startdate)}</TableCell>
-                  <TableCell></TableCell>
+                  <TableCell>{bank.startdate ? formatDate(bank.startdate) : ''}</TableCell>
+                  <TableCell>{bank.enddate ? formatDate(bank.enddate) : ''}</TableCell>
                   <TableCell className='text-center'>
                     <Badge variant={bank.status ? "success" : "destructive"}>
                       {bank.status ? "✔️" : "❌"}
