@@ -36,6 +36,7 @@ export function SupplierList() {
     contact_name: '',
     contact_mobile: '',
     contact_email: '',
+    status: ""
   })
   const [isLoading, setIsLoading] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
@@ -71,7 +72,7 @@ export function SupplierList() {
         contact_name: '',
         contact_mobile: '',
         contact_email: '',
-        
+        status: ""
       })
     }
   }
