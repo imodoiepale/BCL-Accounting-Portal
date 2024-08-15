@@ -258,8 +258,8 @@ export function SupplierList() {
                     <TableCell>{formatDate(supplier.startdate)}</TableCell>
                     <TableCell></TableCell>
                     <TableCell>
-                    <span className={`font-bold capitalize ${supplier.status === 'true' ? 'text-green-600' : 'text-red-600'}`}>
-                      {supplier.status === 'true' ? 'Active' : 'Inactive'}
+                    <span className={`font-bold capitalize ${supplier.status ? 'text-green-600' : 'text-red-600'}`}>
+                      {supplier.status ? 'Active' : 'Inactive'}
                     </span>
                   </TableCell>
                   <TableCell className='text-center'>
