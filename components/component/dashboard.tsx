@@ -36,7 +36,8 @@ const gettingStartedSteps = [
     status: "Incomplete",
     icon: UserIcon,
     badgeColor: "border-red-800",
-    badgeTextColor: "fill-red-300 text-green-300"
+    badgeTextColor: "fill-red-300 text-green-300",
+    link: "/profile"
   },
   { 
     id: 2, 
@@ -45,7 +46,8 @@ const gettingStartedSteps = [
     status: "In Progress",
     icon: UploadIcon,
     badgeColor: "border-yellow-600",
-    badgeTextColor: "fill-yellow-300 text-yellow-300"
+    badgeTextColor: "fill-yellow-300 text-yellow-300",
+    link: "/documents"
   },
   { 
     id: 3, 
@@ -54,7 +56,8 @@ const gettingStartedSteps = [
     status: "In Progress",
     icon: UsersIcon,
     badgeColor: "border-yellow-600",
-    badgeTextColor: "fill-yellow-300 text-yellow-300"
+    badgeTextColor: "fill-yellow-300 text-yellow-300",
+    link: "/profile"
   },
   { 
     id: 5, 
@@ -63,7 +66,8 @@ const gettingStartedSteps = [
     status: "In Progress",
     icon: BanknoteIcon,
     badgeColor: "border-yellow-600",
-    badgeTextColor: "fill-yellow-300 text-yellow-300"
+    badgeTextColor: "fill-yellow-300 text-yellow-300",
+    link: "/profile"
   },
   { 
     id: 4, 
@@ -72,7 +76,8 @@ const gettingStartedSteps = [
     status: "Complete",
     icon: BarChartIcon,
     badgeColor: "border-green-600",
-    badgeTextColor: "fill-green-300 text-green-300"
+    badgeTextColor: "fill-green-300 text-green-300",
+    link: "/reports"
   },
   { 
     id: 6, 
@@ -81,26 +86,29 @@ const gettingStartedSteps = [
     status: "Incomplete",
     icon: SettingsIcon,
     badgeColor: "border-red-600",
-    badgeTextColor: "fill-red-300 text-red-300"
+    badgeTextColor: "fill-red-300 text-red-300",
+    link: "/settings"
   },
-  { 
-    id: 7, 
-    title: "Track Expenses", 
-    description: "Log and categorize your business expenses", 
-    status: "Complete",
-    icon: WalletIcon,
-    badgeColor: "border-green-600",
-    badgeTextColor: "fill-green-300 text-green-300"
-  },
-  { 
-    id: 8, 
-    title: "Verify Transactions", 
-    description: "Review and approve pending transactions", 
-    status: "Complete",
-    icon: CheckIcon,
-    badgeColor: "border-green-600",
-    badgeTextColor: "fill-green-300 text-green-300"
-  },
+  // { 
+  //   id: 7, 
+  //   title: "Track Expenses", 
+  //   description: "Log and categorize your business expenses", 
+  //   status: "Complete",
+  //   icon: WalletIcon,
+  //   badgeColor: "border-green-600",
+  //   badgeTextColor: "fill-green-300 text-green-300",
+  //   link: "/expenses"
+  // },
+  // { 
+  //   id: 8, 
+  //   title: "Verify Transactions", 
+  //   description: "Review and approve pending transactions", 
+  //   status: "Complete",
+  //   icon: CheckIcon,
+  //   badgeColor: "border-green-600",
+  //   badgeTextColor: "fill-green-300 text-green-300",
+  //   link: "/transactions"
+  // },
 ];
 
 const stats = [
@@ -146,13 +154,17 @@ export function Dashboard() {
           'email', 'phone', 'street', 'city', 'postal_code', 'country'
         ];
 
-        const missing = requiredFields.filter(field => !data[field]);
+        const missing = requiredFields.filter(field => !data || !data[field]);
         setMissingFields(missing);
         setIsProfileIncomplete(missing.length > 0);
       } catch (error) {
         console.error('Error fetching company data:', error);
         setIsProfileIncomplete(true);
-        setMissingFields(['Unable to fetch company data']);
+        setMissingFields([
+          'company_name', 'company_type', 'description', 'registration_number', 'date_established', 'kra_pin_number',
+          'industry', 'employees', 'annual_revenue', 'fiscal_year', 'website',
+          'email', 'phone', 'street', 'city', 'postal_code', 'country'
+        ]);
       } finally {
         setIsLoading(false);
       }
@@ -185,9 +197,9 @@ export function Dashboard() {
               <AlertTitle className="text-yellow-900 font-bold text-md">Incomplete Company Profile</AlertTitle>
               <AlertDescription className="text-yellow-700 mt-2 text-sm">
                 <p>Your company profile is incomplete. The following information is missing:</p>
-                <ul className="list-disc list-inside mt-2">
+                <ul className="grid grid-cols-8 gap-2 mt-2">
                   {missingFields.map((field, index) => (
-                    <li key={index}>{field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</li>
+                    <li key={index} className="list-disc list-inside">{field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</li>
                   ))}
                 </ul>
                 <p className="mt-2">
@@ -249,7 +261,7 @@ export function Dashboard() {
           ))}
         </div>
         <div className="grid grid-cols-1 gap-4 bg-muted/40 p-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
-          {gettingStartedSteps.map(({ id, title, description, status, icon: Icon, badgeColor, badgeTextColor }) => (
+          {gettingStartedSteps.map(({ id, title, description, status, icon: Icon, badgeColor, badgeTextColor, link }) => (
             <Card key={id} className="col-span-1">
               <CardHeader>
                 <div className="flex justify-between">
@@ -261,7 +273,7 @@ export function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent className="grid gap-4">
-                <div className="flex items-center justify-between rounded-lg bg-background p-4 transition-colors hover:bg-accent hover:text-accent-foreground">
+                <Link href={link} className="flex items-center justify-between rounded-lg bg-background p-4 transition-colors hover:bg-accent hover:text-accent-foreground">
                   <div className="flex items-center gap-4">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
                       <Icon className="h-5 w-5" />
@@ -271,7 +283,7 @@ export function Dashboard() {
                     </div>
                   </div>
                   <ChevronRightIcon className="h-5 w-5 text-muted-foreground" />
-                </div>
+                </Link>
               </CardContent>
             </Card>
           ))}

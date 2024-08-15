@@ -16,7 +16,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown } from "lucide-react";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +44,7 @@ import { SupplierList } from "@/components/component/SupplierList";
 import { KYCDocumentsList } from "@/components/component/kycDocumentsList";
 import { InsurancePolicy } from "@/components/component/InsurancePolicy";
 import { DirectorsDocumentsList } from "@/components/component/DirectorsDocumentsList";
+import { useRouter } from 'next/navigation';
 
 
 const DataTable = ({ columns, data }) => {
@@ -166,6 +167,10 @@ const generateMockData = (prefix, count) =>
   }));
 
 export default function Profile() {
+
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState("company-info");
+
   const bankData = generateMockData('Bank', 5);
   const directorData = generateMockData('Director', 3);
   const employeeData = generateMockData('Employee', 10);
@@ -173,6 +178,16 @@ export default function Profile() {
   const insuranceData = generateMockData('Insurance', 4);
   const depositData = generateMockData('Deposit', 6);
   const kycData = generateMockData('KYC Document', 5);
+  
+  useEffect(() => {
+    // This effect will run when the component mounts and whenever router.query changes
+    if (router.isReady) {
+      const { tab } = router.query;
+      if (tab) {
+        setActiveTab(tab as string);
+      }
+    }
+  }, [router.isReady, router.query]);
 
   const columns: ColumnDef[] = [
     {
@@ -196,7 +211,7 @@ export default function Profile() {
   return (
     <div className="p-4 w-full">
       <h1 className="text-xl font-bold mb-4">Company Profile</h1>
-      <Tabs defaultValue="company-info">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value)}>
         <TabsList>
           <TabsTrigger value="company-info">Company Info</TabsTrigger>
           <TabsTrigger value="kyc-docs">KYC Documents</TabsTrigger>
