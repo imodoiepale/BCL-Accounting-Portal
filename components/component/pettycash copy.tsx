@@ -1,21 +1,16 @@
-/* eslint-disable react/no-unescaped-entities */
 // @ts-nocheck
 "use client";
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { useUser } from '@clerk/clerk-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
+import { Card } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { FilterIcon, DownloadIcon, PlusIcon } from 'lucide-react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { useUser } from '@clerk/clerk-react';
 
 // Initialize Supabase client
 const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
@@ -52,38 +47,9 @@ const calculateFloatData = () => {
 };
 
 
-const AccountCard = ({ title, allocated, used, balance }) => (
-  <Card className="p-4 bg-white shadow-sm rounded-lg flex flex-col justify-between h-20">
-    <div className="flex justify-between items-center">
-      <h3 className="text-sm font-semibold">{title}</h3>
-      <Button size="sm" variant="outline">Replenish</Button>
-    </div>
-    <div className="flex justify-between text-xs mt-2">
-      <span>Allocated: {allocated}</span>
-      <span>Used: {used}</span>
-      <span>Balance: {balance}</span>
-    </div>
-  </Card>
-);
-
-
 export function PettyCash() {
   const { userId } = useUser();
-  const [branches, setBranches] = useState([]);
-  const [accounts, setAccounts] = useState([]);
-  const [transactions, setTransactions] = useState([]);
-  const [currentBranch, setCurrentBranch] = useState(null);
-  const [currentTab, setCurrentTab] = useState('transactions');
-
-  const [newBranch, setNewBranch] = useState({ name: '', location: '' });
-  const [newAccount, setNewAccount] = useState({ name: '', type: '', initial_balance: '' });
-  const [newTransaction, setNewTransaction] = useState({
-    amount: '',
-    description: '',
-    account_id: '',
-    transaction_type: '',
-    date: '',
-  });
+  // const userId = user?.id;
 
   const [pettyCashEntries, setPettyCashEntries] = useState([]);
   const [floatData, setFloatData] = useState(calculateFloatData());
@@ -233,73 +199,32 @@ export function PettyCash() {
   };
 
   return (
-    <div className="flex w-full bg-muted/40">
+    <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Petty Cash Overview</CardTitle>
-              <CardDescription className="max-w-lg text-balance leading-relaxed">
-                Get a comprehensive view of your company's petty cash across all branches.
-              </CardDescription>
-            </CardHeader>
-            <CardFooter>
-              <Button>Manage Petty Cash</Button>
-            </CardFooter>
-          </Card>
-          {Object.entries(floatData).map(([type, data]) => (
-            <Card key={type}>
-              <CardHeader className="pb-2">
-                <CardDescription>{`Total ${type.charAt(0).toUpperCase() + type.slice(1)}`}</CardDescription>
-                <CardTitle className="text-4xl">{`$${data.allocated}`}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground">{`+${((data.used / data.allocated) * 100).toFixed(1)}% from last month`}</div>
-              </CardContent>
-              <CardFooter>
-                <Progress value={(data.used / data.allocated) * 100} aria-label={`${((data.used / data.allocated) * 100).toFixed(1)}% increase`} />
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+              <h1 className="text-xl font-semibold mb-2">Monthly Petty Cash Entries</h1>
+            <div className="flex justify-between space-x-4">
+                {Object.keys(floatData).map((type) => (
+                  <FloatCard
+                    key={type}
+                    title={type.charAt(0).toUpperCase() + type.slice(1)}
+                    allocated={floatData[type].allocated}
+                    used={floatData[type].used}
+                    balance={floatData[type].balance}
+                  />
+                ))}
+              </div>
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center space-x-2">
 
-        <Tabs defaultValue="entries">
-          <div className="flex items-center">
-            <TabsList>
-              <TabsTrigger value="entries">Entries</TabsTrigger>
-              <TabsTrigger value="accounts">Accounts</TabsTrigger>
-              <TabsTrigger value="transactions">Transactions</TabsTrigger>
-            </TabsList>
-            <div className="ml-auto flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-7 gap-1 text-sm">
-                    <FilterIcon className="h-3.5 w-3.5" />
-                    <span className="sr-only sm:not-sr-only">Filter</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Filter by</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem checked>Cash</DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem>Mpesa</DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem>Cards</DropdownMenuCheckboxItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button size="sm" variant="outline" className="h-7 gap-1 text-sm">
-                <DownloadIcon className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only">Export</span>
-              </Button>
-            </div>
-          </div>
-          <TabsContent value="entries">
-            <Card>
-              <CardHeader className="px-7">
-                <CardTitle>Petty Cash Entries</CardTitle>
-                <CardDescription>View and manage your petty cash entries.</CardDescription>
-                <Sheet>
+            <Input type="search" placeholder="search" className="w-48" />
+            <Button variant="outline" className="flex items-center" onClick={fetchPettyCashEntries}>
+              <RefreshCwIcon className="w-4 h-4 mr-1" />
+              Refresh
+            </Button>
+
+            <Sheet>
               <SheetTrigger asChild>
-                <Button className="bg-blue-600 text-white w-1/8">Add New Entry</Button>
+                <Button className="bg-blue-600 text-white">Add New Entry</Button>
               </SheetTrigger>
               <SheetContent>
                 <SheetHeader>
@@ -362,44 +287,39 @@ export function PettyCash() {
                 </div>
               </SheetContent>
             </Sheet>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Entry ID</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead className="hidden sm:table-cell">Invoice Date</TableHead>
-                      <TableHead className="hidden sm:table-cell">Description</TableHead>
-                      <TableHead>Payment Type</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pettyCashEntries.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{`PC-${entry.id}`}</TableCell>
-                        <TableCell>
-                          <Badge className="text-xs" variant="secondary">
-                            ${entry.amount}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">{formatDate(entry.invoice_date)}</TableCell>
-                        <TableCell className="hidden sm:table-cell">{entry.description}</TableCell>
-                        <TableCell>{entry.payment_type}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="accounts">
-            {/* Add content for Accounts tab */}
-          </TabsContent>
-          <TabsContent value="transactions">
-            {/* Add content for Transactions tab */}
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {tableFields.map(({ label }) => (
+                  <TableHead key={label}>{label}</TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pettyCashEntries.map((entry) => (
+                <TableRow key={entry.id}>
+                  {tableFields.map(({ key, format }) => (
+                    <TableCell key={key}>
+                      {format ? format(entry[key]) : entry[key]}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+        <div className="flex justify-between items-center mt-4">
+          <Button variant="outline" className="flex items-center">
+            <ChevronLeftIcon className="w-4 h-4" />
+          </Button>
+          <span>1</span>
+          <Button variant="outline" className="flex items-center">
+            <ChevronRightIcon className="w-4 h-4" />
+          </Button>
+        </div>
       </main>
     </div>
   );
