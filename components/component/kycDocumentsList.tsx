@@ -13,6 +13,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { RefreshCwIcon, PlusIcon, UploadIcon, EyeIcon, ArrowUpDown } from 'lucide-react'
 import { toast } from 'sonner'
 import dynamic from 'next/dynamic'
+import { useAuth } from '@clerk/clerk-react'
 
 const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => mod.Dialog), { ssr: false })
 const DialogContent = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogContent), { ssr: false })
@@ -48,6 +49,9 @@ const FileViewer = ({ url, onClose }) => {
 }
 
 export function KYCDocumentsList({ category }) {
+
+  const {userId} = useAuth()
+
   const [oneOffDocs, setOneOffDocs] = useState([])
   const [renewalDocs, setRenewalDocs] = useState([])
   const [newDocument, setNewDocument] = useState({
@@ -71,7 +75,7 @@ export function KYCDocumentsList({ category }) {
     createBucketAndFolders().then(() => {
       fetchDocuments()
     })
-  }, [category])
+  }, [category, userId])
 
   const createBucketAndFolders = async () => {
     const { data: bucketData, error: bucketError } = await supabase.storage.createBucket('kyc-documents', {
@@ -101,6 +105,7 @@ export function KYCDocumentsList({ category }) {
     const { data: oneOffData, error: oneOffError } = await supabase
       .from('acc_portal_kyc_docs')
       .select('*')
+      .eq('userid', userId)
       .eq('document_type', 'one_off')
       .eq('category', category)
       .order('id', { ascending: true });
@@ -108,6 +113,7 @@ export function KYCDocumentsList({ category }) {
     const { data: renewalData, error: renewalError } = await supabase
       .from('acc_portal_kyc_docs')
       .select('*')
+      .eq('userid', userId)
       .eq('document_type', 'renewal')
       .eq('category', category)
       .order('id', { ascending: true });
@@ -158,7 +164,7 @@ export function KYCDocumentsList({ category }) {
         expiry_date: isOneOff ? null : newDocument.expiry_date,
         document_url: file_path,
         upload_date: new Date().toISOString(),
-        userid: null,
+        userid: userId,
         entity_id: null,
         entity_type: '',
       }
@@ -244,6 +250,7 @@ export function KYCDocumentsList({ category }) {
         .from('acc_portal_kyc_docs')
         .update({ document_url: data.path })
         .eq('id', doc.id)
+        .eq('userid', userId)
 
       if (updateError) {
         console.error('Error updating document:', updateError)

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { RefreshCwIcon, PlusIcon, UploadIcon, EyeIcon } from 'lucide-react'
+import { useAuth } from '@clerk/clerk-react'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -28,6 +29,8 @@ const formatDate = (dateString) => {
 };
 
 export function DirectorsDocumentsList() {
+  const {userId} = useAuth()
+
   const [oneOffDocs, setOneOffDocs] = useState([])
   const [renewalDocs, setRenewalDocs] = useState([])
   const [newDocument, setNewDocument] = useState({
@@ -49,7 +52,7 @@ export function DirectorsDocumentsList() {
     initializeBucket()
     fetchDocuments()
     fetchDirectors()
-  }, [])
+  }, [userId])
 
   const initializeBucket = async () => {
     const { data: buckets, error } = await supabase.storage.listBuckets()
@@ -80,6 +83,7 @@ export function DirectorsDocumentsList() {
     const { data, error } = await supabase
       .from('acc_portal_directors_documents')
       .select('*')
+      .eq('userid', userId)
       .order('id', { ascending: true });
 
     if (error) {
@@ -93,7 +97,8 @@ export function DirectorsDocumentsList() {
   const fetchDirectors = async () => {
     const { data, error } = await supabase
       .from('acc_portal_directors')
-      .select('id, full_name, first_name, middle_name, last_name, email_address, passport_number, id_number')
+      .select('*')
+      .eq('userid', userId)
       .order('full_name', { ascending: true });
 
     if (error) console.error('Error fetching directors:', error)
@@ -126,6 +131,7 @@ export function DirectorsDocumentsList() {
         ...newDocument,
         type: documentType,
         expiry_date: documentType === 'one-off' ? null : newDocument.expiry_date,
+        userid: userId,
       };
 
       if (file) {
@@ -222,6 +228,7 @@ export function DirectorsDocumentsList() {
           .from('acc_portal_directors_documents')
           .update({ file_path: publicUrlData.publicUrl })
           .eq('id', doc.id)
+          .eq('userid', userId)
 
         if (updateError) {
           throw new Error(`Error updating document: ${updateError.message}`)
