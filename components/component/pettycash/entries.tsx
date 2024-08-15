@@ -29,6 +29,7 @@ const staticFloatData = [
   { payment_type: 'mpesa', float_allocated: 10000, float_used: 2500 },
   { payment_type: 'cash', float_allocated: 5000, float_used: 1500 },
   { payment_type: 'credit_card', float_allocated: 2000, float_used: 500 },
+  { payment_type: 'debit_card', float_allocated: 2000, float_used: 500 },
 ];
 
 const calculateFloatData = () => {
@@ -115,7 +116,7 @@ export function TransactionsTab() {
   
     const { data, error } = await supabase
       .from('acc_portal_petty_cash_entries')
-      .insert([{ ...newPettyCash, receipt_url: receiptUrl, user_id: userId }]);
+      .insert([{ ...newPettyCash, receipt_url: receiptUrl, userid: userId }]);
   
     if (error) console.error('Error adding petty cash entry:', error);
     else {
@@ -139,7 +140,7 @@ export function TransactionsTab() {
       .from('acc_portal_petty_cash_entries')
       .update(updatedData)
       .eq('id', entryId)
-      .eq('user_id', userId);
+      .eq('userid', userId);
     // Handle the result
   };
   
@@ -148,7 +149,7 @@ export function TransactionsTab() {
       .from('acc_portal_petty_cash_entries')
       .delete()
       .eq('id', entryId)
-      .eq('user_id', userId);
+      .eq('userid', userId);
     // Handle the result
   };
   
@@ -171,7 +172,7 @@ export function TransactionsTab() {
     { label: 'Invoice Date', key: 'invoice_date', format: (date) => formatDate(date) },
     { label: 'Description', key: 'description' },
     { label: 'Payment Type', key: 'payment_type' },
-    { label: 'Expense Type', key: 'expense_type' },
+    { label: 'Expense Category', key: 'expense_type' },
     { label: 'Checked By', key: 'checked_by' },
     { label: 'Approved By', key: 'approved_by' }, // Add payment type to table
     {
@@ -189,11 +190,14 @@ export function TransactionsTab() {
 
   const FloatCard = ({ title, allocated, used, balance }) => {
     return (
-      <Card className="p-2 bg-white shadow-sm rounded-lg flex gap-2 items-center mb-4">
-        <h3 className="text-md font-semibold">{title}</h3>
-        <p className="text-sm mt-1">Allocated: {allocated}</p>
-        <p className="text-sm mt-1">Used: {used}</p>
-        <p className="text-sm mt-1">Balance: {balance}</p>
+      <Card className="p-2 bg-white shadow-sm rounded-lg flex text-center items-center mb-4">
+        <h3 className="text-md font-semibold text-center p-2 rounded">{title}</h3> 
+        <div className="w-px h-12 bg-gray-200 mx-4"></div>
+        <p className="text-sm font-semibold text-blue-600">Allocated: {allocated}</p>
+        <div className="w-px h-12 bg-gray-200 mx-4"></div>
+        <p className="text-sm font-semibold text-red-600">Used: {used}</p>
+        <div className="w-px h-12 bg-gray-200 mx-4"></div>
+        <p className="text-sm font-semibold text-green-600">Balance: {balance}</p> 
       </Card>
     );
   };
@@ -201,18 +205,17 @@ export function TransactionsTab() {
   return (
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
-              <h1 className="text-xl font-semibold mb-2">Monthly Petty Cash Entries</h1>
-            <div className="flex justify-between space-x-4">
-                {Object.keys(floatData).map((type) => (
-                  <FloatCard
-                    key={type}
-                    title={type.charAt(0).toUpperCase() + type.slice(1)}
-                    allocated={floatData[type].allocated}
-                    used={floatData[type].used}
-                    balance={floatData[type].balance}
-                  />
-                ))}
-              </div>
+        <h1 className="text-xl font-semibold mb-2">Monthly Petty Cash Entries</h1>
+        <div className=" justify-center space-x-2 grid  grid-cols-4 text">
+            {Object.keys(floatData).map((type) => (
+              <FloatCard
+                key={type}
+                title={`Total ${type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}`}
+                allocated={floatData[type].allocated.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                used={floatData[type].used.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                balance={floatData[type].balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}              />
+            ))}
+          </div>
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center space-x-2">
 
@@ -265,10 +268,10 @@ export function TransactionsTab() {
                     <Input id="receipt" type="file" accept="image/*" onChange={handleFileChange} />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="expense_type">Expense Type</Label>
+                    <Label htmlFor="expense_type">Expense Category</Label>
                     <Select onValueChange={handleExpenseTypeChange} defaultValue="">
                       <SelectTrigger>
-                        <SelectValue placeholder="Select Expense Type" />
+                        <SelectValue placeholder="Select Expense Category" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="motor_vehicle_running_exp">Motor Vehicle Running Exp</SelectItem>

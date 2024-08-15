@@ -64,7 +64,7 @@ export function UsersTab() {
     const { data, error } = await supabase
       .from('branches')
       .select('id, branch_name')
-      .eq('user_id', userId);
+      .eq('userid', userId);
     if (error) console.error('Error fetching branches:', error);
     else setBranches(data);
   };
