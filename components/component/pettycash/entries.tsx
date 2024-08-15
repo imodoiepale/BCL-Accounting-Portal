@@ -115,7 +115,7 @@ export function TransactionsTab() {
   
     const { data, error } = await supabase
       .from('acc_portal_petty_cash_entries')
-      .insert([{ ...newPettyCash, receipt_url: receiptUrl, user_id: userId }]);
+      .insert([{ ...newPettyCash, receipt_url: receiptUrl, userid: userId }]);
   
     if (error) console.error('Error adding petty cash entry:', error);
     else {
@@ -139,7 +139,7 @@ export function TransactionsTab() {
       .from('acc_portal_petty_cash_entries')
       .update(updatedData)
       .eq('id', entryId)
-      .eq('user_id', userId);
+      .eq('userid', userId);
     // Handle the result
   };
   
@@ -148,7 +148,7 @@ export function TransactionsTab() {
       .from('acc_portal_petty_cash_entries')
       .delete()
       .eq('id', entryId)
-      .eq('user_id', userId);
+      .eq('userid', userId);
     // Handle the result
   };
   

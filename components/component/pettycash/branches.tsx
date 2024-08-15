@@ -41,7 +41,7 @@ export function BranchesTab() {
     const { data, error } = await supabase
       .from('branches')
       .select('*')
-      .eq('user_id', userId)
+      .eq('userid', userId)
       .order('id', { ascending: true });
     if (error) console.error('Error fetching branches:', error);
     else setBranches(data);
@@ -55,7 +55,7 @@ export function BranchesTab() {
   const handleSubmit = async () => {
     const { data, error } = await supabase
       .from('branches')
-      .insert([{ ...newBranch, user_id: userId }]);
+      .insert([{ ...newBranch, userid: userId }]);
 
     if (error) console.error('Error adding branch:', error);
     else {

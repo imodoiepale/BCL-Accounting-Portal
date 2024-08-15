@@ -158,7 +158,7 @@ export function KYCDocumentsList({ category }) {
         expiry_date: isOneOff ? null : newDocument.expiry_date,
         document_url: file_path,
         upload_date: new Date().toISOString(),
-        user_id: null,
+        userid: null,
         entity_id: null,
         entity_type: '',
       }
