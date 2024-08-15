@@ -117,9 +117,9 @@ const DataTable = ({ columns, data }) => {
                       {header.isPlaceholder
                         ? null
                         : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
                     </TableHead>
                   );
                 })}
@@ -160,7 +160,7 @@ const DataTable = ({ columns, data }) => {
   );
 };
 
-const generateMockData = (prefix, count) => 
+const generateMockData = (prefix, count) =>
   Array.from({ length: count }, (_, i) => ({
     name: `${prefix}${i + 1}`,
     details: `Details for ${prefix}${i + 1}`,
@@ -178,7 +178,7 @@ export default function Profile() {
   const insuranceData = generateMockData('Insurance', 4);
   const depositData = generateMockData('Deposit', 6);
   const kycData = generateMockData('KYC Document', 5);
-  
+
   useEffect(() => {
     // This effect will run when the component mounts and whenever router.query changes
     if (router.isReady) {
@@ -250,7 +250,7 @@ export default function Profile() {
                   <TabsContent value="directors-kyc">
                     <div className="space-y-4">
                       <h3 className="text-lg font-bold">Directors' KYC Documents</h3>
-                      <DirectorsDocumentsList/>
+                      <DirectorsDocumentsList />
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -385,7 +385,7 @@ export default function Profile() {
                   <TabsContent value="directors-kyc">
                     <div className="space-y-4">
                       <h3 className="text-lg font-bold">Directors' KYC Documents</h3>
-                      <DirectorsDocumentsList/>
+                      <DirectorsDocumentsList />
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -483,7 +483,7 @@ export default function Profile() {
             </TabsContent>
           </Tabs>
         </TabsContent>
-        
+
       </Tabs>
     </div>
   );
