@@ -24,13 +24,13 @@ export function PettyCashManager() {
   const [accountsToReplenish, setAccountsToReplenish] = useState([]);
   const [settings, setSettings] = useState({
     accounts: {
-      enableMultiCurrency: false,
+      enableMultiCurrency: true,
       defaultCurrency: 'USD',
       userLimits: [],
     },
     transactions: {
-      requireApproval: false,
-      attachmentRequired: false,
+      requireApproval: true,
+      attachmentRequired: true,
     },
     reports: {
       viewOptions: ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Annually'],
