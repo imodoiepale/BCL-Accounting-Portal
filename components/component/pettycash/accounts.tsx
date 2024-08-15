@@ -34,7 +34,7 @@ export function AccountsTab() {
     balance: '',
     currency: '',
     status: 'Active',
-    user_id: '', // New field for associating the account with a user
+    userid: '', // New field for associating the account with a user
   });
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export function AccountsTab() {
     const { data, error } = await supabase
       .from('branches')
       .select('id, branch_name')
-      .eq('user_id', userId);
+      .eq('userid', userId);
     if (error) console.error('Error fetching branches:', error);
     else setBranches(data);
   };
@@ -94,14 +94,14 @@ export function AccountsTab() {
         balance: '',
         currency: '',
         status: 'Active',
-        user_id: '',
+        userid: '',
       });
     }
   };
 
   const formFields = [
     { id: 'branch_id', label: 'Branch', type: 'select', options: branches.map(branch => ({ value: branch.id, label: branch.branch_name })) },
-    { id: 'user_id', label: 'User', type: 'select', options: users.map(user => ({ value: user.id, label: user.name })) },
+    { id: 'userid', label: 'User', type: 'select', options: users.map(user => ({ value: user.id, label: user.name })) },
     { id: 'account_name', label: 'Account Name', type: 'text', placeholder: 'Enter account name' },
     { id: 'balance', label: 'Balance', type: 'number', placeholder: 'Enter initial balance' },
     { id: 'currency', label: 'Currency', type: 'select', options: [{ value: 'USD', label: 'USD' }, { value: 'EUR', label: 'EUR' }, { value: 'GBP', label: 'GBP' }] },
