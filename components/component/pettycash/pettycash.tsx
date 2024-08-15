@@ -145,7 +145,7 @@ export function PettyCashManager() {
           <div className="flex-1 flex overflow-hidden">
           <Tabs defaultValue={currentSettingsTab}  className="flex w-full">
               <TabsList className="flex flex-col w-36 space-y-1.5 mt-14 border-r gap-2">
-                {['accounts', 'transactions', 'replenishment'].map((tab) => (
+                {['accounts', 'transactions', 'replenishment','reports'].map((tab) => (
                   <TabsTrigger 
                     key={tab} 
                     value={tab} 
@@ -326,7 +326,7 @@ export function PettyCashManager() {
 
         <Tabs defaultValue="transactions" onValueChange={setCurrentTab}>
           <TabsList>
-            {['branches', 'users', 'accounts', 'transactions'].map((tab) => (
+            {['branches', 'users', 'accounts', 'transactions', 'reports'].map((tab) => (
               <TabsTrigger
                 key={tab}
                 value={tab}
