@@ -2,41 +2,33 @@
 "use client"
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,} from "@/components/ui/sheet"
-import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, UploadIcon } from 'lucide-react'
 import { ScrollArea } from '../ui/scroll-area'
 import { useUser } from '@clerk/clerk-react'
+import { toast } from 'react-hot-toast'
 
+const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
+const url = "https://zyszsqgdlrpnunkegipk.supabase.co"
 
-const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
-const url="https://zyszsqgdlrpnunkegipk.supabase.co"
-
-// Initialize Supabase client
 const supabase = createClient(url, key)
 
-
-// Utility function to format date
 const formatDate = (dateString) => {
   const date = new Date(dateString);
   const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+  const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();
   return `${day}/${month}/${year}`;
 };
 
 export function SupplierList() {
-
   const { user } = useUser();
-
-
   const [suppliers, setSuppliers] = useState([])
   const [newSupplier, setNewSupplier] = useState({
     name: '',
@@ -45,25 +37,25 @@ export function SupplierList() {
     contact_mobile: '',
     contact_email: '',
   })
+  const [isLoading, setIsLoading] = useState(false)
+  const [selectedFile, setSelectedFile] = useState(null)
 
   useEffect(() => {
     fetchSuppliers()
   }, [])
-  
+
   const fetchSuppliers = async () => {
     const { data, error } = await supabase
-    .from('acc_portal_suppliers')
+      .from('acc_portal_suppliers')
       .select('*')
       .eq('userid', user?.id)
       .order('id', { ascending: true });
-      if (error) console.error('Error fetching suppliers:', error)
+    if (error) console.error('Error fetching suppliers:', error)
     else setSuppliers(data)
   }
-  
 
   const handleInputChange = (e) => {
     setNewSupplier({ ...newSupplier, [e.target.id]: e.target.value })
-    console.log(e.target.value)
   }
 
   const handleSubmit = async () => {
@@ -82,7 +74,82 @@ export function SupplierList() {
       })
     }
   }
-  
+
+  const handleFileChange = (event) => {
+    setSelectedFile(event.target.files[0]);
+  };
+
+  const handleCSVUpload = async () => {
+    if (selectedFile) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const text = e.target.result;
+        const rows = text.split('\n').filter(row => row.trim() !== '');
+        const headers = rows[0].split(',').map(header => header.trim());
+        const suppliers = rows.slice(1).map(row => {
+          const rowData = row.split(',');
+          const supplier = {};
+
+          headers.forEach((header, index) => {
+            let value = rowData[index] ? rowData[index].trim() : '';
+            supplier[header] = value;
+          });
+
+          return Object.values(supplier).some(value => value !== '') ? supplier : null;
+        }).filter(supplier => supplier !== null);
+
+        setIsLoading(true);
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const supplier of suppliers) {
+          try {
+            const { data, error } = await supabase
+              .from('acc_portal_suppliers')
+              .insert([{ ...supplier, userid: user?.id }])
+              .select();
+
+            if (error) {
+              console.error('Error adding supplier:', error);
+              errorCount++;
+            } else {
+              successCount++;
+              setSuppliers(prevSuppliers => [...prevSuppliers, data[0]]);
+            }
+          } catch (error) {
+            console.error('Unexpected error during insertion:', error);
+            errorCount++;
+          }
+        }
+
+        setIsLoading(false);
+
+        if (successCount > 0) {
+          toast.success(`Successfully added ${successCount} supplier${successCount > 1 ? 's' : ''}.`);
+        }
+        if (errorCount > 0) {
+          toast.error(`Failed to add ${errorCount} supplier${errorCount > 1 ? 's' : ''}.`);
+        }
+      };
+      reader.readAsText(selectedFile);
+    }
+  };
+
+  const downloadCSVTemplate = () => {
+    const headers = ['name', 'pin', 'contact_name', 'contact_mobile', 'contact_email'];
+    const csvContent = headers.join(',') + '\n';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'supplier_template.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
   return (
     <div className="flex w-full bg-gray-100">
@@ -95,22 +162,47 @@ export function SupplierList() {
               <RefreshCwIcon className="w-4 h-4 mr-1" />
               Refresh
             </Button>
-            <Sheet>
-              <SheetTrigger asChild>
-              <Button className="bg-blue-600 text-white">Add New Supplier</Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle>Add Supplier</SheetTitle>
-                  <SheetDescription>
+            <Button variant="outline" className="flex items-center" onClick={downloadCSVTemplate}>
+              <DownloadIcon className="w-4 h-4 mr-1" />
+              Download CSV Template
+            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-600 text-white">
+                  <UploadIcon className="w-4 h-4 mr-1" />
+                  Upload CSV
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Upload CSV</DialogTitle>
+                  <DialogDescription>
+                    Upload a CSV file containing supplier information.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-4">
+                  <Input type="file" accept=".csv" onChange={handleFileChange} />
+                  <Button onClick={handleCSVUpload} disabled={!selectedFile || isLoading}>
+                    {isLoading ? 'Uploading...' : 'Submit'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-600 text-white">Add New Supplier</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Supplier</DialogTitle>
+                  <DialogDescription>
                     This section includes adding all the details of a supplier to the system
-                  </SheetDescription>
-                </SheetHeader>
-
+                  </DialogDescription>
+                </DialogHeader>
                 <div className="flex flex-col pt-4 gap-4">
                   <div className="space-y-1">
-                      <Label htmlFor="name">Supplier Name</Label>
-                      <Input id="name" placeholder="XYZ Supplier" value={newSupplier.name} onChange={handleInputChange} required />
+                    <Label htmlFor="name">Supplier Name</Label>
+                    <Input id="name" placeholder="XYZ Supplier" value={newSupplier.name} onChange={handleInputChange} required />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="pin">Supplier Pin</Label>
@@ -130,27 +222,27 @@ export function SupplierList() {
                   </div>
                 </div>
                 <div className="pt-4"><Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button></div>
-              </SheetContent>
-            </Sheet>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
         <Card>
           <Table>
             <ScrollArea className="h-[calc(100vh-200px)] w-full">
-            <TableHeader>
-              <TableRow>
-                <TableHead>SUPP ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>PIN</TableHead>
-                <TableHead>Contact Name</TableHead>
-                <TableHead>Contact Mobile</TableHead>
-                <TableHead>Contact Email</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead>End Date</TableHead>
-                <TableHead>Approved by BCL</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SUPP ID</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>PIN</TableHead>
+                  <TableHead>Contact Name</TableHead>
+                  <TableHead>Contact Mobile</TableHead>
+                  <TableHead>Contact Email</TableHead>
+                  <TableHead>Start Date</TableHead>
+                  <TableHead>End Date</TableHead>
+                  <TableHead>Approved by BCL</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {suppliers.map((supplier) => (
                   <TableRow key={supplier.id}>
                     <TableCell>SUPP-{supplier.id}</TableCell>
@@ -168,8 +260,8 @@ export function SupplierList() {
                     </TableCell>
                   </TableRow>
                 ))}
-            </TableBody>
-          </ScrollArea>
+              </TableBody>
+            </ScrollArea>
           </Table>
         </Card>
         <div className="flex justify-between items-center mt-4">
