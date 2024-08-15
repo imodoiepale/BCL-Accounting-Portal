@@ -102,8 +102,8 @@ export function AccountsTab() {
   const formFields = [
     { id: 'branch_id', label: 'Branch', type: 'select', options: branches.map(branch => ({ value: branch.id, label: branch.branch_name })) },
     { id: 'userid', label: 'User', type: 'select', options: users.map(user => ({ value: user.id, label: user.name })) },
-    { id: 'account_name', label: 'Account Name', type: 'text', placeholder: 'Enter account name' },
-    { id: 'balance', label: 'Balance', type: 'number', placeholder: 'Enter initial balance' },
+    { id: 'account_type', label: 'Account Type', type: 'select', options: [ { value: 'Cash', label: 'Cash' }, { value: 'Mpesa', label: 'Mpesa' }, { value: 'Debit Card', label: 'Debit Card' }, { value: 'Credit Card', label: 'Credit Card' }] },
+    { id: 'balance', label: 'Float Balance', type: 'number', placeholder: 'Enter initial float balance' },
     { id: 'currency', label: 'Currency', type: 'select', options: [{ value: 'USD', label: 'USD' }, { value: 'EUR', label: 'EUR' }, { value: 'GBP', label: 'GBP' }] },
     { id: 'status', label: 'Status', type: 'select', options: [{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }] },
   ];
@@ -112,8 +112,8 @@ export function AccountsTab() {
     { label: 'Account ID', key: 'id', format: (id) => `AC-${id}` },
     { label: 'Branch Name', key: 'branches.branch_name' },
     { label: 'User', key: 'users.name' },
-    { label: 'Account Name', key: 'account_name' },
-    { label: 'Balance', key: 'balance', format: (balance) => `$${parseFloat(balance).toFixed(2)}` },
+    { label: 'Account Type', key: 'account_type' },
+    { label: 'Float Balance', key: 'balance', format: (balance) => `$${parseFloat(balance).toFixed(2)}` },
     { label: 'Currency', key: 'currency' },
     { label: 'Created Date', key: 'created_date', format: (date) => formatDate(date) },
     { label: 'Status', key: 'status' },
