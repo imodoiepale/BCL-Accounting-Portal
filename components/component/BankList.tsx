@@ -78,7 +78,7 @@ export function BankList() {
     }
     const { data, error } = await supabase
       .from('acc_portal_banks')
-      .insert([{ ...newBank, userid: user.id }])
+      .insert([{ ...newBank, userid: user.id,  status: 'true' }])
     if (error) {
       console.error('Error adding bank:', error)
       toast.error('Failed to add bank')
