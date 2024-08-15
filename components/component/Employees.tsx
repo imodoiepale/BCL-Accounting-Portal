@@ -283,6 +283,7 @@ export function EmployeeList() {
                 <TableHead>NSSF</TableHead>
                 <TableHead>Start Date</TableHead>
                 <TableHead>End Date</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Approved by BCL</TableHead>
               </TableRow>
             </TableHeader>
@@ -299,9 +300,14 @@ export function EmployeeList() {
                   <TableCell>{employee.mnssf}</TableCell>
                   <TableCell>{formatDate(employee.startdate)}</TableCell>
                   <TableCell></TableCell>
+                  <TableCell>
+                    <span className={`font-bold capitalize ${employee.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
+                      {employee.status}
+                    </span>
+                  </TableCell>
                   <TableCell className='text-center'>
-                    <Badge variant={employee.status ? "success" : "destructive"}>
-                      {employee.status ? "✔️" : "❌"}
+                    <Badge variant={employee.verified ? "success" : "destructive"}>
+                      {employee.verified ? "✔️" : "❌"}
                     </Badge>
                   </TableCell>
                 </TableRow>

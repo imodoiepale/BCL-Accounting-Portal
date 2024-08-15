@@ -339,6 +339,7 @@ export function BankList() {
                 <TableHead>RM Email</TableHead>
                 <TableHead>Start Date</TableHead>
                 <TableHead>End Date</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Approved by BCL</TableHead>
               </TableRow>
             </TableHeader>
@@ -355,9 +356,14 @@ export function BankList() {
                   <TableCell>{bank.relationship_manager_email}</TableCell>
                   <TableCell>{bank.startdate ? formatDate(bank.startdate) : ''}</TableCell>
                   <TableCell>{bank.enddate ? formatDate(bank.enddate) : ''}</TableCell>
+                  <TableCell>
+                    <span className={`font-bold capitalize ${bank.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
+                      {bank.status}
+                    </span>
+                  </TableCell>
                   <TableCell className='text-center'>
-                    <Badge variant={bank.status ? "success" : "destructive"}>
-                      {bank.status ? "✔️" : "❌"}
+                    <Badge variant={bank.verified ? "success" : "destructive"}>
+                      {bank.verified ? "✔️" : "❌"}
                     </Badge>
                   </TableCell>
                 </TableRow>
