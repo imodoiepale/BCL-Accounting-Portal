@@ -1,7 +1,7 @@
 
 // @ts-nocheck
 "use client"
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
@@ -12,10 +12,10 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,} from "@/components/ui/sheet"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, UploadIcon, DownloadIcon } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, UploadIcon, DownloadIcon, EditIcon, TrashIcon } from 'lucide-react'
 import { useUser } from '@clerk/clerk-react'
-import toast from 'react-hot-toast'
+import { toast } from 'react-hot-toast'
 
 const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
 const url="https://zyszsqgdlrpnunkegipk.supabase.co"
@@ -42,14 +42,12 @@ export function BankList() {
     relationship_manager_mobile: '',
     relationship_manager_email: '',
   })
+  const [editingBank, setEditingBank] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
-  useEffect(() => {
-    fetchBanks()
-  }, [user])
-
-  const fetchBanks = async () => {
+  const fetchBanks = useCallback(async () => {
     if (!user) return;
     const { data, error } = await supabase
       .from('acc_portal_banks')
@@ -61,14 +59,27 @@ export function BankList() {
       toast.error('Failed to fetch banks')
     }
     else setBanks(data)
-  }
+  }, [user]);
+
+  useEffect(() => {
+    fetchBanks();
+  }, [fetchBanks]);
 
   const handleInputChange = (e) => {
-    setNewBank({ ...newBank, [e.target.id]: e.target.value })
+    const { id, value } = e.target;
+    if (editingBank) {
+      setEditingBank({ ...editingBank, [id]: value })
+    } else {
+      setNewBank({ ...newBank, [id]: value })
+    }
   }
 
   const handleSelectChange = (value) => {
-    setNewBank({ ...newBank, currency: value })
+    if (editingBank) {
+      setEditingBank({ ...editingBank, currency: value })
+    } else {
+      setNewBank({ ...newBank, currency: value })
+    }
   }
 
   const handleSubmit = async () => {
@@ -98,15 +109,20 @@ export function BankList() {
     }
   }
 
-  const updateBank = async (id, updatedData) => {
+  const handleEdit = (bank) => {
+    setEditingBank(bank)
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdate = async () => {
     if (!user) {
       toast.error('User not authenticated')
       return;
     }
     const { data, error } = await supabase
       .from('acc_portal_banks')
-      .update(updatedData)
-      .eq('id', id)
+      .update(editingBank)
+      .eq('id', editingBank.id)
       .eq('userid', user.id)
     if (error) {
       console.error('Error updating bank:', error)
@@ -114,11 +130,13 @@ export function BankList() {
     }
     else {
       fetchBanks()
+      setIsEditDialogOpen(false)
+      setEditingBank(null)
       toast.success('Bank updated successfully')
     }
   }
-  
-  const deleteBank = async (id) => {
+
+  const handleDelete = async (id) => {
     if (!user) {
       toast.error('User not authenticated')
       return;
@@ -341,6 +359,7 @@ export function BankList() {
                 <TableHead>End Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Approved by BCL</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -357,7 +376,7 @@ export function BankList() {
                   <TableCell>{bank.startdate ? formatDate(bank.startdate) : ''}</TableCell>
                   <TableCell>{bank.enddate ? formatDate(bank.enddate) : ''}</TableCell>
                   <TableCell>
-                  <span className={`font-bold capitalize ${bank.status ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`font-bold capitalize ${bank.status ? 'text-green-600' : 'text-red-600'}`}>
                       {bank.status ? 'Active' : 'Inactive'}
                     </span>
                   </TableCell>
@@ -365,6 +384,16 @@ export function BankList() {
                     <Badge variant={bank.verified ? "success" : "destructive"}>
                       {bank.verified ? "✔️" : "❌"}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(bank)}>
+                        <EditIcon className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(bank.id)}>
+                        <TrashIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -381,6 +410,61 @@ export function BankList() {
           </Button>
         </div>
       </main>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Bank Account</DialogTitle>
+            <DialogDescription>
+              Update the details of the bank account
+            </DialogDescription>
+          </DialogHeader>
+          {editingBank && (
+            <div className="flex flex-col gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="name">Bank Name</Label>
+                <Input id="name" value={editingBank.name} onChange={handleInputChange} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="account_number">Account Number</Label>
+                <Input id="account_number" value={editingBank.account_number} onChange={handleInputChange} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="currency">Currency</Label>
+                <Select onValueChange={handleSelectChange} value={editingBank.currency}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose Currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="KES">KES</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="branch">Branch</Label>
+                <Input id="branch" value={editingBank.branch} onChange={handleInputChange} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="relationship_manager_name">Relationship Manager Name</Label>
+                <Input id="relationship_manager_name" value={editingBank.relationship_manager_name} onChange={handleInputChange} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="relationship_manager_mobile">Relationship Manager Mobile</Label>
+                <Input id="relationship_manager_mobile" value={editingBank.relationship_manager_mobile} onChange={handleInputChange} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="relationship_manager_email">Relationship Manager Email</Label>
+                <Input id="relationship_manager_email" value={editingBank.relationship_manager_email} onChange={handleInputChange} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={handleUpdate}>Update</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

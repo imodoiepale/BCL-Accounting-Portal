@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 // @ts-nocheck
 "use client"
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
@@ -12,6 +12,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { PlusIcon, RefreshCwIcon, SearchIcon, UploadIcon, DownloadIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { PencilIcon, TrashIcon } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { useAuth } from '@clerk/clerk-react'
 import toast, { Toaster } from 'react-hot-toast'
-
+import Papa from 'papaparse'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -101,6 +102,7 @@ const directorFields = {
     { id: 'languages_spoken', label: 'Languages Spoken', type: 'text' },
   ],
 }
+
 const CSVUploadDialog = ({ isOpen, onClose, onUpload }) => {
   const [file, setFile] = useState(null);
 
@@ -153,7 +155,6 @@ export function DirectorsList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isCSVUploadDialogOpen, setIsCSVUploadDialogOpen] = useState(false);
-  const fileInputRef = useRef(null);
 
   const fields = Object.values(directorFields).flatMap(category => category.map(field => field.id));
 
@@ -269,10 +270,29 @@ export function DirectorsList() {
   };
 
   const handleCSVDownload = () => {
-    const headers = fields.join(',');
-    const csv = [headers];
-    csv.push(fields.map(() => '').join(','));
-    const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const headers = fields.map(field => {
+      const fieldInfo = Object.values(directorFields).flat().find(f => f.id === field);
+      return fieldInfo ? fieldInfo.label : field;
+    });
+  
+    // Function to escape and quote CSV fields
+    const escapeField = (field) => {
+      if (field.includes('"') || field.includes(',') || field.includes('\n')) {
+        return `"${field.replace(/"/g, '""')}"`;
+      }
+      return field;
+    };
+  
+    // Escape and quote all headers
+    const escapedHeaders = headers.map(escapeField);
+  
+    // Join the escaped headers with commas
+    const headerRow = escapedHeaders.join(',');
+  
+    // Create the CSV content
+    const csv = headerRow + '\n';
+  
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
@@ -286,109 +306,106 @@ export function DirectorsList() {
   };
 
   const handleCSVUpload = async (file) => {
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const text = e.target.result;
-        const rows = text.split('\n').filter(row => row.trim() !== ''); // Remove empty rows
-        const headers = rows[0].split(',').map(header => header.trim());
-        const directors = rows.slice(1).map(row => {
-          const rowData = row.split(',');
+    Papa.parse(file, {
+      complete: async (results) => {
+        if (!results.data || !Array.isArray(results.data) || results.data.length === 0) {
+          toast.error("The CSV file appears to be empty or invalid.");
+          return;
+        }
+
+        const headers = results.data[0];
+        if (!Array.isArray(headers)) {
+          toast.error("Unable to process the CSV headers. Please check the file format.");
+          return;
+        }
+
+        const directors = results.data.slice(1).map(row => {
+          if (!Array.isArray(row)) {
+            console.error("Invalid row data:", row);
+            return null;
+          }
+
           const director = {};
-  
           headers.forEach((header, index) => {
-            let value = rowData[index] ? rowData[index].trim() : '';
-            // Convert empty strings to null for numeric fields
-            if (['shares_held', 'dependents', 'annual_income'].includes(header) && value === '') {
-              value = null;
+            if (typeof header !== 'string') {
+              console.error("Invalid header:", header);
+              return;
             }
-            director[header] = value;
+
+            const field = Object.values(directorFields).flat().find(f => f.label === header);
+            if (field) {
+              let value = row[index] ? row[index].toString().trim() : '';
+              if (field.type === 'date' && value) {
+                const dateParts = value.split('/');
+                if (dateParts.length === 3) {
+                  const [month, day, year] = dateParts;
+                  value = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                }
+              } else if (['shares_held', 'dependents', 'annual_income'].includes(field.id)) {
+                value = value === '' ? null : parseFloat(value);
+                if (isNaN(value)) {
+                  console.warn(`Invalid numeric value for ${field.id}: ${row[index]}`);
+                  value = null;
+                }
+              }
+              director[field.id] = value;
+            }
           });
-  
-          // Filter out rows that are completely empty
           return Object.values(director).some(value => value !== '') ? director : null;
-        }).filter(director => director !== null); // Remove null directors
-    
+        }).filter(director => director !== null);
+
+        if (directors.length === 0) {
+          toast.error("No valid director data found in the CSV file.");
+          return;
+        }
+
         setIsLoading(true);
         let successCount = 0;
         let errorCount = 0;
         let skippedCount = 0;
-    
-        console.log("Parsed Directors Data:", directors);
-    
+
         for (const director of directors) {
-          // Check if either id_number or full_name is missing
-          if (!director.id_number || !director.full_name) {
-            // Proceed to insert a new director if either id_number or full_name is missing
-            try {
-              console.log("Inserting new director due to missing id_number or full_name:", director);
-              const { data, error } = await supabase
-                .from('acc_portal_directors')
-                .insert([{ ...director, userid: userId }])
-                .select();
-  
-              if (error) {
-                console.error('Error adding director:', error);
-                errorCount++;
-              } else {
-                successCount++;
-                setDirectors(prevDirectors => [...prevDirectors, data[0]]);
-              }
-            } catch (error) {
-              console.error('Unexpected error during insertion:', error);
-              errorCount++;
-            }
-            continue; // Skip to the next director after insert
+          if (!director.id_number && !director.full_name) {
+            skippedCount++;
+            continue;
           }
-  
+
           try {
-            // Fetch existing directors based on both id_number and full_name
             const { data: existingDirectors, error: fetchError } = await supabase
               .from('acc_portal_directors')
               .select('*')
               .eq('userid', userId)
-              .eq('id_number', director.id_number)
-              .eq('full_name', director.full_name);
-  
+              .or(`id_number.eq.${director.id_number},full_name.eq.${director.full_name}`);
+
             if (fetchError) {
               console.error('Error fetching existing directors:', fetchError);
               errorCount++;
               continue;
             }
-  
+
             if (existingDirectors.length > 0) {
-              // Update existing director
-              console.log("Updating existing director:", existingDirectors[0].id);
-              const { data, error } = await supabase
+              const { error } = await supabase
                 .from('acc_portal_directors')
                 .update(director)
                 .eq('id', existingDirectors[0].id)
-                .eq('userid', userId)
-                .select();
-  
+                .eq('userid', userId);
+
               if (error) {
                 console.error('Error updating director:', error);
                 errorCount++;
               } else {
                 successCount++;
-                setDirectors(prevDirectors => 
-                  prevDirectors.map(d => d.id === existingDirectors[0].id ? data[0] : d)
-                );
               }
             } else {
-              // Insert new director if no existing match found
-              console.log("Inserting new director:", director);
-              const { data, error } = await supabase
+              const { error } = await supabase
                 .from('acc_portal_directors')
-                .insert([{ ...director, userid: userId }])
-                .select();
-  
+                .insert([{ ...director, userid: userId }]);
+
               if (error) {
                 console.error('Error adding director:', error);
                 errorCount++;
               } else {
                 successCount++;
-                setDirectors(prevDirectors => [...prevDirectors, data[0]]);
               }
             }
           } catch (error) {
@@ -396,9 +413,10 @@ export function DirectorsList() {
             errorCount++;
           }
         }
-  
+
         setIsLoading(false);
-  
+        await fetchDirectors();
+
         if (successCount > 0) {
           toast.success(`Successfully added/updated ${successCount} director${successCount > 1 ? 's' : ''}.`);
         }
@@ -406,218 +424,226 @@ export function DirectorsList() {
           toast.error(`Failed to add/update ${errorCount} director${errorCount > 1 ? 's' : ''}.`);
         }
         if (skippedCount > 0) {
-          toast.info(`Skipped ${skippedCount} row${skippedCount > 1 ? 's' : ''}.`);
+          toast.info(`Skipped ${skippedCount} row${skippedCount > 1 ? 's' : ''} due to missing required information.`);
         }
-      };
-      reader.readAsText(file);
-    }
-  };
-  
-
-  const getDirectorStatus = (director) => {
-    const missingFields = fields.filter(field => !director[field] || director[field] === '');
-    return {
-      status: missingFields.length === 0 ? 'complete' : 'pending',
-      missingCount: missingFields.length
-    };
+      },
+      header: false,
+      skipEmptyLines: true,
+      error: (error) => {
+        console.error('Error parsing CSV:', error);
+        toast.error("Failed to parse the CSV file. Please check the file format.");
+      }
+    });
   };
 
-  const renderFormFields = (directorData, onChangeHandler, directorId = null) => (
-    <div className="grid grid-cols-6 gap-4 px-4">
-      {Object.entries(directorFields).map(([category, fields]) => (
-        <div key={category} className="col-span-6 ">
-          <h3 className="text-lg font-semibold mb-2">{category}</h3>
-          <div className="grid grid-cols-4 gap-4 border rounded-lg p-4 mb-4 shadow-sm">
-            {fields.map((field) => (
-              <div key={field.id} className="col-span-1 space-y-1">
-                <Label htmlFor={field.id} className="text-sm font-medium">{field.label}</Label>
-                {field.type === 'select' ? (
-                  <Select onValueChange={(value) => onChangeHandler({ target: { id: field.id, value } }, directorId)}>
-                    <SelectTrigger className="w-full p-2 border rounded">
-                      <SelectValue placeholder={`Select ${field.label}`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {field.options.map(option => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : field.type === 'textarea' ? (
-                  <textarea
-                    id={field.id}
-                    value={directorData[field.id] || ''}
-                    onChange={(e) => onChangeHandler(e, directorId)}
-                    className="w-full p-2 border rounded"
-                    rows={3}
-                  />
-                ) : (
-                  <Input
-                    id={field.id}
-                    type={field.type}
-                    value={directorData[field.id] || ''}
-                    onChange={(e) => onChangeHandler(e, directorId)}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+const getDirectorStatus = (director) => {
+const missingFields = fields.filter(field => !director[field] || director[field] === '');
+return {
+  status: missingFields.length === 0 ? 'complete' : 'pending',
+  missingCount: missingFields.length
+};
+};
 
-  const filteredDirectors = directors.filter(director =>
-    Object.values(director).some(value =>
-      String(value).toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
-
-  return (
-    <div className="flex w-full bg-gray-100">
-      <Toaster position="top-right" />
-      <main className="flex-1 p-6 w-full">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-semibold">Directors List</h1>
-          <div className="flex items-center space-x-2">
-            <div className="relative">
-              <SearchIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <Input
-                type="search"
-                placeholder="Search directors"
-                className="pl-8 w-64"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Button variant="outline" className="flex items-center" onClick={fetchDirectors} disabled={isLoading}>
-              <RefreshCwIcon className={`w-4 h-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            <Button variant="outline" onClick={handleCSVDownload}>
-              <DownloadIcon className="w-4 h-4 mr-2" />
-              Download CSV Template
-            </Button>
-            <Button variant="outline" onClick={() => setIsCSVUploadDialogOpen(true)}>
-              <UploadIcon className="w-4 h-4 mr-2" />
-              Upload CSV
-            </Button>
-            <Dialog open={isAddingDirector} onOpenChange={setIsAddingDirector}>
-              <DialogTrigger asChild>
-                <Button className="bg-blue-600 text-white">
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  Add Director
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-[95vw] w-[1200px]">
-                <DialogHeader>
-                  <DialogTitle>Add New Director</DialogTitle>
-                  <DialogDescription>
-                    Fill in the details for the new director.
-                  </DialogDescription>
-                </DialogHeader>
-                <ScrollArea className="max-h-[80vh] pr-4">
-                  {renderFormFields(newDirector, handleInputChange)}
-                </ScrollArea>
-                <div className="mt-4 flex justify-end">
-                  <Button onClick={handleSubmit} disabled={isLoading}>
-                    {isLoading ? 'Adding...' : 'Add Director'}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-
-        <Card className="mt-4">
-          <ScrollArea className="h-[calc(100vh-200px)] w-full">
-            <div className="relative">
-              <Table className="border-collapse">
-                <TableHeader className="sticky top-0 z-10 bg-white">
-                  <TableRow>
-                    <TableHead className="sticky left-0 z-20 bg-white border">Field</TableHead>
-                    {filteredDirectors.map((director, index) => (
-                      <TableHead key={director.id} className="text-center border">Director {index + 1}</TableHead>
-                    ))}
-                  </TableRow>
-                  <TableRow>
-                    <TableHead className="sticky left-0 z-20 bg-white border">Actions</TableHead>
-                    {filteredDirectors.map((director) => (
-                      <TableHead key={director.id} className="text-center border">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(director)} className="mr-2">
-                          Edit
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => handleDelete(director.id)}>
-                          Delete
-                        </Button>
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                  <TableRow>
-                    <TableHead className="sticky left-0 z-20 bg-white border">Status</TableHead>
-                    {filteredDirectors.map((director) => {
-                      const { status, missingCount } = getDirectorStatus(director)
-                      return (
-                        <TableHead key={director.id} className="text-center border">
-                          <Badge 
-                            className={`cursor-pointer ${status === 'complete' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}
-                            onClick={() => {
-                              setSelectedDirector(director)
-                              setIsEditingMissingFields(true)
-                              setChangedFields({})
-                            }}
-                          >
-                            {status === 'complete' ? 'Complete' : `Pending (${missingCount})`}
-                          </Badge>
-                        </TableHead>
-                      )
-                    })}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {fields.map((field, rowIndex) => (
-                    <TableRow key={field} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                      <TableCell className="sticky left-0 z-10 bg-inherit font-medium border">
-                        {Object.values(directorFields).flat().find(f => f.id === field)?.label || field}
-                      </TableCell>
-                      {filteredDirectors.map((director) => (
-                        <TableCell key={director.id} className="border">{director[field] || '-'}</TableCell>
-                      ))}
-                    </TableRow>
+const renderFormFields = (directorData, onChangeHandler, directorId = null) => (
+<div className="grid grid-cols-6 gap-4 px-4">
+  {Object.entries(directorFields).map(([category, fields]) => (
+    <div key={category} className="col-span-6 ">
+      <h3 className="text-lg font-semibold mb-2">{category}</h3>
+      <div className="grid grid-cols-4 gap-4 border rounded-lg p-4 mb-4 shadow-sm">
+        {fields.map((field) => (
+          <div key={field.id} className="col-span-1 space-y-1">
+            <Label htmlFor={field.id} className="text-sm font-medium">{field.label}</Label>
+            {field.type === 'select' ? (
+              <Select 
+                onValueChange={(value) => onChangeHandler({ target: { id: field.id, value } }, directorId)}
+                value={directorData[field.id] || ''}
+              >
+                <SelectTrigger className="w-full p-2 border rounded">
+                  <SelectValue placeholder={`Select ${field.label}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {field.options.map(option => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
                   ))}
-                </TableBody>
-              </Table>
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </Card>
+                </SelectContent>
+              </Select>
+            ) : field.type === 'textarea' ? (
+              <textarea
+                id={field.id}
+                value={directorData[field.id] || ''}
+                onChange={(e) => onChangeHandler(e, directorId)}
+                className="w-full p-2 border rounded"
+                rows={3}
+              />
+            ) : (
+              <Input
+                id={field.id}
+                type={field.type}
+                value={directorData[field.id] || ''}
+                onChange={(e) => onChangeHandler(e, directorId)}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  ))}
+</div>
+);
 
-        <Dialog open={isEditingMissingFields} onOpenChange={setIsEditingMissingFields}>
-          <DialogContent className="max-w-[95vw] w-[1400px]">
+const filteredDirectors = directors.filter(director =>
+Object.values(director).some(value =>
+  String(value).toLowerCase().includes(searchTerm.toLowerCase())
+)
+);
+
+return (
+<div className="flex w-full bg-gray-100">
+  <Toaster position="top-right" />
+  <main className="flex-1 p-6 w-full">
+    <div className="flex justify-between items-center mb-4">
+      <h1 className="text-xl font-semibold">Directors List</h1>
+      <div className="flex items-center space-x-2">
+        <div className="relative">
+          <SearchIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <Input
+            type="search"
+            placeholder="Search directors"
+            className="pl-8 w-64"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <Button variant="outline" className="flex items-center" onClick={fetchDirectors} disabled={isLoading}>
+          <RefreshCwIcon className={`w-4 h-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+        <Button variant="outline" onClick={handleCSVDownload}>
+          <DownloadIcon className="w-4 h-4 mr-2" />
+          Download CSV Template
+        </Button>
+        <Button variant="outline" onClick={() => setIsCSVUploadDialogOpen(true)}>
+          <UploadIcon className="w-4 h-4 mr-2" />
+          Upload CSV
+        </Button>
+        <Dialog open={isAddingDirector} onOpenChange={setIsAddingDirector}>
+          <DialogTrigger asChild>
+            <Button className="bg-blue-600 text-white">
+              <PlusIcon className="w-4 h-4 mr-2" />
+              Add Director
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-[95vw] w-[1200px]">
             <DialogHeader>
-              <DialogTitle>Edit Director Information</DialogTitle>
+              <DialogTitle>Add New Director</DialogTitle>
               <DialogDescription>
-                Update the information for this director. Only changed fields will be submitted.
+                Fill in the details for the new director.
               </DialogDescription>
             </DialogHeader>
-            <ScrollArea className="max-h-[80vh] px-4">
-              {selectedDirector && renderFormFields(selectedDirector, handleInputChange, selectedDirector.id)}
+            <ScrollArea className="max-h-[80vh] pr-4">
+              {renderFormFields(newDirector, handleInputChange)}
             </ScrollArea>
             <div className="mt-4 flex justify-end">
-              <Button onClick={handleMissingFieldsSubmit} disabled={isLoading}>
-                {isLoading ? 'Saving...' : 'Save Changes'}
+              <Button onClick={handleSubmit} disabled={isLoading}>
+                {isLoading ? 'Adding...' : 'Add Director'}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
-
-        <CSVUploadDialog
-          isOpen={isCSVUploadDialogOpen}
-          onClose={() => setIsCSVUploadDialogOpen(false)}
-          onUpload={handleCSVUpload}
-        />
-      </main>
+      </div>
     </div>
-  );
+
+    <Card className="mt-4">
+      <ScrollArea className="h-[calc(100vh-200px)] w-full">
+        <div className="relative">
+          <Table className="border-collapse">
+            <TableHeader className="sticky top-0 z-10 bg-white">
+              <TableRow>
+                <TableHead className="sticky left-0 z-20 bg-white border">Field</TableHead>
+                {filteredDirectors.map((director, index) => (
+                  <TableHead key={director.id} className="text-center border">Director {index + 1}</TableHead>
+                ))}
+              </TableRow>
+             <TableRow>
+                <TableHead className="sticky left-0 z-20 bg-white border">Actions</TableHead>
+                {filteredDirectors.map((director) => (
+                  <TableHead key={director.id} className="text-center border">
+                    <Button variant="outline" size="icon" onClick={() => handleEdit(director)} className="mr-2">
+                      <PencilIcon className="h-4 w-4" />
+                    </Button>
+                    <Button variant="destructive" size="icon" onClick={() => handleDelete(director.id)}>
+                      <TrashIcon className="h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                ))}
+              </TableRow>
+
+              <TableRow>
+                <TableHead className="sticky left-0 z-20 bg-white border">Status</TableHead>
+                {filteredDirectors.map((director) => {
+                  const { status, missingCount } = getDirectorStatus(director)
+                  return (
+                    <TableHead key={director.id} className="text-center border">
+                      <Badge 
+                        className={`cursor-pointer ${status === 'complete' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}
+                        onClick={() => {
+                          setSelectedDirector(director)
+                          setIsEditingMissingFields(true)
+                          setChangedFields({})
+                        }}
+                      >
+                        {status === 'complete' ? 'Complete' : `Pending (${missingCount})`}
+                      </Badge>
+                    </TableHead>
+                  )
+                })}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {fields.map((field, rowIndex) => (
+                <TableRow key={field} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                  <TableCell className="sticky left-0 z-10 bg-inherit font-medium border">
+                    {Object.values(directorFields).flat().find(f => f.id === field)?.label || field}
+                  </TableCell>
+                  {filteredDirectors.map((director) => (
+                    <TableCell key={director.id} className="border">{director[field] || '-'}</TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+    </Card>
+
+    <Dialog open={isEditingMissingFields} onOpenChange={setIsEditingMissingFields}>
+      <DialogContent className="max-w-[95vw] w-[1400px]">
+        <DialogHeader>
+          <DialogTitle>Edit Director Information</DialogTitle>
+          <DialogDescription>
+            Update the information for this director. Only changed fields will be submitted.
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="max-h-[80vh] px-4">
+          {selectedDirector && renderFormFields(selectedDirector, handleInputChange, selectedDirector.id)}
+        </ScrollArea>
+        <div className="mt-4 flex justify-end">
+          <Button onClick={handleMissingFieldsSubmit} disabled={isLoading}>
+            {isLoading ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <CSVUploadDialog
+      isOpen={isCSVUploadDialogOpen}
+      onClose={() => setIsCSVUploadDialogOpen(false)}
+      onUpload={handleCSVUpload}
+    />
+  </main>
+</div>
+);
 }
