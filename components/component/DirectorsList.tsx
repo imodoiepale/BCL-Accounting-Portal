@@ -12,6 +12,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { PlusIcon, RefreshCwIcon, SearchIcon, UploadIcon, DownloadIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { PencilIcon, TrashIcon } from "lucide-react";
+
 import {
   Dialog,
   DialogContent,
@@ -544,19 +546,20 @@ export function DirectorsList() {
                       <TableHead key={director.id} className="text-center border">Director {index + 1}</TableHead>
                     ))}
                   </TableRow>
-                  <TableRow>
+                 <TableRow>
                     <TableHead className="sticky left-0 z-20 bg-white border">Actions</TableHead>
                     {filteredDirectors.map((director) => (
                       <TableHead key={director.id} className="text-center border">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(director)} className="mr-2">
-                          Edit
+                        <Button variant="outline" size="icon" onClick={() => handleEdit(director)} className="mr-2">
+                          <PencilIcon className="h-4 w-4" />
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => handleDelete(director.id)}>
-                          Delete
+                        <Button variant="destructive" size="icon" onClick={() => handleDelete(director.id)}>
+                          <TrashIcon className="h-4 w-4" />
                         </Button>
                       </TableHead>
                     ))}
                   </TableRow>
+
                   <TableRow>
                     <TableHead className="sticky left-0 z-20 bg-white border">Status</TableHead>
                     {filteredDirectors.map((director) => {
