@@ -62,6 +62,8 @@ export default function BankStatements() {
   const [currentDate, setCurrentDate] = useState('');
   const [currentMonth, setCurrentMonth] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const [displayMonth, setDisplayMonth] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -108,22 +110,6 @@ export default function BankStatements() {
   }, []);
 
   useEffect(() => {
-    console.log('MonthlyDocsClient - Selected Month:', selectedMonth);
-    console.log('MonthlyDocsClient - Is Current Month:', isCurrentMonth);
-
-    if (isCurrentMonth) {
-      const currentDate = new Date();
-      const currentMonthDisplay = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-      setDisplayMonth(currentMonthDisplay);
-      fetchData();
-    } else if (selectedMonth) {
-      setDisplayMonth(selectedMonth);
-      fetchData(selectedMonth);
-    }
-  }, [fetchData, isCurrentMonth, selectedMonth]);
-
-
-  useEffect(() => {
     const date = new Date();
     setCurrentDate(date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -132,8 +118,22 @@ export default function BankStatements() {
       day: 'numeric'
     }));
     setCurrentMonth(date.toLocaleDateString('en-US', { month: 'long' }));
+    setSelectedMonth(date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    console.log('MonthlyDocsClient - Selected Month:', selectedMonth);
+    const isCurrentMonth = selectedMonth === new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    console.log('MonthlyDocsClient - Is Current Month:', isCurrentMonth);
+
+    if (isCurrentMonth) {
+      setDisplayMonth(selectedMonth);
+    } else {
+      setDisplayMonth(selectedMonth || 'Select a month');
+    }
+    fetchData();
+  }, [fetchData, selectedMonth]);
 
   const memoizedColumns = useMemo(() => bankColumns, []);
 

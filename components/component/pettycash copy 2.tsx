@@ -188,6 +188,7 @@ export default function PettyCash() {
                         <SelectItem value="cash">Cash</SelectItem>
                         <SelectItem value="mpesa">MPesa</SelectItem>
                         <SelectItem value="credit_card">Credit Card</SelectItem>
+                        <SelectItem value="credit_card">Bank</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
