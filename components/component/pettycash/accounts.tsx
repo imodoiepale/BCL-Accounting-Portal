@@ -102,7 +102,7 @@ export function AccountsTab() {
   const formFields = [
     { id: 'branch_id', label: 'Branch', type: 'select', options: branches.map(branch => ({ value: branch.id, label: branch.branch_name })) },
     { id: 'userid', label: 'User', type: 'select', options: users.map(user => ({ value: user.id, label: user.name })) },
-    { id: 'account_type', label: 'Account Type', type: 'select', options: [ { value: 'Cash', label: 'Cash' }, { value: 'Mpesa', label: 'Mpesa' }, { value: 'Debit Card', label: 'Debit Card' }, { value: 'Credit Card', label: 'Credit Card' }] },
+    { id: 'account_type', label: 'Account Type', type: 'select', options: [ { value: 'Cash', label: 'Cash' }, { value: 'Mpesa', label: 'Mpesa' }, { value: 'Debit Card', label: 'Debit Card' }, { value: 'Credit Card', label: 'Credit Card' }, { value: 'Bank', label: 'Bank' }] },
     { id: 'balance', label: 'Float Balance', type: 'number', placeholder: 'Enter initial float balance' },
     { id: 'currency', label: 'Currency', type: 'select', options: [{ value: 'USD', label: 'USD' }, { value: 'EUR', label: 'EUR' }, { value: 'GBP', label: 'GBP' }] },
     { id: 'status', label: 'Status', type: 'select', options: [{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }] },

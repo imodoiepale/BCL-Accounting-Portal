@@ -310,7 +310,7 @@ const DocumentUpload = () => {
             </TabsContent>
           </Tabs>
         </TabsContent>
-        <TabsContent value="other">
+        {/* <TabsContent value="other">
           <Tabs defaultValue="current" className="w-full">
             <TabsList>
               <TabsTrigger value="current">Current Month</TabsTrigger>
@@ -323,8 +323,8 @@ const DocumentUpload = () => {
               <PreviousMonths />
             </TabsContent>
           </Tabs>
-        </TabsContent>
-      </Tabs>
+        </TabsContent>*/}
+      </Tabs> 
     </div>
   );
 };
