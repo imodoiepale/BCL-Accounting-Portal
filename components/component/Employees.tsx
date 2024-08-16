@@ -1,6 +1,7 @@
+
 // @ts-nocheck
 "use client"
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
@@ -10,10 +11,12 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,} from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, UploadIcon, DownloadIcon } from 'lucide-react'
 import { useUser } from '@clerk/clerk-react'
 import toast, { Toaster } from 'react-hot-toast';
+import { PencilIcon, TrashIcon } from 'lucide-react'
 
 const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
 const url="https://zyszsqgdlrpnunkegipk.supabase.co"
@@ -45,7 +48,6 @@ const formatDate = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
-
 export function EmployeeList() {
   const { user } = useUser();
   const [employees, setEmployees] = useState([])
@@ -60,14 +62,11 @@ export function EmployeeList() {
     startdate: '',
   })
   const [isUploading, setIsUploading] = useState(false)
-  const [isDialogOpen, setIsDialogOpen] = useState(false); // State to control the dialog
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingEmployee, setEditingEmployee] = useState(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
-
-  useEffect(() => {
-    fetchEmployees()
-  }, [])
-
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     const { data, error } = await supabase
       .from('acc_portal_employees')
       .select('*')
@@ -75,7 +74,11 @@ export function EmployeeList() {
       .order('id', { ascending: true });
     if (error) console.error('Error fetching employees:', error)
     else setEmployees(data)
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    fetchEmployees()
+  }, [fetchEmployees])
 
   const handleInputChange = (e) => {
     setNewEmployee({ ...newEmployee, [e.target.id]: e.target.value })
@@ -88,7 +91,7 @@ export function EmployeeList() {
     if (error){
       console.error('Error adding employee:', error);
       toast.error('Failed to add employee.');
-    }else {
+    } else {
       fetchEmployees()
       setNewEmployee({
         name: '',
@@ -101,7 +104,7 @@ export function EmployeeList() {
         startdate: '',
       })
       toast.success('Employee added successfully!');
-      setIsDialogOpen(false); // Close the dialog
+      setIsDialogOpen(false);
     }
   }
 
@@ -177,6 +180,51 @@ export function EmployeeList() {
       document.body.removeChild(link);
     }
   };
+
+  const handleEdit = (employee) => {
+    setEditingEmployee(employee)
+    setIsEditDialogOpen(true)
+  }
+
+  const handleEditInputChange = (e) => {
+    setEditingEmployee({ ...editingEmployee, [e.target.id]: e.target.value })
+  }
+
+  const handleEditSubmit = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_employees')
+      .update(editingEmployee)
+      .eq('id', editingEmployee.id)
+      .select()
+
+    if (error) {
+      console.error('Error updating employee:', error)
+      toast.error('Failed to update employee.')
+    } else {
+      fetchEmployees()
+      toast.success('Employee updated successfully!')
+      setIsEditDialogOpen(false)
+    }
+  }
+
+  const handleDelete = async (id) => {
+    const confirmDelete = window.confirm('Are you sure you want to delete this employee?')
+    if (confirmDelete) {
+      const { data, error } = await supabase
+        .from('acc_portal_employees')
+        .delete()
+        .eq('id', id)
+        .select()
+
+      if (error) {
+        console.error('Error deleting employee:', error)
+        toast.error('Failed to delete employee.')
+      } else {
+        fetchEmployees()
+        toast.success('Employee deleted successfully!')
+      }
+    }
+  }
 
   return (
     <div className="flex w-full bg-gray-100">
@@ -271,7 +319,7 @@ export function EmployeeList() {
           </div>
         </div>
         <Card>
-          <Table>
+        <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>EMP ID</TableHead>
@@ -286,6 +334,7 @@ export function EmployeeList() {
                 <TableHead>End Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Approved by BCL</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -300,7 +349,7 @@ export function EmployeeList() {
                   <TableCell>{employee.nhif}</TableCell>
                   <TableCell>{employee.mnssf}</TableCell>
                   <TableCell>{formatDate(employee.startdate)}</TableCell>
-                  <TableCell></TableCell>
+                  <TableCell>{employee.enddate ? formatDate(employee.enddate) : ''}</TableCell>
                   <TableCell>
                     <span className={`font-bold capitalize ${employee.status ? 'text-green-600' : 'text-red-600'}`}>
                       {employee.status ? 'Active' : 'Inactive'}
@@ -310,6 +359,60 @@ export function EmployeeList() {
                     <Badge variant={employee.verified ? "success" : "destructive"}>
                       {employee.verified ? "✔️" : "❌"}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-center space-x-2">
+                      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(employee)}>
+                            <PencilIcon className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Edit Employee</DialogTitle>
+                          </DialogHeader>
+                          <div className="flex flex-col gap-4">
+                            <div className="space-y-1">
+                              <Label htmlFor="name">Name</Label>
+                              <Input id="name" value={editingEmployee?.name || ''} onChange={handleEditInputChange} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="id_number">ID Number</Label>
+                              <Input id="id_number" value={editingEmployee?.id_number || ''} onChange={handleEditInputChange} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="kra_pin">KRA PIN</Label>
+                              <Input id="kra_pin" value={editingEmployee?.kra_pin || ''} onChange={handleEditInputChange} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="email">Email</Label>
+                              <Input id="email" value={editingEmployee?.email || ''} onChange={handleEditInputChange} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="mobile">Mobile</Label>
+                              <Input id="mobile" value={editingEmployee?.mobile || ''} onChange={handleEditInputChange} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="nhif">NHIF Number</Label>
+                              <Input id="nhif" value={editingEmployee?.nhif || ''} onChange={handleEditInputChange} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="mnssf">MNSSF Number</Label>
+                              <Input id="mnssf" value={editingEmployee?.mnssf || ''} onChange={handleEditInputChange} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="startdate">Start Date</Label>
+                              <Input id="startdate" type="date" value={editingEmployee?.startdate || ''} onChange={handleEditInputChange} />
+                            </div>
+                            <Button onClick={handleEditSubmit}>Save Changes</Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(employee.id)}>
+                        <TrashIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -325,6 +428,7 @@ export function EmployeeList() {
             <ChevronRightIcon className="w-4 h-4" />
           </Button>
         </div>
+        <Toaster />
       </main>
     </div>
   )
