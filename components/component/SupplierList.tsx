@@ -1,6 +1,6 @@
 // @ts-nocheck
 "use client"
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -9,8 +9,8 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, UploadIcon } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, UploadIcon, Edit3Icon, Trash2Icon } from 'lucide-react'
 import { ScrollArea } from '../ui/scroll-area'
 import { useUser } from '@clerk/clerk-react'
 import { toast } from 'react-hot-toast'
@@ -37,25 +37,32 @@ export function SupplierList() {
     contact_name: '',
     contact_mobile: '',
     contact_email: '',
-    status: ""
+    status: "true"
   })
   const [isLoading, setIsLoading] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [currentSupplier, setCurrentSupplier] = useState(null)
+  const [editField, setEditField] = useState('')
 
-  useEffect(() => {
-    fetchSuppliers()
-  }, [])
-
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     const { data, error } = await supabase
       .from('acc_portal_suppliers')
       .select('*')
       .eq('userid', user?.id)
       .order('id', { ascending: true });
-    if (error) console.error('Error fetching suppliers:', error)
-    else setSuppliers(data)
-  }
-
+    if (error) {
+      console.error('Error fetching suppliers:', error)
+      toast.error('Failed to fetch suppliers.')
+    } else {
+      setSuppliers(data)
+    }
+  }, [user?.id])
+  
+  useEffect(() => {
+    fetchSuppliers()
+  }, [fetchSuppliers])
+  
   const handleInputChange = (e) => {
     setNewSupplier({ ...newSupplier, [e.target.id]: e.target.value })
   }
@@ -63,9 +70,11 @@ export function SupplierList() {
   const handleSubmit = async () => {
     const { data, error } = await supabase
       .from('acc_portal_suppliers')
-      .insert([{ ...newSupplier, userid: user?.id , status: 'true' }])
-    if (error) console.error('Error adding supplier:', error)
-    else {
+      .insert([{ ...newSupplier, userid: user?.id }])
+    if (error) {
+      console.error('Error adding supplier:', error)
+      toast.error('Failed to add supplier.')
+    } else {
       fetchSuppliers()
       setNewSupplier({
         name: '',
@@ -73,8 +82,9 @@ export function SupplierList() {
         contact_name: '',
         contact_mobile: '',
         contact_email: '',
-        status: ""
+        status: "true"
       })
+      toast.success('Supplier added successfully!')
     }
   }
 
@@ -153,6 +163,61 @@ export function SupplierList() {
       document.body.removeChild(link);
     }
   };
+
+  const handleDelete = async (id) => {
+    const { error } = await supabase
+      .from('acc_portal_suppliers')
+      .delete()
+      .eq('id', id)
+    if (error) {
+      console.error('Error deleting supplier:', error)
+      toast.error('Failed to delete supplier.')
+    } else {
+      fetchSuppliers()
+      toast.success('Supplier deleted successfully!')
+    }
+  }
+
+  const handleEditFieldChange = (e) => {
+    setEditField(e.target.id)
+    setCurrentSupplier({ ...currentSupplier, [e.target.id]: e.target.value })
+  }
+  const handleEditCancel = () => {
+    setCurrentSupplier({
+      ...currentSupplier,
+      enddate: currentSupplier.enddate || ''
+    })
+    setIsDialogOpen(false)
+  }
+  
+  const handleEdit = (supplier) => {
+    setCurrentSupplier({
+      ...supplier,
+      enddate: supplier.enddate || '' 
+    })
+    setIsDialogOpen(true)
+  }
+  const handleEditSubmit = async () => {
+    const { id, ...updateData } = currentSupplier;
+  
+    Object.keys(updateData).forEach(key => 
+      (updateData[key] === undefined || updateData[key] === null) && delete updateData[key]
+    );
+  
+    const { error } = await supabase
+      .from('acc_portal_suppliers')
+      .update(updateData)
+      .eq('id', id)
+  
+    if (error) {
+      console.error('Error updating supplier:', error)
+      toast.error('Failed to update supplier.')
+    } else {
+      fetchSuppliers()
+      setIsDialogOpen(false)
+      toast.success('Supplier updated successfully!')
+    }
+  }
 
   return (
     <div className="flex w-full bg-gray-100">
@@ -244,6 +309,7 @@ export function SupplierList() {
                   <TableHead>End Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Approved by BCL</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -256,17 +322,27 @@ export function SupplierList() {
                     <TableCell>{supplier.contact_mobile}</TableCell>
                     <TableCell>{supplier.contact_email}</TableCell>
                     <TableCell>{formatDate(supplier.startdate)}</TableCell>
-                    <TableCell></TableCell>
+                    <TableCell>{supplier.enddate ? formatDate(supplier.enddate) : ''}</TableCell>
                     <TableCell>
-                    <span className={`font-bold capitalize ${supplier.status ? 'text-green-600' : 'text-red-600'}`}>
-                      {supplier.status ? 'Active' : 'Inactive'}
-                    </span>
-                  </TableCell>
-                  <TableCell className='text-center'>
-                    <Badge variant={supplier.verified ? "success" : "destructive"}>
-                      {supplier.verified ? "✔️" : "❌"}
-                    </Badge>
-                  </TableCell>
+                      <span className={`font-bold capitalize ${supplier.status === 'true' ? 'text-green-600' : 'text-red-600'}`}>
+                        {supplier.status === 'true' ? 'Active' : 'Inactive'}
+                      </span>
+                    </TableCell>
+                    <TableCell className='text-center'>
+                      <Badge variant={supplier.verified ? "success" : "destructive"}>
+                        {supplier.verified ? "✔️" : "❌"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button variant="ghost" onClick={() => handleEdit(supplier)}>
+                          <Edit3Icon className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" onClick={() => handleDelete(supplier.id)}>
+                          <Trash2Icon className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -279,10 +355,78 @@ export function SupplierList() {
           </Button>
           <span>1</span>
           <Button variant="outline" className="flex items-center">
-            <ChevronRightIcon className="w-4 h-4" />
+          <ChevronRightIcon className="w-4 h-4" />
           </Button>
         </div>
       </main>
+
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Edit Supplier</DialogTitle>
+        <DialogDescription>
+          Make changes to the supplier information here.
+        </DialogDescription>
+      </DialogHeader>
+      {currentSupplier && (
+        <div className="flex flex-col gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="edit-name">Supplier Name</Label>
+            <Input
+              id="edit-name"
+              value={currentSupplier.name}
+              onChange={(e) => setCurrentSupplier({ ...currentSupplier, name: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="edit-pin">Supplier Pin</Label>
+            <Input
+              id="edit-pin"
+              value={currentSupplier.pin}
+              onChange={(e) => setCurrentSupplier({ ...currentSupplier, pin: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="edit-contact-name">Contact Name</Label>
+            <Input
+              id="edit-contact-name"
+              value={currentSupplier.contact_name}
+              onChange={(e) => setCurrentSupplier({ ...currentSupplier, contact_name: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="edit-contact-mobile">Contact Mobile</Label>
+            <Input
+              id="edit-contact-mobile"
+              value={currentSupplier.contact_mobile}
+              onChange={(e) => setCurrentSupplier({ ...currentSupplier, contact_mobile: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="edit-contact-email">Contact Email</Label>
+            <Input
+              id="edit-contact-email"
+              value={currentSupplier.contact_email}
+              onChange={(e) => setCurrentSupplier({ ...currentSupplier, contact_email: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="edit-end-date">End Date</Label>
+            <Input
+              id="edit-end-date"
+              type="date"
+              value={currentSupplier.enddate || ''}
+              onChange={(e) => setCurrentSupplier({ ...currentSupplier, enddate: e.target.value })}
+            />
+          </div>
+        </div>
+      )}
+      <DialogFooter>
+        <Button onClick={handleEditSubmit}>Save changes</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
     </div>
   )
 }
