@@ -292,63 +292,66 @@ export function DirectorsList() {
         const text = e.target.result;
         const rows = text.split('\n').filter(row => row.trim() !== ''); // Remove empty rows
         const headers = rows[0].split(',').map(header => header.trim());
+        
+        // Identify date fields
+        const dateFields = Object.values(directorFields)
+          .flat()
+          .filter(field => field.type === 'date')
+          .map(field => field.id);
+  
         const directors = rows.slice(1).map(row => {
           const rowData = row.split(',');
           const director = {};
   
           headers.forEach((header, index) => {
             let value = rowData[index] ? rowData[index].trim() : '';
+            
+            // Convert date strings to ISO format
+            if (dateFields.includes(header) && value) {
+              const dateParts = value.split('/');
+              if (dateParts.length === 3) {
+                // Assuming date format is MM/DD/YYYY
+                const [month, day, year] = dateParts;
+                value = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              }
+            }
+            
             // Convert empty strings to null for numeric fields
             if (['shares_held', 'dependents', 'annual_income'].includes(header) && value === '') {
               value = null;
+            } else if (['shares_held', 'dependents', 'annual_income'].includes(header)) {
+              // Ensure numeric fields are parsed as numbers
+              value = parseFloat(value);
             }
+            
             director[header] = value;
           });
   
           // Filter out rows that are completely empty
           return Object.values(director).some(value => value !== '') ? director : null;
-        }).filter(director => director !== null); // Remove null directors
-    
+        }).filter(director => director !== null);
+  
         setIsLoading(true);
         let successCount = 0;
         let errorCount = 0;
         let skippedCount = 0;
-    
+  
         console.log("Parsed Directors Data:", directors);
-    
+  
         for (const director of directors) {
           // Check if either id_number or full_name is missing
-          if (!director.id_number || !director.full_name) {
-            // Proceed to insert a new director if either id_number or full_name is missing
-            try {
-              console.log("Inserting new director due to missing id_number or full_name:", director);
-              const { data, error } = await supabase
-                .from('acc_portal_directors')
-                .insert([{ ...director, userid: userId }])
-                .select();
-  
-              if (error) {
-                console.error('Error adding director:', error);
-                errorCount++;
-              } else {
-                successCount++;
-                setDirectors(prevDirectors => [...prevDirectors, data[0]]);
-              }
-            } catch (error) {
-              console.error('Unexpected error during insertion:', error);
-              errorCount++;
-            }
-            continue; // Skip to the next director after insert
+          if (!director.id_number && !director.full_name) {
+            skippedCount++;
+            continue; // Skip this director if both id_number and full_name are missing
           }
   
           try {
-            // Fetch existing directors based on both id_number and full_name
+            // Fetch existing directors based on id_number or full_name
             const { data: existingDirectors, error: fetchError } = await supabase
               .from('acc_portal_directors')
               .select('*')
               .eq('userid', userId)
-              .eq('id_number', director.id_number)
-              .eq('full_name', director.full_name);
+              .or(`id_number.eq.${director.id_number},full_name.eq.${director.full_name}`);
   
             if (fetchError) {
               console.error('Error fetching existing directors:', fetchError);
@@ -376,7 +379,7 @@ export function DirectorsList() {
                 );
               }
             } else {
-              // Insert new director if no existing match found
+              // Insert new director
               console.log("Inserting new director:", director);
               const { data, error } = await supabase
                 .from('acc_portal_directors')
@@ -406,7 +409,7 @@ export function DirectorsList() {
           toast.error(`Failed to add/update ${errorCount} director${errorCount > 1 ? 's' : ''}.`);
         }
         if (skippedCount > 0) {
-          toast.info(`Skipped ${skippedCount} row${skippedCount > 1 ? 's' : ''}.`);
+          toast.info(`Skipped ${skippedCount} row${skippedCount > 1 ? 's' : ''} due to missing required information.`);
         }
       };
       reader.readAsText(file);
