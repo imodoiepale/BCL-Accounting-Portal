@@ -736,4 +736,3 @@ export const bankColumns: ColumnDef<AllBanks>[] = [
   },
 ];
 
-export { supplierColumns, bankColumns };
