@@ -47,6 +47,7 @@ export function BankList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
+
   const fetchBanks = useCallback(async () => {
     if (!user) return;
     const { data, error } = await supabase
@@ -56,10 +57,11 @@ export function BankList() {
       .order('id', { ascending: true });
     if (error) {
       console.error('Error fetching banks:', error)
-      toast.error('Failed to fetch banks')
+      toast.error('Failed to fetch banks: ' + error.message)
     }
     else setBanks(data)
   }, [user]);
+
 
   useEffect(() => {
     fetchBanks();
@@ -87,14 +89,28 @@ export function BankList() {
       toast.error('User not authenticated')
       return;
     }
-    const { data, error } = await supabase
-      .from('acc_portal_banks')
-      .insert([{ ...newBank, userid: user.id,  status: 'true' }])
-    if (error) {
-      console.error('Error adding bank:', error)
-      toast.error('Failed to add bank')
-    }
-    else {
+    
+    // Check if account number already exists
+    try {
+      const { data: existingAccount, error: checkError } = await supabase
+        .from('acc_portal_banks')
+        .select('account_number')
+        .eq('account_number', newBank.account_number)
+        .maybeSingle()
+  
+      if (checkError) throw checkError;
+  
+      if (existingAccount) {
+        toast.error('An account with this account number already exists')
+        return;
+      }
+  
+      const { data, error } = await supabase
+        .from('acc_portal_banks')
+        .insert([{ ...newBank, userid: user.id, status: 'true' }])
+      
+      if (error) throw error;
+  
       fetchBanks()
       setNewBank({
         name: '',
@@ -106,8 +122,12 @@ export function BankList() {
         relationship_manager_email: '',
       })
       toast.success('Bank added successfully')
+    } catch (error) {
+      console.error('Error adding bank:', error)
+      toast.error('Failed to add bank: ' + error.message)
     }
   }
+
 
   const handleEdit = (bank) => {
     setEditingBank(bank)
