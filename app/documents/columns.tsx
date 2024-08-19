@@ -1,6 +1,6 @@
 // @ts-nocheck
 //@ts-ignore
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Form,
   FormControl,
@@ -83,6 +83,9 @@ const schema = yup.object().shape({
   file: yup.mixed().required("File is required")
 });
 
+// Create a cache object outside of the component
+const dataCache = new Map();
+
 interface UploadCellProps {
   row: any;
   selectedMonth: string;
@@ -112,10 +115,24 @@ const UploadCell: React.FC<UploadCellProps> = ({ row, selectedMonth, type }) => 
     resolver: yupResolver(schema),
   });
 
+  const cacheKey = useMemo(() => {
+    return `${userId}-${selectedMonth}-${row.getValue(type === 'supplier' ? 'suppSeq' : 'bankSeq')}-${type}`;
+  }, [userId, selectedMonth, row, type]);
+
   const fetchData = useCallback(async () => {
     if (!userId || !selectedMonth || !row.getValue(type === 'supplier' ? 'suppSeq' : 'bankSeq')) {
       console.error('Missing required data:', { userId, selectedMonth, rowId: row.getValue(type === 'supplier' ? 'suppSeq' : 'bankSeq') });
       setState(prev => ({ ...prev, isDataFetching: false }));
+      return;
+    }
+
+    // Check if data is in cache
+    if (dataCache.has(cacheKey)) {
+      setState(prev => ({
+        ...prev,
+        ...dataCache.get(cacheKey),
+        isDataFetching: false
+      }));
       return;
     }
 
@@ -152,20 +169,28 @@ const UploadCell: React.FC<UploadCellProps> = ({ row, selectedMonth, type }) => 
 
       if (uploadError) throw uploadError;
 
-      setState(prev => ({
-        ...prev,
+      const newState = {
         itemData: fetchedItemData,
         uploadStatus: uploadData && uploadData.length > 0 ? uploadData[0].upload_status : 'Not Uploaded',
         filePath: uploadData && uploadData.length > 0 ? uploadData[0].file_path : null,
         isDataFetching: false
-      }));
+      };
+
+      // Update cache
+      dataCache.set(cacheKey, newState);
+
+      setState(prev => ({ ...prev, ...newState }));
 
     } catch (error) {
       console.error('Error fetching data:', error);
       setState(prev => ({ ...prev, uploadStatus: 'Error', isDataFetching: false }));
       alert(`Error fetching ${type} data: ${error.message}`);
     }
-  }, [userId, selectedMonth, row, type]);
+  }, [userId, selectedMonth, row, type, cacheKey]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const debouncedFetchData = debounce(fetchData, 300);
 
