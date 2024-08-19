@@ -4,10 +4,10 @@ import { sendEmail } from '../../utils/emailService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
-    const { to, subject, html } = req.body;
+    const { to, subject, html, fromName, fromEmail } = req.body;
 
     try {
-      const result = await sendEmail(to, subject, html);
+      const result = await sendEmail(to, subject, html, fromName, fromEmail);
       res.status(200).json({ message: 'Email sent successfully', result });
     } catch (error) {
       res.status(500).json({ message: 'Error sending email', error: (error as Error).message });
