@@ -41,8 +41,6 @@ import {
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, Mail, Phone, PlusCircle, Upload } from "lucide-react";
 import React, { useEffect, useMemo, useState } from 'react';
-
-// CHANGE: Removed unused Resend import
 import { useUser } from '@clerk/clerk-react';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -86,7 +84,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
 
   useEffect(() => {
     fetchData(fromDate.toISOString().split('T')[0], toDate.toISOString().split('T')[0]);
-  }, [fromDate, toDate]);
+  }, [fromDate, toDate, fetchData]);
 
   const visibleMonths = useMemo(() => {
     const months = [];
@@ -139,20 +137,23 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
     const message = encodeURIComponent(`Hello, you have missing documents. Please upload them as soon as possible.`);
     window.open(`https://wa.me/${phoneNumber}?text=${message}`, '_blank');
   };
-  
+
   const sendEmailRequest = async (supplier: DataRow) => {
     setEmailSending(true);
     const missingDocs = getMissingDocuments(supplier);
     const missingDocsText = missingDocs.map(doc => `${MONTHS[doc.month]} ${doc.year}`).join(', ');
     
     const username = user?.username || 'User';
-
+    const userEmail = user?.email || process.env.EMAIL_FROM_ADDRESS; // Fallback to default if user email is not available
+  
     try {
       const emailData = {
         to: supplier.email,
         subject: `Missing Documents Request for ${supplier.name}`,
         html: `<p>Dear ${supplier.name},</p><p>We noticed that you have missing documents for the following months:</p> ${missingDocsText}.</p><p>Please upload these documents as soon as possible.</p>
         <p>Best regards,<br>${username}<br></p>`,
+        fromName: username,
+        fromEmail: userEmail,
       };
       
       const response = await fetch('/api/send-email', {
@@ -286,8 +287,6 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
             }
           }
         }
-
-        console.log("START DATE IS ", startDate);
         
         let cellContent;
         let bgColor;
@@ -378,7 +377,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
                   <h3 className="text-xl font-semibold mb-4">Missing Monthly Documents</h3>
                   <ScrollArea className="h-[300px] rounded-md border p-4">
                     <ul className="grid grid-cols-2 gap-4">
-                      {getMissingDocuments(supplier).map((doc) => (
+                    {getMissingDocuments(supplier).map((doc) => (
                         <li key={`${doc.month}-${doc.year}`} className="flex justify-between items-center bg-gray-100 p-3 rounded-lg">
                           <span className="font-medium">{MONTHS[doc.month]} {doc.year}</span>
                           <Button
@@ -458,7 +457,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         );
       }
     },
-  ], [visibleMonths, uploadDialogOpen, selectedMonth, emailSending]);
+  ], [visibleMonths, currentMonthIndex, currentYear, emailSending, sendEmailRequest, sendWhatsAppMessage]);
 
   const table = useReactTable({
     data,
