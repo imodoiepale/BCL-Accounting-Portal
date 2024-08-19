@@ -345,9 +345,9 @@ export function EmployeeList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((employee) => (
+              {employees.map((employee,index) => (
                 <TableRow key={employee.id}>
-                  <TableCell>EMP-{employee.id}</TableCell>
+                  <TableCell>EMP-{index + 1}</TableCell>
                   <TableCell>{employee.name}</TableCell>
                   <TableCell>{employee.id_number}</TableCell>
                   <TableCell>{employee.kra_pin}</TableCell>

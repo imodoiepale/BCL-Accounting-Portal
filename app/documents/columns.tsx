@@ -425,7 +425,10 @@ export const supplierColumns: ColumnDef<any>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div className="text-center">SUP-{row.getValue("suppSeq")}</div>,
+    cell: ({ row, table }) => {
+      const index = table.getSortedRowModel().rows.findIndex((r) => r.id === row.id) + 1;
+      return <div className="text-center">S-{index}</div>;
+    },
   },
   {
     accessorKey: "suppName",
@@ -629,7 +632,10 @@ export const bankColumns: ColumnDef<any>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div className="text-center">BA-{row.getValue("bankSeq")}</div>,
+    cell: ({ row, table }) => {
+      const index = table.getSortedRowModel().rows.findIndex((r) => r.id === row.id) + 1;
+      return <div className="text-center">B-{index}</div>;
+    },
   },
   {
     accessorKey: "bankName",
