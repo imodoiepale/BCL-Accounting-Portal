@@ -222,7 +222,7 @@ export function SupplierList() {
       toast.success('Supplier updated successfully!')
     }
   }
-
+  
   return (
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
@@ -321,9 +321,9 @@ export function SupplierList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {suppliers.map((supplier) => (
+                {suppliers.map((supplier, index) => (
                   <TableRow key={supplier.id}>
-                    <TableCell>SUPP-{supplier.id}</TableCell>
+                    <TableCell>S-{index + 1}</TableCell>
                     <TableCell>{supplier.name}</TableCell>
                     <TableCell>{supplier.pin}</TableCell>
                     <TableCell>{supplier.contact_name}</TableCell>
