@@ -1,6 +1,7 @@
 
 // @ts-nocheck
 "use client"
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from "next/link"
@@ -58,8 +59,9 @@ export function EmployeeList() {
     email: '',
     mobile: '',
     nhif: '',
-    mnssf: '',
+    nssf: '',
     startdate: '',
+    enddate: '', // Added end date
   })
   const [isUploading, setIsUploading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -100,8 +102,9 @@ export function EmployeeList() {
         email: '',
         mobile: '',
         nhif: '',
-        mnssf: '',
+        nssf: '',
         startdate: '',
+        enddate: '', // Reset end date
       })
       toast.success('Employee added successfully!');
       setIsDialogOpen(false);
@@ -121,7 +124,7 @@ export function EmployeeList() {
           const employee = {};
           headers.forEach((header, index) => {
             let value = rowData[index] ? rowData[index].trim() : '';
-            if (['nhif', 'mnssf'].includes(header) && value === '') {
+            if (['nhif', 'nssf'].includes(header) && value === '') {
               value = null;
             }
             employee[header] = value;
@@ -166,7 +169,7 @@ export function EmployeeList() {
   };
 
   const downloadCSVTemplate = () => {
-    const headers = ['name', 'id_number', 'kra_pin', 'email', 'mobile', 'nhif', 'mnssf', 'startdate'];
+    const headers = ['name', 'id_number', 'kra_pin', 'email', 'mobile', 'nhif', 'nssf', 'startdate', 'enddate'];
     const csvContent = headers.join(',') + '\n';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -305,12 +308,16 @@ export function EmployeeList() {
                     <Input id="nhif" placeholder="123456789" value={newEmployee.nhif} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="mnssf">MNSSF Number</Label>
-                    <Input id="mnssf" placeholder="987654321" value={newEmployee.mnssf} onChange={handleInputChange} />
+                    <Label htmlFor="nssf">MNSSF Number</Label>
+                    <Input id="nssf" placeholder="987654321" value={newEmployee.nssf} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="startdate">Start Date</Label>
                     <Input id="startdate" type="date" value={newEmployee.startdate} onChange={handleInputChange} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="enddate">End Date</Label>
+                    <Input id="enddate" type="date" value={newEmployee.enddate} onChange={handleInputChange} />
                   </div>
                 </div>
                 <div className="pt-4"><Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button></div>
@@ -347,7 +354,7 @@ export function EmployeeList() {
                   <TableCell>{employee.email}</TableCell>
                   <TableCell>{employee.mobile}</TableCell>
                   <TableCell>{employee.nhif}</TableCell>
-                  <TableCell>{employee.mnssf}</TableCell>
+                  <TableCell>{employee.nssf}</TableCell>
                   <TableCell>{formatDate(employee.startdate)}</TableCell>
                   <TableCell>{employee.enddate ? formatDate(employee.enddate) : ''}</TableCell>
                   <TableCell>
@@ -398,12 +405,16 @@ export function EmployeeList() {
                               <Input id="nhif" value={editingEmployee?.nhif || ''} onChange={handleEditInputChange} />
                             </div>
                             <div className="space-y-1">
-                              <Label htmlFor="mnssf">MNSSF Number</Label>
-                              <Input id="mnssf" value={editingEmployee?.mnssf || ''} onChange={handleEditInputChange} />
+                              <Label htmlFor="nssf">MNSSF Number</Label>
+                              <Input id="nssf" value={editingEmployee?.nssf || ''} onChange={handleEditInputChange} />
                             </div>
                             <div className="space-y-1">
                               <Label htmlFor="startdate">Start Date</Label>
                               <Input id="startdate" type="date" value={editingEmployee?.startdate || ''} onChange={handleEditInputChange} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="enddate">End Date</Label>
+                              <Input id="enddate" type="date" value={editingEmployee?.enddate || ''} onChange={handleEditInputChange} />
                             </div>
                             <Button onClick={handleEditSubmit}>Save Changes</Button>
                           </div>

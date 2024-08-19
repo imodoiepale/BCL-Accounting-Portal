@@ -37,6 +37,7 @@ export function SupplierList() {
     contact_name: '',
     contact_mobile: '',
     contact_email: '',
+    startdate: '',
     status: "true"
   })
   const [isLoading, setIsLoading] = useState(false)
@@ -82,6 +83,7 @@ export function SupplierList() {
         contact_name: '',
         contact_mobile: '',
         contact_email: '',
+        startdate: '',
         status: "true"
       })
       toast.success('Supplier added successfully!')
@@ -149,7 +151,7 @@ export function SupplierList() {
   };
 
   const downloadCSVTemplate = () => {
-    const headers = ['name', 'pin', 'contact_name', 'contact_mobile', 'contact_email'];
+    const headers = ['name', 'pin', 'contact_name', 'contact_mobile', 'contact_email', 'startdate'];
     const csvContent = headers.join(',') + '\n';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -185,6 +187,7 @@ export function SupplierList() {
   const handleEditCancel = () => {
     setCurrentSupplier({
       ...currentSupplier,
+      startdate: currentSupplier.startdate || '',
       enddate: currentSupplier.enddate || ''
     })
     setIsDialogOpen(false)
@@ -193,6 +196,7 @@ export function SupplierList() {
   const handleEdit = (supplier) => {
     setCurrentSupplier({
       ...supplier,
+      startdate: supplier.startdate || '',
       enddate: supplier.enddate || '' 
     })
     setIsDialogOpen(true)
@@ -288,6 +292,10 @@ export function SupplierList() {
                     <Label htmlFor="contact_email">Supplier Contact Email</Label>
                     <Input id="contact_email" placeholder="john@example.com" value={newSupplier.contact_email} onChange={handleInputChange} />
                   </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="startdate">Start Date</Label>
+                    <Input id="startdate" type="date" value={newSupplier.startdate} onChange={handleInputChange} />
+                  </div>
                 </div>
                 <div className="pt-4"><Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button></div>
               </SheetContent>
@@ -321,7 +329,7 @@ export function SupplierList() {
                     <TableCell>{supplier.contact_name}</TableCell>
                     <TableCell>{supplier.contact_mobile}</TableCell>
                     <TableCell>{supplier.contact_email}</TableCell>
-                    <TableCell>{formatDate(supplier.startdate)}</TableCell>
+                    <TableCell>{supplier.startdate ? formatDate(supplier.startdate) : ''}</TableCell>
                     <TableCell>{supplier.enddate ? formatDate(supplier.enddate) : ''}</TableCell>
                     <TableCell>
                       <span className={`font-bold capitalize ${supplier.status === 'true' ? 'text-green-600' : 'text-red-600'}`}>
@@ -355,78 +363,86 @@ export function SupplierList() {
           </Button>
           <span>1</span>
           <Button variant="outline" className="flex items-center">
-          <ChevronRightIcon className="w-4 h-4" />
+            <ChevronRightIcon className="w-4 h-4" />
           </Button>
         </div>
       </main>
 
-
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Edit Supplier</DialogTitle>
-        <DialogDescription>
-          Make changes to the supplier information here.
-        </DialogDescription>
-      </DialogHeader>
-      {currentSupplier && (
-        <div className="flex flex-col gap-4">
-          <div className="space-y-1">
-            <Label htmlFor="edit-name">Supplier Name</Label>
-            <Input
-              id="edit-name"
-              value={currentSupplier.name}
-              onChange={(e) => setCurrentSupplier({ ...currentSupplier, name: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="edit-pin">Supplier Pin</Label>
-            <Input
-              id="edit-pin"
-              value={currentSupplier.pin}
-              onChange={(e) => setCurrentSupplier({ ...currentSupplier, pin: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="edit-contact-name">Contact Name</Label>
-            <Input
-              id="edit-contact-name"
-              value={currentSupplier.contact_name}
-              onChange={(e) => setCurrentSupplier({ ...currentSupplier, contact_name: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="edit-contact-mobile">Contact Mobile</Label>
-            <Input
-              id="edit-contact-mobile"
-              value={currentSupplier.contact_mobile}
-              onChange={(e) => setCurrentSupplier({ ...currentSupplier, contact_mobile: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="edit-contact-email">Contact Email</Label>
-            <Input
-              id="edit-contact-email"
-              value={currentSupplier.contact_email}
-              onChange={(e) => setCurrentSupplier({ ...currentSupplier, contact_email: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="edit-end-date">End Date</Label>
-            <Input
-              id="edit-end-date"
-              type="date"
-              value={currentSupplier.enddate || ''}
-              onChange={(e) => setCurrentSupplier({ ...currentSupplier, enddate: e.target.value })}
-            />
-          </div>
-        </div>
-      )}
-      <DialogFooter>
-        <Button onClick={handleEditSubmit}>Save changes</Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Supplier</DialogTitle>
+            <DialogDescription>
+              Make changes to the supplier information here.
+            </DialogDescription>
+          </DialogHeader>
+          {currentSupplier && (
+            <div className="flex flex-col gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="edit-name">Supplier Name</Label>
+                <Input
+                  id="edit-name"
+                  value={currentSupplier.name}
+                  onChange={(e) => setCurrentSupplier({ ...currentSupplier, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-pin">Supplier Pin</Label>
+                <Input
+                  id="edit-pin"
+                  value={currentSupplier.pin}
+                  onChange={(e) => setCurrentSupplier({ ...currentSupplier, pin: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-contact-name">Contact Name</Label>
+                <Input
+                  id="edit-contact-name"
+                  value={currentSupplier.contact_name}
+                  onChange={(e) => setCurrentSupplier({ ...currentSupplier, contact_name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-contact-mobile">Contact Mobile</Label>
+                <Input
+                  id="edit-contact-mobile"
+                  value={currentSupplier.contact_mobile}
+                  onChange={(e) => setCurrentSupplier({ ...currentSupplier, contact_mobile: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-contact-email">Contact Email</Label>
+                <Input
+                  id="edit-contact-email"
+                  value={currentSupplier.contact_email}
+                  onChange={(e) => setCurrentSupplier({ ...currentSupplier, contact_email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-start-date">Start Date</Label>
+                <Input
+                  id="edit-start-date"
+                  type="date"
+                  value={currentSupplier.startdate || ''}
+                  onChange={(e) => setCurrentSupplier({ ...currentSupplier, startdate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-end-date">End Date</Label>
+                <Input
+                  id="edit-end-date"
+                  type="date"
+                  value={currentSupplier.enddate || ''}
+                  onChange={(e) => setCurrentSupplier({ ...currentSupplier, enddate: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={handleEditSubmit}>Save changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
