@@ -26,7 +26,6 @@ import { useAuth } from '@clerk/clerk-react';
 import { format } from "date-fns"
 // @ts-nocheck
 import { ColumnDef } from "@tanstack/react-table";
-import React from 'react';
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, Info } from "lucide-react";
