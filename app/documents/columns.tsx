@@ -24,8 +24,6 @@ import { useForm } from "react-hook-form";
 import * as yup from 'yup';
 import { useAuth } from '@clerk/clerk-react';
 import { format } from "date-fns"
-// @ts-nocheck
-import { ColumnDef } from "@tanstack/react-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, Info } from "lucide-react";
