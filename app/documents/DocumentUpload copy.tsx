@@ -53,7 +53,7 @@ export function CombinedMonthlyDocs({ type, selectedMonth, isCurrentMonth }: Com
 
       let query = supabase
         .from(type === 'supplier' ? 'acc_portal_suppliers' : 'acc_portal_banks')
-        .select('*' , 'name', 'id' ,'startdate')
+        .select('*')
         .eq('userid', userId)
         .order('id', { ascending: true });
 
@@ -85,8 +85,8 @@ export function CombinedMonthlyDocs({ type, selectedMonth, isCurrentMonth }: Com
       console.log('Extended Date range:', extendedStartDate.toISOString(), 'to', extendedEndDate.toISOString());
       
       uploadQuery = uploadQuery
-        .gte('upload_date', extendedStartDate.toISOString())
-        .lte('upload_date', extendedEndDate.toISOString());
+      .gte('docs_date_range', startDate.toISOString())
+      .lte('docs_date_range_end', endDate.toISOString())
 
       const [{ data: mainData, error: mainError }, { data: uploadData, error: uploadError }] = await Promise.all([
         query,
@@ -101,30 +101,48 @@ export function CombinedMonthlyDocs({ type, selectedMonth, isCurrentMonth }: Com
       const transformedData = mainData.map(item => {
         const latestUpload = uploadMap.get(item.id) || {};
         return {
-          id: item.id,
-          name: item.name,
-          status: item.status ? 'Active' : 'Inactive',
-          startDate: formatDate(item.startdate),
-          verifiedByBCLAccManager: latestUpload.is_verified || false,
-          uploadStatus: latestUpload.upload_status ? 'Uploaded' : 'Not Uploaded',
-          uploadDate: formatDateTime(latestUpload.upload_date),
-          periodFrom: formatDate(latestUpload.docs_date_range),
-          periodTo: formatDate(latestUpload.docs_date_range_end),
-          verifyByBCL: latestUpload.is_verified || false,
-          pin: item.pin,
-          contactName: item.contact_name,
-          contactMobile: item.contact_mobile,
-          contactEmail: item.contact_email,
-          closingBalance: latestUpload.closing_balance || '',
-          closingBalanceVerify: latestUpload.balance_verification ? "true" : "false",
-          filePath: latestUpload.file_path || '',
-          currency: item.currency,
-          accountNumber: item.account_number,
+          [type === 'supplier' ? 'suppSeq' : 'bankSeq']: item.id,
+          [type === 'supplier' ? 'suppName' : 'bankName']: item.name,
+          [type === 'supplier' ? 'suppStatus' : 'bankStatus']: item.status ? 'Active' : 'Inactive',
+          [type === 'supplier' ? 'suppStartDate' : 'bankStartDate']: formatDate(item.startdate),
+          [type === 'supplier' ? 'verifiedByBCLAccManager' : 'verifiedByBCLAccManager']: latestUpload.is_verified || false,
+          [type === 'supplier' ? 'suppUploadStatus' : 'uploadStatus']: latestUpload.upload_status ? 'Uploaded' : 'Not Uploaded',
+          [type === 'supplier' ? 'suppUploadDate' : 'uploadDate']: formatDateTime(latestUpload.upload_date),
+          [type === 'supplier' ? 'supplierWefDate' : 'bankPeriodFrom']: formatDate(latestUpload.docs_date_range),
+          [type === 'supplier' ? 'supplierUntilDate' : 'bankPeriodTo']: formatDate(latestUpload.docs_date_range_end),
+          [type === 'supplier' ? 'verifyByBCL' : 'verifyByBCL']: latestUpload.is_verified || false,
+          [type === 'supplier' ? 'suppPIN' : 'accountNumber']: type === 'supplier' ? item.pin : item.account_number,
+          [type === 'supplier' ? 'suppContactName' : 'branchName']: type === 'supplier' ? item.contact_name : item.branch_name,
+          [type === 'supplier' ? 'suppContactMobile' : 'currency']: type === 'supplier' ? item.contact_mobile : item.currency,
+          [type === 'supplier' ? 'suppContactEmail' : 'bankContactEmail']: type === 'supplier' ? item.contact_email : '',
+          [type === 'supplier' ? 'closingBalance' : 'closingBalance']: latestUpload.closing_balance || '',
+          [type === 'supplier' ? 'closingBalanceVerify' : 'closingBalanceVerify']: latestUpload.balance_verification ? "true" : "false",
+          [type === 'supplier' ? 'suppFilePath' : 'bankFilePath']: latestUpload.file_path || '',
         };
       });
 
+      // [type === 'supplier' ? 'suppSeq' : 'bankSeq']: item.id,
+      //     [type === 'supplier' ? 'suppName' : 'bankName']: item.name,
+      //     [type === 'supplier' ? 'suppStatus' : 'bankStatus']: item.status ? 'Active' : 'Inactive',
+      //     [type === 'supplier' ? 'suppStartDate' : 'bankStartDate']: formatDate(item.startdate),
+      //     [type === 'supplier' ? 'suppVerifiedByBCLAccManager' : 'bankVerifiedByBCLAccManager']: latestUpload.is_verified || false,
+      //     [type === 'supplier' ? 'suppUploadStatus' : 'bankUploadStatus']: latestUpload.upload_status ? 'Uploaded' : 'Not Uploaded',
+      //     [type === 'supplier' ? 'suppUploadDate' : 'bankUploadDate']: formatDateTime(latestUpload.upload_date),
+      //     [type === 'supplier' ? 'suppPeriodFrom' : 'bankPeriodFrom']: formatDate(latestUpload.docs_date_range),
+      //     [type === 'supplier' ? 'suppPeriodTo' : 'bankPeriodTo']: formatDate(latestUpload.docs_date_range_end),
+      //     [type === 'supplier' ? 'suppVerifyByBCL' : 'bankVerifyByBCL']: latestUpload.is_verified || false,
+      //     [type === 'supplier' ? 'suppPIN' : 'accountNumber']: type === 'supplier' ? item.pin : item.account_number,
+      //     [type === 'supplier' ? 'suppContactName' : 'branchName']: type === 'supplier' ? item.contact_name : item.branch_name,
+      //     [type === 'supplier' ? 'suppContactMobile' : 'currency']: type === 'supplier' ? item.contact_mobile : item.currency,
+      //     [type === 'supplier' ? 'suppContactEmail' : 'bankContactEmail']: type === 'supplier' ? item.contact_email : '',
+      //     [type === 'supplier' ? 'suppClosingBalance' : 'bankClosingBalance']: latestUpload.closing_balance || '',
+      //     [type === 'supplier' ? 'suppClosingBalanceVerify' : 'bankClosingBalanceVerify']: latestUpload.balance_verification ? "true" : "false",
+      //     [type === 'supplier' ? 'suppFilePath' : 'bankFilePath']: latestUpload.file_path || '',
+      //   };
+      // });
+
       setData(transformedData);
-      console.log('Trans ',transformedData);
+      console.log('Transformed data:', transformedData);
     } catch (error) {
       console.error('Error fetching data:', error);
       // TODO: Add user-facing error message
@@ -147,6 +165,7 @@ export function CombinedMonthlyDocs({ type, selectedMonth, isCurrentMonth }: Com
       fetchData(selectedMonth);
     }
   }, [fetchData, isCurrentMonth, selectedMonth, type]);
+
 
   const columns = type === 'supplier' ? supplierColumns : bankColumns;
 
