@@ -1,5 +1,6 @@
-/* eslint-disable react-hooks/rules-of-hooks */
-//@ts-nocheck
+// @ts-nocheck
+//@ts-ignore
+"use client"
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,6 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, CalendarIcon, Info } from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as yup from 'yup';
-import { AllCompanies } from './page';
 import { useAuth } from '@clerk/clerk-react';
 import { format } from "date-fns"
 
@@ -41,6 +41,45 @@ const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+
+// Define the types for supplier and bank data
+export type SupplierData = {
+  id: string
+  name: string
+  status: string
+  startDate: string
+  verifiedByBCLAccManager: boolean
+  uploadStatus: string
+  uploadDate: string
+  periodFrom: string
+  periodTo: string
+  verifyByBCL: boolean
+  pin: string
+  contactName: string
+  contactMobile: string
+  contactEmail: string
+  closingBalance: string
+  closingBalanceVerify: string
+  filePath: string
+}
+
+export type BankData = {
+  id: string
+  name: string
+  status: string
+  startDate: string
+  verified: boolean
+  uploadStatus: string
+  uploadDate: string
+  periodFrom: string
+  periodTo: string
+  verifyByBCL: boolean
+  closingBalance: string
+  closingBalanceVerified: boolean
+  currency: string
+  accountNumber: string
+  branchName: string
+}
 
 interface DatePickerDemoProps {
   date: Date | undefined;
@@ -74,23 +113,23 @@ function DatePickerDemo({ date, onDateChange }: DatePickerDemoProps) {
   )
 }
 
-const UploadCell = React.memo(({ row, selectedMonth }) => {
+const schema = yup.object().shape({
+  periodFrom: yup.date().required("Period From is required"),
+  periodTo: yup.date()
+    .required("Period To is required")
+    .min(yup.ref('periodFrom'), "Period To must be later than Period From"),
+  closingBalance: yup.number().required("Closing Balance is required"),
+  file: yup.mixed().required("File is required")
+});
+
+const UploadCell = React.memo(({ row, selectedMonth, type }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(row.getValue("uploadStatus"));
   const [isLoading, setIsLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
-  const [supplierData, setSupplierData] = useState(null);
+  const [itemData, setItemData] = useState(null);
 
   const { userId } = useAuth();
-
-  const schema = yup.object().shape({
-    periodFrom: yup.date().required("Period From is required"),
-    periodTo: yup.date()
-      .required("Period To is required")
-      .min(yup.ref('periodFrom'), "Period To must be later than Period From"),
-    closingBalance: yup.number().required("Closing Balance is required"),
-    file: yup.mixed().required("File is required")
-  });
 
   const form = useForm({
     defaultValues: {
@@ -116,30 +155,70 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
       // End date: last day of the previous month
       const endDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0);
   
-      console.log('start date ', startDate);
-      console.log('end  date ', endDate);
+      // console.log('start date ', startDate);
+      // console.log('end  date ', endDate);
       // Set form values
       form.setValue('periodFrom', startDate);
       form.setValue('periodTo', endDate);
     }
   }, [selectedMonth, form]);
-  
 
-  useEffect(() => {
-    if (row.original) {
-      setSupplierData({
-        suppSeq: row.original.suppSeq,
-        suppName: row.original.suppName,
-        CompanyId: row.original.CompanyId
-      });
+useEffect(() => {
+  const fetchData = async () => {
+    if (!userId || !selectedMonth || !row.original.id) return;
+
+    const [monthName, year] = selectedMonth.split(' ');
+    const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth();
+    const startDate = new Date(parseInt(year), monthNumber, 1);
+    const endDate = new Date(parseInt(year), monthNumber + 1, 0);
+
+    try {
+      // Fetch item data
+      const { data: itemData, error: itemError } = await supabase
+        .from(type === 'supplier' ? 'acc_portal_suppliers' : 'acc_portal_banks')
+        .select('*' )
+        .eq('id', row.original.id)
+        .single();
+
+      if (itemError) throw itemError;
+
+      setItemData(itemData);
+
+      // Fetch upload status
+      const { data: uploadData, error: uploadError } = await supabase
+        .from('acc_portal_monthly_files_upload')
+        .select('*')
+        .eq('document_type', type === 'supplier' ? 'supplier statement' : 'bank statement')
+        .eq('userid', userId)
+        .eq(type === 'supplier' ? 'supplier_id' : 'bank_id', row.original.id)
+        .gte('docs_date_range', startDate.toISOString())
+        .lte('docs_date_range_end', endDate.toISOString())
+        .order('upload_date', { ascending: false })
+        .limit(1);
+
+      if (uploadError) throw uploadError;
+
+      if (uploadData && uploadData.length > 0) {
+        setUploadStatus(uploadData[0].upload_status);
+        row.original.filePath = uploadData[0].file_path;
+      } else {
+        setUploadStatus('Not Uploaded');
+        row.original.filePath = null;
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setUploadStatus('Error');
     }
-  }, [row.original]);
+  };
+
+  fetchData();
+}, [userId, selectedMonth, row.original.id, type]);
+
 
   useEffect(() => {
-    if (supplierData && userId && selectedMonth) {
+    if (itemData && userId && selectedMonth && itemData.id) {
       const fetchUploadStatus = async () => {
         try {
-
           const [monthName, year] = selectedMonth.split(' ');
           const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth();
 
@@ -151,11 +230,11 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
           const { data, error } = await supabase
             .from('acc_portal_monthly_files_upload')
             .select('*')     
-            .eq('document_type', 'supplier statement')
+            .eq('document_type', type === 'supplier' ? 'supplier statement' : 'bank statement')
             .eq('userid', userId)
-            .eq('supplier_id', supplierData.suppSeq)
-            .lte('docs_date_range', endDate.toISOString())
-            .gte('docs_date_range_end', startDate.toISOString())
+            .eq(type === 'supplier' ? 'supplier_id' : 'bank_id', itemData.id)
+            // .lte('docs_date_range', endDate.toISOString())
+            // .gte('docs_date_range_end', startDate.toISOString())
             .order('upload_date', { ascending: false });
 
           if (error) {
@@ -179,14 +258,14 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
 
       fetchUploadStatus();
     }
-  }, [supplierData, userId, selectedMonth, row]);
+  }, [itemData, userId, selectedMonth, row, type]);
 
   const handleButtonClick = useCallback(async () => {
     if (uploadStatus === 'Uploaded' && row.original.filePath) {
       setIsLoading(true);
       try {
         const { data, error } = await supabase.storage
-          .from('Accounting-Portal')
+          .from(type === 'supplier' ? 'Accounting-Portal' : 'Bank-Statements')
           .createSignedUrl(row.original.filePath, 60);
 
         if (error) throw error;
@@ -202,31 +281,31 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
     } else {
       setIsDialogOpen(true);
     }
-  }, [uploadStatus, row.original.filePath]);
+  }, [uploadStatus, row.original.filePath, type]);
 
   const onSubmit = useCallback(async (data) => {
     setIsLoading(true);
     try {
-      console.log('onSubmit - supplierData:', supplierData);
+      console.log('onSubmit - itemData:', itemData);
       console.log('onSubmit - selectedMonth:', selectedMonth);
 
-      if (!supplierData || !supplierData.suppSeq) {
-        throw new Error('Supplier data is not available. Please try again.');
+      if (!itemData || !itemData.id) {
+        throw new Error(`${type.charAt(0).toUpperCase() + type.slice(1)} data is not available. Please try again.`);
       }
 
       if (!selectedMonth) {
         throw new Error('Selected month is not available. Please try again.');
       }
 
-      console.log('Submitting for supplier:', supplierData);
+      console.log(`Submitting for ${type}:`, itemData);
 
       const file = data.file[0];
       const [monthName, year] = selectedMonth.split(' ');
 
-      const filePath = `Monthly-Documents/suppliers/${year}/${monthName}/${supplierData.suppName}/${file.name}`;
+      const filePath = `Monthly-Documents/${type}s/${year}/${monthName}/${itemData.name}/${file.name}`;
 
       const { error: storageError } = await supabase.storage
-        .from('Accounting-Portal')
+        .from(type === 'supplier' ? 'Accounting-Portal' : 'Bank-Statements')
         .upload(filePath, file);
 
       if (storageError) throw new Error(`Error uploading file: ${storageError.message}`);
@@ -234,8 +313,8 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
       const { error: insertError } = await supabase
         .from('acc_portal_monthly_files_upload')
         .insert({
-          supplier_id: supplierData.suppSeq,
-          document_type: 'supplier statement',
+          [type === 'supplier' ? 'supplier_id' : 'bank_id']: itemData.id,
+          document_type: type === 'supplier' ? 'supplier statement' : 'bank statement',
           upload_date: new Date().toISOString(),
           docs_date_range: data.periodFrom,
           docs_date_range_end: data.periodTo,
@@ -258,7 +337,7 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [supplierData, selectedMonth, userId, row.original]);
+  }, [itemData, selectedMonth, userId, row.original, type]);
 
   return (
     <div className="text-center">
@@ -274,7 +353,7 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              {uploadStatus === 'Uploaded' ? 'File Preview' : `Upload Document for ${supplierData?.suppName || 'Supplier'}`}
+              {uploadStatus === 'Uploaded' ? 'File Preview' : `Upload Document for ${itemData?.name || type}`}
             </DialogTitle>
             <DialogDescription>
               {uploadStatus === 'Uploaded'
@@ -368,35 +447,35 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
 
 UploadCell.displayName = 'UploadCell';
 
-export const supplierColumns: ColumnDef<AllCompanies>[] = [
+const createCommonColumns = (type: 'supplier' | 'bank') => [
   {
-    accessorKey: "suppSeq",
+    accessorKey: type === 'supplier' ? "suppSeq" : "bankSeq",
     header: ({ column }) => (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Supp Seq
+        {type === 'supplier' ? 'Supp Seq' : 'Bank Acc Seq'}
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div className="text-center">SUP-{row.getValue("suppSeq")}</div>,
+    cell: ({ row }) => <div className="text-center">{type === 'supplier' ? 'SUP' : 'BA'}-{row.getValue(type === 'supplier' ? "suppSeq" : "bankSeq")}</div>,
   },
   {
-    accessorKey: "suppName",
+    accessorKey: type === 'supplier' ? "suppName" : "bankName",
     header: ({ column }) => (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Supp Name
+        {type === 'supplier' ? 'Supp Name' : 'Bank Name'}
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div className="whitespace-nowrap">{row.getValue("suppName")}</div>,
+    cell: ({ row }) => <div className="whitespace-nowrap">{row.getValue(type === 'supplier' ? "suppName" : "bankName")}</div>,
   },
   {
-    accessorKey: "suppStatus",
+    accessorKey: type === 'supplier' ? "suppStatus" : "bankStatus",
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -407,13 +486,13 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
       </Button>
     ),
     cell: ({ row }) => {
-      const status = row.getValue("suppStatus");
+      const status = row.getValue(type === 'supplier' ? "suppStatus" : "bankStatus");
       const statusClass = status === 'Active' ? 'text-green-500' : 'text-red-500';
       return <div className={`text-center font-medium ${statusClass}`}>{status}</div>;
     },
   },
   {
-    accessorKey: "suppStartDate",
+    accessorKey: type === 'supplier' ? "suppStartDate" : "startDate",
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -423,23 +502,10 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div className="text-center">{row.getValue("suppStartDate")}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue(type === 'supplier' ? "suppStartDate" : "startDate")}</div>,
   },
   {
-    accessorKey: "suppEndDate",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        End date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => <div className="text-center">{row.getValue("suppEndDate")}</div>,
-  },
-  {
-    accessorKey: "verifiedByBCLAccManager",
+    accessorKey: type === 'supplier' ? "verifiedByBCLAccManager" : "verified",
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -449,7 +515,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div className="text-center">{row.getValue("verifiedByBCLAccManager") ? "✅" : "❌"}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue(type === 'supplier' ? "verifiedByBCLAccManager" : "verified") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "uploadStatus",
@@ -461,7 +527,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         Upload
       </Button>
     ),
-    cell: ({ row, table }) => <UploadCell row={row} selectedMonth={table.options.meta?.selectedMonth} />,
+    cell: ({ row, table }) => <UploadCell row={row} selectedMonth={table.options.meta?.selectedMonth} type={type} />,
   },
   {
     accessorKey: "uploadDate",
@@ -478,20 +544,20 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
     cell: ({ row }) => <div className="text-center">{row.getValue("uploadDate") || 'N/A'}</div>,
   },
   {
-    accessorKey: "supplierWefDate",
+    accessorKey: type === 'supplier' ? "supplierWefDate" : "periodFrom",
     header: ({ column }) => (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Period From (SWEF Date)
+        Period From
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div className="text-center">{row.getValue("supplierWefDate") || 'N/A'}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue(type === 'supplier' ? "supplierWefDate" : "periodFrom") || 'N/A'}</div>,
   },
   {
-    accessorKey: "supplierUntilDate",
+    accessorKey: type === 'supplier' ? "supplierUntilDate" : "periodTo",
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -501,7 +567,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div className="text-center">{row.getValue("supplierUntilDate") || 'N/A'}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue(type === 'supplier' ? "supplierUntilDate" : "periodTo") || 'N/A'}</div>,
   },
   {
     accessorKey: "verifyByBCL",
@@ -530,7 +596,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
     cell: ({ row }) => <div className="text-center">{row.getValue("closingBalance") || 'N/A'}</div>,
   },
   {
-    accessorKey: "closingBalanceVerify",
+    accessorKey: type === 'supplier' ? "closingBalanceVerify" : "closingBalanceVerified",
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -540,8 +606,12 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div className="text-center">{row.getValue("closingBalanceVerify") === "true" ? "✅" : "❌"}</div>,
+    cell: ({ row }) => <div className="text-center">{row.getValue(type === 'supplier' ? "closingBalanceVerify" : "closingBalanceVerified") === true ? "✅" : "❌"}</div>,
   },
+];
+
+export const supplierColumns: ColumnDef<AllCompanies>[] = [
+  ...createCommonColumns('supplier'),
   {
     id: "profile",
     header: "Profile",
@@ -557,7 +627,7 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{supplier.name} Profile</DialogTitle>
+              <DialogTitle>{supplier.suppName} Profile</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
@@ -592,5 +662,77 @@ export const supplierColumns: ColumnDef<AllCompanies>[] = [
   },
 ];
 
-export default supplierColumns;
+export const bankColumns: ColumnDef<AllBanks>[] = [
+  ...createCommonColumns('bank'),
+  {
+    accessorKey: "currency",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Currency
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div className="text-center">{row.getValue("currency")}</div>,
+  },
+  {
+    accessorKey: "accountNumber",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Account Number
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div className="text-center">{row.getValue("accountNumber")}</div>,
+  },
+  {
+    id: "profile",
+    header: "Profile",
+    cell: ({ row }) => {
+      const bank = row.original;
+      return (
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open profile</span>
+              <Info className="h-4 w-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{bank.bankName} Profile</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Account Number:</span>
+                <span className="col-span-3">{bank.accountNumber}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Currency:</span>
+                <span className="col-span-3">{bank.currency}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Branch Name:</span>
+                <span className="col-span-3">{bank.branchName}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Start Date:</span>
+                <span className="col-span-3">{bank.startDate}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-bold">Status:</span>
+                <span className="col-span-3">{bank.bankStatus}</span>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      );
+    },
+  },
+];
 

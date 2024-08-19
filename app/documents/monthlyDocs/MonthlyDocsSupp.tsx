@@ -74,49 +74,53 @@ interface MonthlyDocsClientProps {
       try {
         setIsLoading(true);
         console.log('Fetching data for month:', month || 'Current Month');
-  
+    
         let supplierQuery = supabase
           .from('acc_portal_suppliers')
           .select('*')
           .eq('userid', userId)
           .order('id', { ascending: true });
-  
+    
         let uploadQuery = supabase
           .from('acc_portal_monthly_files_upload')
           .select('*')
-          .eq('userid', userId);
-  
+          .eq('userid', userId)
+          .eq('document_type', 'supplier statement');
+    
         let startDate, endDate;
-  
+    
         if (month) {
           const [monthName, year] = month.split(' ');
-          const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth() + 1;
+          const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth();
           
-          startDate = `${year}-${monthNumber.toString().padStart(2, '0')}-01`;
-          endDate = new Date(parseInt(year), monthNumber, 0).toISOString().split('T')[0];
+          startDate = new Date(parseInt(year), monthNumber, 1);
+          endDate = new Date(parseInt(year), monthNumber + 1, 0);
         } else {
           const now = new Date();
-          const currentYear = now.getFullYear();
-          const currentMonth = now.getMonth() + 1;
-          startDate = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-01`;
-          endDate = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         }
         
-        console.log('Date range:', startDate, 'to', endDate);
+        const extendedStartDate = new Date(startDate);
+        extendedStartDate.setDate(extendedStartDate.getDate() - 2);
+        const extendedEndDate = new Date(endDate);
+        extendedEndDate.setDate(extendedEndDate.getDate() + 2);
+    
+        console.log('Extended Date range:', extendedStartDate.toISOString(), 'to', extendedEndDate.toISOString());
         
         uploadQuery = uploadQuery
-          .gte('upload_date', startDate)
-          .lte('upload_date', endDate);
-  
+          .gte('upload_date', extendedStartDate.toISOString())
+          .lte('upload_date', extendedEndDate.toISOString());
+    
         const [{ data: supplierData, error: supplierError }, { data: uploadData, error: uploadError }] = await Promise.all([
           supplierQuery,
           uploadQuery
         ]);
-  
+    
         if (supplierError) throw new Error(`Error fetching supplier data: ${supplierError.message}`);
         if (uploadError) throw new Error(`Error fetching upload data: ${uploadError.message}`);
-  
-        const uploadMap = new Map(uploadData.map(item => [item.supplier_id, item]));
+    
+        const uploadMap = new Map(uploadData.map(item => [item.supplier_id, item]));    
   
         const transformedData: AllCompanies[] = supplierData.map(supplier => {
           const latestUpload = uploadMap.get(supplier.id) || {};
@@ -154,7 +158,7 @@ interface MonthlyDocsClientProps {
     useEffect(() => {
       console.log('MonthlyDocsClient - Selected Month:', selectedMonth);
       console.log('MonthlyDocsClient - Is Current Month:', isCurrentMonth);
-  
+    
       if (isCurrentMonth) {
         const currentDate = new Date();
         const currentMonthDisplay = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });

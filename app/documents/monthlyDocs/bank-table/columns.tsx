@@ -1,8 +1,7 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 //@ts-nocheck
 
-"use client";
-
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,21 +19,59 @@ import {
   FormLabel,
   FormMessage
 } from "@/components/ui/form";
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input";
+import { yupResolver } from '@hookform/resolvers/yup';
 import { createClient } from '@supabase/supabase-js';
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Info } from "lucide-react";
-import React, { useCallback, useEffect, useState } from 'react';
+import { ArrowUpDown, CalendarIcon, Info } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { AllBanks } from './page';
-import { useAuth } from "@clerk/clerk-react";
+import { AllCompanies } from './page';
+import { useAuth } from '@clerk/clerk-react';
+import { format } from "date-fns"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
+const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+interface DatePickerDemoProps {
+  date: Date | undefined;
+  onDateChange: (date: Date | undefined) => void;
+}
+
+function DatePickerDemo({ date, onDateChange }: DatePickerDemoProps) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant={"outline"}
+          className={cn(
+            "w-[280px] justify-start text-left font-normal",
+            !date && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {date ? format(date, "PPP") : <span>Pick a date</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0">
+        <Calendar
+          mode="single"
+          selected={date}
+          onSelect={onDateChange}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 const schema = yup.object().shape({
   periodFrom: yup.date().required('Period From is required'),
@@ -78,17 +115,28 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
   useEffect(() => {
     if (selectedMonth) {
       const [monthName, year] = selectedMonth.split(' ');
-      const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
-      const startDate = new Date(parseInt(year), monthIndex, 1);
-      const endDate = new Date(parseInt(year), monthIndex + 1, 0);
-
-      form.setValue('periodFrom', startDate.toISOString().split('T')[0]);
-      form.setValue('periodTo', endDate.toISOString().split('T')[0]);
+      const currentDate = new Date(`${monthName} 1, ${year}`);
+      
+      // Calculate the previous month
+      const previousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      
+      // Start date: first day of the previous month
+      const startDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 1);
+      
+      // End date: last day of the previous month
+      const endDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0);
+  
+      console.log('start date ', startDate);
+      console.log('end  date ', endDate);
+      // Set form values
+      form.setValue('periodFrom', startDate);
+      form.setValue('periodTo', endDate);
     }
   }, [selectedMonth, form]);
 
   useEffect(() => {
     if (row.original) {
+      // console.log('Setting bankData:', row.original);
       setBankData({
         bankSeq: row.original.bankSeq,
         bankName: row.original.bankName
@@ -97,44 +145,61 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
   }, [row.original]);
 
   useEffect(() => {
-    if (bankData && userId && selectedMonth) {
-      const fetchUploadStatus = async () => {
-        try {
-          const [monthName, year] = selectedMonth.split(' ');
-          const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth() + 1;
-          const startDate = `${year}-${monthNumber.toString().padStart(2, '0')}-01`;
-          const endDate = new Date(parseInt(year), monthNumber, 0).toISOString().split('T')[0];
-
-          const { data, error } = await supabase
-            .from('acc_portal_monthly_files_upload')
-            .select('upload_status, file_path')
-            .eq('bank_id', bankData.bankSeq)
-            .eq('document_type', 'bank statement')
-            .eq('userid', userId)
-            .gte('upload_date', startDate)
-            .lte('upload_date', endDate)
-            .order('upload_date', { ascending: false })
-            .limit(1);
+    if (!bankData) {
+      console.error('Bank data is not available');
+      setUploadStatus('Error: No bank data');
+      return;
+    }
   
-          if (error) {
-            throw error;
-          }
+    if (!userId) {
+      console.error('User ID is not available');
+      setUploadStatus('Error: No user ID');
+      return;
+    }
   
-          if (data && data.length > 0) {
-            setUploadStatus(data[0].upload_status);
-            row.original.filePath = data[0].file_path;
-          } else {
-            setUploadStatus('Not Uploaded');
-            row.original.filePath = null;
-          }
-        } catch (error) {
-          console.error('Error fetching upload status:', error);
+    if (!selectedMonth) {
+      console.error('Selected month is not available');
+      setUploadStatus('Error: No month selected');
+      return;
+    }
+  
+    const fetchUploadStatus = async () => {
+      try {
+        const [monthName, year] = selectedMonth.split(' ');
+        const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth() + 1;
+        const startDate = `${year}-${monthNumber.toString().padStart(2, '0')}-01`;
+        const endDate = new Date(parseInt(year), monthNumber, 0);
+  
+        console.log('Fetching upload status for:', {
+          bankId: bankData.bankSeq,
+          userId,
+          startDate,
+          endDate: endDate.toISOString()
+        });
+  
+        const { data, error } = await supabase
+          .from('acc_portal_monthly_files_upload')
+          .select('*')
+          .eq('bank_id', bankData.bankSeq)
+          .eq('document_type', 'bank statement')
+          .eq('userid', userId)
+          .order('upload_date', { ascending: false })
+          .limit(1);
+  
+        if (error) throw error;
+  
+        if (data && data.length > 0) {
+          setUploadStatus(data[0].upload_status);
+        } else {
           setUploadStatus('Not Uploaded');
         }
-      };
+      } catch (error) {
+        console.error('Error fetching upload status:', error);
+        setUploadStatus('Error: Failed to fetch');
+      }
+    };
   
-      fetchUploadStatus();
-    }
+    fetchUploadStatus();
   }, [bankData, userId, selectedMonth, row]);
 
   const handleButtonClick = useCallback(async () => {
@@ -175,7 +240,7 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
       }3
 
       const file = data.file[0];
-      const [monthName, year] = ss3.split(' ');
+      const [monthName, year] = selectedMonth.split(' ');
 
       const filePath = `Accounting-Portal/banks/${year}/${monthName}/${bankData.bankName}/${file.name}`;
 
@@ -253,7 +318,10 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
                       <FormItem>
                         <FormLabel>Period From</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                        <DatePickerDemo
+                            date={field.value}
+                            onDateChange={(date) => field.onChange(date)}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -266,7 +334,10 @@ const UploadCell = React.memo(({ row, selectedMonth }) => {
                       <FormItem>
                         <FormLabel>Period To</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                        <DatePickerDemo
+                            date={field.value}
+                            onDateChange={(date) => field.onChange(date)}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

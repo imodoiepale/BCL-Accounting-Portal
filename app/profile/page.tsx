@@ -213,7 +213,7 @@ export default function Profile() {
       <h1 className="text-xl font-bold mb-4">Company Profile</h1>
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value)}>
         <TabsList>
-          <TabsTrigger value="company-info">Company Info</TabsTrigger>
+          <TabsTrigger value="company-info">Information</TabsTrigger>
           <TabsTrigger value="kyc-docs">KYC Documents</TabsTrigger>
         </TabsList>
         <TabsContent value="company-info" className="px2">
@@ -235,7 +235,8 @@ export default function Profile() {
               </div>
             </TabsContent>
             <TabsContent value="directors-info">
-              <div className="space-y-4">
+              <DirectorsList />
+              {/* <div className="space-y-4">
                 <Tabs defaultValue="director-info">
                   <TabsList>
                     <TabsTrigger value="director-info">Directors' Information</TabsTrigger>
@@ -254,7 +255,7 @@ export default function Profile() {
                     </div>
                   </TabsContent>
                 </Tabs>
-              </div>
+              </div> */}
             </TabsContent>
             <TabsContent value="employee-info">
               <div className="space-y-4">
@@ -370,7 +371,8 @@ export default function Profile() {
               </div>
             </TabsContent>
             <TabsContent value="directors-info">
-              <div className="space-y-4">
+                <DirectorsDocumentsList />
+              {/* <div className="space-y-4">
                 <Tabs defaultValue="director-info">
                   <TabsList>
                     <TabsTrigger value="director-info">Directors' Documents</TabsTrigger>
@@ -389,7 +391,7 @@ export default function Profile() {
                     </div>
                   </TabsContent>
                 </Tabs>
-              </div>
+              </div> */}
             </TabsContent>
             <TabsContent value="employee-info">
               <div className="space-y-4">
