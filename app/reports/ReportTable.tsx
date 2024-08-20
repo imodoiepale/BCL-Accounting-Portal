@@ -55,8 +55,8 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 interface DataRow {
   id: string;
   name: string;
-  email: string;
-  phoneNumber: string;
+  email?: string;
+  phoneNumber?: string;
   startDate: string;
   months: {
     upload_status: string;
@@ -79,7 +79,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
   const [rowSelection, setRowSelection] = useState({});
   const [fromDate, setFromDate] = useState<Date>(new Date("2024-01-01"));
   const [toDate, setToDate] = useState<Date>(new Date("2024-12-31"));
-  const [selectedSupplier, setSelectedSupplier] = useState<DataRow | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<DataRow | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<{ month: number, year: number } | null>(null);
   const [emailSending, setEmailSending] = useState(false);
@@ -122,10 +122,10 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
     return null;
   };
 
-  const getMissingDocuments = (supplier: DataRow) => {
-    const startDate = parseDate(supplier.startDate);
+  const getMissingDocuments = (entity: DataRow) => {
+    const startDate = parseDate(entity.startDate);
     if (!startDate) {
-      console.error(`Invalid start date for supplier ${supplier.name}: ${supplier.startDate}`);
+      console.error(`Invalid start date for ${entity.name}: ${entity.startDate}`);
       return [];
     }
     const currentDate = new Date();
@@ -134,7 +134,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
     for (let d = new Date(startDate); d <= currentDate; d.setMonth(d.getMonth() + 1)) {
       const month = d.getMonth();
       const year = d.getFullYear();
-      if (!supplier.months[month] || supplier.months[month].upload_status !== 'uploaded') {
+      if (!entity.months[month] || entity.months[month].upload_status !== 'uploaded') {
         missingDocs.push({ month, year });
       }
     }
@@ -154,9 +154,9 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
     window.open(`https://wa.me/${phoneNumber}?text=${message}`, '_blank');
   };
 
-  const sendEmailRequest = async (supplier: DataRow) => {
+  const sendEmailRequest = async (entity: DataRow) => {
     setEmailSending(true);
-    const missingDocs = getMissingDocuments(supplier);
+    const missingDocs = getMissingDocuments(entity);
     const missingDocsText = missingDocs.map(doc => `${MONTHS[doc.month]} ${doc.year}`).join(', ');
     
     const username = user?.username || 'User';
@@ -164,9 +164,9 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
   
     try {
       const emailData = {
-        to: supplier.email,
-        subject: `Missing Documents Request for ${supplier.name}`,
-        html: `<p>Dear ${supplier.name},</p><p>We noticed that you have missing documents for the following months:</p> ${missingDocsText}.</p><p>Please upload these documents as soon as possible.</p>
+        to: entity.email,
+        subject: `Missing Documents Request for ${entity.name}`,
+        html: `<p>Dear ${entity.name},</p><p>We noticed that you have missing documents for the following months:</p> ${missingDocsText}.</p><p>Please upload these documents as soon as possible.</p>
         <p>Best regards,<br>${username}<br></p>`,
         fromName: username,
         fromEmail: userEmail,
@@ -200,7 +200,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
     e.preventDefault();
     setIsUploading(true);
 
-    if (!selectedSupplier || !selectedMonth || !uploadFile) {
+    if (!selectedEntity || !selectedMonth || !uploadFile) {
         toast.error("Missing required information");
         setIsUploading(false);
         return;
@@ -212,23 +212,24 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
 
     const uploadPromise = new Promise(async (resolve, reject) => {
         try {
-            console.log('Selected supplier:', selectedSupplier);
+            console.log('Selected entity:', selectedEntity);
 
-            // Extract numeric part of supplier ID
-            const supplierIdMatch = selectedSupplier.id.match(/\d+/);
-            if (!supplierIdMatch) {
-                throw new Error('Invalid supplier ID: ' + selectedSupplier.id);
+            // Extract numeric part of entity ID
+            const entityIdMatch = selectedEntity.id.match(/\d+/);
+            if (!entityIdMatch) {
+                throw new Error('Invalid entity ID: ' + selectedEntity.id);
             }
-            const supplierId = parseInt(supplierIdMatch[0]);
-            console.log('Parsed supplier ID:', supplierId);
+            const entityId = parseInt(entityIdMatch[0]);
+            console.log('Parsed entity ID:', entityId);
 
-            if (isNaN(supplierId)) {
-                throw new Error('Invalid supplier ID: ' + selectedSupplier.id);
+            if (isNaN(entityId)) {
+                throw new Error('Invalid entity ID: ' + selectedEntity.id);
             }
 
             const year = selectedMonth.year.toString();
             const monthName = MONTHS[selectedMonth.month];
-            const directoryPath = `Monthly-Documents/suppliers/${year}/${monthName}/${selectedSupplier.name}/`;
+            const isSupplier = selectedEntity.id.startsWith('S-');
+            const directoryPath = `Monthly-Documents/${isSupplier ? 'suppliers' : 'banks'}/${year}/${monthName}/${selectedEntity.name}/`;
 
             const bucketName = 'Accounting-Portal';
             const filePath = `${directoryPath}${uploadFile.name}`;
@@ -262,8 +263,8 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
             const tableName = 'acc_portal_monthly_files_upload';
 
             const insertData = {
-                supplier_id: supplierId,
-                document_type: 'supplier statement',
+                [isSupplier ? 'supplier_id' : 'bank_id']: entityId,
+                document_type: isSupplier ? 'supplier statement' : 'bank statement',
                 upload_date: new Date().toISOString(),
                 is_verified: false,
                 docs_date_range: startDate.toISOString().split('T')[0],
@@ -306,8 +307,6 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         setIsUploading(false);
     });
 };
-
-
 
   const columns: ColumnDef<DataRow>[] = useMemo(() => [
     {
@@ -369,22 +368,8 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
       ),
       cell: ({ row }) => <div className="text-center">{row.getValue("startDate")}</div>,
     },
-    {
-      accessorKey: "endDate",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="text-wrap"
-        >
-          End Date
-          <ArrowUpDown className="h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => <div className="text-center">{row.getValue("endDate")}</div>,
-    },
     ...visibleMonths.map((monthData, index) => ({
-      id: `${monthData.month}-${monthData.year}`,
+      id: `${monthData.year}`,
       accessorKey: `months.${index}`,
       header: ({ column }) => (
         <Button
@@ -475,264 +460,268 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         );
       },
     })),
-      {
-        accessorKey: "missingDocs",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="text-wrap"
-          >
-            Missing Docs
-            <ArrowUpDown className="h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => {
-          const supplier = row.original;
-          return (
-            <div className="text-center">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" className="h-8 w-8 p-0">
-                    <span className="sr-only">Open missing documents</span>
-                    <PlusCircle className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold">{supplier.email} | {supplier.name} - Missing Documents</DialogTitle>
-                  </DialogHeader>
-                  <div className="mt-6">
-                    <h3 className="text-xl font-semibold mb-4">Missing Monthly Documents</h3>
-                    <ScrollArea className="h-[300px] rounded-md border p-4">
-                      <ul className="grid grid-cols-2 gap-4">
-                      {getMissingDocuments(supplier).map((doc) => (
-                          <li key={`${doc.month}-${doc.year}`} className="flex justify-between items-center bg-gray-100 p-3 rounded-lg">
-                            <span className="font-medium">{MONTHS[doc.month]} {doc.year}</span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedSupplier(supplier);
-                                setSelectedMonth({ month: doc.month, year: doc.year });
-                                setUploadDialogOpen(true);
-                              }}
-                              className="transition-colors hover:bg-primary hover:text-primary-foreground"
-                            >
-                              <Upload className="h-4 w-4 mr-2" />
-                              Upload
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    </ScrollArea>
-                  </div>
+    {
+      accessorKey: "missingDocs",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="text-wrap"
+        >
+          Missing Docs
+          <ArrowUpDown className="h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const entity = row.original;
+        return (
+          <div className="text-center">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open missing documents</span>
+                  <PlusCircle className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold">{entity.name} - Missing Documents</DialogTitle>
+                </DialogHeader>
+                <div className="mt-6">
+                  <h3 className="text-xl font-semibold mb-4">Missing Monthly Documents</h3>
+                  <ScrollArea className="h-[300px] rounded-md border p-4">
+                    <ul className="grid grid-cols-2 gap-4">
+                    {getMissingDocuments(entity).map((doc) => (
+                        <li key={`${doc.month}-${doc.year}`} className="flex justify-between items-center bg-gray-100 p-3 rounded-lg">
+                          <span className="font-medium">{MONTHS[doc.month]} {doc.year}</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedEntity(entity);
+                              setSelectedMonth({ month: doc.month, year: doc.year });
+                              setUploadDialogOpen(true);
+                            }}
+                            className="transition-colors hover:bg-primary hover:text-primary-foreground"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
+                </div>
+                {entity.email && (
                   <div className="mt-6 flex justify-between items-center">
                     <Button
-                      onClick={() => sendEmailRequest(supplier)}
+                      onClick={() => sendEmailRequest(entity)}
                       className="flex-1 mr-2"
                       disabled={emailSending}
                     >
                       <Mail className="h-4 w-4 mr-2" />
                       {emailSending ? 'Sending...' : 'Request via Email'}
                     </Button>
-                    <Button
-                      onClick={() => sendWhatsAppMessage(supplier.phoneNumber)}
-                      className="flex-1 ml-2 bg-green-500 hover:bg-green-600"
-                    >
-                      <Phone className="h-4 w-4 mr-2" />
-                      Request via WhatsApp
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          );
-        }
-      },
-    ], [visibleMonths, currentMonthIndex, currentYear, emailSending, sendEmailRequest, sendWhatsAppMessage]);
-
-    const table = useReactTable({
-        data,
-        columns,
-        onSortingChange: setSorting,
-        onColumnFiltersChange: setColumnFilters,
-        getCoreRowModel: getCoreRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
-        getSortedRowModel: getSortedRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
-        onRowSelectionChange: setRowSelection,
-        state: {
-          sorting,
-          columnFilters,
-          rowSelection,
-        },
-      });
-    
-      return (
-        <div className="w-[2000px]">
-          <Toaster position="top-right" />
-          <div className="flex items-start py-4">
-            <div className="flex gap-4 items-center flex-grow">
-              <DateRangePicker
-                onUpdate={({ range }) => {
-                  if (range.from && range.to) {
-                    setFromDate(range.from);
-                    setToDate(range.to);
-                  }
-                }}
-                initialDateFrom={fromDate}
-                initialDateTo={toDate}
-                align="start"
-                locale="en-GB"
-                showCompare={false}
-              />
-            </div>
-            <div className="w-[250px] px-4">
-              <Input
-                placeholder="Filter names..."
-                value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-                onChange={(event) =>
-                  table.getColumn("name")?.setFilterValue(event.target.value)
-                }
-                className="max-w-sm"
-              />
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="ml-auto">
-                  Columns <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => {
-                    const isMonthColumn = column.id.includes('-');
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) =>
-                          column.toggleVisibility(!!value)
-                        }
+                    {entity.phoneNumber && (
+                      <Button
+                        onClick={() => sendWhatsAppMessage(entity.phoneNumber)}
+                        className="flex-1 ml-2 bg-green-500 hover:bg-green-600"
                       >
-                        {isMonthColumn ? column.id : column.id.replace(/([A-Z])/g, ' $1').trim()}
-                      </DropdownMenuCheckboxItem>
-                    )
-                  })}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                        <Phone className="h-4 w-4 mr-2" />
+                        Request via WhatsApp
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </div>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
-        </div>
-        <div className="space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+        );
+      }
+    },
+  ], [visibleMonths, currentMonthIndex, currentYear, emailSending, sendEmailRequest, sendWhatsAppMessage]);
 
-      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Upload Document for {selectedMonth ? `${MONTHS[selectedMonth.month]} ${selectedMonth.year}` : ''}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={uploadDocument}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="startDate">Start Date:</label>
-                <Input id="startDate" value={selectedMonth ? `${selectedMonth.year}-${String(selectedMonth.month + 1).padStart(2, '0')}-01` : ''} readOnly className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="endDate">End Date:</label>
-                <Input id="endDate" value={selectedMonth ? new Date(selectedMonth.year, selectedMonth.month + 1, 0).toISOString().split('T')[0] : ''} readOnly className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="closingBalance">Closing Balance:</label>
-                <Input id="closingBalance" type="number" className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="document">Document:</label>
-                <Input 
-                  id="document" 
-                  type="file" 
-                  className="col-span-3" 
-                  onChange={handleFileChange}
-                  required 
-                />
-              </div>
-            </div>
-            <div className="flex justify-end mt-4">
-              <Button type="submit" disabled={isUploading}>
-                {isUploading ? 'Uploading...' : 'Submit'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+  const table = useReactTable({
+    data,
+    columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onRowSelectionChange: setRowSelection,
+    state: {
+      sorting,
+      columnFilters,
+      rowSelection,
+    },
+  });
+
+  return (
+    <div className="w-[2000px]">
+      <Toaster position="top-right" />
+      <div className="flex items-start py-4">
+        <div className="flex gap-4 items-center flex-grow">
+          <DateRangePicker
+            onUpdate={({ range }) => {
+              if (range.from && range.to) {
+                setFromDate(range.from);
+                setToDate(range.to);
+              }
+            }}
+            initialDateFrom={fromDate}
+            initialDateTo={toDate}
+            align="start"
+            locale="en-GB"
+            showCompare={false}
+          />
+        </div>
+        <div className="w-[250px] px-4">
+          <Input
+            placeholder="Filter names..."
+            value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("name")?.setFilterValue(event.target.value)
+            }
+            className="max-w-sm"
+          />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              Columns <ChevronDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => {
+                const isMonthColumn = column.id.includes('-');
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {isMonthColumn ? column.id : column.id.replace(/([A-Z])/g, ' $1').trim()}
+                  </DropdownMenuCheckboxItem>
+                )
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))
+        ) : (
+          <TableRow>
+            <TableCell colSpan={columns.length} className="h-24 text-center">
+              No results.
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+  </div>
+  <div className="flex items-center justify-end space-x-2 py-4">
+    <div className="flex-1 text-sm text-muted-foreground">
+      {table.getFilteredSelectedRowModel().rows.length} of{" "}
+      {table.getFilteredRowModel().rows.length} row(s) selected.
     </div>
-  );
+    <div className="space-x-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => table.previousPage()}
+        disabled={!table.getCanPreviousPage()}
+      >
+        Previous
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => table.nextPage()}
+        disabled={!table.getCanNextPage()}
+      >
+        Next
+      </Button>
+    </div>
+  </div>
+
+  <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Upload Document for {selectedMonth ? `${MONTHS[selectedMonth.month]} ${selectedMonth.year}` : ''}</DialogTitle>
+      </DialogHeader>
+      <form onSubmit={uploadDocument}>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <label htmlFor="startDate">Start Date:</label>
+            <Input id="startDate" value={selectedMonth ? `${selectedMonth.year}-${String(selectedMonth.month + 1).padStart(2, '0')}-01` : ''} readOnly className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <label htmlFor="endDate">End Date:</label>
+            <Input id="endDate" value={selectedMonth ? new Date(selectedMonth.year, selectedMonth.month + 1, 0).toISOString().split('T')[0] : ''} readOnly className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <label htmlFor="closingBalance">Closing Balance:</label>
+            <Input id="closingBalance" type="number" className="col-span-3" required />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <label htmlFor="document">Document:</label>
+            <Input 
+              id="document" 
+              type="file" 
+              className="col-span-3" 
+              onChange={handleFileChange}
+              required 
+            />
+          </div>
+        </div>
+        <div className="flex justify-end mt-4">
+          <Button type="submit" disabled={isUploading}>
+            {isUploading ? 'Uploading...' : 'Submit'}
+          </Button>
+        </div>
+      </form>
+    </DialogContent>
+  </Dialog>
+</div>
+);
 }
 
 export default ReportTable;
