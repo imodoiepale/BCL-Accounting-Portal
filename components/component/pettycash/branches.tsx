@@ -9,7 +9,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
 
 const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
 
@@ -22,7 +22,7 @@ const formatDate = (dateString) => {
 };
 
 export function BranchesTab() {
-  const { userId } = useUser();
+  const { userId } = useAuth();
 
   const [branches, setBranches] = useState([]);
   const [newBranch, setNewBranch] = useState({
@@ -37,38 +37,42 @@ export function BranchesTab() {
     fetchBranches();
   }, []);
 
-  const fetchBranches = async () => {
-    const { data, error } = await supabase
-      .from('branches')
-      .select('*')
-      .eq('userid', userId)
-      .order('id', { ascending: true });
-    if (error) console.error('Error fetching branches:', error);
-    else setBranches(data);
-  };
+// Update the table name in the fetchBranches function
+const fetchBranches = async () => {
+  const { data, error } = await supabase
+    .from('acc_portal_pettycash_branches')
+    .select('*')
+    .eq('userid', userId)
+    .order('id', { ascending: true });
+  if (error) console.error('Error fetching branches:', error);
+  else setBranches(data);
+};
+
+// Update the table name in the handleSubmit function
+const handleSubmit = async () => {
+  const { data, error } = await supabase
+    .from('acc_portal_pettycash_branches')
+    .insert([{ ...newBranch, userid: userId }]);
+
+  if (error) console.error('Error adding branch:', error);
+  else {
+    fetchBranches();
+    setNewBranch({
+      branch_name: '',
+      location: '',
+      manager_name: '',
+      contact_number: '',
+      email: '',
+    });
+  }
+};
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
     setNewBranch((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleSubmit = async () => {
-    const { data, error } = await supabase
-      .from('branches')
-      .insert([{ ...newBranch, userid: userId }]);
 
-    if (error) console.error('Error adding branch:', error);
-    else {
-      fetchBranches();
-      setNewBranch({
-        branch_name: '',
-        location: '',
-        manager_name: '',
-        contact_number: '',
-        email: '',
-      });
-    }
-  };
 
   const formFields = [
     { id: 'branch_name', label: 'Branch Name', type: 'text', placeholder: 'Enter branch name' },
