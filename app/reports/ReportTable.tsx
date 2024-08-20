@@ -154,19 +154,19 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
     window.open(`https://wa.me/${phoneNumber}?text=${message}`, '_blank');
   };
 
-  const sendEmailRequest = async (entity: DataRow) => {
+  const sendEmailRequest = async (supplier: DataRow) => {
     setEmailSending(true);
-    const missingDocs = getMissingDocuments(entity);
+    const missingDocs = getMissingDocuments(supplier);
     const missingDocsText = missingDocs.map(doc => `${MONTHS[doc.month]} ${doc.year}`).join(', ');
     
     const username = user?.username || 'User';
-    const userEmail = user?.email || process.env.EMAIL_FROM_ADDRESS;
+    const userEmail = user?.email || process.env.EMAIL_FROM_ADDRESS; 
   
     try {
       const emailData = {
-        to: entity.email,
-        subject: `Missing Documents Request for ${entity.name}`,
-        html: `<p>Dear ${entity.name},</p><p>We noticed that you have missing documents for the following months:</p> ${missingDocsText}.</p><p>Please upload these documents as soon as possible.</p>
+        to: supplier.email,
+        subject: `Missing Documents Request for ${supplier.name}`,
+        html: `<p>Dear ${supplier.name},</p><p>We noticed that you have missing documents for the following months:</p> ${missingDocsText}.</p><p>Please upload these documents as soon as possible.</p>
         <p>Best regards,<br>${username}<br></p>`,
         fromName: username,
         fromEmail: userEmail,
