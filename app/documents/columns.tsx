@@ -287,16 +287,16 @@ const UploadCell: React.FC<UploadCellProps> = ({ row, selectedMonth, type }) => 
     if (selectedMonth) {
       const [monthName, year] = selectedMonth.split(' ');
       const currentDate = new Date(`${monthName} 1, ${year}`);
-      
+
       // Calculate the previous month
       const previousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-      
+
       // Start date: first day of the previous month
       const startDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 1);
-      
+
       // End date: last day of the previous month
       const endDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0);
-  
+
       // console.log('start date ', startDate);
       // console.log('end  date ', endDate);
       // Set form values
@@ -369,37 +369,37 @@ const UploadCell: React.FC<UploadCellProps> = ({ row, selectedMonth, type }) => 
                       </FormItem>
                     )}
                   />
-                
-                <FormField
-                  control={form.control}
-                  name="closingBalance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Closing Balance</FormLabel>
-                      <FormControl>
-                        <Input type="number" className='w-[280px]'{...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="file"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Upload File</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="file"
-                          onChange={(e) => field.onChange(e.target.files)}
-                          className='w-[280px]'
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+
+                  <FormField
+                    control={form.control}
+                    name="closingBalance"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Closing Balance</FormLabel>
+                        <FormControl>
+                          <Input type="number" className='w-[280px]'{...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="file"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Upload File</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="file"
+                            onChange={(e) => field.onChange(e.target.files)}
+                            className='w-[280px]'
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
                 <Button type="submit" disabled={state.isLoading}>
                   {state.isLoading ? 'Uploading...' : 'Submit'}
@@ -417,16 +417,23 @@ UploadCell.displayName = 'UploadCell';
 
 // Helper function for creating sortable header
 const createSortableHeader = (label: string) => {
-  const SortableHeader = ({ column }) => (
-    <Button
-      variant="ghost"
-      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      className="whitespace-nowrap"
-    >
-      {label}
-      <ArrowUpDown className="ml-2 h-4 w-4" />
-    </Button>
-  );
+  const SortableHeader = ({ column }) => {
+    const words = label.split(' ');
+    const isLongHeader = words.length > 2;
+
+    return (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        className={`text-center ${isLongHeader ? 'flex items-start p-2 h-auto min-h-[60px] ' : 'whitespace-nowrap'}`}
+      >
+        <span className={isLongHeader ? 'whitespace-normal mb-1 w-30 text-center' : 'whitespace-nowrap'}>
+          {label}
+        </span>
+        {/* <ArrowUpDown className={`${isLongHeader ? 'mt-1' : 'ml-2'} h-4 w-4`} /> */}
+      </Button>
+    );
+  };
   SortableHeader.displayName = `SortableHeader_${label}`;
   return SortableHeader;
 };
@@ -437,6 +444,163 @@ const createStatusCell = (getValue) => {
   const statusClass = status === 'Active' ? 'text-green-500' : 'text-red-500';
   return <div className={`text-center font-medium ${statusClass}`}>{status}</div>;
 };
+
+// Supplier Profile Component
+const SupplierProfile = ({ suppSeq }) => {
+  const [profileData, setProfileData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const fetchProfileData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('acc_portal_suppliers')
+        .select('*')
+        .eq('id', suppSeq)
+        .single();
+
+      if (error) throw error;
+      setProfileData(data);
+    } catch (error) {
+      console.error('Error fetching supplier profile:', error);
+      alert('Error fetching supplier profile. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [suppSeq]);
+
+  useEffect(() => {
+    if (isOpen && !profileData) {
+      fetchProfileData();
+    }
+  }, [isOpen, profileData, fetchProfileData]);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" className="h-8 w-8 p-0">
+          <span className="sr-only">Open profile</span>
+          <Info className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{profileData?.name || 'Supplier'} Profile</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div>Loading profile data...</div>
+        ) : profileData ? (
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <span className="font-bold">Supplier PIN:</span>
+              <span className="col-span-3">{profileData.pin}</span>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <span className="font-bold">Contact Name:</span>
+              <span className="col-span-3">{profileData.contact_name}</span>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <span className="font-bold">Contact Mobile:</span>
+              <span className="col-span-3">{profileData.contact_mobile}</span>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <span className="font-bold">Contact Email:</span>
+              <span className="col-span-3">{profileData.contact_email}</span>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <span className="font-bold">Start Date:</span>
+              <span className="col-span-3">{profileData.startdate}</span>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <span className="font-bold">Status:</span>
+              <span className="col-span-3">{profileData.status ? 'Active' : 'Inactive'}</span>
+            </div>
+          </div>
+        ) : (
+          <div>No profile data available</div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Bank Profile Component
+const BankProfile = ({ bankSeq }) => {
+  const [profileData, setProfileData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const fetchProfileData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('acc_portal_banks')
+        .select('*')
+        .eq('id', bankSeq)
+        .single();
+
+      if (error) throw error;
+      setProfileData(data);
+    } catch (error) {
+      console.error('Error fetching bank profile:', error);
+      alert('Error fetching bank profile. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [bankSeq]);
+
+  useEffect(() => {
+    if (isOpen && !profileData) {
+      fetchProfileData();
+    }
+  }, [isOpen, profileData, fetchProfileData]);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" className="h-8 w-8 p-0">
+          <span className="sr-only">Open profile</span>
+          <Info className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{profileData?.name || 'Bank'} Profile</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div>Loading profile data...</div>
+        ) : profileData ? (
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <span className="font-bold">Account Number:</span>
+              <span className="col-span-3">{profileData.account_number}</span>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <span className="font-bold">Currency:</span>
+              <span className="col-span-3">{profileData.currency}</span>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <span className="font-bold">Branch Name:</span>
+              <span className="col-span-3">{profileData.branch}</span>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <span className="font-bold">Start Date:</span>
+              <span className="col-span-3">{profileData.startdate}</span>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <span className="font-bold">Status:</span>
+              <span className="col-span-3">{profileData.status ? 'Active' : 'Inactive'}</span>
+            </div>
+          </div>
+        ) : (
+          <div>No profile data available</div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 
 export const supplierColumns: ColumnDef<any>[] = [
   {
@@ -505,50 +669,7 @@ export const supplierColumns: ColumnDef<any>[] = [
   {
     id: "profile",
     header: "Profile",
-    cell: ({ row }) => {
-      const supplier = row.original;
-      return (
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open profile</span>
-              <Info className="h-4 w-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{supplier.suppName} Profile</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-bold">Supplier PIN:</span>
-                <span className="col-span-3">{supplier.suppPIN}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-bold">Contact Name:</span>
-                <span className="col-span-3">{supplier.suppContactName}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-bold">Contact Mobile:</span>
-                <span className="col-span-3">{supplier.suppContactMobile}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-bold">Contact Email:</span>
-                <span className="col-span-3">{supplier.suppContactEmail}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-bold">Start Date:</span>
-                <span className="col-span-3">{supplier.suppStartDate}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-bold">Status:</span>
-                <span className="col-span-3">{supplier.suppStatus}</span>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      );
-    },
+    cell: ({ row }) => <SupplierProfile suppSeq={row.getValue('suppSeq')} />,
   },
 ];
 
@@ -629,45 +750,6 @@ export const bankColumns: ColumnDef<any>[] = [
   {
     id: "profile",
     header: "Profile",
-    cell: ({ row }) => {
-      const bank = row.original;
-      return (
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open profile</span>
-              <Info className="h-4 w-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{bank.bankName} Profile</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-bold">Account Number:</span>
-                <span className="col-span-3">{bank.accountNumber}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-bold">Currency:</span>
-                <span className="col-span-3">{bank.currency}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-bold">Branch Name:</span>
-                <span className="col-span-3">{bank.branchName}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-bold">Start Date:</span>
-                <span className="col-span-3">{bank.startDate}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-bold">Status:</span>
-                <span className="col-span-3">{bank.bankStatus}</span>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      );
-    },
+    cell: ({ row }) => <BankProfile bankSeq={row.getValue('bankSeq')} />,
   },
 ];
