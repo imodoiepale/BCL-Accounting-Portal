@@ -3,7 +3,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import PettyCashReportsTab from './reports';
 const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
 
 export function PettyCashManager() {
-  const { userId } = useUser();
+  const { userId } = useAuth();
   const [currentTab, setCurrentTab] = useState('accounts');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [accountsToReplenish, setAccountsToReplenish] = useState([]);
@@ -56,13 +56,14 @@ export function PettyCashManager() {
     fetchAccountsToReplenish();
   }, []);
 
+  // Update the table name in the fetchAccountsToReplenish function
   const fetchAccountsToReplenish = async () => {
     const { data, error } = await supabase
-      .from('accounts')
-      .select('id, account_name, balance, currency, users(name)')
+      .from('acc_portal_pettycash_accounts')
+      .select('id, account_name, balance, currency, acc_portal_pettycash_users(name)')
       .lt('balance', 1000)
       .order('balance', { ascending: true });
-    
+
     if (error) {
       console.error('Error fetching accounts to replenish:', error);
     } else {
@@ -150,8 +151,8 @@ export function PettyCashManager() {
             <TransactionsTab settings={settings.transactions} />
           </TabsContent>
           <TabsContent value="reports">
-          <PettyCashReportsTab />
-        </TabsContent>
+            <PettyCashReportsTab />
+          </TabsContent>
         </Tabs>
       </main>
     </div>

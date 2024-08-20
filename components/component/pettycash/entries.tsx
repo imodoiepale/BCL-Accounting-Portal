@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
 
 // Initialize Supabase client
 const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
@@ -49,7 +49,7 @@ const calculateFloatData = () => {
 
 
 export function TransactionsTab() {
-  const { userId } = useUser();
+  const { userId } = useAuth();
   // const userId = user?.id;
 
   const [pettyCashEntries, setPettyCashEntries] = useState([]);
@@ -71,17 +71,74 @@ export function TransactionsTab() {
     fetchPettyCashEntries();
   }, []);
 
-  const fetchPettyCashEntries = async () => {
-    const { data, error } = await supabase
-      .from('acc_portal_petty_cash_entries')
-      .select('*')
-      .eq('userid', userId)
-      .order('id', { ascending: true });
-    if (error) console.error('Error fetching petty cash entries:', error);
-    else setPettyCashEntries(data);
-  };
-  
+  // Update the table name in the fetchPettyCashEntries function
+const fetchPettyCashEntries = async () => {
+  const { data, error } = await supabase
+    .from('acc_portal_pettycash_entries')
+    .select('*')
+    .eq('userid', userId)
+    .order('id', { ascending: true });
+  if (error) console.error('Error fetching petty cash entries:', error);
+  else setPettyCashEntries(data);
+};
 
+// Update the table name in the handleSubmit function
+const handleSubmit = async () => {
+  let receiptUrl = '';
+  if (newPettyCash.receipt_url) {
+    const { data: storageData, error: storageError } = await supabase
+      .storage
+      .from('Accounting-Portal')
+      .upload(`petty-cash/${userId}/${newPettyCash.receipt_url.name}`, newPettyCash.receipt_url);
+
+    if (storageError) {
+      console.error('Error uploading receipt:', storageError);
+      return;
+    }
+    receiptUrl = storageData.path;
+  }
+
+  const { data, error } = await supabase
+    .from('acc_portal_pettycash_entries')
+    .insert([{ ...newPettyCash, receipt_url: receiptUrl, userid: userId }]);
+
+  if (error) console.error('Error adding petty cash entry:', error);
+  else {
+    fetchPettyCashEntries();
+    setNewPettyCash({
+      amount: '',
+      invoice_number: '',
+      invoice_date: '',
+      description: '',
+      receipt_url: " ",
+      expense_type: '',
+      checked_by: '',
+      approved_by: '',
+      payment_type: '',
+    });
+  }
+};
+
+// Update the table name in the updateEntry function
+const updateEntry = async (entryId, updatedData) => {
+  const { data, error } = await supabase
+    .from('acc_portal_pettycash_entries')
+    .update(updatedData)
+    .eq('id', entryId)
+    .eq('userid', userId);
+  // Handle the result
+};
+
+// Update the table name in the deleteEntry function
+const deleteEntry = async (entryId) => {
+  const { data, error } = await supabase
+    .from('acc_portal_pettycash_entries')
+    .delete()
+    .eq('id', entryId)
+    .eq('userid', userId);
+  // Handle the result
+};
+  
   const handleInputChange = (e) => {
     const { id, value } = e.target;
     setNewPettyCash((prev) => ({ ...prev, [id]: value }));
@@ -99,61 +156,6 @@ export function TransactionsTab() {
     setNewPettyCash((prev) => ({ ...prev, payment_type: value }));
   };
 
-  const handleSubmit = async () => {
-    let receiptUrl = '';
-    if (newPettyCash.receipt_url) {
-      const { data: storageData, error: storageError } = await supabase
-        .storage
-        .from('Accounting-Portal')
-        .upload(`petty-cash/${userId}/${newPettyCash.receipt_url.name}`, newPettyCash.receipt_url);
-  
-      if (storageError) {
-        console.error('Error uploading receipt:', storageError);
-        return;
-      }
-      receiptUrl = storageData.path;
-    }
-  
-    const { data, error } = await supabase
-      .from('acc_portal_petty_cash_entries')
-      .insert([{ ...newPettyCash, receipt_url: receiptUrl, userid: userId }]);
-  
-    if (error) console.error('Error adding petty cash entry:', error);
-    else {
-      fetchPettyCashEntries();
-      setNewPettyCash({
-        amount: '',
-        invoice_number: '',
-        invoice_date: '',
-        description: '',
-        receipt_url: " ",
-        expense_type: '',
-        checked_by: '',
-        approved_by: '',
-        payment_type: '', // Reset payment type
-      });
-    }
-  };
-
-  const updateEntry = async (entryId, updatedData) => {
-    const { data, error } = await supabase
-      .from('acc_portal_petty_cash_entries')
-      .update(updatedData)
-      .eq('id', entryId)
-      .eq('userid', userId);
-    // Handle the result
-  };
-  
-  const deleteEntry = async (entryId) => {
-    const { data, error } = await supabase
-      .from('acc_portal_petty_cash_entries')
-      .delete()
-      .eq('id', entryId)
-      .eq('userid', userId);
-    // Handle the result
-  };
-  
-  
   // Fields to be displayed in the form
   const formFields = [
     { id: 'amount', label: 'Amount', type: 'number', placeholder: '1000' },
