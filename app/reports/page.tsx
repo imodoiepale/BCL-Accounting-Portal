@@ -60,7 +60,7 @@ export default function Reports() {
   const [newSupplier, setNewSupplier] = useState(initialSupplierState);
 
   // Memoized fetch functions
-  const fetchSuppliers = useCallback(async () => {
+  const fetchSuppliers = useCallback(async (fromDate, toDate) => {
     if (!userId) return;
 
     try {
@@ -75,7 +75,9 @@ export default function Reports() {
       const { data: reports, error: reportError } = await supabase
         .from('acc_portal_monthly_files_upload')
         .select('supplier_id, docs_date_range, docs_date_range_end, is_verified, closing_balance')
-        .eq('document_type', 'supplier statement');
+        .eq('document_type', 'supplier statement')
+        .gte('docs_date_range', fromDate)
+        .lte('docs_date_range', toDate);
 
       if (reportError) throw reportError;
 
@@ -116,7 +118,7 @@ export default function Reports() {
     }
   }, [userId]);
 
-  const fetchBanks = useCallback(async () => {
+  const fetchBanks = useCallback(async (fromDate, toDate) => {
     if (!userId) return;
 
     try {
@@ -131,7 +133,9 @@ export default function Reports() {
       const { data: reports, error: reportError } = await supabase
         .from('acc_portal_monthly_files_upload')
         .select('bank_id, docs_date_range, docs_date_range_end, is_verified, closing_balance')
-        .eq('document_type', 'bank statement');
+        .eq('document_type', 'bank statement')
+        .gte('docs_date_range', fromDate)
+        .lte('docs_date_range', toDate);
 
       if (reportError) throw reportError;
 
@@ -172,7 +176,10 @@ export default function Reports() {
 
   useEffect(() => {
     if (userId) {
-      Promise.all([fetchSuppliers(), fetchBanks()]).then(() => setIsLoading(false));
+      const currentDate = new Date();
+      const fromDate = new Date(currentDate.getFullYear(), 0, 1).toISOString().split('T')[0];
+      const toDate = new Date(currentDate.getFullYear(), 11, 31).toISOString().split('T')[0];
+      Promise.all([fetchSuppliers(fromDate, toDate), fetchBanks(fromDate, toDate)]).then(() => setIsLoading(false));
     }
   }, [userId, fetchSuppliers, fetchBanks]);
 
@@ -253,7 +260,7 @@ export default function Reports() {
               <TabsTrigger value="balance">Suppliers Statement Closing Balance</TabsTrigger>
             </TabsList>
             <TabsContent value="suppliers">
-              <ReportTable data={supplierData} title="Suppliers Report" fetchData={fetchSuppliers} />
+              <ReportTable data={supplierData} title="Suppliers Report" fetchData={fetchSuppliers} addButtonText="Add Supplier Statement" />
             </TabsContent>
             <TabsContent value="balance">
               <BalanceTable data={supplierData} title="Suppliers Report" fetchData={fetchSuppliers} />
@@ -268,7 +275,7 @@ export default function Reports() {
               <TabsTrigger value="balance">Banks Statement Closing Balance</TabsTrigger>
             </TabsList>
             <TabsContent value="statements">
-              <ReportTable data={bankData} title="Banks Report" fetchData={fetchBanks} />
+              <ReportTable data={bankData} title="Banks Report" fetchData={fetchBanks} addButtonText="Add Bank Statement" />
             </TabsContent>
             <TabsContent value="balance">
               <BalanceTable data={bankData} title="Banks Report" fetchData={fetchBanks} />
