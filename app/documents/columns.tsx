@@ -369,7 +369,7 @@ const UploadCell: React.FC<UploadCellProps> = ({ row, selectedMonth, type }) => 
                       </FormItem>
                     )}
                   />
-                </div>
+                
                 <FormField
                   control={form.control}
                   name="closingBalance"
@@ -377,7 +377,7 @@ const UploadCell: React.FC<UploadCellProps> = ({ row, selectedMonth, type }) => 
                     <FormItem>
                       <FormLabel>Closing Balance</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input type="number" className='w-[280px]'{...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -393,12 +393,14 @@ const UploadCell: React.FC<UploadCellProps> = ({ row, selectedMonth, type }) => 
                         <Input
                           type="file"
                           onChange={(e) => field.onChange(e.target.files)}
+                          className='w-[280px]'
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                </div>
                 <Button type="submit" disabled={state.isLoading}>
                   {state.isLoading ? 'Uploading...' : 'Submit'}
                 </Button>
@@ -413,18 +415,33 @@ const UploadCell: React.FC<UploadCellProps> = ({ row, selectedMonth, type }) => 
 
 UploadCell.displayName = 'UploadCell';
 
+// Helper function for creating sortable header
+const createSortableHeader = (label: string) => {
+  const SortableHeader = ({ column }) => (
+    <Button
+      variant="ghost"
+      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      className="whitespace-nowrap"
+    >
+      {label}
+      <ArrowUpDown className="ml-2 h-4 w-4" />
+    </Button>
+  );
+  SortableHeader.displayName = `SortableHeader_${label}`;
+  return SortableHeader;
+};
+
+// Helper function for creating status cell
+const createStatusCell = (getValue) => {
+  const status = getValue();
+  const statusClass = status === 'Active' ? 'text-green-500' : 'text-red-500';
+  return <div className={`text-center font-medium ${statusClass}`}>{status}</div>;
+};
+
 export const supplierColumns: ColumnDef<any>[] = [
   {
     accessorKey: "suppSeq",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Supp Seq
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Supp Seq"),
     cell: ({ row, table }) => {
       const index = table.getSortedRowModel().rows.findIndex((r) => r.id === row.id) + 1;
       return <div className="text-center">S-{index}</div>;
@@ -432,58 +449,22 @@ export const supplierColumns: ColumnDef<any>[] = [
   },
   {
     accessorKey: "suppName",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Supp Name
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Supp Name"),
     cell: ({ row }) => <div className="whitespace-nowrap">{row.getValue("suppName")}</div>,
   },
   {
     accessorKey: "suppStatus",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Status
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const status = row.getValue("suppStatus");
-      const statusClass = status === 'Active' ? 'text-green-500' : 'text-red-500';
-      return <div className={`text-center font-medium ${statusClass}`}>{status}</div>;
-    },
+    header: createSortableHeader("Status"),
+    cell: ({ row }) => createStatusCell(() => row.getValue("suppStatus")),
   },
   {
     accessorKey: "suppStartDate",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Start date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Start date"),
     cell: ({ row }) => <div className="text-center">{row.getValue("suppStartDate")}</div>,
   },
   {
     accessorKey: "verifiedByBCLAccManager",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Verified by BCL
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Verified by BCL"),
     cell: ({ row }) => <div className="text-center">{row.getValue("verifiedByBCLAccManager") ? "✅" : "❌"}</div>,
   },
   {
@@ -493,81 +474,32 @@ export const supplierColumns: ColumnDef<any>[] = [
   },
   {
     accessorKey: "uploadDate",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="whitespace-nowrap"
-      >
-        Upload Date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Upload Date"),
     cell: ({ row }) => <div className="text-center">{row.getValue("uploadDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "supplierWefDate",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Period From
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Period From"),
     cell: ({ row }) => <div className="text-center">{row.getValue("supplierWefDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "supplierUntilDate",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Period To
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Period To"),
     cell: ({ row }) => <div className="text-center">{row.getValue("supplierUntilDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "verifyByBCL",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Start Range Verification
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Start Range Verification"),
     cell: ({ row }) => <div className="text-center">{row.getValue("verifyByBCL") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "closingBalance",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Closing Balance
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Closing Balance"),
     cell: ({ row }) => <div className="text-center">{row.getValue("closingBalance") || 'N/A'}</div>,
   },
   {
     accessorKey: "closingBalanceVerify",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Closing Balance Verified
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Closing Balance Verified"),
     cell: ({ row }) => <div className="text-center">{row.getValue("closingBalanceVerify") === true ? "✅" : "❌"}</div>,
   },
   {
@@ -623,15 +555,7 @@ export const supplierColumns: ColumnDef<any>[] = [
 export const bankColumns: ColumnDef<any>[] = [
   {
     accessorKey: "bankSeq",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Bank Acc Seq
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Bank Acc Seq"),
     cell: ({ row, table }) => {
       const index = table.getSortedRowModel().rows.findIndex((r) => r.id === row.id) + 1;
       return <div className="text-center">B-{index}</div>;
@@ -639,58 +563,22 @@ export const bankColumns: ColumnDef<any>[] = [
   },
   {
     accessorKey: "bankName",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Bank Name
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Bank Name"),
     cell: ({ row }) => <div className="whitespace-nowrap">{row.getValue("bankName")}</div>,
   },
   {
     accessorKey: "bankStatus",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Status
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const status = row.getValue("bankStatus");
-      const statusClass = status === 'Active' ? 'text-green-500' : 'text-red-500';
-      return <div className={`text-center font-medium ${statusClass}`}>{status}</div>;
-    },
+    header: createSortableHeader("Status"),
+    cell: ({ row }) => createStatusCell(() => row.getValue("bankStatus")),
   },
   {
-    accessorKey: "startDate",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Start date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => <div className="text-center">{row.getValue("startDate")}</div>,
+    accessorKey: "bankStartDate",
+    header: createSortableHeader("Start date"),
+    cell: ({ row }) => <div className="text-center">{row.getValue("bankStartDate")}</div>,
   },
   {
     accessorKey: "verified",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Verified by BCL
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Verified by BCL"),
     cell: ({ row }) => <div className="text-center">{row.getValue("verified") ? "✅" : "❌"}</div>,
   },
   {
@@ -700,107 +588,42 @@ export const bankColumns: ColumnDef<any>[] = [
   },
   {
     accessorKey: "uploadDate",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="whitespace-nowrap"
-      >
-        Upload Date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Upload Date"),
     cell: ({ row }) => <div className="text-center">{row.getValue("uploadDate") || 'N/A'}</div>,
   },
   {
     accessorKey: "periodFrom",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Period From
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Period From"),
     cell: ({ row }) => <div className="text-center">{row.getValue("periodFrom") || 'N/A'}</div>,
   },
   {
     accessorKey: "periodTo",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Period To
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Period To"),
     cell: ({ row }) => <div className="text-center">{row.getValue("periodTo") || 'N/A'}</div>,
   },
   {
     accessorKey: "verifyByBCL",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Start Range Verification
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Start Range Verification"),
     cell: ({ row }) => <div className="text-center">{row.getValue("verifyByBCL") ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "closingBalance",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Closing Balance
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Closing Balance"),
     cell: ({ row }) => <div className="text-center">{row.getValue("closingBalance") || 'N/A'}</div>,
   },
   {
     accessorKey: "closingBalanceVerified",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Closing Balance Verified
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Closing Balance Verified"),
     cell: ({ row }) => <div className="text-center">{row.getValue("closingBalanceVerified") === true ? "✅" : "❌"}</div>,
   },
   {
     accessorKey: "currency",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Currency
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Currency"),
     cell: ({ row }) => <div className="text-center">{row.getValue("currency")}</div>,
   },
   {
     accessorKey: "accountNumber",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Account Number
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: createSortableHeader("Account Number"),
     cell: ({ row }) => <div className="text-center">{row.getValue("accountNumber")}</div>,
   },
   {

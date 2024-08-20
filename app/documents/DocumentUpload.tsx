@@ -7,9 +7,10 @@ import { useAuth } from '@clerk/clerk-react';
 import { DataTable } from "./data-table";
 import { supplierColumns, bankColumns } from "./columns";
 
-const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(
+  'https://zyszsqgdlrpnunkegipk.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing'
+);
 
 interface CombinedMonthlyDocsProps {
   type: 'supplier' | 'bank';
@@ -17,86 +18,71 @@ interface CombinedMonthlyDocsProps {
   isCurrentMonth: boolean;
 }
 
-function formatDate(dateString: string) {
-  if (!dateString) return 'N/A';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  });
-}
+const formatDate = (dateString: string) => 
+  dateString ? new Date(dateString).toLocaleDateString('en-GB', {
+    day: '2-digit', month: '2-digit', year: 'numeric'
+  }) : 'N/A';
 
-function formatDateTime(dateTimeString: string) {
-  if (!dateTimeString) return 'N/A';
-  const date = new Date(dateTimeString);
-  return date.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  }).replace(',', '');
-}
+const formatDateTime = (dateTimeString: string) => 
+  dateTimeString ? new Date(dateTimeString).toLocaleString('en-GB', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true
+  }).replace(',', '') : 'N/A';
 
-export function CombinedMonthlyDocs({ type, selectedMonth, isCurrentMonth }: CombinedMonthlyDocsProps) {
-  const { userId } = useAuth();
-  const [data, setData] = useState<any[]>([]);
-  const [displayMonth, setDisplayMonth] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+const getDateRange = (month: string | null, isCurrentMonth: boolean) => {
+  const now = new Date();
+  let year, monthIndex;
 
-  const fetchData = useCallback(async (month?: string) => {
-    try {
+  if (isCurrentMonth) {
+    // For the current month, we're actually looking at the previous month
+    year = now.getFullYear();
+    monthIndex = now.getMonth() - 1;
+  } else if (month) {
+    const [monthName, yearStr] = month.split(' ');
+    year = parseInt(yearStr, 10);
+    monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
+  } else {
+    throw new Error("Invalid month input");
+  }
+
+  const startDate = new Date(year, monthIndex, 1);
+  const endDate = new Date(year, monthIndex + 1, 0);
+
+  return { startDate, endDate };
+};
+
+
+  export function CombinedMonthlyDocs({ type, selectedMonth, isCurrentMonth }: CombinedMonthlyDocsProps) {
+    const { userId } = useAuth();
+    const [data, setData] = useState<any[]>([]);
+    const [displayMonth, setDisplayMonth] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+  
+    const fetchData = useCallback(async () => {
+      if (!userId) return;
+  
       setIsLoading(true);
-      console.log(`Fetching ${type} data for month:`, month || 'Current Month');
-
-      let query = supabase
-        .from(type === 'supplier' ? 'acc_portal_suppliers' : 'acc_portal_banks')
-        .select('*')
-        .eq('userid', userId)
-        .order('id', { ascending: true });
-
-      let uploadQuery = supabase
-        .from('acc_portal_monthly_files_upload')
-        .select('*')
-        .eq('userid', userId)
-        .eq('document_type', type === 'supplier' ? 'supplier statement' : 'bank statement');
-
-      let startDate, endDate;
-
-      if (month) {
-        const [monthName, year] = month.split(' ');
-        const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth();
+      try {
+        const { startDate, endDate } = getDateRange(selectedMonth, isCurrentMonth);
         
-        startDate = new Date(parseInt(year), monthNumber, 1);
-        endDate = new Date(parseInt(year), monthNumber + 1, 0);
-      } else {
-        const now = new Date();
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      }
-      
-      const extendedStartDate = new Date(startDate);
-      extendedStartDate.setDate(extendedStartDate.getDate() - 2);
-      const extendedEndDate = new Date(endDate);
-      extendedEndDate.setDate(extendedEndDate.getDate() + 2);
-
-      console.log('Extended Date range:', extendedStartDate.toISOString(), 'to', extendedEndDate.toISOString());
-      
-      uploadQuery = uploadQuery
-        .gte('docs_date_range', startDate.toISOString())
-        .lte('docs_date_range_end', endDate.toISOString());
-
-      const [{ data: mainData, error: mainError }, { data: uploadData, error: uploadError }] = await Promise.all([
-        query,
-        uploadQuery
-      ]);
-
-      if (mainError) throw new Error(`Error fetching ${type} data: ${mainError.message}`);
-      if (uploadError) throw new Error(`Error fetching upload data: ${uploadError.message}`);
-
-      const uploadMap = new Map(uploadData.map(item => [item[`${type}_id`], item]));    
+        const [{ data: mainData }, { data: uploadData }] = await Promise.all([
+          supabase
+            .from(type === 'supplier' ? 'acc_portal_suppliers' : 'acc_portal_banks')
+            .select('*')
+            .eq('userid', userId)
+            .order('id', { ascending: true }),
+          supabase
+            .from('acc_portal_monthly_files_upload')
+            .select('*')
+            .eq('userid', userId)
+            .eq('document_type', type === 'supplier' ? 'supplier statement' : 'bank statement')
+            .gte('docs_date_range', startDate.toISOString())
+            .lte('docs_date_range_end', endDate.toISOString())
+        ]);
+  
+        if (!mainData || !uploadData) throw new Error('Failed to fetch data');
+  
+        const uploadMap = new Map(uploadData.map(item => [item[`${type}_id`], item])); 
 
       const transformedData = mainData.map(item => {
         const latestUpload = uploadMap.get(item.id) || {};
@@ -132,19 +118,19 @@ export function CombinedMonthlyDocs({ type, selectedMonth, isCurrentMonth }: Com
   }, [userId, type]);
 
   useEffect(() => {
-    console.log(`CombinedMonthlyDocs (${type}) - Selected Month:`, selectedMonth);
-    console.log(`CombinedMonthlyDocs (${type}) - Is Current Month:`, isCurrentMonth);
-  
+    const now = new Date();
+    const currentMonth = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      .toLocaleString('default', { month: 'long', year: 'numeric' });
+
     if (isCurrentMonth) {
-      const currentDate = new Date();
-      const currentMonthDisplay = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-      setDisplayMonth(currentMonthDisplay);
-      fetchData();
+      setDisplayMonth(`${previousMonth} uploading in ${currentMonth}`);
     } else if (selectedMonth) {
       setDisplayMonth(selectedMonth);
-      fetchData(selectedMonth);
     }
-  }, [fetchData, isCurrentMonth, selectedMonth, type]);
+
+    fetchData();
+  }, [fetchData, isCurrentMonth, selectedMonth]);
 
   const columns = type === 'supplier' ? supplierColumns : bankColumns;
 
@@ -153,49 +139,34 @@ export function CombinedMonthlyDocs({ type, selectedMonth, isCurrentMonth }: Com
       <p className="text-lg mb-4">
         {type === 'supplier' ? 'Supplier' : 'Bank'} Statements for <span className="font-semibold text-blue-700">{displayMonth}</span>
       </p>
-      <div className="">
-        <div className="align-middle">
-          <div className="border-b border-gray-200 shadow sm:rounded-lg">
-            {isLoading ? (
-              <p>Loading...</p>
-            ) : (
-              <DataTable 
-                columns={columns} 
-                data={data}
-                selectedMonth={selectedMonth || displayMonth}
-              />
-            )}
-          </div>
-        </div>
+      <div className="border-b border-gray-200 shadow sm:rounded-lg">
+        {isLoading ? (
+          <p>Loading...</p>
+        ) : (
+          <DataTable 
+            columns={columns} 
+            data={data}
+            selectedMonth={selectedMonth || displayMonth}
+          />
+        )}
       </div>
     </main>
   );
 }
 
-
 export function PreviousMonths({ type }: { type: 'supplier' | 'bank' }) {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
-  const generateMonths = useCallback(() => {
-    const months = [];
+  const months = useMemo(() => {
+    const result = [];
     const currentDate = new Date();
+    currentDate.setMonth(currentDate.getMonth() - 1); // Start from previous month
     for (let i = 0; i < 12; i++) {
+      result.push(currentDate.toLocaleString('default', { month: 'long', year: 'numeric' }));
       currentDate.setMonth(currentDate.getMonth() - 1);
-      months.push(currentDate.toLocaleString('default', { month: 'long', year: 'numeric' }));
     }
-    return months;
+    return result;
   }, []);
-
-  const months = useMemo(() => generateMonths(), [generateMonths]);
-
-  const handleMonthSelect = useCallback((month: string) => {
-    console.log(`PreviousMonths (${type}) - Month selected:`, month);
-    setSelectedMonth(month);
-  }, [type]);
-
-  useEffect(() => {
-    console.log(`PreviousMonths (${type}) - Effect - Selected Month:`, selectedMonth);
-  }, [selectedMonth, type]);
 
   return (
     <div className="flex flex-col md:flex-row">
@@ -206,7 +177,7 @@ export function PreviousMonths({ type }: { type: 'supplier' | 'bank' }) {
             <Button
               key={month}
               variant={selectedMonth === month ? "default" : "outline"}
-              onClick={() => handleMonthSelect(month)}
+              onClick={() => setSelectedMonth(month)}
               className="w-full"
             >
               {month}
@@ -218,7 +189,6 @@ export function PreviousMonths({ type }: { type: 'supplier' | 'bank' }) {
         {selectedMonth && (
           <CombinedMonthlyDocs 
             type={type}
-            // data={data}
             selectedMonth={selectedMonth}
             isCurrentMonth={false}
           />
@@ -227,4 +197,3 @@ export function PreviousMonths({ type }: { type: 'supplier' | 'bank' }) {
     </div>
   );
 }
-
