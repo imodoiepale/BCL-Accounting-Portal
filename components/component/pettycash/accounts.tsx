@@ -131,10 +131,10 @@ const handleSubmit = async () => {
     { label: 'User', key: 'acc_portal_pettycash_users.name' },
     { label: 'Account Type', key: 'account_type' },
     { label: 'Account Number', key: 'account_number' },
+    { label: 'Currency', key: 'currency' },
     { label: 'Float Balance', key: 'balance', format: (balance) => `$${parseFloat(balance).toFixed(2)}` },
     { label: 'Min Amount', key: 'min_amount', format: (amount) => `$${parseFloat(amount).toFixed(2)}` },
     { label: 'Max Amount', key: 'max_amount', format: (amount) => `$${parseFloat(amount).toFixed(2)}` },
-    { label: 'Currency', key: 'currency' },
     { label: 'Created Date', key: 'created_date', format: (date) => formatDate(date) },
     { label: 'Status', key: 'status' },
   ];
