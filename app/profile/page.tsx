@@ -366,32 +366,26 @@ export default function Profile() {
             </TabsList>
             <TabsContent value="company-info-tab">
               <div className="space-y-4">
-                <h3 className="text-lg font-bold">Company's Documents</h3>
-                <KYCDocumentsList category="company" />
+                <Tabs defaultValue="kra">
+                  <TabsList>
+                    <TabsTrigger value="kra">KRA Documents</TabsTrigger>
+                    <TabsTrigger value="sheria">Sheria Documents</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="kra">
+                    <div className="space-y-4">
+                      <KYCDocumentsList category="KRA" />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="sheria">
+                    <div className="space-y-4">
+                    <KYCDocumentsList category="Sheria" />
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             </TabsContent>
             <TabsContent value="directors-info">
                 <DirectorsDocumentsList />
-              {/* <div className="space-y-4">
-                <Tabs defaultValue="director-info">
-                  <TabsList>
-                    <TabsTrigger value="director-info">Directors' Documents</TabsTrigger>
-                    <TabsTrigger value="directors-kyc">Directors' KYC Documents</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="director-info">
-                    <div className="space-y-4">
-                      <h3 className="text-xl ">Directors' Documents</h3>
-                      <KYCDocumentsList />
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="directors-kyc">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-bold">Directors' KYC Documents</h3>
-                      <DirectorsDocumentsList />
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div> */}
             </TabsContent>
             <TabsContent value="employee-info">
               <div className="space-y-4">
