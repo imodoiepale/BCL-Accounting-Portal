@@ -133,7 +133,7 @@ export function DataTable<TData, TValue>({
     </>
   ), [statusCounts, getColumnCount, columns]);
 
-  return (
+   return (
     <div className="space-y-4 w-full">
       <DataTableToolbar table={table} />
       <div className="rounded-md border overflow-hidden">
@@ -144,7 +144,8 @@ export function DataTable<TData, TValue>({
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="text-xs font-extrabold">
+                    <TableHead key={header.id} className="text-xs font-extrabold whitespace-normal" 
+                    style={{ minHeight: '60px' }}>
                       {header.isPlaceholder
                         ? null
                         : flexRender(
