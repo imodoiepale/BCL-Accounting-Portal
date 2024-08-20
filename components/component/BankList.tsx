@@ -259,7 +259,7 @@ export function BankList() {
       document.body.removeChild(link);
     }
   };
-  
+
   return (
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
@@ -383,9 +383,9 @@ export function BankList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {banks.map((bank) => (
+              {banks.map((bank, index) => (
                 <TableRow key={bank.id}>
-                  <TableCell>BANK-ACC-{bank.id}</TableCell>
+                  <TableCell>B-{index + 1}</TableCell>
                   <TableCell>{bank.name}</TableCell>
                   <TableCell>{bank.account_number}</TableCell>
                   <TableCell>{bank.currency}</TableCell>

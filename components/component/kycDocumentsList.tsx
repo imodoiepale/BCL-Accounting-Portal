@@ -80,8 +80,8 @@ export function KYCDocumentsList({ category }) {
   const createBucketAndFolders = async () => {
     const { data: bucketData, error: bucketError } = await supabase.storage.createBucket('kyc-documents', {
       public: false,
-      allowedMimeTypes: ['application/pdf', 'image/png', 'image/jpeg'],
-      fileSizeLimit: 5 * 1024 * 1024, // 5MB limit
+      allowedMimeTypes: ['*'],      
+      fileSizeLimit: 50 * 1024 * 1024, // 50MB limit
     })
 
     if (bucketError && bucketError.message !== 'Bucket already exists') {
