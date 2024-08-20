@@ -23,6 +23,7 @@ export default function Reports() {
   const { userId } = useAuth();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [hasInitialFetch, setHasInitialFetch] = useState(false);
 
   const [supplierData, setSupplierData] = useState([]);
   const [bankData, setBankData] = useState([]);
@@ -57,13 +58,13 @@ export default function Reports() {
   };
 
   useEffect(() => {
-    if (userId) {
+    if (userId && !hasInitialFetch) {
       fetchSuppliers();
       fetchBanks();
       setIsLoading(false);
+      setHasInitialFetch(true);
     }
-  }, [userId]);
-  // console.log(userId)
+  }, [userId, hasInitialFetch]);
   
 
   const fetchSuppliers = async () => {
@@ -84,7 +85,7 @@ export default function Reports() {
 
     
 
-      console.log(reports)
+      // console.log(reports)
   
     if (reportError) {
       console.error('Error fetching supplier reports:', reportError);
@@ -104,7 +105,7 @@ export default function Reports() {
           return {
             status: 'uploaded',
             isVerified: reportForMonth.is_verified,
-            startDate: formatDate(reportForMonth.docs_date_range),
+            startDate: formatDate(reportForMonth.docs_date_range) || ' ',
             endDate: formatDate(reportForMonth.docs_date_range_end),
             closingBalance: reportForMonth.closing_balance
           };
