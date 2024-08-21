@@ -94,7 +94,7 @@ export function PettyCashManager() {
           Settings
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[1000px] p-0" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-[1000px] p-0">
         <DialogHeader className="px-4 py-3 border-b">
           <DialogTitle>Petty Cash Settings</DialogTitle>
           <DialogDescription>

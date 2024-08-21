@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 // @ts-nocheck
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Pencil, Trash2, Download } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -19,13 +19,23 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { format } from "date-fns";
+import { createClient } from '@supabase/supabase-js';
 import { Calendar as CalendarIcon } from "lucide-react";
+import { useAuth, useUser } from '@clerk/clerk-react';
+
+const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export function PettyCashSettings({ settings, setSettings, accountsToReplenish, handleReplenishAll, handleReplenishAccount, handleExportToExcel }) {
+  const { userId } = useAuth();
+  const { user } = useUser();
   const [currentSettingsTab, setCurrentSettingsTab] = useState('accounts');
   const [editingCategory, setEditingCategory] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [addCategoryDialogOpen, setAddCategoryDialogOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState({ expense: "", subcategory: "" });  
 
   const handleSettingChange = (section, key, value) => {
     setSettings(prevSettings => ({
@@ -72,15 +82,32 @@ export function PettyCashSettings({ settings, setSettings, accountsToReplenish, 
     }));
   };
 
-  const handleAddCategory = () => {
-    setSettings(prevSettings => ({
-      ...prevSettings,
-      categories: [
-        ...prevSettings.categories,
-        { type: 'Expense', name: '' },
-      ],
-    }));
+  const handleAddCategory = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_pettycash_expense_categories')
+      .insert({
+        expense_category: newCategory.expense,
+        subexpense_category: newCategory.subcategory,
+        userid: userId // Assuming you have access to the user's ID
+      });
+
+    if (error) {
+      console.error('Error adding category:', error);
+    } else {
+      setNewCategory({ expense: "", subcategory: "" });     
+      fetchExpenseCategories();
+    }
   };
+
+  
+  const fetchExpenseCategories = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_pettycash_expense_categories')
+      .select('*')
+      .eq('userid', userId);
+    if (data) setSettings(prevSettings => ({ ...prevSettings, categories: data }));
+  };
+
 
   const handleEditCategory = (category) => {
     setEditingCategory(category);
@@ -414,21 +441,59 @@ export function PettyCashSettings({ settings, setSettings, accountsToReplenish, 
                     <Card className="p-4">
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-sm font-medium">Expense Categories</h3>
-                        <Button onClick={handleAddCategory} className="h-8 text-xs">Add Category</Button>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button className="h-8 text-xs">Add Category</Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Add New Expense Category</DialogTitle>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="expense" className="text-right">
+                                  Expense
+                                </Label>
+                                <Input
+                                  id="expense"
+                                  value={newCategory.expense}
+                                  onChange={(e) => setNewCategory({ ...newCategory, expense: e.target.value })}
+                                  className="col-span-3"
+                                />
+                              </div>
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="subcategory" className="text-right">
+                                  Subcategory
+                                </Label>
+                                <Input
+                                  id="subcategory"
+                                  value={newCategory.subcategory}
+                                  onChange={(e) => setNewCategory({ ...newCategory, subcategory: e.target.value })}
+                                  className="col-span-3"
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button onClick={handleAddCategory}>Submit</Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="text-xs">Type</TableHead>
-                            <TableHead className="text-xs">Name</TableHead>
+                            <TableHead className="text-xs">No.</TableHead>
+                            <TableHead className="text-xs">SubExpense Category</TableHead>
+                            <TableHead className="text-xs">Expense Category</TableHead>
                             <TableHead className="text-xs w-24">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {settings.categories.map((category, index) => (
                             <TableRow key={index}>
-                              <TableCell className="py-2">{category.type}</TableCell>
-                              <TableCell className="py-2">{category.name}</TableCell>
+                              <TableCell className="py-2">{index + 1}</TableCell>
+                              <TableCell className="py-2">{category.subexpense_category || 'N/A'}</TableCell>
+                              <TableCell className="py-2">{category.expense_category || 'N/A'}</TableCell>
                               <TableCell className="py-2">
                                 <div className="flex space-x-2">
                                   <Button
