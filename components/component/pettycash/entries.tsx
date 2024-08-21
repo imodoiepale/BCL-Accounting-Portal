@@ -25,7 +25,6 @@ const formatDate = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
-
 const staticFloatData = [
   { payment_type: 'mpesa', float_allocated: 10000, float_used: 2500 },
   { payment_type: 'cash', float_allocated: 5000, float_used: 1500 },
@@ -57,6 +56,10 @@ export function TransactionsTab() {
   const [accounts, setAccounts] = useState([]);
   const [users, setUsers] = useState([]);
   const [floatData, setFloatData] = useState(calculateFloatData());
+  const [expenseCategories, setExpenseCategories] = useState([]);
+  const [expenseSubcategories, setExpenseSubcategories] = useState([]);
+
+
 
   const [newPettyCash, setNewPettyCash] = useState({
     amount: '',
@@ -64,7 +67,8 @@ export function TransactionsTab() {
     invoice_date: '',
     description: '',
     receipt_url: null,
-    expense_type: '',
+    expense_category: '',
+    subexpense_category: '',
     payment_type: '',
     checked_by: '',
     approved_by: '',
@@ -94,6 +98,35 @@ export function TransactionsTab() {
       setPettyCashEntries(data);
     }
   };
+
+  useEffect(() => {
+    const fetchExpenseCategories = async () => {
+      const { data, error } = await supabase
+        .from('acc_portal_pettycash_expense_categories')
+        .select('*')
+        .eq('userid', userId);
+      
+      if (data) {
+        const uniqueCategories = [...new Set(data.map(item => item.expense_category))];
+        setExpenseCategories(uniqueCategories);
+      }
+    };
+  
+    fetchExpenseCategories();
+  }, [userId]);
+  
+  const fetchSubcategories = async (selectedCategory) => {
+    const { data, error } = await supabase
+      .from('acc_portal_pettycash_expense_categories')
+      .select('subexpense_category')
+      .eq('userid', userId)
+      .eq('expense_category', selectedCategory);
+    
+    if (data) {
+      const uniqueSubcategories = [...new Set(data.map(item => item.subexpense_category).filter(Boolean))];
+      setExpenseSubcategories(uniqueSubcategories);
+    }
+  };  
 
   const fetchBranches = async () => {
     const { data, error } = await supabase
@@ -165,7 +198,9 @@ export function TransactionsTab() {
       .insert([{
         ...newPettyCash,
         receipt_url: receiptUrl,
-        userid: userId
+        userid: userId,
+        expense_category: newPettyCash.expense_category,
+        subexpense_category: newPettyCash.subexpense_category   
       }]);
 
     if (error) {
@@ -179,7 +214,8 @@ export function TransactionsTab() {
         invoice_date: '',
         description: '',
         receipt_url: null,
-        expense_type: '',
+        expense_category: '',
+        subexpense_category: '',
         payment_type: '',
         checked_by: '',
         approved_by: '',
@@ -220,7 +256,12 @@ export function TransactionsTab() {
   };
 
   const handleExpenseTypeChange = (value) => {
-    setNewPettyCash((prev) => ({ ...prev, expense_type: value }));
+    setNewPettyCash((prev) => ({ ...prev, expense_category: value }));
+    fetchSubcategories(value);
+  };
+
+  const handleSubExpenseTypeChange = (value) => {
+    setNewPettyCash((prev) => ({ ...prev, subexpense_category: value }));
   };
 
   const handlePaymentTypeChange = (value) => {
@@ -254,17 +295,17 @@ export function TransactionsTab() {
       onChange: handleFileChange,
     },
     {
-      id: 'expense_type',
+      id: 'expense_category',
       label: 'Expense Category',
       type: 'select',
-      options: [
-        { value: 'motor_vehicle_running_exp', label: 'Motor Vehicle Running Exp' },
-        { value: 'postage_telephone', label: 'Postage & Telephone' },
-        { value: 'staff_costs', label: 'Staff Costs' },
-        { value: 'repairs_maintenance', label: 'Repairs & Maintenance' },
-        { value: 'disallowable_exp', label: 'Disallowable Exp' },
-        { value: 'non', label: 'Non' },
-      ],
+      options: expenseCategories.map(cat => ({ value: cat.id, label: cat.name })),
+      onChange: handleExpenseTypeChange,
+    },
+    {
+      id: 'subexpense_category',
+      label: 'Expense SubCategory',
+      type: 'select',
+      options: expenseSubcategories.map(subcat => ({ value: subcat.id, label: subcat.name })),
       onChange: handleExpenseTypeChange,
     },
     {
@@ -287,7 +328,7 @@ export function TransactionsTab() {
 
   // Fields to be displayed in the table
   const tableFields = [
-    { label: 'Entry ID', key: 'id', format: (id) => `PC-${id}` },
+    // { label: 'Entry ID', key: 'id', format: (id) => `PC-${id}` },
     { label: 'User', key: 'user_name' },
     { label: 'Branch', key: 'branch_name' },
     { label: 'Account Type', key: 'account_type' },
@@ -295,7 +336,8 @@ export function TransactionsTab() {
     { label: 'Invoice Number', key: 'invoice_number' },
     { label: 'Invoice Date', key: 'invoice_date', format: (date) => formatDate(date) },
     { label: 'Description', key: 'description' },
-    { label: 'Expense Category', key: 'expense_type' },
+    { label: 'Expense Category', key: 'expense_category' },
+    { label: 'Expense SubCategory', key: 'subexpense_category' },
     { label: 'Checked By', key: 'checked_by' },
     { label: 'Approved By', key: 'approved_by' },
     {
@@ -397,20 +439,21 @@ export function TransactionsTab() {
                       accept: 'image/*',
                       onChange: handleFileChange,
                     },
-                    {
-                      id: 'expense_type',
-                      label: 'Expense Category',
-                      type: 'select',
-                      options: [
-                        { value: 'motor_vehicle_running_exp', label: 'Motor Vehicle Running Exp' },
-                        { value: 'postage_telephone', label: 'Postage & Telephone' },
-                        { value: 'staff_costs', label: 'Staff Costs' },
-                        { value: 'repairs_maintenance', label: 'Repairs & Maintenance' },
-                        { value: 'disallowable_exp', label: 'Disallowable Exp' },
-                        { value: 'non', label: 'Non' },
-                      ],
-                      onChange: handleExpenseTypeChange,
-                    }, {
+                      {
+                        id: 'expense_category',
+                        label: 'Expense Category',
+                        type: 'select',
+                        options: expenseCategories.map(cat => ({ value: cat, label: cat })),
+                        onChange: handleExpenseTypeChange,
+                      },
+                      {
+                        id: 'subexpense_category',
+                        label: 'Expense SubCategory',
+                        type: 'select',
+                        options: expenseSubcategories.map(subcat => ({ value: subcat, label: subcat })),
+                        onChange: handleSubExpenseTypeChange,
+                      },                    
+                     {
                       id: 'branch_name',
                       label: 'Branch',
                       type: 'select',
@@ -471,14 +514,16 @@ export function TransactionsTab() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>#</TableHead>
                 {tableFields.map(({ label }) => (
                   <TableHead key={label}>{label}</TableHead>
                 ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pettyCashEntries.map((entry) => (
+              {pettyCashEntries.map((entry, index) => (
                 <TableRow key={entry.id}>
+                  <TableCell>{index + 1}</TableCell>
                   {tableFields.map(({ key, format }) => (
                     <TableCell key={key}>
                       {format ? format(entry[key]) : entry[key]}

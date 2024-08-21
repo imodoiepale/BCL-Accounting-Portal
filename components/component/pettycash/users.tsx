@@ -78,6 +78,7 @@ export function UsersTab() {
       .eq('userid', userId);
     if (error) console.error('Error fetching branches:', error);
     else setBranches(data);
+    console.log("Branches: " , data)
   };
 
   // Update the table name in the handleSubmit function
@@ -127,7 +128,7 @@ export function UsersTab() {
     { label: 'Name', key: 'name' },
     { label: 'Email', key: 'email' },
     { label: 'Role', key: 'role' },
-    { label: 'Branch', key: 'branches.branch_name' },
+    { label: 'Branch', key: 'acc_portal_pettycash_branches.branch_name' },
     {
       label: 'Number of Accounts',
       key: 'account_count',
@@ -226,9 +227,12 @@ export function UsersTab() {
               {users.map((user) => (
                 <TableRow key={user.id}>
                   {tableFields.map(({ key, format }) => (
-                    <TableCell key={key}>
-                      {format ? format(user[key], user) : user[key]}
-                    </TableCell>
+                   <TableCell key={key}>
+                   {format 
+                     ? format(key.split('.').reduce((o, i) => o?.[i], user), user)
+                     : key.split('.').reduce((o, i) => o?.[i], user) || 'N/A'}
+                 </TableCell>
+                 
                   ))}
                 </TableRow>
               ))}
