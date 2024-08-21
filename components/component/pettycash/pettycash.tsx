@@ -60,7 +60,7 @@ export function PettyCashManager() {
   const fetchAccountsToReplenish = async () => {
     const { data, error } = await supabase
       .from('acc_portal_pettycash_accounts')
-      .select('id, account_name, balance, currency, acc_portal_pettycash_users(name)')
+      .select('id, account_type, balance, currency, acc_portal_pettycash_users(name)')
       .lt('balance', 1000)
       .order('balance', { ascending: true });
 
