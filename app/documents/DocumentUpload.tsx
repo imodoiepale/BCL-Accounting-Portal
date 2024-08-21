@@ -185,7 +185,7 @@ export function PreviousMonths({ type }: { type: 'supplier' | 'bank' }) {
           ))}
         </div>
       </div>
-      <div className="w-full md:w-3/4 lg:w-4/5 p-4">
+      <div className="w-full  p-4">
         {selectedMonth && (
           <CombinedMonthlyDocs 
             type={type}

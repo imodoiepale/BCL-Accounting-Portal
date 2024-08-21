@@ -373,12 +373,22 @@ export function TransactionsTab() {
                 </SheetHeader>
                 <div className="flex flex-col pt-4 gap-4">
                   {[
-                    { id: 'amount', label: 'Amount', type: 'number', placeholder: '1000' },
-                    { id: 'invoice_number', label: 'Invoice Number', type: 'text', placeholder: 'INV-123456' },
-                    { id: 'invoice_date', label: 'Invoice Date', type: 'date', placeholder: '' },
-                    { id: 'description', label: 'Description', type: 'text', placeholder: 'Description of the petty cash' },
-                    { id: 'checked_by', label: 'Checked By', type: 'text', placeholder: 'John Doe' },
-                    { id: 'approved_by', label: 'Approved By', type: 'text', placeholder: 'Jane Smith' },
+                     { id: 'invoice_number', label: 'Invoice Number', type: 'text', placeholder: 'INV-123456' },
+                     { id: 'invoice_date', label: 'Invoice Date', type: 'date', placeholder: '' },
+                    {
+                      id: 'branch_name',
+                      label: 'Branch',
+                      type: 'select',
+                      options: branches.map(branch => ({ value: branch.branch_name, label: branch.branch_name })),
+                      onChange: (value) => setNewPettyCash(prev => ({ ...prev, branch_name: value })),
+                    },
+                    {
+                      id: 'user_name',
+                      label: 'User',
+                      type: 'select',
+                      options: users.map(user => ({ value: user.name, label: user.name })),
+                      onChange: (value) => setNewPettyCash(prev => ({ ...prev, user_name: value })),
+                    },
                     {
                       id: 'account_type',
                       label: 'Account Type',
@@ -389,13 +399,6 @@ export function TransactionsTab() {
                         { value: 'mpesa', label: 'M-Pesa' },
                       ],
                       onChange: (value) => setNewPettyCash(prev => ({ ...prev, account_type: value })),
-                    },
-                    {
-                      id: 'receipt',
-                      label: 'Receipt Image',
-                      type: 'file',
-                      accept: 'image/*',
-                      onChange: handleFileChange,
                     },
                     {
                       id: 'expense_type',
@@ -410,21 +413,20 @@ export function TransactionsTab() {
                         { value: 'non', label: 'Non' },
                       ],
                       onChange: handleExpenseTypeChange,
-                    }, {
-                      id: 'branch_name',
-                      label: 'Branch',
-                      type: 'select',
-                      options: branches.map(branch => ({ value: branch.branch_name, label: branch.branch_name })),
-                      onChange: (value) => setNewPettyCash(prev => ({ ...prev, branch_name: value })),
-                    },
+                    }, 
+                    { id: 'amount', label: 'Amount', type: 'number', placeholder: '1000' },
+                   
+                    { id: 'description', label: 'Description', type: 'text', placeholder: 'Description of the petty cash' },
+                    { id: 'checked_by', label: 'Checked By', type: 'text', placeholder: 'John Doe' },
+                    { id: 'approved_by', label: 'Approved By', type: 'text', placeholder: 'Jane Smith' },
+                    
                     {
-                      id: 'user_name',
-                      label: 'User',
-                      type: 'select',
-                      options: users.map(user => ({ value: user.name, label: user.name })),
-                      onChange: (value) => setNewPettyCash(prev => ({ ...prev, user_name: value })),
+                      id: 'receipt',
+                      label: 'Receipt Image',
+                      type: 'file',
+                      accept: 'image/*',
+                      onChange: handleFileChange,
                     },
-
                   ].map(({ id, label, type, placeholder, options, onChange, accept }) => (
                     <div key={id} className="space-y-1">
                       <Label htmlFor={id}>{label}</Label>
