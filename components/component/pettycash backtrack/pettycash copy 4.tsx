@@ -2,7 +2,7 @@
 // @ts-nocheck
 "use client";
 
-import PettyCashManager from './pettycash/pettycash';
+import PettyCashManager from '../pettycash/pettycash';
 
 export function PettyCash() {
 
