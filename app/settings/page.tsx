@@ -1,124 +1,109 @@
 //@ts-nocheck
 
 "use client";
-
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState, useEffect } from 'react';
-import supabase from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import supabase from '@/lib/supabaseClient';
 
 const SettingsPage = () => {
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [newDocument, setNewDocument] = useState({
+    name: '',
+    department: '',
+    validity_days: '',
+    reminder_days: '',
 
-  const [kraDocuments, setKraDocuments] = useState([]);
-  const [sheriaDocuments, setSheriaDocuments] = useState([]);
+  });
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   useEffect(() => {
-    fetchDocuments('KRA');
-    fetchDocuments('Sheria House');
+    fetchDocuments();
   }, []);
 
-  const fetchDocuments = async (department) => {
+  const fetchDocuments = async () => {
     const { data, error } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('department', department);
+      .from('acc_portal_kyc')
+      .select('*');
     if (error) console.error('Error fetching documents:', error);
+    else setDocuments(data);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewDocument(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddDocument = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_kyc')
+      .insert([{
+        ...newDocument,
+        validity_days: parseInt(newDocument.validity_days),
+        reminder_days: parseInt(newDocument.reminder_days),
+      }]);
+    if (error) console.error('Error adding document:', error);
     else {
-      if (department === 'KRA') setKraDocuments(data);
-      if (department === 'Sheria House') setSheriaDocuments(data);
+      fetchDocuments();
+      setNewDocument({ name: '', department: '', validity_days: '', reminder_days: '' });
+      setIsAddDialogOpen(false);
     }
   };
 
-  const handleInputChange = (e, index, department) => {
-    const { name, value } = e.target;
-    const updatedDocuments = department === 'KRA' ? [...kraDocuments] : [...sheriaDocuments];
-    updatedDocuments[index][name] = value;
-    department === 'KRA' ? setKraDocuments(updatedDocuments) : setSheriaDocuments(updatedDocuments);
-  };
-
-  const handleSave = async (document, department) => {
+  const handleToggleListed = async (id, currentValue) => {
     const { error } = await supabase
-      .from('documents')
-      .upsert(document, { onConflict: ['id'] });
-    if (error) console.error('Error saving document:', error);
-    else fetchDocuments(department);
+      .from('acc_portal_kyc')
+      .update({ listed: !currentValue })
+      .eq('id', id);
+    if (error) console.error('Error updating document:', error);
+    else fetchDocuments();
   };
 
-  const renderDocumentTable = (documents, department) => (
+  const renderDocumentTable = (department) => (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Document Name</TableHead>
           <TableHead>Department</TableHead>
-          <TableHead>Issue Date</TableHead>
-          <TableHead>Expiry Date</TableHead>
           <TableHead>Validity Days</TableHead>
-          <TableHead>Reminder Days</TableHead>
-          <TableHead>Actions</TableHead>
+          <TableHead>Listed</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {documents.map((doc, index) => (
-          <TableRow key={index}>
-            <TableCell>
-              <Input
-                name="name"
-                value={doc.name}
-                onChange={(e) => handleInputChange(e, index, department)}
-              />
-            </TableCell>
-            <TableCell>{doc.department}</TableCell>
-            <TableCell>
-              <Input
-                name="issueDate"
-                value={doc.issue_date}
-                onChange={(e) => handleInputChange(e, index, department)}
-              />
-            </TableCell>
-            <TableCell>
-              <Input
-                name="expiryDate"
-                value={doc.expiry_name}
-                onChange={(e) => handleInputChange(e, index, department)}
-              />
-            </TableCell>
-            <TableCell>
-              <Input
-                name="validityDays"
-                value={doc.validity_days}
-                onChange={(e) => handleInputChange(e, index, department)}
-              />
-            </TableCell>
-            <TableCell>
-              <Input
-                name="reminderDays"
-                value={doc.reminder_days}
-                onChange={(e) => handleInputChange(e, index, department)}
-              />
-            </TableCell>
-            <TableCell>
-              <Button onClick={() => handleSave(doc, department)}>Save</Button>
-            </TableCell>
-          </TableRow>
-        ))}
+        {documents
+          .filter(doc => doc.department === department)
+          .map((doc) => (
+            <TableRow key={doc.id}>
+              <TableCell>{doc.name}</TableCell>
+              <TableCell>{doc.department}</TableCell>
+              <TableCell>{doc.validity_days}</TableCell>
+              <TableCell>
+                <Switch
+                  checked={doc.listed}
+                  onCheckedChange={() => handleToggleListed(doc.id, doc.listed)}
+                />
+              </TableCell>
+            </TableRow>
+          ))}
       </TableBody>
     </Table>
   );
 
   return (
-    <div className=" w-full p-4">
-      <h1 className="text-3xl font-bold ">Settings</h1>
+    <div className="w-full p-4">
+      <h1 className="text-3xl font-bold">Settings</h1>
 
-      <Tabs defaultValue="Notifications" className="w-full">
+      <Tabs defaultValue="notifications" className="w-full">
         <TabsList>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
@@ -211,7 +196,7 @@ const SettingsPage = () => {
         <TabsContent value="docs">
           <Tabs defaultValue="company-docs" className="w-full">
             <TabsList>
-              <TabsTrigger value="company-docs">Companys Documents</TabsTrigger>
+              <TabsTrigger value="company-docs">Company Documents</TabsTrigger>
               <TabsTrigger value="directors-docs">Directors Documents</TabsTrigger>
               <TabsTrigger value="suppliers-docs">Suppliers Documents</TabsTrigger>
               <TabsTrigger value="banks-docs">Banks Documents</TabsTrigger>
@@ -234,7 +219,7 @@ const SettingsPage = () => {
                       <h2 className="text-2xl font-semibold">KRA Documents</h2>
                     </CardHeader>
                     <CardContent>
-                      {renderDocumentTable(kraDocuments, 'KRA')}
+                      {renderDocumentTable('KRA')}
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -245,11 +230,60 @@ const SettingsPage = () => {
                       <h2 className="text-2xl font-semibold">Sheria Documents</h2>
                     </CardHeader>
                     <CardContent>
-                      {renderDocumentTable(sheriaDocuments, 'Sheria House')}
+                      {renderDocumentTable('Sheria House')}
                     </CardContent>
                   </Card>
                 </TabsContent>
               </Tabs>
+
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="mt-4">Add New Document</Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add New Document</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      {/* Existing input fields */}
+                      <Input
+                        name="name"
+                        placeholder="Document Name"
+                        value={newDocument.name}
+                        onChange={handleInputChange}
+                      />
+                      <Select
+                        name="department"
+                        value={newDocument.department}
+                        onValueChange={(value) => setNewDocument(prev => ({ ...prev, department: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="KRA">KRA</SelectItem>
+                          <SelectItem value="Sheria House">Sheria House</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        name="validity_days"
+                        type="number"
+                        placeholder="Validity Days"
+                        value={newDocument.validity_days}
+                        onChange={handleInputChange}
+                      />
+                      {/* New input field for reminder days */}
+                      <Input
+                        name="reminder_days"
+                        type="number"
+                        placeholder="Reminder Days"
+                        value={newDocument.reminder_days}
+                        onChange={handleInputChange}
+                      />
+                      <Button onClick={handleAddDocument}>Add Document</Button>
+                    </div>
+                  </DialogContent>
+              </Dialog>
             </TabsContent>
 
             <TabsContent value="suppliers-docs">
