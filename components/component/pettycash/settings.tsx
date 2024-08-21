@@ -155,6 +155,7 @@ export function PettyCashSettings({ settings, setSettings, accountsToReplenish, 
                         />
                       </div>
                     </div>
+                    
                   </Card>
                   <Card className="p-4">
                     <h3 className="text-sm font-medium mb-2">User Account Limits</h3>
@@ -230,6 +231,7 @@ export function PettyCashSettings({ settings, setSettings, accountsToReplenish, 
                             // onCheckedChange={(checked) => handleSettingChange('transactions', 'attachmentRequired', checked)}
                           />
                         </div>
+                            
                       </CardContent>
                     </Card>
                   </TabsContent>
