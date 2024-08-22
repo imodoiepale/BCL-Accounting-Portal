@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RefreshCwIcon, UploadIcon, EyeIcon, ArrowUpDown, Edit2Icon } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast, Toaster } from 'react-hot-toast'
 import dynamic from 'next/dynamic'
 import { useAuth } from '@clerk/clerk-react'
 
@@ -31,6 +31,16 @@ const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
   return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+};
+
+const calculateRemainingDays = (issueDate, expiryDate, validityDays) => {
+  if (!issueDate || !expiryDate || !validityDays) return 'N/A';
+  
+  const today = new Date();
+  const expiry = new Date(expiryDate);
+  const remainingDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+  
+  return remainingDays > 0 ? remainingDays : 0;
 };
 
 const FileViewer = ({ url, onClose }) => {
@@ -85,8 +95,12 @@ export function KYCDocumentsList() {
       .eq('listed', true)
       .order('id', { ascending: true });
 
-    if (documentError) console.error('Error fetching documents:', documentError)
-    else setDocuments(documentData)
+    if (documentError) {
+      console.error('Error fetching documents:', documentError)
+      toast.error('Failed to fetch documents. Please try again.')
+    } else {
+      setDocuments(documentData)
+    }
   }
 
   const handleInputChange = (e) => {
@@ -106,11 +120,7 @@ export function KYCDocumentsList() {
 
       if (error) {
         console.error('Error creating signed URL:', error)
-        toast({
-          title: "Error",
-          description: "Failed to retrieve document. Please try again.",
-          variant: "destructive",
-        })
+        toast.error("Failed to retrieve document. Please try again.")
         return
       }
 
@@ -122,17 +132,14 @@ export function KYCDocumentsList() {
         id: doc.id,
         issue_date: doc.issue_date || '',
         expiry_date: doc.expiry_date || '',
+        validity_days: doc.validity_days || '',
       })
     }
   }
 
   const handleFileUpload = async () => {
     if (!file || !editingDocument) {
-      toast({
-        title: "Error",
-        description: "Please select a file and fill in all fields.",
-        variant: "destructive",
-      })
+      toast.error("Please select a file and fill in all fields.")
       return
     }
 
@@ -152,7 +159,9 @@ export function KYCDocumentsList() {
         .update({ 
           filepath: data.path,
           issue_date: editingDocument.issue_date,
-          expiry_date: editingDocument.expiry_date
+          expiry_date: editingDocument.expiry_date,
+          validity_days: editingDocument.validity_days,
+          reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date, editingDocument.validity_days).toString()
         })
         .eq('id', editingDocument.id)
         .eq('listed', true)
@@ -161,10 +170,7 @@ export function KYCDocumentsList() {
         throw new Error(`Document update failed: ${updateError.message}`)
       }
 
-      toast({
-        title: "Success",
-        description: "Document uploaded and updated successfully",
-      })
+      toast.success("Document uploaded and updated successfully")
 
       fetchDocuments()
       setIsUploadingDocument(false)
@@ -172,11 +178,7 @@ export function KYCDocumentsList() {
       setFile(null)
     } catch (error) {
       console.error('Error in handleFileUpload:', error)
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      })
+      toast.error(error.message)
     }
   }
 
@@ -185,6 +187,7 @@ export function KYCDocumentsList() {
       id: doc.id,
       issue_date: doc.issue_date || '',
       expiry_date: doc.expiry_date || '',
+      validity_days: doc.validity_days || '',
     })
   }
 
@@ -194,7 +197,9 @@ export function KYCDocumentsList() {
         .from('acc_portal_kyc')
         .update({
           issue_date: editingDocument.issue_date,
-          expiry_date: editingDocument.expiry_date
+          expiry_date: editingDocument.expiry_date,
+          validity_days: editingDocument.validity_days,
+          reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date, editingDocument.validity_days).toString()
         })
         .eq('id', editingDocument.id)
 
@@ -202,20 +207,13 @@ export function KYCDocumentsList() {
         throw new Error(`Document update failed: ${error.message}`)
       }
 
-      toast({
-        title: "Success",
-        description: "Document updated successfully",
-      })
+      toast.success("Document updated successfully")
 
       fetchDocuments()
       setEditingDocument(null)
     } catch (error) {
       console.error('Error in handleUpdate:', error)
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      })
+      toast.error(error.message)
     }
   }
 
@@ -256,6 +254,7 @@ export function KYCDocumentsList() {
 
   return (
     <div className="flex w-full bg-gray-100 h-screen">
+      <Toaster position="top-right" />
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-semibold">KYC Documents</h1>
@@ -291,6 +290,12 @@ export function KYCDocumentsList() {
                 <TableHead onClick={() => handleSort('expiry_date')} className="cursor-pointer bg-gray-200 font-medium">
                   Expiry Date {sortColumn === 'expiry_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
+                <TableHead onClick={() => handleSort('validity_days')} className="cursor-pointer bg-gray-200 font-medium">
+                  Validity Days {sortColumn === 'validity_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead onClick={() => handleSort('reminder_days')} className="cursor-pointer bg-gray-200 font-medium">
+                  Reminder Days {sortColumn === 'reminder_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
                 <TableHead className="bg-gray-200 font-medium">Status</TableHead>
                 <TableHead className="bg-gray-200 font-medium">Actions</TableHead>
               </TableRow>
@@ -303,6 +308,8 @@ export function KYCDocumentsList() {
                   <TableCell>{doc.department}</TableCell>
                   <TableCell>{doc.filepath ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
                   <TableCell>{doc.filepath ? formatDate(doc.expiry_date) : 'Pending'}</TableCell>
+                  <TableCell>{doc.validity_days || 'N/A'}</TableCell>
+                  <TableCell>{doc.reminder_days || 'N/A'}</TableCell>
                   <TableCell>
                     <Badge className={doc.filepath ? 'bg-green-500' : 'bg-yellow-500'}>
                       {doc.filepath ? 'Uploaded' : 'Pending'}
@@ -318,8 +325,7 @@ export function KYCDocumentsList() {
                       Edit
                     </Button>
                   </TableCell>
-                </TableRow>
-              ))}
+                </TableRow>))}
             </TableBody>
           </Table>
         </Card>
@@ -352,6 +358,16 @@ export function KYCDocumentsList() {
                   />
                 </div>
                 <div>
+                  <Label htmlFor="validity_days">Validity Days</Label>
+                  <Input 
+                    id="validity_days" 
+                    type="number" 
+                    value={editingDocument?.validity_days || ''} 
+                    onChange={handleInputChange} 
+                    required 
+                  />
+                </div>
+                <div>
                   <Label htmlFor="file">Upload Document</Label>
                   <Input id="file" type="file" onChange={handleFileChange} required />
                 </div>
@@ -360,7 +376,8 @@ export function KYCDocumentsList() {
                 <Button className="bg-blue-600 text-white mr-2" onClick={handleFileUpload}>Upload</Button>
                 <Button variant="outline" onClick={() => {
                   setIsUploadingDocument(false);
-                  setEditingDocument(null);setFile(null);
+                  setEditingDocument(null);
+                  setFile(null);
                 }}>Cancel</Button>
               </div>
             </DialogContent>
@@ -390,6 +407,16 @@ export function KYCDocumentsList() {
                     id="expiry_date" 
                     type="date" 
                     value={editingDocument.expiry_date} 
+                    onChange={handleInputChange} 
+                    required 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="validity_days">Validity Days</Label>
+                  <Input 
+                    id="validity_days" 
+                    type="number" 
+                    value={editingDocument.validity_days} 
                     onChange={handleInputChange} 
                     required 
                   />
