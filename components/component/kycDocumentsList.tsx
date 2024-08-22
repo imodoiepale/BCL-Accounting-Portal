@@ -56,7 +56,7 @@ const FileViewer = ({ url, onClose }) => {
   )
 }
 
-export function KYCDocumentsList() {
+export function KYCDocumentsList({ category, subcategory }) {
   const {userId} = useAuth()
 
   const [documents, setDocuments] = useState([])
@@ -73,7 +73,8 @@ export function KYCDocumentsList() {
     createBucketAndFolders().then(() => {
       fetchDocuments()
     })
-  }, [userId])
+  }, [userId, category, subcategory])
+
 
   const createBucketAndFolders = async () => {
     const { data: bucketData, error: bucketError } = await supabase.storage.createBucket('kyc-documents', {
@@ -89,11 +90,17 @@ export function KYCDocumentsList() {
   }
 
   const fetchDocuments = async () => {
-    const { data: documentData, error: documentError } = await supabase
+    let query = supabase
       .from('acc_portal_kyc')
       .select('*')
       .eq('listed', true)
-      .order('id', { ascending: true });
+      .eq('category', category)
+
+    if (subcategory) {
+      query = query.eq('subcategory', subcategory)
+    }
+
+    const { data: documentData, error: documentError } = await query.order('id', { ascending: true });
 
     if (documentError) {
       console.error('Error fetching documents:', documentError)
@@ -252,12 +259,12 @@ export function KYCDocumentsList() {
     )
   }
 
-  return (
-    <div className="flex w-full bg-gray-100 h-screen">
+   return (
+    <div className="flex w-full bg-gray-100">
       <Toaster position="top-right" />
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-semibold">KYC Documents</h1>
+          <h1 className="text-xl font-semibold">KYC Documents - {category} {subcategory && `- ${subcategory}`}</h1>
           <div className="flex items-center space-x-2">
             <Input 
               type="search" 
