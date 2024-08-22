@@ -1,6 +1,5 @@
 //@ts-nocheck
 "use client"
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { createClient } from '@supabase/supabase-js';
@@ -73,7 +72,7 @@ interface ReportTableProps {
   addButtonText: string;
 }
 
-const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addButtonText }) => {
+const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fetchData, addButtonText }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
@@ -85,6 +84,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
   const [emailSending, setEmailSending] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [data, setData] = useState<DataRow[]>(initialData);
 
   const { user } = useUser();
 
@@ -93,6 +93,14 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
 
   useEffect(() => {
     fetchData(fromDate.toISOString().split('T')[0], toDate.toISOString().split('T')[0]);
+  }, [fromDate, toDate, fetchData]);
+
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      fetchData(fromDate.toISOString().split('T')[0], toDate.toISOString().split('T')[0]);
+    }, 60000); // Refresh every minute
+
+    return () => clearInterval(refreshInterval);
   }, [fromDate, toDate, fetchData]);
 
   const visibleMonths = useMemo(() => {
@@ -201,9 +209,9 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
     setIsUploading(true);
 
     if (!selectedEntity || !selectedMonth || !uploadFile) {
-        toast.error("Missing required information");
-        setIsUploading(false);
-        return;
+      toast.error("Missing required information");
+      setIsUploading(false);
+      return;
     }
 
     const closingBalance = (e.currentTarget.elements.namedItem('closingBalance') as HTMLInputElement).value;
@@ -211,102 +219,118 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
     const endDate = new Date(selectedMonth.year, selectedMonth.month + 1, 0);
 
     const uploadPromise = new Promise(async (resolve, reject) => {
-        try {
-            console.log('Selected entity:', selectedEntity);
+      try {
+        console.log('Selected entity:', selectedEntity);
 
-            // Extract numeric part of entity ID
-            const entityIdMatch = selectedEntity.id.match(/\d+/);
-            if (!entityIdMatch) {
-                throw new Error('Invalid entity ID: ' + selectedEntity.id);
-            }
-            const entityId = parseInt(entityIdMatch[0]);
-            console.log('Parsed entity ID:', entityId);
-
-            if (isNaN(entityId)) {
-                throw new Error('Invalid entity ID: ' + selectedEntity.id);
-            }
-
-            const year = selectedMonth.year.toString();
-            const monthName = MONTHS[selectedMonth.month];
-            const isSupplier = selectedEntity.id.startsWith('S-');
-            const directoryPath = `Monthly-Documents/${isSupplier ? 'suppliers' : 'banks'}/${year}/${monthName}/${selectedEntity.name}/`;
-
-            const bucketName = 'Accounting-Portal';
-            const filePath = `${directoryPath}${uploadFile.name}`;
-
-            const { data: fileData, error: uploadError } = await supabase.storage
-                .from(bucketName)
-                .upload(filePath, uploadFile, {
-                    cacheControl: '3600',
-                    upsert: false
-                });
-
-            if (uploadError) {
-                console.error('Upload error:', uploadError);
-                throw new Error(uploadError.message || 'Error uploading file');
-            }
-
-            if (!fileData) {
-                throw new Error('No file data returned from upload');
-            }
-
-            const { data: publicUrlData } = supabase.storage
-                .from(bucketName)
-                .getPublicUrl(filePath);
-
-            const publicUrl = publicUrlData?.publicUrl;
-
-            if (!publicUrl) {
-                throw new Error('Failed to get public URL for the uploaded file');
-            }
-
-            const tableName = 'acc_portal_monthly_files_upload';
-
-            const insertData = {
-                [isSupplier ? 'supplier_id' : 'bank_id']: entityId,
-                document_type: isSupplier ? 'supplier statement' : 'bank statement',
-                upload_date: new Date().toISOString(),
-                is_verified: false,
-                docs_date_range: startDate.toISOString().split('T')[0],
-                closing_balance: parseFloat(closingBalance),
-                balance_verification: false,
-                docs_date_range_end: endDate.toISOString().split('T')[0],
-                file_path: publicUrl,
-                upload_status: 'Uploaded',
-                userid: user?.id,
-            };
-
-            console.log('Data to be inserted:', insertData);
-
-            const { error: insertError } = await supabase
-                .from(tableName)
-                .insert(insertData);
-
-            if (insertError) {
-                console.error('Insert error:', insertError);
-                throw new Error(insertError.message || 'Error inserting file metadata');
-            }
-
-            resolve('File uploaded successfully');
-        } catch (error) {
-            console.error('Error in upload process:', error);
-            reject(error instanceof Error ? error.message : 'Unknown error');
+        // Extract numeric part of entity ID
+        const entityIdMatch = selectedEntity.id.match(/\d+/);
+        if (!entityIdMatch) {
+          throw new Error('Invalid entity ID: ' + selectedEntity.id);
         }
+        const entityId = parseInt(entityIdMatch[0]);
+        console.log('Parsed entity ID:', entityId);
+
+        if (isNaN(entityId)) {
+          throw new Error('Invalid entity ID: ' + selectedEntity.id);
+        }
+
+        const year = selectedMonth.year.toString();
+        const monthName = MONTHS[selectedMonth.month];
+        const isSupplier = selectedEntity.id.startsWith('S-');
+        const directoryPath = `Monthly-Documents/${isSupplier ? 'suppliers' : 'banks'}/${year}/${monthName}/${selectedEntity.name}/`;
+
+        const bucketName = 'Accounting-Portal';
+        const filePath = `${directoryPath}${uploadFile.name}`;
+
+        const { data: fileData, error: uploadError } = await supabase.storage
+          .from(bucketName)
+          .upload(filePath, uploadFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw new Error(uploadError.message || 'Error uploading file');
+        }
+
+        if (!fileData) {
+          throw new Error('No file data returned from upload');
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(filePath);
+
+        const publicUrl = publicUrlData?.publicUrl;
+
+        if (!publicUrl) {
+          throw new Error('Failed to get public URL for the uploaded file');
+        }
+
+        const tableName = 'acc_portal_monthly_files_upload';
+
+        const insertData = {
+          [isSupplier ? 'supplier_id' : 'bank_id']: entityId,
+          document_type: isSupplier ? 'supplier statement' : 'bank statement',
+          upload_date: new Date().toISOString(),
+          is_verified: false,
+          docs_date_range: startDate.toISOString().split('T')[0],
+          closing_balance: parseFloat(closingBalance),
+          balance_verification: false,
+          docs_date_range_end: endDate.toISOString().split('T')[0],
+          file_path: publicUrl,
+          upload_status: 'Uploaded',
+          userid: user?.id,
+        };
+
+        console.log('Data to be inserted:', insertData);
+
+        const { error: insertError } = await supabase
+          .from(tableName)
+          .insert(insertData);
+
+        if (insertError) {
+          console.error('Insert error:', insertError);
+          throw new Error(insertError.message || 'Error inserting file metadata');
+        }
+
+        // Update the local state to reflect the new upload
+        const updatedEntity = {...selectedEntity};
+        if (!updatedEntity.months[selectedMonth.month]) {
+          updatedEntity.months[selectedMonth.month] = {};
+        }
+        updatedEntity.months[selectedMonth.month].upload_status = 'uploaded';
+        updatedEntity.months[selectedMonth.month].isVerified = false;
+        updatedEntity.months[selectedMonth.month].startDate = startDate.toISOString().split('T')[0];
+        updatedEntity.months[selectedMonth.month].endDate = endDate.toISOString().split('T')[0];
+
+        // Update the data state
+        setData(prevData => prevData.map(entity => 
+          entity.id === updatedEntity.id ? updatedEntity : entity
+        ));
+
+        resolve('File uploaded successfully');
+      } catch (error) {
+        console.error('Error in upload process:', error);
+        reject(error instanceof Error ? error.message : 'Unknown error');
+      }
     });
 
     toast.promise(uploadPromise, {
-        loading: 'Uploading file...',
-        success: 'File uploaded successfully',
-        error: (err) => `Error uploading file: ${err}`
+      loading: 'Uploading file...',
+      success: 'File uploaded successfully',
+      error: (err) => `Error uploading file: ${err}`
     }).then(() => {
-        setUploadDialogOpen(false);
-        setUploadFile(null);
-        setSelectedMonth(null);
-        fetchData(fromDate.toISOString().split('T')[0], toDate.toISOString().split('T')[0]);
+      setUploadDialogOpen(false);
+      setUploadFile(null);
+      setSelectedMonth(null);
+      // Fetch fresh data from the server
+      fetchData(fromDate.toISOString().split('T')[0], toDate.toISOString().split('T')[0]);
     }).finally(() => {
-        setIsUploading(false);
+      setIsUploading(false);
     });
-};
+  };
 
   const columns: ColumnDef<DataRow>[] = useMemo(() => [
     {
@@ -360,8 +384,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="text-wrap"
-        >
+          className="text-wrap">
           Start Date
           <ArrowUpDown className="h-4 w-4" />
         </Button>
@@ -369,7 +392,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
       cell: ({ row }) => <div className="text-center">{row.getValue("startDate")}</div>,
     },
     ...visibleMonths.map((monthData, index) => ({
-      id: `${monthData.year}`,
+      id: `${monthData.year}-${monthData.month}`,
       accessorKey: `months.${index}`,
       header: ({ column }) => (
         <Button
@@ -387,20 +410,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
         const cellDate = new Date(visibleMonths[index].date);
         const currentDate = new Date();
         
-        let startDate: Date | null = null;
-        if (startDateString) {
-          // Try to parse the date, accounting for different formats
-          const parsedDate = new Date(startDateString);
-          if (!isNaN(parsedDate.getTime())) {
-            startDate = parsedDate;
-          } else {
-            // If standard parsing fails, try DD.MM.YYYY format
-            const [day, month, year] = startDateString.split('.');
-            if (day && month && year) {
-              startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-            }
-          }
-        }
+        let startDate: Date | null = parseDate(startDateString);
         
         let cellContent;
         let bgColor;
@@ -419,7 +429,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
           bgColor = 'bg-gray-100';
           tooltipContent = <p>Future month</p>;
         } else if (monthData) {
-          if (monthData.status === 'uploaded') {
+          if (monthData.upload_status === 'uploaded') {
             cellContent = monthData.isVerified ? '✅' : '⏳';
             bgColor = monthData.isVerified ? 'bg-green-200' : 'bg-yellow-200';
           } else {
@@ -428,7 +438,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
           }
           tooltipContent = (
             <>
-              <p>Status: {monthData.status}</p>
+              <p>Status: {monthData.upload_status}</p>
               <p>Verified: {monthData.isVerified ? '✅' : '❌'}</p>
               {monthData.startDate && <p>Start: {monthData.startDate}</p>}
               {monthData.endDate && <p>End: {monthData.endDate}</p>}
@@ -641,87 +651,87 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, title, fetchData, addBu
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  No results.
                 </TableCell>
-              ))}
-            </TableRow>
-          ))
-        ) : (
-          <TableRow>
-            <TableCell colSpan={columns.length} className="h-24 text-center">
-              No results.
-            </TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
-  </div>
-  <div className="flex items-center justify-end space-x-2 py-4">
-    <div className="flex-1 text-sm text-muted-foreground">
-      {table.getFilteredSelectedRowModel().rows.length} of{" "}
-      {table.getFilteredRowModel().rows.length} row(s) selected.
-    </div>
-    <div className="space-x-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => table.previousPage()}
-        disabled={!table.getCanPreviousPage()}
-      >
-        Previous
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => table.nextPage()}
-        disabled={!table.getCanNextPage()}
-      >
-        Next
-      </Button>
-    </div>
-  </div>
-
-  <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Upload Document for {selectedMonth ? `${MONTHS[selectedMonth.month]} ${selectedMonth.year}` : ''}</DialogTitle>
-      </DialogHeader>
-      <form onSubmit={uploadDocument}>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <label htmlFor="startDate">Start Date:</label>
-            <Input id="startDate" value={selectedMonth ? `${selectedMonth.year}-${String(selectedMonth.month + 1).padStart(2, '0')}-01` : ''} readOnly className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <label htmlFor="endDate">End Date:</label>
-            <Input id="endDate" value={selectedMonth ? new Date(selectedMonth.year, selectedMonth.month + 1, 0).toISOString().split('T')[0] : ''} readOnly className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <label htmlFor="closingBalance">Closing Balance:</label>
-            <Input id="closingBalance" type="number" className="col-span-3" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <label htmlFor="document">Document:</label>
-            <Input 
-              id="document" 
-              type="file" 
-              className="col-span-3" 
-              onChange={handleFileChange}
-              required 
-            />
-          </div>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <div className="flex-1 text-sm text-muted-foreground">
+          {table.getFilteredSelectedRowModel().rows.length} of{" "}
+          {table.getFilteredRowModel().rows.length} row(s) selected.
         </div>
-        <div className="flex justify-end mt-4">
-          <Button type="submit" disabled={isUploading}>
-            {isUploading ? 'Uploading...' : 'Submit'}
+        <div className="space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next
           </Button>
         </div>
-      </form>
-    </DialogContent>
-  </Dialog>
-</div>
-);
+      </div>
+
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Document for {selectedMonth ? `${MONTHS[selectedMonth.month]} ${selectedMonth.year}` : ''}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={uploadDocument}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="startDate">Start Date:</label>
+                <Input id="startDate" value={selectedMonth ? `${selectedMonth.year}-${String(selectedMonth.month + 1).padStart(2, '0')}-01` : ''} readOnly className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="endDate">End Date:</label>
+                <Input id="endDate" value={selectedMonth ? new Date(selectedMonth.year, selectedMonth.month + 1, 0).toISOString().split('T')[0] : ''} readOnly className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="closingBalance">Closing Balance:</label>
+                <Input id="closingBalance" type="number" className="col-span-3" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="document">Document:</label>
+                <Input 
+                  id="document" 
+                  type="file" 
+                  className="col-span-3" 
+                  onChange={handleFileChange}
+                  required 
+                />
+              </div>
+            </div>
+            <div className="flex justify-end mt-4">
+              <Button type="submit" disabled={isUploading}>
+                {isUploading ? 'Uploading...' : 'Submit'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
 export default ReportTable;
