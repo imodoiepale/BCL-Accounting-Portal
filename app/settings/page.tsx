@@ -2,10 +2,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -13,17 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import supabase from '@/lib/supabaseClient';
 import { toast, Toaster } from 'react-hot-toast';
+import { Switch } from "@/components/ui/switch";
 
 const SettingsPage = () => {
-  const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [newDocument, setNewDocument] = useState({
     name: '',
     category: '',
     subcategory: '',
     validity_days: '',
-    reminder_days: '',
     department: '',
   });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -63,13 +57,9 @@ const SettingsPage = () => {
     const newDoc = {
       ...newDocument,
       category: activeCategory,
+      subcategory: activeSubcategory || '',
       validity_days: parseInt(newDocument.validity_days),
-      reminder_days: parseInt(newDocument.reminder_days),
     };
-
-    if (activeSubcategory) {
-      newDoc.subcategory = activeSubcategory;
-    }
 
     const { data, error } = await supabase
       .from('acc_portal_kyc')
@@ -80,7 +70,7 @@ const SettingsPage = () => {
       toast.error('Failed to add document');
     } else {
       fetchDocuments();
-      setNewDocument({ name: '', validity_days: '', reminder_days: '', department: '' });
+      setNewDocument({ name: '', validity_days: '', department: '' });
       setIsAddDialogOpen(false);
       toast.success('Document added successfully');
     }
@@ -96,7 +86,7 @@ const SettingsPage = () => {
       toast.error('Failed to update document');
     } else {
       fetchDocuments();
-      toast.success('Success!!');
+      toast.success('Document listing updated');
     }
   };
 
@@ -155,7 +145,6 @@ const SettingsPage = () => {
             onChange={handleInputChange}
             className="w-full"
           />
-         
           <Input
             name="department"
             placeholder="Department"
@@ -253,8 +242,8 @@ const SettingsPage = () => {
 
         <TabsContent value="suppliers-docs">
           {renderCategoryContent('suppliers-docs', [
-            { value: 'monthly-service-vendors', label: 'Monthly Service Vendors' },
-            { value: 'trading-suppliers', label: 'Trading Suppliers' },
+            { value: 'monthly-service-vendors-docs', label: 'Monthly Service Vendors - Documents' },
+            { value: 'trading-suppliers-docs', label: 'Trading Suppliers - Documents' },
           ])}
         </TabsContent>
 
@@ -308,14 +297,15 @@ const SettingsPage = () => {
 
         <TabsContent value="fixed-assets-docs">
           {renderCategoryContent('fixed-assets-docs', [
-            { value: 'computer-equipment', label: 'Computer & Equipment' },
-            { value: 'furniture-fitting', label: 'Furniture Fitting & Equipment 12.5%' },
-            { value: 'land-building', label: 'Land & Building' },
-            { value: 'plant-equipment', label: 'Plant & Equipment - 12.5%' },
-            { value: 'motor-vehicles', label: 'Motor Vehicles - 25%' },
+            { value: 'comp-equip-docs', label: 'Computer & Equipment' },
+            { value: 'furniture-fitting-docs', label: 'Furniture Fitting & Equipment 12.5%' },
+            { value: 'land-building-docs', label: 'Land & Building' },
+            { value: 'plant-equip-docs', label: 'Plant & Equipment - 12.5%' },
+            { value: 'motor-vehicles-docs', label: 'Motor Vehicles - 25%' },
           ])}
         </TabsContent>
       </Tabs>
+
       <Toaster />
     </div>
   );
