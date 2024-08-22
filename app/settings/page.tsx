@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import supabase from '@/lib/supabaseClient';
+import { toast, Toaster } from 'react-hot-toast';
 
 const SettingsPage = () => {
   const [notifications, setNotifications] = useState(true);
@@ -20,23 +21,30 @@ const SettingsPage = () => {
   const [documents, setDocuments] = useState([]);
   const [newDocument, setNewDocument] = useState({
     name: '',
-    department: '',
+    category: '',
+    subcategory: '',
     validity_days: '',
     reminder_days: '',
-
+    department: '',
   });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('company-docs');
+  const [activeSubcategory, setActiveSubcategory] = useState('kra-docs');
 
   useEffect(() => {
     fetchDocuments();
-  }, []);
+  }, [activeCategory, activeSubcategory]);
 
   const fetchDocuments = async () => {
     const { data, error } = await supabase
       .from('acc_portal_kyc')
       .select('*');
-    if (error) console.error('Error fetching documents:', error);
-    else setDocuments(data);
+    if (error) {
+      console.error('Error fetching documents:', error);
+      toast.error('Failed to fetch documents');
+    } else {
+      setDocuments(data);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -49,14 +57,19 @@ const SettingsPage = () => {
       .from('acc_portal_kyc')
       .insert([{
         ...newDocument,
+        category: activeCategory,
+        subcategory: activeSubcategory,
         validity_days: parseInt(newDocument.validity_days),
         reminder_days: parseInt(newDocument.reminder_days),
       }]);
-    if (error) console.error('Error adding document:', error);
-    else {
+    if (error) {
+      console.error('Error adding document:', error);
+      toast.error('Failed to add document');
+    } else {
       fetchDocuments();
-      setNewDocument({ name: '', department: '', validity_days: '', reminder_days: '' });
+      setNewDocument({ name: '', validity_days: '', reminder_days: '', department: '' });
       setIsAddDialogOpen(false);
+      toast.success('Document added successfully');
     }
   };
 
@@ -65,28 +78,35 @@ const SettingsPage = () => {
       .from('acc_portal_kyc')
       .update({ listed: !currentValue })
       .eq('id', id);
-    if (error) console.error('Error updating document:', error);
-    else fetchDocuments();
+    if (error) {
+      console.error('Error updating document:', error);
+      toast.error('Failed to update document');
+    } else {
+      fetchDocuments();
+      toast.success('Document updated successfully');
+    }
   };
 
-  const renderDocumentTable = (department) => (
-    <Table>
+  const renderDocumentTable = (category, subcategory) => (
+    <Table className="w-full">
       <TableHeader>
         <TableRow>
-          <TableHead>Document Name</TableHead>
-          <TableHead>Department</TableHead>
-          <TableHead>Validity Days</TableHead>
-          <TableHead>Listed</TableHead>
+          <TableHead className="font-bold">Document Name</TableHead>
+          <TableHead className="font-bold">Validity Days</TableHead>
+          <TableHead className="font-bold">Reminder Days</TableHead>
+          <TableHead className="font-bold">Department</TableHead>
+          <TableHead className="font-bold">Listed</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {documents
-          .filter(doc => doc.department === department)
+          .filter(doc => doc.category === category && doc.subcategory === subcategory)
           .map((doc) => (
-            <TableRow key={doc.id}>
+            <TableRow key={doc.id} className="hover:bg-gray-100">
               <TableCell>{doc.name}</TableCell>
-              <TableCell>{doc.department}</TableCell>
               <TableCell>{doc.validity_days}</TableCell>
+              <TableCell>{doc.reminder_days}</TableCell>
+              <TableCell>{doc.department}</TableCell>
               <TableCell>
                 <Switch
                   checked={doc.listed}
@@ -99,288 +119,156 @@ const SettingsPage = () => {
     </Table>
   );
 
-  return (
-    <div className="w-full p-4">
-      <h1 className="text-3xl font-bold">Settings</h1>
+  const renderAddDocumentDialog = () => (
+    <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+      <DialogTrigger asChild>
+        <Button className="mt-4 bg-blue-500 hover:bg-blue-600 text-white">Add New Document</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold">Add New Document</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Input
+            name="name"
+            placeholder="Document Name"
+            value={newDocument.name}
+            onChange={handleInputChange}
+            className="w-full"
+          />
+          <Input
+            name="validity_days"
+            type="number"
+            placeholder="Validity Days"
+            value={newDocument.validity_days}
+            onChange={handleInputChange}
+            className="w-full"
+          />
+          <Input
+            name="reminder_days"
+            type="number"
+            placeholder="Reminder Days"
+            value={newDocument.reminder_days}
+            onChange={handleInputChange}
+            className="w-full"
+          />
+          <Input
+            name="department"
+            placeholder="Department"
+            value={newDocument.department}
+            onChange={handleInputChange}
+            className="w-full"
+          />
+          <Button onClick={handleAddDocument} className="w-full bg-green-500 hover:bg-green-600 text-white">Add Document</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+  
+  const renderCategoryContent = (category, subcategories) => (
+    <Tabs 
+      defaultValue={subcategories[0].value} 
+      className="w-full"
+      onValueChange={(value) => setActiveSubcategory(value)}
+    >
+      <TabsList className="mb-4">
+        {subcategories.map((subcategory) => (
+          <TabsTrigger key={subcategory.value} value={subcategory.value} className="px-4 py-2">
+            {subcategory.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {subcategories.map((subcategory) => (
+        <TabsContent key={subcategory.value} value={subcategory.value}>
+          <Card className="shadow-lg">
+            <CardHeader>
+              <h2 className="text-2xl font-semibold">{subcategory.label}</h2>
+            </CardHeader>
+            <CardContent>
+              {renderDocumentTable(category, subcategory.value)}
+              {renderAddDocumentDialog()}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      ))}
+    </Tabs>
+  );
 
-      <Tabs defaultValue="notifications" className="w-full">
-        <TabsList>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="appearance">Appearance</TabsTrigger>
-          <TabsTrigger value="language">Language</TabsTrigger>
-          <TabsTrigger value="docs">Documents</TabsTrigger>
+  return (
+    <div className="w-full p-8 bg-gray-50">
+      <h1 className="text-3xl font-bold mb-8">Settings</h1>
+
+      <Tabs 
+        defaultValue="company-docs" 
+        className="w-full"
+        onValueChange={(value) => setActiveCategory(value)}
+      >
+        <TabsList className="mb-8 flex flex-wrap">
+          <TabsTrigger value="company-docs" className="px-4 py-2">Company Documents</TabsTrigger>
+          <TabsTrigger value="directors-docs" className="px-4 py-2">Directors Documents</TabsTrigger>
+          <TabsTrigger value="suppliers-docs" className="px-4 py-2">Suppliers Documents</TabsTrigger>
+          <TabsTrigger value="banks-docs" className="px-4 py-2">Banks Documents</TabsTrigger>
+          <TabsTrigger value="employees-docs" className="px-4 py-2">Employees Documents</TabsTrigger>
+          <TabsTrigger value="insurance-docs" className="px-4 py-2">Insurance Policy Documents</TabsTrigger>
+          <TabsTrigger value="deposits-docs" className="px-4 py-2">Deposits Documents</TabsTrigger>
+          <TabsTrigger value="fixed-assets-docs" className="px-4 py-2">Fixed Assets Register</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <h2 className="text-2xl font-semibold">Notification Settings</h2>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="notifications"
-                  checked={notifications}
-                  onCheckedChange={setNotifications}
-                />
-                <Label htmlFor="notifications">Enable notifications</Label>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="company-docs">
+          {renderCategoryContent('company-docs', [
+            { value: 'kra-docs', label: 'KRA Documents' },
+            { value: 'sheria-docs', label: 'Sheria Documents' }
+          ])}
         </TabsContent>
 
-        <TabsContent value="appearance">
-          <Card>
-            <CardHeader>
-              <h2 className="text-2xl font-semibold">Appearance Settings</h2>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="darkMode"
-                  checked={darkMode}
-                  onCheckedChange={setDarkMode}
-                />
-                <Label htmlFor="darkMode">Dark Mode</Label>
-              </div>
-              <div className="space-y-2">
-                <Label>Theme Color</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a color" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="blue">Blue</SelectItem>
-                    <SelectItem value="green">Green</SelectItem>
-                    <SelectItem value="purple">Purple</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Font Size</Label>
-                <Slider
-                  defaultValue={[16]}
-                  max={24}
-                  min={12}
-                  step={1}
-                />
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="directors-docs">
+          {renderCategoryContent('directors-docs', [
+            { value: 'directors-general', label: 'Directors General Documents' }
+          ])}
         </TabsContent>
 
-        <TabsContent value="language">
-          <Card>
-            <CardHeader>
-              <h2 className="text-2xl font-semibold">Language Settings</h2>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label>Select Language</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="es">Spanish</SelectItem>
-                    <SelectItem value="fr">French</SelectItem>
-                    <SelectItem value="de">German</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="suppliers-docs">
+          {renderCategoryContent('suppliers-docs', [
+            { value: 'monthly-service-vendors', label: 'Monthly Service Vendors - Documents' },
+            { value: 'trading-suppliers', label: 'Trading Suppliers - Documents' }
+          ])}
         </TabsContent>
 
-        <TabsContent value="docs">
-          <Tabs defaultValue="company-docs" className="w-full">
-            <TabsList>
-              <TabsTrigger value="company-docs">Company Documents</TabsTrigger>
-              <TabsTrigger value="directors-docs">Directors Documents</TabsTrigger>
-              <TabsTrigger value="suppliers-docs">Suppliers Documents</TabsTrigger>
-              <TabsTrigger value="banks-docs">Banks Documents</TabsTrigger>
-              <TabsTrigger value="employees-docs">Employees Documents</TabsTrigger>
-              <TabsTrigger value="insurance-docs">Insurance Policy Documents</TabsTrigger>
-              <TabsTrigger value="deposits-docs">Deposits Documents</TabsTrigger>
-              <TabsTrigger value="fixed-assets-docs">Fixed Assets Register</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="company-docs">
-              <Tabs defaultValue="kra-docs" className="w-full">
-                <TabsList>
-                  <TabsTrigger value="kra-docs">KRA Documents</TabsTrigger>
-                  <TabsTrigger value="sheria-docs">Sheria Documents</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="kra-docs">
-                  <Card>
-                    <CardHeader>
-                      <h2 className="text-2xl font-semibold">KRA Documents</h2>
-                    </CardHeader>
-                    <CardContent>
-                      {renderDocumentTable('KRA')}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="sheria-docs">
-                  <Card>
-                    <CardHeader>
-                      <h2 className="text-2xl font-semibold">Sheria Documents</h2>
-                    </CardHeader>
-                    <CardContent>
-                      {renderDocumentTable('Sheria House')}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="mt-4">Add New Document</Button>
-                </DialogTrigger>
-                <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add New Document</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      {/* Existing input fields */}
-                      <Input
-                        name="name"
-                        placeholder="Document Name"
-                        value={newDocument.name}
-                        onChange={handleInputChange}
-                      />
-                      <Select
-                        name="department"
-                        value={newDocument.department}
-                        onValueChange={(value) => setNewDocument(prev => ({ ...prev, department: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="KRA">KRA</SelectItem>
-                          <SelectItem value="Sheria House">Sheria House</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        name="validity_days"
-                        type="number"
-                        placeholder="Validity Days"
-                        value={newDocument.validity_days}
-                        onChange={handleInputChange}
-                      />
-                      {/* New input field for reminder days */}
-                      <Input
-                        name="reminder_days"
-                        type="number"
-                        placeholder="Reminder Days"
-                        value={newDocument.reminder_days}
-                        onChange={handleInputChange}
-                      />
-                      <Button onClick={handleAddDocument}>Add Document</Button>
-                    </div>
-                  </DialogContent>
-              </Dialog>
-            </TabsContent>
-
-            <TabsContent value="suppliers-docs">
-              <Tabs defaultValue="monthly-service-vendors" className="w-full">
-                <TabsList>
-                  <TabsTrigger value="monthly-service-vendors">Monthly Service Vendors - Documents</TabsTrigger>
-                  <TabsTrigger value="trading-suppliers">Trading Suppliers - Documents</TabsTrigger>
-                </TabsList>
-                <TabsContent value="monthly-service-vendors">
-                  <Card>
-                    <CardHeader>
-                      <h2 className="text-2xl font-semibold">Monthly Service Vendors - Documents</h2>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Add content related to Monthly Service Vendors - Documents here */}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                <TabsContent value="trading-suppliers">
-                  <Card>
-                    <CardHeader>
-                      <h2 className="text-2xl font-semibold">Trading Suppliers - Documents</h2>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Add content related to Trading Suppliers - Documents here */}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </TabsContent>
-
-            <TabsContent value="fixed-assets-docs">
-              <Tabs defaultValue="computer-equipments" className="w-full">
-                <TabsList>
-                  <TabsTrigger value="computer-equipments">Computer & Equipments</TabsTrigger>
-                  <TabsTrigger value="furniture-fittings">Furniture Fitting & Equip 12.5%</TabsTrigger>
-                  <TabsTrigger value="land-building">Land & Building</TabsTrigger>
-                  <TabsTrigger value="plant-equipment">Plant & Equipment - 12.5%</TabsTrigger>
-                  <TabsTrigger value="motor-vehicles">Motor Vehicles - 25%</TabsTrigger>
-                </TabsList>
-                <TabsContent value="computer-equipments">
-                  <Card>
-                    <CardHeader>
-                      <h2 className="text-2xl font-semibold">Computer & Equipments</h2>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Add content related to Computer & Equipments here */}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                <TabsContent value="furniture-fittings">
-                  <Card>
-                    <CardHeader>
-                      <h2 className="text-2xl font-semibold">Furniture Fitting & Equip 12.5%</h2>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Add content related to Furniture Fitting & Equip 12.5% here */}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                <TabsContent value="land-building">
-                  <Card>
-                    <CardHeader>
-                      <h2 className="text-2xl font-semibold">Land & Building</h2>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Add content related to Land & Building here */}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                <TabsContent value="plant-equipment">
-                  <Card>
-                    <CardHeader>
-                      <h2 className="text-2xl font-semibold">Plant & Equipment - 12.5%</h2>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Add content related to Plant & Equipment - 12.5% here */}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                <TabsContent value="motor-vehicles">
-                  <Card>
-                    <CardHeader>
-                      <h2 className="text-2xl font-semibold">Motor Vehicles - 25%</h2>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Add content related to Motor Vehicles - 25% here */}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </TabsContent>
-
-          </Tabs>
+        <TabsContent value="banks-docs">
+          {renderCategoryContent('banks-docs', [
+            { value: 'banks-general', label: 'Banks General Documents' }
+          ])}
         </TabsContent>
 
+        <TabsContent value="employees-docs">
+          {renderCategoryContent('employees-docs', [
+            { value: 'employees-general', label: 'Employees General Documents' }
+          ])}
+        </TabsContent>
+
+        <TabsContent value="insurance-docs">
+          {renderCategoryContent('insurance-docs', [
+            { value: 'insurance-general', label: 'Insurance General Documents' }
+          ])}
+        </TabsContent>
+
+        <TabsContent value="deposits-docs">
+          {renderCategoryContent('deposits-docs', [
+            { value: 'deposits-general', label: 'Deposits General Documents' }
+          ])}
+        </TabsContent>
+
+        <TabsContent value="fixed-assets-docs">
+          {renderCategoryContent('fixed-assets-docs', [
+            { value: 'computer-equipments', label: 'Computer & Equipments' },
+            { value: 'furniture-fittings', label: 'Furniture Fitting & Equipments' },
+            { value: 'land-building', label: 'Land & Building' },
+            { value: 'plant-equipment', label: 'Plant & Equipment - 12.5%' },
+            { value: 'motor-vehicles', label: 'Motor Vehicles - 25%' }
+          ])}
+        </TabsContent>
       </Tabs>
+      <Toaster position="top-right" />
     </div>
   );
 };
