@@ -12,6 +12,8 @@ import { RefreshCwIcon, UploadIcon, EyeIcon, ArrowUpDown, Edit2Icon } from 'luci
 import { toast, Toaster } from 'react-hot-toast'
 import dynamic from 'next/dynamic'
 import { useAuth } from '@clerk/clerk-react'
+import { useUser } from '@clerk/clerk-react'
+
 
 const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => mod.Dialog), { ssr: false })
 const DialogContent = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogContent), { ssr: false })
@@ -57,7 +59,7 @@ const FileViewer = ({ url, onClose }) => {
 }
 
 export function KYCDocumentsList({ category, subcategory }) {
-  const {userId} = useAuth()
+  const { user } = useUser()  
 
   const [documents, setDocuments] = useState([])
   const [isUploadingDocument, setIsUploadingDocument] = useState(false)
@@ -70,11 +72,10 @@ export function KYCDocumentsList({ category, subcategory }) {
   const [editingDocument, setEditingDocument] = useState(null)
 
   useEffect(() => {
-    createBucketAndFolders().then(() => {
+    if (user) {
       fetchDocuments()
-    })
-  }, [userId, category, subcategory])
-
+    }
+  }, [user, category, subcategory])
 
   const createBucketAndFolders = async () => {
     const { data: bucketData, error: bucketError } = await supabase.storage.createBucket('kyc-documents', {
@@ -90,24 +91,40 @@ export function KYCDocumentsList({ category, subcategory }) {
   }
 
   const fetchDocuments = async () => {
-    let query = supabase
+    const { data: baseDocuments, error: baseError } = await supabase
       .from('acc_portal_kyc')
       .select('*')
       .eq('listed', true)
       .eq('category', category)
+      .eq('subcategory', subcategory);
 
-    if (subcategory) {
-      query = query.eq('subcategory', subcategory)
-    }
-
-    const { data: documentData, error: documentError } = await query.order('id', { ascending: true });
-
-    if (documentError) {
-      console.error('Error fetching documents:', documentError)
+    if (baseError) {
+      console.error('Error fetching base documents:', baseError)
       toast.error('Failed to fetch documents. Please try again.')
-    } else {
-      setDocuments(documentData)
+      return
     }
+
+    const { data: uploadedDocuments, error: uploadError } = await supabase
+      .from('acc_portal_kyc_uploads')
+      .select('*')
+      .eq('userid', user.id);  // Use user.id instead of userId
+
+    if (uploadError) {
+      console.error('Error fetching uploaded documents:', uploadError)
+      toast.error('Failed to fetch uploaded documents. Please try again.')
+      return
+    }
+
+    const mergedDocuments = baseDocuments.map(baseDoc => {
+      const uploadedDoc = uploadedDocuments.find(upDoc => upDoc.kyc_id === baseDoc.id);
+      return {
+        ...baseDoc,
+        ...uploadedDoc,
+        isUploaded: !!uploadedDoc
+      };
+    });
+
+    setDocuments(mergedDocuments);
   }
 
   const handleInputChange = (e) => {
@@ -155,29 +172,29 @@ export function KYCDocumentsList({ category, subcategory }) {
       const fileName = `${Math.random()}.${fileExt}`
       const { data, error } = await supabase.storage
         .from('kyc-documents')
-        .upload(`${userId}/${fileName}`, file)
+        .upload(`${user.id}/${fileName}`, file)
 
       if (error) {
         throw new Error(`File upload failed: ${error.message}`)
       }
 
-      const { error: updateError } = await supabase
-        .from('acc_portal_kyc')
-        .update({ 
+      const { error: insertError } = await supabase
+        .from('acc_portal_kyc_uploads')
+        .insert({ 
+          userid: user.id,  // Use user.id instead of userId
+          kyc_id: editingDocument.id,
           filepath: data.path,
           issue_date: editingDocument.issue_date,
           expiry_date: editingDocument.expiry_date,
           validity_days: editingDocument.validity_days,
           reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date, editingDocument.validity_days).toString()
         })
-        .eq('id', editingDocument.id)
-        .eq('listed', true)
 
-      if (updateError) {
-        throw new Error(`Document update failed: ${updateError.message}`)
+      if (insertError) {
+        throw new Error(`Document insert failed: ${insertError.message}`)
       }
 
-      toast.success("Document uploaded and updated successfully")
+      toast.success("Document uploaded and inserted successfully")
 
       fetchDocuments()
       setIsUploadingDocument(false)
@@ -188,6 +205,7 @@ export function KYCDocumentsList({ category, subcategory }) {
       toast.error(error.message)
     }
   }
+
 
   const handleEdit = (doc) => {
     setEditingDocument({
@@ -201,14 +219,15 @@ export function KYCDocumentsList({ category, subcategory }) {
   const handleUpdate = async () => {
     try {
       const { error } = await supabase
-        .from('acc_portal_kyc')
+        .from('acc_portal_kyc_uploads')
         .update({
           issue_date: editingDocument.issue_date,
           expiry_date: editingDocument.expiry_date,
           validity_days: editingDocument.validity_days,
           reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date, editingDocument.validity_days).toString()
         })
-        .eq('id', editingDocument.id)
+        .eq('kyc_id', editingDocument.id)
+        .eq('userid', userId)
 
       if (error) {
         throw new Error(`Document update failed: ${error.message}`)
@@ -259,7 +278,9 @@ export function KYCDocumentsList({ category, subcategory }) {
     )
   }
 
-   return (
+  // ... Rest of the component remains the same ...
+
+  return (
     <div className="flex w-full bg-gray-100">
       <Toaster position="top-right" />
       <main className="flex-1 p-6 w-full">
@@ -313,26 +334,29 @@ export function KYCDocumentsList({ category, subcategory }) {
                   <TableCell>{index + 1}</TableCell>
                   <TableCell>{doc.name}</TableCell>
                   <TableCell>{doc.department}</TableCell>
-                  <TableCell>{doc.filepath ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
-                  <TableCell>{doc.filepath ? formatDate(doc.expiry_date) : 'Pending'}</TableCell>
+                  <TableCell>{doc.isUploaded ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
+                  <TableCell>{doc.isUploaded ? formatDate(doc.expiry_date) : 'Pending'}</TableCell>
                   <TableCell>{doc.validity_days || 'N/A'}</TableCell>
                   <TableCell>{doc.reminder_days || 'N/A'}</TableCell>
                   <TableCell>
-                    <Badge className={doc.filepath ? 'bg-green-500' : 'bg-yellow-500'}>
-                      {doc.filepath ? 'Uploaded' : 'Pending'}
+                    <Badge className={doc.isUploaded ? 'bg-green-500' : 'bg-yellow-500'}>
+                      {doc.isUploaded ? 'Uploaded' : 'Pending'}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <Button variant="outline" onClick={() => handleViewUpload(doc)} className="mr-2 hover:bg-gray-200 text-gray-600">
-                      {doc.filepath ? <EyeIcon className="w-4 h-4 mr-2" /> : <UploadIcon className="w-4 h-4 mr-2" />}
-                      {doc.filepath ? "View" : "Upload"}
+                      {doc.isUploaded ? <EyeIcon className="w-4 h-4 mr-2" /> : <UploadIcon className="w-4 h-4 mr-2" />}
+                      {doc.isUploaded ? "View" : "Upload"}
                     </Button>
-                    <Button variant="outline" onClick={() => handleEdit(doc)} className="hover:bg-gray-200 text-gray-600">
-                      <Edit2Icon className="w-4 h-4 mr-2" />
-                      Edit
-                    </Button>
+                    {doc.isUploaded && (
+                      <Button variant="outline" onClick={() => handleEdit(doc)} className="hover:bg-gray-200 text-gray-600">
+                        <Edit2Icon className="w-4 h-4 mr-2" />
+                        Edit
+                      </Button>
+                    )}
                   </TableCell>
-                </TableRow>))}
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </Card>
