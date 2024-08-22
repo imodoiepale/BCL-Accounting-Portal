@@ -1,31 +1,31 @@
 // @ts-nocheck
 "use client"
-import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RefreshCwIcon, UploadIcon, EyeIcon, ArrowUpDown, Edit2Icon } from 'lucide-react';
-import { toast } from 'sonner';
-import dynamic from 'next/dynamic';
-import { useAuth } from '@clerk/clerk-react';
+import React, { useState, useEffect } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { RefreshCwIcon, UploadIcon, EyeIcon, ArrowUpDown, Edit2Icon } from 'lucide-react'
+import { toast } from 'sonner'
+import dynamic from 'next/dynamic'
+import { useAuth } from '@clerk/clerk-react'
 
-const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => mod.Dialog), { ssr: false });
-const DialogContent = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogContent), { ssr: false });
-const DialogHeader = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogHeader), { ssr: false });
-const DialogTitle = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogTitle), { ssr: false });
+const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => mod.Dialog), { ssr: false })
+const DialogContent = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogContent), { ssr: false })
+const DialogHeader = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogHeader), { ssr: false })
+const DialogTitle = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogTitle), { ssr: false })
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL or Anon Key is missing in environment variables.');
+  throw new Error('Supabase URL or Anon Key is missing in environment variables.')
 }
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
@@ -43,37 +43,27 @@ const FileViewer = ({ url, onClose }) => {
         <iframe src={url} style={{ width: '100%', height: '80vh' }} />
       </DialogContent>
     </Dialog>
-  );
-};
+  )
+}
 
 export function KYCDocumentsList() {
-  const { userId } = useAuth();
+  const {userId} = useAuth()
 
-  const [documents, setDocuments] = useState([]);
-  const [newDocument, setNewDocument] = useState({
-    name: '',
-    department: '',
-    issue_date: '',
-    expiry_date: '',
-    validity_days: 0,
-    reminder_days: 0,
-    filepath: '',
-  });
-  const [isAddingDocument, setIsAddingDocument] = useState(false);
-  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
-  const [uploadingDocumentId, setUploadingDocumentId] = useState(null);
-  const [file, setFile] = useState(null);
-  const [sortColumn, setSortColumn] = useState(null);
-  const [sortDirection, setSortDirection] = useState('asc');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewerUrl, setViewerUrl] = useState(null);
-  const [editingDocument, setEditingDocument] = useState(null);
+  const [documents, setDocuments] = useState([])
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false)
+  const [uploadingDocumentId, setUploadingDocumentId] = useState(null)
+  const [file, setFile] = useState(null)
+  const [sortColumn, setSortColumn] = useState(null)
+  const [sortDirection, setSortDirection] = useState('asc')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [viewerUrl, setViewerUrl] = useState(null)
+  const [editingDocument, setEditingDocument] = useState(null)
 
   useEffect(() => {
     createBucketAndFolders().then(() => {
-      fetchDocuments();
-    });
-  }, [userId]);
+      fetchDocuments()
+    })
+  }, [userId])
 
   const createBucketAndFolders = async () => {
     const { data: bucketData, error: bucketError } = await supabase.storage.createBucket('kyc-documents', {
@@ -101,80 +91,11 @@ export function KYCDocumentsList() {
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
-    if (editingDocument) {
-      setEditingDocument({ ...editingDocument, [id]: value });
-    } else {
-      setNewDocument({ ...newDocument, [id]: value });
-    }
+    setEditingDocument({ ...editingDocument, [id]: value });
   }
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0])
-  }
-
-  const handleSubmit = async () => {
-    try {
-      let filepath = '';
-      if (file) {
-        const fileExt = file.name.split('.').pop()
-        const fileName = `${Math.random()}.${fileExt}`
-        const { data, error } = await supabase.storage
-          .from('kyc-documents')
-          .upload(`${userId}/${fileName}`, file)
-
-        if (error) {
-          console.error('Error uploading file:', error)
-          throw new Error(`File upload failed: ${error.message}`)
-        }
-
-        filepath = data.path;
-      }
-
-      const documentToInsert = {
-        name: newDocument.name,
-        department: newDocument.department,
-        issue_date: newDocument.issue_date,
-        expiry_date: newDocument.expiry_date,
-        validity_days: newDocument.validity_days,
-        reminder_days: newDocument.reminder_days,
-        filepath: filepath,
-        listed: true,
-      }
-
-      const { data, error } = await supabase
-        .from('acc_portal_kyc')
-        .insert([documentToInsert])
-        .select()
-
-      if (error) {
-        throw new Error(`Document insertion failed: ${error.message || 'Unknown error'}`)
-      }
-
-      toast({
-        title: "Success",
-        description: "Document added successfully",
-      })
-      
-      fetchDocuments()
-      setNewDocument({
-        name: '',
-        department: '',
-        issue_date: '',
-        expiry_date: '',
-        validity_days: 0,
-        reminder_days: 0,
-        filepath: '',
-      })
-      setFile(null)
-      setIsAddingDocument(false)
-    } catch (error) {
-      console.error('Error in handleSubmit:', error)
-      toast({
-        title: "Error",
-        description: `Failed to add document: ${error.message}`,
-        variant: "destructive",
-      })
-    }
   }
 
   const handleViewUpload = async (doc) => {
@@ -260,14 +181,21 @@ export function KYCDocumentsList() {
   }
 
   const handleEdit = (doc) => {
-    setEditingDocument(doc)
+    setEditingDocument({
+      id: doc.id,
+      issue_date: doc.issue_date || '',
+      expiry_date: doc.expiry_date || '',
+    })
   }
 
   const handleUpdate = async () => {
     try {
       const { error } = await supabase
         .from('acc_portal_kyc')
-        .update(editingDocument)
+        .update({
+          issue_date: editingDocument.issue_date,
+          expiry_date: editingDocument.expiry_date
+        })
         .eq('id', editingDocument.id)
 
       if (error) {
@@ -343,10 +271,6 @@ export function KYCDocumentsList() {
               <RefreshCwIcon className="w-4 h-4 mr-1" />
               Refresh
             </Button>
-            <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setIsAddingDocument(true)}>
-              <RefreshCwIcon className="w-4 h-4 mr-2" />
-              Add Document
-            </Button>
           </div>
         </div>
 
@@ -399,38 +323,6 @@ export function KYCDocumentsList() {
             </TableBody>
           </Table>
         </Card>
-
-        {isAddingDocument && (
-          <Dialog open={isAddingDocument} onOpenChange={setIsAddingDocument}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add KYC Document</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Document Name</Label>
-                  <Input id="name" placeholder="e.g., Tax Compliance Certificate" value={newDocument.name} onChange={handleInputChange} required />
-                </div>
-                <div>
-                  <Label htmlFor="department">Department</Label>
-                  <Input id="department" placeholder="e.g., Finance" value={newDocument.department} onChange={handleInputChange} required />
-                </div>
-                <div>
-                  <Label htmlFor="validity_days">Validity (days)</Label>
-                  <Input id="validity_days" type="number" value={newDocument.validity_days} onChange={handleInputChange} required />
-                </div>
-                <div>
-                  <Label htmlFor="reminder_days">Reminder (days)</Label>
-                  <Input id="reminder_days" type="number" value={newDocument.reminder_days} onChange={handleInputChange} required />
-                </div>
-              </div>
-              <div className="flex justify-end mt-4">
-                <Button className="bg-blue-600 text-white mr-2" onClick={handleSubmit}>Save</Button>
-                <Button variant="outline" onClick={() => setIsAddingDocument(false)}>Cancel</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
         
         {isUploadingDocument && (
           <Dialog open={isUploadingDocument} onOpenChange={setIsUploadingDocument}>
@@ -468,8 +360,7 @@ export function KYCDocumentsList() {
                 <Button className="bg-blue-600 text-white mr-2" onClick={handleFileUpload}>Upload</Button>
                 <Button variant="outline" onClick={() => {
                   setIsUploadingDocument(false);
-                  setEditingDocument(null);
-                  setFile(null);
+                  setEditingDocument(null);setFile(null);
                 }}>Cancel</Button>
               </div>
             </DialogContent>
@@ -484,28 +375,24 @@ export function KYCDocumentsList() {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="name">Document Name</Label>
-                  <Input id="name" value={editingDocument.name} onChange={handleInputChange} required />
-                </div>
-                <div>
-                  <Label htmlFor="department">Department</Label>
-                  <Input id="department" value={editingDocument.department} onChange={handleInputChange} required />
-                </div>
-                <div>
                   <Label htmlFor="issue_date">Issue Date</Label>
-                  <Input id="issue_date" type="date" value={editingDocument.issue_date} onChange={handleInputChange} required />
+                  <Input 
+                    id="issue_date" 
+                    type="date" 
+                    value={editingDocument.issue_date} 
+                    onChange={handleInputChange} 
+                    required 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="expiry_date">Expiry Date</Label>
-                  <Input id="expiry_date" type="date" value={editingDocument.expiry_date} onChange={handleInputChange} required />
-                </div>
-                <div>
-                  <Label htmlFor="validity_days">Validity (days)</Label>
-                  <Input id="validity_days" type="number" value={editingDocument.validity_days} onChange={handleInputChange} required />
-                </div>
-                <div>
-                  <Label htmlFor="reminder_days">Reminder (days)</Label>
-                  <Input id="reminder_days" type="number" value={editingDocument.reminder_days} onChange={handleInputChange} required />
+                  <Input 
+                    id="expiry_date" 
+                    type="date" 
+                    value={editingDocument.expiry_date} 
+                    onChange={handleInputChange} 
+                    required 
+                  />
                 </div>
               </div>
               <div className="flex justify-end mt-4">
