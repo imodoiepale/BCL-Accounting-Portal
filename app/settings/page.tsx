@@ -1,5 +1,4 @@
 //@ts-nocheck
-
 "use client";
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -29,16 +28,24 @@ const SettingsPage = () => {
   });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('company-docs');
-  const [activeSubcategory, setActiveSubcategory] = useState('kra-docs');
+  const [activeSubcategory, setActiveSubcategory] = useState('');
 
   useEffect(() => {
     fetchDocuments();
   }, [activeCategory, activeSubcategory]);
 
   const fetchDocuments = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('acc_portal_kyc')
-      .select('*');
+      .select('*')
+      .eq('category', activeCategory);
+
+    if (activeSubcategory) {
+      query = query.eq('subcategory', activeSubcategory);
+    }
+
+    const { data, error } = await query;
+
     if (error) {
       console.error('Error fetching documents:', error);
       toast.error('Failed to fetch documents');
@@ -53,15 +60,21 @@ const SettingsPage = () => {
   };
 
   const handleAddDocument = async () => {
+    const newDoc = {
+      ...newDocument,
+      category: activeCategory,
+      validity_days: parseInt(newDocument.validity_days),
+      reminder_days: parseInt(newDocument.reminder_days),
+    };
+
+    if (activeSubcategory) {
+      newDoc.subcategory = activeSubcategory;
+    }
+
     const { data, error } = await supabase
       .from('acc_portal_kyc')
-      .insert([{
-        ...newDocument,
-        category: activeCategory,
-        subcategory: activeSubcategory,
-        validity_days: parseInt(newDocument.validity_days),
-        reminder_days: parseInt(newDocument.reminder_days),
-      }]);
+      .insert([newDoc]);
+
     if (error) {
       console.error('Error adding document:', error);
       toast.error('Failed to add document');
@@ -99,7 +112,7 @@ const SettingsPage = () => {
       </TableHeader>
       <TableBody>
         {documents
-          .filter(doc => doc.category === category && doc.subcategory === subcategory)
+          .filter(doc => doc.category === category && (!subcategory || doc.subcategory === subcategory))
           .map((doc) => (
             <TableRow key={doc.id} className="hover:bg-gray-100">
               <TableCell>{doc.name}</TableCell>
@@ -155,33 +168,47 @@ const SettingsPage = () => {
       </DialogContent>
     </Dialog>
   );
-  
+
   const renderCategoryContent = (category, subcategories) => (
     <Tabs 
-      defaultValue={subcategories[0].value} 
+      defaultValue={subcategories.length > 0 ? subcategories[0].value : ''} 
       className="w-full"
       onValueChange={(value) => setActiveSubcategory(value)}
     >
-      <TabsList className="mb-4">
-        {subcategories.map((subcategory) => (
-          <TabsTrigger key={subcategory.value} value={subcategory.value} className="px-4 py-2">
-            {subcategory.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-      {subcategories.map((subcategory) => (
-        <TabsContent key={subcategory.value} value={subcategory.value}>
+      {subcategories.length > 0 && (
+        <TabsList className="mb-4">
+          {subcategories.map((subcategory) => (
+            <TabsTrigger key={subcategory.value} value={subcategory.value} className="px-4 py-2">
+              {subcategory.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      )}
+      {subcategories.length > 0
+        ? subcategories.map((subcategory) => (
+            <TabsContent key={subcategory.value} value={subcategory.value}>
+              <Card className="shadow-lg">
+                <CardHeader>
+                  <h2 className="text-2xl font-semibold">{subcategory.label}</h2>
+                </CardHeader>
+                <CardContent>
+                  {renderDocumentTable(category, subcategory.value)}
+                  {renderAddDocumentDialog()}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          ))
+        : (
           <Card className="shadow-lg">
             <CardHeader>
-              <h2 className="text-2xl font-semibold">{subcategory.label}</h2>
+              <h2 className="text-2xl font-semibold">{category}</h2>
             </CardHeader>
             <CardContent>
-              {renderDocumentTable(category, subcategory.value)}
+              {renderDocumentTable(category, '')}
               {renderAddDocumentDialog()}
             </CardContent>
           </Card>
-        </TabsContent>
-      ))}
+        )}
     </Tabs>
   );
 
@@ -208,58 +235,88 @@ const SettingsPage = () => {
         <TabsContent value="company-docs">
           {renderCategoryContent('company-docs', [
             { value: 'kra-docs', label: 'KRA Documents' },
-            { value: 'sheria-docs', label: 'Sheria Documents' }
+            { value: 'sheria-docs', label: 'Sheria Documents' },
           ])}
         </TabsContent>
 
         <TabsContent value="directors-docs">
-          {renderCategoryContent('directors-docs', [
-            { value: 'directors-general', label: 'Directors General Documents' }
-          ])}
+          <Card className="shadow-lg">
+            <CardHeader>
+              <h2 className="text-2xl font-semibold">Directors Documents</h2>
+            </CardHeader>
+            <CardContent>
+              {renderDocumentTable('directors-docs', '')}
+              {renderAddDocumentDialog()}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="suppliers-docs">
           {renderCategoryContent('suppliers-docs', [
-            { value: 'monthly-service-vendors', label: 'Monthly Service Vendors - Documents' },
-            { value: 'trading-suppliers', label: 'Trading Suppliers - Documents' }
+            { value: 'monthly-service-vendors', label: 'Monthly Service Vendors' },
+            { value: 'trading-suppliers', label: 'Trading Suppliers' },
           ])}
         </TabsContent>
 
         <TabsContent value="banks-docs">
-          {renderCategoryContent('banks-docs', [
-            { value: 'banks-general', label: 'Banks General Documents' }
-          ])}
+          <Card className="shadow-lg">
+            <CardHeader>
+              <h2 className="text-2xl font-semibold">Banks Documents</h2>
+            </CardHeader>
+            <CardContent>
+              {renderDocumentTable('banks-docs', '')}
+              {renderAddDocumentDialog()}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="employees-docs">
-          {renderCategoryContent('employees-docs', [
-            { value: 'employees-general', label: 'Employees General Documents' }
-          ])}
+          <Card className="shadow-lg">
+            <CardHeader>
+              <h2 className="text-2xl font-semibold">Employees Documents</h2>
+            </CardHeader>
+            <CardContent>
+              {renderDocumentTable('employees-docs', '')}
+              {renderAddDocumentDialog()}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="insurance-docs">
-          {renderCategoryContent('insurance-docs', [
-            { value: 'insurance-general', label: 'Insurance General Documents' }
-          ])}
+          <Card className="shadow-lg">
+            <CardHeader>
+              <h2 className="text-2xl font-semibold">Insurance Policy Documents</h2>
+            </CardHeader>
+            <CardContent>
+              {renderDocumentTable('insurance-docs', '')}
+              {renderAddDocumentDialog()}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="deposits-docs">
-          {renderCategoryContent('deposits-docs', [
-            { value: 'deposits-general', label: 'Deposits General Documents' }
-          ])}
+          <Card className="shadow-lg">
+            <CardHeader>
+              <h2 className="text-2xl font-semibold">Deposits Documents</h2>
+            </CardHeader>
+            <CardContent>
+              {renderDocumentTable('deposits-docs', '')}
+              {renderAddDocumentDialog()}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="fixed-assets-docs">
           {renderCategoryContent('fixed-assets-docs', [
-            { value: 'computer-equipments', label: 'Computer & Equipments' },
-            { value: 'furniture-fittings', label: 'Furniture Fitting & Equipments' },
+            { value: 'computer-equipment', label: 'Computer & Equipment' },
+            { value: 'furniture-fitting', label: 'Furniture Fitting & Equipment 12.5%' },
             { value: 'land-building', label: 'Land & Building' },
             { value: 'plant-equipment', label: 'Plant & Equipment - 12.5%' },
-            { value: 'motor-vehicles', label: 'Motor Vehicles - 25%' }
+            { value: 'motor-vehicles', label: 'Motor Vehicles - 25%' },
           ])}
         </TabsContent>
       </Tabs>
-      <Toaster position="top-right" />
+      <Toaster />
     </div>
   );
 };
