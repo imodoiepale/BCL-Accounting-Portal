@@ -83,7 +83,7 @@ const SettingsPage = () => {
       toast.error('Failed to update document');
     } else {
       fetchDocuments();
-      toast.success('Document updated successfully');
+      toast.success('Success!!');
     }
   };
 
@@ -93,7 +93,6 @@ const SettingsPage = () => {
         <TableRow>
           <TableHead className="font-bold">Document Name</TableHead>
           <TableHead className="font-bold">Validity Days</TableHead>
-          <TableHead className="font-bold">Reminder Days</TableHead>
           <TableHead className="font-bold">Department</TableHead>
           <TableHead className="font-bold">Listed</TableHead>
         </TableRow>
@@ -105,7 +104,6 @@ const SettingsPage = () => {
             <TableRow key={doc.id} className="hover:bg-gray-100">
               <TableCell>{doc.name}</TableCell>
               <TableCell>{doc.validity_days}</TableCell>
-              <TableCell>{doc.reminder_days}</TableCell>
               <TableCell>{doc.department}</TableCell>
               <TableCell>
                 <Switch
@@ -144,14 +142,7 @@ const SettingsPage = () => {
             onChange={handleInputChange}
             className="w-full"
           />
-          <Input
-            name="reminder_days"
-            type="number"
-            placeholder="Reminder Days"
-            value={newDocument.reminder_days}
-            onChange={handleInputChange}
-            className="w-full"
-          />
+         
           <Input
             name="department"
             placeholder="Department"
