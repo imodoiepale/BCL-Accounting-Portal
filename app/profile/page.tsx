@@ -216,7 +216,7 @@ export default function Profile() {
           <TabsTrigger value="company-info">Information</TabsTrigger>
           <TabsTrigger value="kyc-docs">KYC Documents</TabsTrigger>
         </TabsList>
-        <TabsContent value="company-info" className="px2">
+        <TabsContent value="company-info" className="px-2">
           <Tabs defaultValue="company-info-tab">
             <TabsList>
               <TabsTrigger value="company-info-tab">Company's Information</TabsTrigger>
@@ -236,26 +236,6 @@ export default function Profile() {
             </TabsContent>
             <TabsContent value="directors-info">
               <DirectorsList />
-              {/* <div className="space-y-4">
-                <Tabs defaultValue="director-info">
-                  <TabsList>
-                    <TabsTrigger value="director-info">Directors' Information</TabsTrigger>
-                    <TabsTrigger value="directors-kyc">Directors' KYC Documents</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="director-info">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-bold">Directors' Information</h3>
-                      <DirectorsList />
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="directors-kyc">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-bold">Directors' KYC Documents</h3>
-                      <DirectorsDocumentsList />
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div> */}
             </TabsContent>
             <TabsContent value="employee-info">
               <div className="space-y-4">
@@ -274,14 +254,13 @@ export default function Profile() {
                   <TabsContent value="trading-suppliers">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Trading Suppliers</h4>
-                      <SupplierList />
+                      <SupplierList type="trading" />
                     </div>
                   </TabsContent>
                   <TabsContent value="monthly-service-vendors">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Monthly Service Vendors</h4>
-                      <h2 className="text-xl font-semibold mb-2">Suppliers</h2>
-                      <SupplierList />
+                      <SupplierList type="monthly" />
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -373,24 +352,24 @@ export default function Profile() {
                   </TabsList>
                   <TabsContent value="kra">
                     <div className="space-y-4">
-                      <KYCDocumentsList category="KRA" />
+                      <KYCDocumentsList category="company-docs" subcategory="kra-docs" />
                     </div>
                   </TabsContent>
                   <TabsContent value="sheria">
                     <div className="space-y-4">
-                    <KYCDocumentsList category="Sheria" />
+                      <KYCDocumentsList category="company-docs" subcategory="sheria-docs" />
                     </div>
                   </TabsContent>
                 </Tabs>
               </div>
             </TabsContent>
             <TabsContent value="directors-info">
-                <DirectorsDocumentsList />
+              <DirectorsDocumentsList />
             </TabsContent>
             <TabsContent value="employee-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Employees' Documents</h3>
-                <KYCDocumentsList />
+                <KYCDocumentsList category="employees-docs" />
               </div>
             </TabsContent>
             <TabsContent value="suppliers-info">
@@ -403,13 +382,13 @@ export default function Profile() {
                   <TabsContent value="trading-suppliers">
                     <div className="space-y-4">
                       <h4 className="text-xl font-medium">Trading Suppliers Documents</h4>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="suppliers-docs" subcategory="trading-suppliers-docs" />
                     </div>
                   </TabsContent>
                   <TabsContent value="monthly-service-vendors">
                     <div className="space-y-4">
                       <h2 className="text-xl font-medium">Monthly Service Vendors Documents</h2>
-                      <KYCDocumentsList />
+                      <KYCDocumentsList category="suppliers-docs" subcategory="monthly-service-vendors-docs" />
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -418,13 +397,13 @@ export default function Profile() {
             <TabsContent value="insurances-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Insurance Policy Documents</h3>
-                <KYCDocumentsList category="insurance" />
+                <KYCDocumentsList category="insurance-docs" />
               </div>
             </TabsContent>
             <TabsContent value="deposits-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Deposits' Documents</h3>
-                <KYCDocumentsList category="deposits" />
+                <KYCDocumentsList category="deposits-docs" />
               </div>
             </TabsContent>
             <TabsContent value="fixed-assets-info">
@@ -441,31 +420,31 @@ export default function Profile() {
                   <TabsContent value="computer-equipment">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Computer & Equipments</h4>
-                      <KYCDocumentsList category="fixed-assets-computer" />
+                      <KYCDocumentsList category="fixed-assets-docs" subcategory="computer-equipment" />
                     </div>
                   </TabsContent>
                   <TabsContent value="furniture-fitting">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Furniture Fitting & Equip 12.5%</h4>
-                      <KYCDocumentsList category="fixed-assets-furniture" />
+                      <KYCDocumentsList category="fixed-assets-docs" subcategory="furniture-fitting" />
                     </div>
                   </TabsContent>
                   <TabsContent value="land-building">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Land & Building</h4>
-                      <KYCDocumentsList category="fixed-assets-land" />
+                      <KYCDocumentsList category="fixed-assets-docs" subcategory="land-building" />
                     </div>
                   </TabsContent>
                   <TabsContent value="plant-equipment">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Plant & Equipment - 12.5 %</h4>
-                      <KYCDocumentsList category="fixed-assets-plant" />
+                      <KYCDocumentsList category="fixed-assets-docs" subcategory="plant-equipment" />
                     </div>
                   </TabsContent>
                   <TabsContent value="motor-vehicles">
                     <div className="space-y-4">
                       <h4 className="text-md font-medium">Motor Vehicles - 25 %</h4>
-                      <KYCDocumentsList category="fixed-assets-vehicles" />
+                      <KYCDocumentsList category="fixed-assets-docs" subcategory="motor-vehicles" />
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -473,15 +452,13 @@ export default function Profile() {
             </TabsContent>
             <TabsContent value="banks-info">
               <div className="space-y-4">
-                <h2 className="text-xl  mb-2">Bank Documents</h2>
-                <KYCDocumentsList />
+                <h2 className="text-xl mb-2">Bank Documents</h2>
+                <KYCDocumentsList category="banks-docs" />
               </div>
             </TabsContent>
           </Tabs>
         </TabsContent>
-
       </Tabs>
     </div>
   );
 }
-
