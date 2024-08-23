@@ -42,6 +42,16 @@ const calculateRemainingDays = (issueDate, expiryDate) => {
   return remainingDays > 0 ? remainingDays : 0;
 };
 
+
+
+const getDaysToExpiryColor = (days) => {
+  if (days === 'N/A') return 'text-gray-500';
+  const daysNum = parseInt(days);
+  if (daysNum <= 0) return 'text-red-500 font-bold';
+  if (daysNum <= 90) return 'text-blue-500';
+  return 'text-green-500';
+};
+
 const FileViewer = ({ url, onClose }) => {
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -304,7 +314,7 @@ export function DirectorsDocumentsList() {
                   Expiry Date {sortColumn === 'expiry_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
                 <TableHead onClick={() => handleSort('reminder_days')} className="cursor-pointer bg-gray-200 font-medium">
-                  Reminder Days {sortColumn === 'reminder_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                  Days to expiry {sortColumn === 'reminder_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
                 <TableHead className="bg-gray-200 font-medium">Status</TableHead>
                 <TableHead className="bg-gray-200 font-medium">Actions</TableHead>
@@ -318,14 +328,16 @@ export function DirectorsDocumentsList() {
                   <TableCell>{doc.department}</TableCell>
                   <TableCell>{doc.isUploaded ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
                   <TableCell>{doc.isUploaded ? formatDate(doc.expiry_date) : 'Pending'}</TableCell>
-                  <TableCell>{doc.reminder_days || 'N/A'}</TableCell>
+                  <TableCell className={getDaysToExpiryColor(doc.reminder_days)}>
+                    {doc.reminder_days || 'N/A'}
+                  </TableCell>
                   <TableCell>
                     <Badge className={doc.isUploaded ? 'bg-green-500' : 'bg-yellow-500'}>
                       {doc.isUploaded ? 'Uploaded' : 'Pending'}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="outline" onClick={() => handleViewUpload(doc)} className="mr-2 hover:bg-gray-200text-gray-600">
+                    <Button variant="outline" onClick={() => handleViewUpload(doc)} className="mr-2 hover:bg-gray-200 text-gray-600">
                       {doc.isUploaded ? <EyeIcon className="w-4 h-4 mr-2" /> : <UploadIcon className="w-4 h-4 mr-2" />}
                       {doc.isUploaded ? "View" : "Upload"}
                     </Button>
