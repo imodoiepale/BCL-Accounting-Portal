@@ -245,27 +245,27 @@ export default function Profile() {
               </div>
             </TabsContent>
             <TabsContent value="suppliers-info">
-              <div className="space-y-4">
-                <Tabs defaultValue="trading-suppliers">
-                  <TabsList>
-                    <TabsTrigger value="trading-suppliers">Trading Suppliers - Information</TabsTrigger>
-                    <TabsTrigger value="monthly-service-vendors">Monthly Service Vendors - Information</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="trading-suppliers">
-                    <div className="space-y-4">
-                      <h4 className="text-md font-medium">Trading Suppliers</h4>
-                      <SupplierList type="trading" />
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="monthly-service-vendors">
-                    <div className="space-y-4">
-                      <h4 className="text-md font-medium">Monthly Service Vendors</h4>
-                      <SupplierList type="monthly" />
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </TabsContent>
+            <div className="space-y-4">
+              <Tabs defaultValue="trading-suppliers">
+                <TabsList>
+                  <TabsTrigger value="trading-suppliers">Trading Suppliers - Information</TabsTrigger>
+                  <TabsTrigger value="monthly-service-vendors">Monthly Service Vendors - Information</TabsTrigger>
+                </TabsList>
+                <TabsContent value="trading-suppliers">
+                  <div className="space-y-4">
+                    <h4 className="text-md font-medium">Trading Suppliers</h4>
+                    <SupplierList type="trading" />
+                  </div>
+                </TabsContent>
+                <TabsContent value="monthly-service-vendors">
+                  <div className="space-y-4">
+                    <h4 className="text-md font-medium">Monthly Service Vendors</h4>
+                    <SupplierList type="monthly" />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </TabsContent>
             <TabsContent value="insurances-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Insurances' Information</h3>
