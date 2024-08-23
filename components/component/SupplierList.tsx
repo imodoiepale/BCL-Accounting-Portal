@@ -319,18 +319,7 @@ export function SupplierList({ type }) {
                     <Label htmlFor="startdate">Start Date</Label>
                     <Input id="startdate" type="date" value={newSupplier.startdate} onChange={handleInputChange} />
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="category">Category</Label>
-                    <Select id="category" value={newSupplier.category} onValueChange={(value) => setNewSupplier({ ...newSupplier, category: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="trading">Trading Supplier</SelectItem>
-                        <SelectItem value="monthly">Monthly Service Vendor</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                
                 </div>
                 <div className="pt-4"><Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button></div>
               </SheetContent>
