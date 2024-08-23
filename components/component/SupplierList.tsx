@@ -14,11 +14,14 @@ import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, UploadI
 import { ScrollArea } from '../ui/scroll-area'
 import { useUser } from '@clerk/clerk-react'
 import { toast } from 'react-hot-toast'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
-const url = "https://zyszsqgdlrpnunkegipk.supabase.co"
 
-const supabase = createClient(url, key)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL 
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY 
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);
@@ -28,7 +31,7 @@ const formatDate = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
-export function SupplierList() {
+export function SupplierList({ type }) {
   const { user } = useUser();
   const [suppliers, setSuppliers] = useState([])
   const [newSupplier, setNewSupplier] = useState({
@@ -38,7 +41,8 @@ export function SupplierList() {
     contact_mobile: '',
     contact_email: '',
     startdate: '',
-    status: "true"
+    status: "true",
+    category: type
   })
   const [isLoading, setIsLoading] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
@@ -51,6 +55,7 @@ export function SupplierList() {
       .from('acc_portal_suppliers')
       .select('*')
       .eq('userid', user?.id)
+      .eq('category', type)
       .order('id', { ascending: true });
     if (error) {
       console.error('Error fetching suppliers:', error)
@@ -58,7 +63,7 @@ export function SupplierList() {
     } else {
       setSuppliers(data)
     }
-  }, [user?.id])
+  }, [user?.id, type])
   
   useEffect(() => {
     fetchSuppliers()
@@ -84,7 +89,8 @@ export function SupplierList() {
         contact_mobile: '',
         contact_email: '',
         startdate: '',
-        status: "true"
+        status: "true",
+        category: type
       })
       toast.success('Supplier added successfully!')
     }
@@ -121,7 +127,7 @@ export function SupplierList() {
           try {
             const { data, error } = await supabase
               .from('acc_portal_suppliers')
-              .insert([{ ...supplier, userid: user?.id }])
+              .insert([{ ...supplier, userid: user?.id, category: type }])
               .select();
 
             if (error) {
@@ -151,7 +157,7 @@ export function SupplierList() {
   };
 
   const downloadCSVTemplate = () => {
-    const headers = ['name', 'pin', 'contact_name', 'contact_mobile', 'contact_email', 'startdate'];
+    const headers = ['name', 'pin', 'contact_name', 'contact_mobile', 'contact_email', 'startdate', 'category'];
     const csvContent = headers.join(',') + '\n';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -184,6 +190,7 @@ export function SupplierList() {
     setEditField(e.target.id)
     setCurrentSupplier({ ...currentSupplier, [e.target.id]: e.target.value })
   }
+
   const handleEditCancel = () => {
     setCurrentSupplier({
       ...currentSupplier,
@@ -201,6 +208,7 @@ export function SupplierList() {
     })
     setIsDialogOpen(true)
   }
+
   const handleEditSubmit = async () => {
     const { id, ...updateData } = currentSupplier;
   
@@ -227,7 +235,7 @@ export function SupplierList() {
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-semibold">Supplier List</h1>
+          <h1 className="text-xl font-semibold">Supplier List - {type === 'trading' ? 'Trading Suppliers' : 'Monthly Service Vendors'}</h1>
           <div className="flex items-center space-x-2">
             <Input type="search" placeholder="search" className="w-48" />
             <Button variant="outline" className="flex items-center" onClick={fetchSuppliers}>
@@ -295,6 +303,18 @@ export function SupplierList() {
                   <div className="space-y-1">
                     <Label htmlFor="startdate">Start Date</Label>
                     <Input id="startdate" type="date" value={newSupplier.startdate} onChange={handleInputChange} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="category">Category</Label>
+                    <Select id="category" value={newSupplier.category} onValueChange={(value) => setNewSupplier({ ...newSupplier, category: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="trading">Trading Supplier</SelectItem>
+                        <SelectItem value="monthly">Monthly Service Vendor</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="pt-4"><Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button></div>
@@ -436,6 +456,21 @@ export function SupplierList() {
                   onChange={(e) => setCurrentSupplier({ ...currentSupplier, enddate: e.target.value })}
                 />
               </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-category">Category</Label>
+                <Select
+                  value={currentSupplier.category}
+                  onValueChange={(value) => setCurrentSupplier({ ...currentSupplier, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="trading">Trading Supplier</SelectItem>
+                    <SelectItem value="monthly">Monthly Service Vendor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -444,5 +479,4 @@ export function SupplierList() {
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
+  )}
