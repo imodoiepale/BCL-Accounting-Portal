@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, UploadIcon, Edit3Icon, Trash2Icon } from 'lucide-react'
 import { ScrollArea } from '../ui/scroll-area'
 import { useUser } from '@clerk/clerk-react'
-import { toast } from 'react-hot-toast'
+import { toast, Toaster } from 'react-hot-toast'
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 
@@ -21,6 +22,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY 
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
 
 
 const formatDate = (dateString) => {
@@ -49,6 +51,8 @@ export function SupplierList({ type }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [currentSupplier, setCurrentSupplier] = useState(null)
   const [editField, setEditField] = useState('')
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+
 
   const fetchSuppliers = useCallback(async () => {
     const { data, error } = await supabase
@@ -92,8 +96,15 @@ export function SupplierList({ type }) {
         status: "true",
         category: type
       })
+      closeForm()
       toast.success('Supplier added successfully!')
+
     }
+  }
+
+
+  const closeForm = () => {
+    setIsSheetOpen(false)
   }
 
   const handleFileChange = (event) => {
@@ -283,9 +294,9 @@ export function SupplierList({ type }) {
                 </div>
               </DialogContent>
             </Dialog>
-            <Sheet>
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
-                <Button className="bg-blue-600 text-white">Add New Supplier</Button>
+              <Button className="bg-blue-600 text-white" onClick={() => setIsSheetOpen(true)}>Add New Supplier</Button>
               </SheetTrigger>
               <SheetContent>
                 <SheetHeader>
