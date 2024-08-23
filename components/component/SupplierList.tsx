@@ -125,9 +125,11 @@ export function SupplierList({ type }) {
 
         for (const supplier of suppliers) {
           try {
+            // Use the category from the CSV, fallback to the current type if not present
+            const category = supplier.category || type;
             const { data, error } = await supabase
               .from('acc_portal_suppliers')
-              .insert([{ ...supplier, userid: user?.id, category: type }])
+              .insert([{ ...supplier, userid: user?.id, category }])
               .select();
 
             if (error) {
@@ -151,14 +153,27 @@ export function SupplierList({ type }) {
         if (errorCount > 0) {
           toast.error(`Failed to add ${errorCount} supplier${errorCount > 1 ? 's' : ''}.`);
         }
+        
+        // Refresh the supplier list after upload
+        fetchSuppliers();
       };
       reader.readAsText(selectedFile);
     }
   };
 
   const downloadCSVTemplate = () => {
-    const headers = ['name', 'pin', 'contact_name', 'contact_mobile', 'contact_email', 'startdate', 'category'];
-    const csvContent = headers.join(',') + '\n';
+    const headers = [
+      'name',
+      'pin',
+      'contact_name',
+      'contact_mobile',
+      'contact_email',
+      'startdate',
+      'category ("trading" or "monthly")'
+    ];
+    
+    const csvContent = headers.join(',');
+  
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     if (link.download !== undefined) {
