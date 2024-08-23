@@ -57,7 +57,7 @@ const DocumentUpload = () => {
         <h1 className="text-2xl font-bold">Monthly Document Upload</h1>
         <Sheet>
           <SheetTrigger asChild>
-            <Button 
+            <Button
               className="bg-blue-600 text-white"
               onClick={handleAddDetails}
             >
@@ -121,18 +121,51 @@ const DocumentUpload = () => {
           <TabsTrigger value="bank">Bank Statements</TabsTrigger>
         </TabsList>
         <TabsContent value="supplier">
-          <Tabs defaultValue="current" className="w-full" onValueChange={(value) => setActiveSubTab(value)}>
+
+          <Tabs defaultValue="trading" className="w-full" onValueChange={(value) => setActiveTab(value)}>
             <TabsList>
-              <TabsTrigger value="current">Current Month</TabsTrigger>
-              <TabsTrigger value="previous">Previous Months</TabsTrigger>
+              <TabsTrigger value="trading">Trading Suppliers </TabsTrigger>
+              <TabsTrigger value="monthly">Monthly Service Vendors</TabsTrigger>
             </TabsList>
-            <TabsContent value="current">
-              <CombinedMonthlyDocs type="supplier" isCurrentMonth={true} />
+            <TabsContent value="trading">
+              <Tabs defaultValue="current" className="w-full" onValueChange={(value) => setActiveSubTab(value)}>
+                <TabsList>
+                  <TabsTrigger value="current">Current Month</TabsTrigger>
+                  <TabsTrigger value="previous">Previous Months</TabsTrigger>
+                </TabsList>
+                <TabsContent value="current">
+                  <CombinedMonthlyDocs type="supplier" isCurrentMonth={true} />
+                </TabsContent>
+                <TabsContent value="previous">
+                  <PreviousMonths type="supplier" />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
-            <TabsContent value="previous">
-              <PreviousMonths type="supplier" />
+            <TabsContent value="monthly">
+              <Tabs defaultValue="current" className="w-full" onValueChange={(value) => setActiveSubTab(value)}>
+                <TabsList>
+                  <TabsTrigger value="current">Current Month</TabsTrigger>
+                  <TabsTrigger value="previous">Previous Months</TabsTrigger>
+                </TabsList>
+                <TabsContent value="current">
+                  <CombinedMonthlyDocs 
+                  type="supplier" 
+                  Stype='trading' 
+                  isCurrentMonth={true} 
+                  />
+                </TabsContent>
+                <TabsContent value="previous">
+                  <PreviousMonths 
+                  type="supplier" 
+                  Stype='monthly' 
+                  />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
           </Tabs>
+
+
+
         </TabsContent>
         <TabsContent value="bank">
           <Tabs defaultValue="current" className="w-full" onValueChange={(value) => setActiveSubTab(value)}>
@@ -148,7 +181,7 @@ const DocumentUpload = () => {
             </TabsContent>
           </Tabs>
         </TabsContent>
-      </Tabs> 
+      </Tabs>
     </div>
   );
 };
