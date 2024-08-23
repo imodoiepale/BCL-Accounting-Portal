@@ -297,7 +297,7 @@ export function KYCDocumentsList({ category, subcategory }) {
                   Expiry Date {sortColumn === 'expiry_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
                 <TableHead onClick={() => handleSort('reminder_days')} className="cursor-pointer bg-gray-200 font-medium">
-                  Reminder Days {sortColumn === 'reminder_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                   Days To Expiry {sortColumn === 'reminder_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
                 <TableHead className="bg-gray-200 font-medium">Status</TableHead>
                 <TableHead className="bg-gray-200 font-medium">Actions</TableHead>
