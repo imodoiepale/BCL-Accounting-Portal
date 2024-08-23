@@ -14,9 +14,11 @@ const supabase = createClient(
 
 interface CombinedMonthlyDocsProps {
   type: 'supplier' | 'bank';
+  Stype?: 'trading' | 'monthly';
   selectedMonth?: string | null;
   isCurrentMonth: boolean;
 }
+
 
 const formatDate = (dateString: string) => 
   dateString ? new Date(dateString).toLocaleDateString('en-GB', {
