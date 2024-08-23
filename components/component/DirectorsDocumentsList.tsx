@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 // @ts-nocheck
 "use client"
+
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
@@ -9,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select } from "@/components/ui/select"
 import { RefreshCwIcon, EyeIcon, UploadIcon, ArrowUpDown, Edit2Icon } from 'lucide-react'
 import { toast, Toaster } from 'react-hot-toast'
 import dynamic from 'next/dynamic'
@@ -23,9 +25,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
-
-const BUCKET_NAME = 'directors-documents'
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
@@ -70,51 +69,53 @@ export function DirectorsDocumentsList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [viewerUrl, setViewerUrl] = useState(null)
   const [editingDocument, setEditingDocument] = useState(null)
+  const [category, setCategory] = useState('')
+  const [subcategory, setSubcategory] = useState('')
 
   useEffect(() => {
-    initializeBucket()
     fetchDocuments()
-    fetchDirectors()
-  }, [userId])
+  }, [userId, category, subcategory])
 
-  const initializeBucket = async () => {
-    const { data: buckets, error } = await supabase.storage.listBuckets()
-    
-    if (error) {
-      console.error('Error listing buckets:', error)
+  const fetchDocuments = async () => {
+    setIsLoading(true)
+    let query = supabase
+      .from('acc_portal_kyc')
+      .select('*')
+      .eq('listed', true)
+      .eq('category', 'directors-docs')
+
+    const { data: baseDocuments, error: baseError } = await query
+
+    if (baseError) {
+      console.error('Error fetching base documents:', baseError)
+      toast.error('Failed to fetch documents. Please try again.')
+      setIsLoading(false)
       return
     }
 
-    const bucketExists = buckets.some(bucket => bucket.name === BUCKET_NAME)
-
-    if (!bucketExists) {
-      const { data, error } = await supabase.storage.createBucket(BUCKET_NAME, {
-        public: false,
-        fileSizeLimit: MAX_FILE_SIZE
-      })
-
-      if (error) {
-        console.error('Error creating bucket:', error)
-        toast.error(`Failed to create storage bucket. Please contact support.`)
-      } else {
-        console.log('Bucket created successfully:', data)
-      }
-    }
-  }
-
-  const fetchDocuments = async () => {
-    const { data, error } = await supabase
-      .from('acc_portal_directors_documents')
+    const { data: uploadedDocuments, error: uploadError } = await supabase
+      .from('acc_portal_kyc_uploads')
       .select('*')
       .eq('userid', userId)
-      .order('id', { ascending: true });
 
-    if (error) {
-      console.error('Error fetching documents:', error);
-      toast.error('Failed to fetch documents. Please try again.')
-    } else {
-      setDocuments(data);
+    if (uploadError) {
+      console.error('Error fetching uploaded documents:', uploadError)
+      toast.error('Failed to fetch uploaded documents. Please try again.')
+      setIsLoading(false)
+      return
     }
+
+    const mergedDocuments = baseDocuments.map(baseDoc => {
+      const uploadedDoc = uploadedDocuments.find(uploadedDoc => uploadedDoc.kyc_id === baseDoc.id)
+      return {
+        ...baseDoc,
+        ...uploadedDoc,
+        isUploaded: !!uploadedDoc
+      }
+    })
+
+    setDocuments(mergedDocuments)
+    setIsLoading(false)
   }
 
   const handleInputChange = (e) => {
@@ -127,10 +128,10 @@ export function DirectorsDocumentsList() {
   }
 
   const handleViewUpload = async (doc) => {
-    if (doc.file_path) {
+    if (doc.filepath) {
       const { data, error } = await supabase.storage
-        .from(BUCKET_NAME)
-        .createSignedUrl(doc.file_path, 60)
+        .from('kyc-documents')
+        .createSignedUrl(doc.filepath, 60)
 
       if (error) {
         console.error('Error creating signed URL:', error)
@@ -156,55 +157,41 @@ export function DirectorsDocumentsList() {
       return
     }
 
-    setIsLoading(true)
     try {
       const fileExt = file.name.split('.').pop()
       const fileName = `${Math.random()}.${fileExt}`
-      const filePath = `${editingDocument.id}/${fileName}`
-      
       const { data, error } = await supabase.storage
-        .from(BUCKET_NAME)
-        .upload(filePath, file)
+        .from('kyc-documents')
+        .upload(`${userId}/${fileName}`, file)
 
       if (error) {
         throw new Error(`File upload failed: ${error.message}`)
       }
 
-      const { data: publicUrlData, error: publicUrlError } = supabase
-        .storage
-        .from(BUCKET_NAME)
-        .getPublicUrl(data.path)
-
-      if (publicUrlError) {
-        throw new Error(`Error getting public URL: ${publicUrlError.message}`)
-      }
-
-      const { error: updateError } = await supabase
-        .from('acc_portal_directors_documents')
-        .update({ 
-          file_path: publicUrlData.publicUrl,
+      const { error: insertError } = await supabase
+        .from('acc_portal_kyc_uploads')
+        .insert({ 
+          userid: userId,
+          kyc_id: editingDocument.id,
+          filepath: data.path,
           issue_date: editingDocument.issue_date,
           expiry_date: editingDocument.expiry_date,
-          status: 'complete'
+          reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date).toString()
         })
-        .eq('id', editingDocument.id)
-        .eq('userid', userId)
 
-      if (updateError) {
-        throw new Error(`Error updating document: ${updateError.message}`)
+      if (insertError) {
+        throw new Error(`Document insert failed: ${insertError.message}`)
       }
 
-      toast.success("Document uploaded and updated successfully")
+      toast.success("Document uploaded and inserted successfully")
 
       fetchDocuments()
       setIsUploadingDocument(false)
       setEditingDocument(null)
       setFile(null)
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error in handleFileUpload:', error)
       toast.error(error.message)
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -219,12 +206,13 @@ export function DirectorsDocumentsList() {
   const handleUpdate = async () => {
     try {
       const { error } = await supabase
-        .from('acc_portal_directors_documents')
+        .from('acc_portal_kyc_uploads')
         .update({
           issue_date: editingDocument.issue_date,
           expiry_date: editingDocument.expiry_date,
+          reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date).toString()
         })
-        .eq('id', editingDocument.id)
+        .eq('kyc_id', editingDocument.id)
         .eq('userid', userId)
 
       if (error) {
@@ -281,8 +269,9 @@ export function DirectorsDocumentsList() {
       <Toaster position="top-right" />
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-semibold">Directors' Documents List</h1>
+          <h1 className="text-xl font-semibold">KYC Documents - {category} {subcategory && `- ${subcategory}`}</h1>
           <div className="flex items-center space-x-2">
+            
             <Input 
               type="search" 
               placeholder="Search documents" 
@@ -305,11 +294,8 @@ export function DirectorsDocumentsList() {
                 <TableHead onClick={() => handleSort('name')} className="cursor-pointer bg-gray-200 font-medium">
                   Document Name {sortColumn === 'name' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
-                <TableHead onClick={() => handleSort('director_id')} className="cursor-pointer bg-gray-200 font-medium">
-                  Director {sortColumn === 'director_id' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-                </TableHead>
-                <TableHead onClick={() => handleSort('type')} className="cursor-pointer bg-gray-200 font-medium">
-                  Type {sortColumn === 'type' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                <TableHead onClick={() => handleSort('department')} className="cursor-pointer bg-gray-200 font-medium">
+                  Department {sortColumn === 'department' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
                 <TableHead onClick={() => handleSort('issue_date')} className="cursor-pointer bg-gray-200 font-medium">
                   Issue Date {sortColumn === 'issue_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
@@ -317,7 +303,9 @@ export function DirectorsDocumentsList() {
                 <TableHead onClick={() => handleSort('expiry_date')} className="cursor-pointer bg-gray-200 font-medium">
                   Expiry Date {sortColumn === 'expiry_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
-                <TableHead className="bg-gray-200 font-medium">Reminder Days</TableHead>
+                <TableHead onClick={() => handleSort('reminder_days')} className="cursor-pointer bg-gray-200 font-medium">
+                  Reminder Days {sortColumn === 'reminder_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
                 <TableHead className="bg-gray-200 font-medium">Status</TableHead>
                 <TableHead className="bg-gray-200 font-medium">Actions</TableHead>
               </TableRow>
@@ -327,22 +315,21 @@ export function DirectorsDocumentsList() {
                 <TableRow key={doc.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-100'}>
                   <TableCell>{index + 1}</TableCell>
                   <TableCell>{doc.name}</TableCell>
-                  <TableCell>{directors.find(d => d.id === doc.director_id)?.full_name || 'Unknown'}</TableCell>
-                  <TableCell>{doc.type}</TableCell>
-                  <TableCell>{formatDate(doc.issue_date)}</TableCell>
-                  <TableCell>{formatDate(doc.expiry_date)}</TableCell>
-                  <TableCell>{calculateRemainingDays(doc.issue_date, doc.expiry_date)}</TableCell>
+                  <TableCell>{doc.department}</TableCell>
+                  <TableCell>{doc.isUploaded ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
+                  <TableCell>{doc.isUploaded ? formatDate(doc.expiry_date) : 'Pending'}</TableCell>
+                  <TableCell>{doc.reminder_days || 'N/A'}</TableCell>
                   <TableCell>
-                    <Badge className={doc.status === 'complete' ? 'bg-green-500' : 'bg-yellow-500'}>
-                      {doc.status === 'complete' ? 'Complete' : 'Pending'}
+                    <Badge className={doc.isUploaded ? 'bg-green-500' : 'bg-yellow-500'}>
+                      {doc.isUploaded ? 'Uploaded' : 'Pending'}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                  <Button variant="outline" onClick={() => handleViewUpload(doc)} className="mr-2 hover:bg-gray-200 text-gray-600">
-                      {doc.file_path ? <EyeIcon className="w-4 h-4 mr-2" /> : <UploadIcon className="w-4 h-4 mr-2" />}
-                      {doc.file_path ? "View" : "Upload"}
+                    <Button variant="outline" onClick={() => handleViewUpload(doc)} className="mr-2 hover:bg-gray-200text-gray-600">
+                      {doc.isUploaded ? <EyeIcon className="w-4 h-4 mr-2" /> : <UploadIcon className="w-4 h-4 mr-2" />}
+                      {doc.isUploaded ? "View" : "Upload"}
                     </Button>
-                    {doc.file_path && (
+                    {doc.isUploaded && (
                       <Button variant="outline" onClick={() => handleEdit(doc)} className="hover:bg-gray-200 text-gray-600">
                         <Edit2Icon className="w-4 h-4 mr-2" />
                         Edit
@@ -356,7 +343,13 @@ export function DirectorsDocumentsList() {
         </Card>
         
         {isUploadingDocument && (
-          <Dialog open={isUploadingDocument} onOpenChange={setIsUploadingDocument}>
+          <Dialog open={isUploadingDocument} onOpenChange={(open) => {
+            setIsUploadingDocument(open)
+            if (!open) {
+              setEditingDocument(null)
+              setFile(null)
+            }
+          }}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Upload Document</DialogTitle>
@@ -388,13 +381,11 @@ export function DirectorsDocumentsList() {
                 </div>
               </div>
               <div className="flex justify-end mt-4">
-                <Button className="bg-blue-600 text-white mr-2" onClick={handleFileUpload} disabled={isLoading}>
-                  {isLoading ? 'Uploading...' : 'Upload'}
-                </Button>
+                <Button className="bg-blue-600 text-white mr-2" onClick={handleFileUpload}>Upload</Button>
                 <Button variant="outline" onClick={() => {
-                  setIsUploadingDocument(false);
-                  setEditingDocument(null);
-                  setFile(null);
+                  setIsUploadingDocument(false)
+                  setEditingDocument(null)
+                  setFile(null)
                 }}>Cancel</Button>
               </div>
             </DialogContent>
@@ -442,6 +433,3 @@ export function DirectorsDocumentsList() {
     </div>
   )
 }
-
-
-
