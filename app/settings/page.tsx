@@ -7,9 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import supabase from '@/lib/supabaseClient';
 import { toast, Toaster } from 'react-hot-toast';
 import { Switch } from "@/components/ui/switch";
+
 
 const SettingsPage = () => {
   const [documents, setDocuments] = useState([]);
@@ -19,14 +21,18 @@ const SettingsPage = () => {
     subcategory: '',
     validity_days: '',
     department: '',
+    document_type: 'one-off',
   });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingDocument, setEditingDocument] = useState(null);
   const [activeCategory, setActiveCategory] = useState('company-docs');
   const [activeSubcategory, setActiveSubcategory] = useState('');
 
   useEffect(() => {
     fetchDocuments();
   }, [activeCategory, activeSubcategory]);
+
 
   const fetchDocuments = async () => {
     let query = supabase
@@ -53,12 +59,17 @@ const SettingsPage = () => {
     setNewDocument(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditingDocument(prev => ({ ...prev, [name]: value }));
+  };
+
   const handleAddDocument = async () => {
     const newDoc = {
       ...newDocument,
       category: activeCategory,
       subcategory: activeSubcategory || '',
-      validity_days: parseInt(newDocument.validity_days),
+      validity_days: newDocument.document_type === 'renewal' ? parseInt(newDocument.validity_days) : null,
     };
 
     const { data, error } = await supabase
@@ -70,11 +81,48 @@ const SettingsPage = () => {
       toast.error('Failed to add document');
     } else {
       fetchDocuments();
-      setNewDocument({ name: '', validity_days: '', department: '' });
+      setNewDocument({ name: '', validity_days: '', department: '', document_type: 'one-off' });
       setIsAddDialogOpen(false);
       toast.success('Document added successfully');
     }
   };
+
+  const handleEditDocument = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_kyc')
+      .update({
+        name: editingDocument.name,
+        validity_days: editingDocument.document_type === 'renewal' ? parseInt(editingDocument.validity_days) : null,
+        department: editingDocument.department,
+        document_type: editingDocument.document_type,
+      })
+      .eq('id', editingDocument.id);
+
+    if (error) {
+      console.error('Error updating document:', error);
+      toast.error('Failed to update document');
+    } else {
+      fetchDocuments();
+      setIsEditDialogOpen(false);
+      toast.success('Document updated successfully');
+    }
+  };
+
+  const handleDeleteDocument = async (id) => {
+    const { error } = await supabase
+      .from('acc_portal_kyc')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting document:', error);
+      toast.error('Failed to delete document');
+    } else {
+      fetchDocuments();
+      toast.success('Document deleted successfully');
+    }
+  };
+
 
   const handleToggleListed = async (id, currentValue) => {
     const { error } = await supabase
@@ -97,7 +145,9 @@ const SettingsPage = () => {
           <TableHead className="font-bold">Document Name</TableHead>
           <TableHead className="font-bold">Validity Days</TableHead>
           <TableHead className="font-bold">Department</TableHead>
+          <TableHead className="font-bold">Type</TableHead>
           <TableHead className="font-bold">Listed</TableHead>
+          <TableHead className="font-bold">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -106,20 +156,27 @@ const SettingsPage = () => {
           .map((doc) => (
             <TableRow key={doc.id} className="hover:bg-gray-100">
               <TableCell>{doc.name}</TableCell>
-              <TableCell>{doc.validity_days}</TableCell>
+              <TableCell>{doc.validity_days || 'N/A'}</TableCell>
               <TableCell>{doc.department}</TableCell>
+              <TableCell>{doc.document_type}</TableCell>
               <TableCell>
                 <Switch
                   checked={doc.listed}
                   onCheckedChange={() => handleToggleListed(doc.id, doc.listed)}
                 />
               </TableCell>
+              <TableCell>
+                <Button onClick={() => {
+                  setEditingDocument(doc);
+                  setIsEditDialogOpen(true);
+                }} className="mr-2 bg-yellow-500 hover:bg-yellow-600 text-white">Edit</Button>
+                <Button onClick={() => handleDeleteDocument(doc.id)} className="bg-red-500 hover:bg-red-600 text-white">Delete</Button>
+              </TableCell>
             </TableRow>
           ))}
       </TableBody>
     </Table>
   );
-
   const renderAddDocumentDialog = () => (
     <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
       <DialogTrigger asChild>
@@ -137,14 +194,29 @@ const SettingsPage = () => {
             onChange={handleInputChange}
             className="w-full"
           />
-          <Input
-            name="validity_days"
-            type="number"
-            placeholder="Validity Days"
-            value={newDocument.validity_days}
-            onChange={handleInputChange}
-            className="w-full"
-          />
+          <Select
+            name="document_type"
+            value={newDocument.document_type}
+            onValueChange={(value) => setNewDocument(prev => ({ ...prev, document_type: value }))}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select document type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="one-off">One-off</SelectItem>
+              <SelectItem value="renewal">Renewal</SelectItem>
+            </SelectContent>
+          </Select>
+          {newDocument.document_type === 'renewal' && (
+            <Input
+              name="validity_days"
+              type="number"
+              placeholder="Validity Days"
+              value={newDocument.validity_days}
+              onChange={handleInputChange}
+              className="w-full"
+            />
+          )}
           <Input
             name="department"
             placeholder="Department"
@@ -153,6 +225,56 @@ const SettingsPage = () => {
             className="w-full"
           />
           <Button onClick={handleAddDocument} className="w-full bg-green-500 hover:bg-green-600 text-white">Add Document</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const renderEditDocumentDialog = () => (
+    <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold">Edit Document</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Input
+            name="name"
+            placeholder="Document Name"
+            value={editingDocument?.name || ''}
+            onChange={handleEditInputChange}
+            className="w-full"
+          />
+          <Select
+            name="document_type"
+            value={editingDocument?.document_type || 'one-off'}
+            onValueChange={(value) => setEditingDocument(prev => ({ ...prev, document_type: value }))}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select document type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="one-off">One-off</SelectItem>
+              <SelectItem value="renewal">Renewal</SelectItem>
+            </SelectContent>
+          </Select>
+          {editingDocument?.document_type === 'renewal' && (
+            <Input
+              name="validity_days"
+              type="number"
+              placeholder="Validity Days"
+              value={editingDocument?.validity_days || ''}
+              onChange={handleEditInputChange}
+              className="w-full"
+            />
+          )}
+          <Input
+            name="department"
+            placeholder="Department"
+            value={editingDocument?.department || ''}
+            onChange={handleEditInputChange}
+            className="w-full"
+          />
+          <Button onClick={handleEditDocument} className="w-full bg-green-500 hover:bg-green-600 text-white">Update Document</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -305,7 +427,7 @@ const SettingsPage = () => {
           ])}
         </TabsContent>
       </Tabs>
-
+      {renderEditDocumentDialog()}
       <Toaster />
     </div>
   );
