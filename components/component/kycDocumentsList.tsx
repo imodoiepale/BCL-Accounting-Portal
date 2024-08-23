@@ -43,6 +43,15 @@ const calculateRemainingDays = (issueDate, expiryDate) => {
   return remainingDays > 0 ? remainingDays : 0;
 };
 
+
+const getDaysToExpiryColor = (days) => {
+  if (days === 'N/A') return 'text-gray-500';
+  const daysNum = parseInt(days);
+  if (daysNum <= 0) return 'text-red-500 font-bold';
+  if (daysNum <= 90) return 'text-blue-500';
+  return 'text-green-500';
+};
+
 const FileViewer = ({ url, onClose }) => {
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -311,7 +320,9 @@ export function KYCDocumentsList({ category, subcategory }) {
                   <TableCell>{doc.department}</TableCell>
                   <TableCell>{doc.isUploaded ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
                   <TableCell>{doc.isUploaded ? formatDate(doc.expiry_date) : 'Pending'}</TableCell>
-                  <TableCell>{doc.reminder_days || 'N/A'}</TableCell>
+                  <TableCell className={getDaysToExpiryColor(doc.reminder_days)}>
+                    {doc.reminder_days || 'N/A'}
+                  </TableCell>
                   <TableCell>
                     <Badge className={doc.isUploaded ? 'bg-green-500' : 'bg-yellow-500'}>
                       {doc.isUploaded ? 'Uploaded' : 'Pending'}
