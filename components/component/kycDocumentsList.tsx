@@ -11,9 +11,7 @@ import { Label } from "@/components/ui/label"
 import { RefreshCwIcon, UploadIcon, EyeIcon, ArrowUpDown, Edit2Icon } from 'lucide-react'
 import { toast, Toaster } from 'react-hot-toast'
 import dynamic from 'next/dynamic'
-import { useAuth } from '@clerk/clerk-react'
 import { useUser } from '@clerk/clerk-react'
-
 
 const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => mod.Dialog), { ssr: false })
 const DialogContent = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogContent), { ssr: false })
@@ -35,8 +33,8 @@ const formatDate = (dateString) => {
   return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
 };
 
-const calculateRemainingDays = (issueDate, expiryDate, validityDays) => {
-  if (!issueDate || !expiryDate || !validityDays) return 'N/A';
+const calculateRemainingDays = (issueDate, expiryDate) => {
+  if (!issueDate || !expiryDate) return 'N/A';
   
   const today = new Date();
   const expiry = new Date(expiryDate);
@@ -77,19 +75,6 @@ export function KYCDocumentsList({ category, subcategory }) {
     }
   }, [user, category, subcategory])
 
-  const createBucketAndFolders = async () => {
-    const { data: bucketData, error: bucketError } = await supabase.storage.createBucket('kyc-documents', {
-      public: false,
-      allowedMimeTypes: ['*'],      
-      fileSizeLimit: 50 * 1024 * 1024, // 50MB limit
-    })
-
-    if (bucketError && bucketError.message !== 'Bucket already exists') {
-      console.error('Error creating bucket:', bucketError)
-      return
-    }
-  }
-
   const fetchDocuments = async () => {
     const { data: baseDocuments, error: baseError } = await supabase
       .from('acc_portal_kyc')
@@ -107,7 +92,7 @@ export function KYCDocumentsList({ category, subcategory }) {
     const { data: uploadedDocuments, error: uploadError } = await supabase
       .from('acc_portal_kyc_uploads')
       .select('*')
-      .eq('userid', user.id);  // Use user.id instead of userId
+      .eq('userid', user.id);
 
     if (uploadError) {
       console.error('Error fetching uploaded documents:', uploadError)
@@ -156,7 +141,6 @@ export function KYCDocumentsList({ category, subcategory }) {
         id: doc.id,
         issue_date: doc.issue_date || '',
         expiry_date: doc.expiry_date || '',
-        validity_days: doc.validity_days || '',
       })
     }
   }
@@ -181,13 +165,12 @@ export function KYCDocumentsList({ category, subcategory }) {
       const { error: insertError } = await supabase
         .from('acc_portal_kyc_uploads')
         .insert({ 
-          userid: user.id,  // Use user.id instead of userId
+          userid: user.id,
           kyc_id: editingDocument.id,
           filepath: data.path,
           issue_date: editingDocument.issue_date,
           expiry_date: editingDocument.expiry_date,
-          validity_days: editingDocument.validity_days,
-          reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date, editingDocument.validity_days).toString()
+          reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date).toString()
         })
 
       if (insertError) {
@@ -206,13 +189,11 @@ export function KYCDocumentsList({ category, subcategory }) {
     }
   }
 
-
   const handleEdit = (doc) => {
     setEditingDocument({
       id: doc.id,
       issue_date: doc.issue_date || '',
       expiry_date: doc.expiry_date || '',
-      validity_days: doc.validity_days || '',
     })
   }
 
@@ -223,11 +204,10 @@ export function KYCDocumentsList({ category, subcategory }) {
         .update({
           issue_date: editingDocument.issue_date,
           expiry_date: editingDocument.expiry_date,
-          validity_days: editingDocument.validity_days,
-          reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date, editingDocument.validity_days).toString()
+          reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date).toString()
         })
         .eq('kyc_id', editingDocument.id)
-        .eq('userid', userId)
+        .eq('userid', user.id)
 
       if (error) {
         throw new Error(`Document update failed: ${error.message}`)
@@ -278,8 +258,6 @@ export function KYCDocumentsList({ category, subcategory }) {
     )
   }
 
-  // ... Rest of the component remains the same ...
-
   return (
     <div className="flex w-full bg-gray-100">
       <Toaster position="top-right" />
@@ -318,9 +296,6 @@ export function KYCDocumentsList({ category, subcategory }) {
                 <TableHead onClick={() => handleSort('expiry_date')} className="cursor-pointer bg-gray-200 font-medium">
                   Expiry Date {sortColumn === 'expiry_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
-                <TableHead onClick={() => handleSort('validity_days')} className="cursor-pointer bg-gray-200 font-medium">
-                  Validity Days {sortColumn === 'validity_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-                </TableHead>
                 <TableHead onClick={() => handleSort('reminder_days')} className="cursor-pointer bg-gray-200 font-medium">
                   Reminder Days {sortColumn === 'reminder_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
@@ -336,7 +311,6 @@ export function KYCDocumentsList({ category, subcategory }) {
                   <TableCell>{doc.department}</TableCell>
                   <TableCell>{doc.isUploaded ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
                   <TableCell>{doc.isUploaded ? formatDate(doc.expiry_date) : 'Pending'}</TableCell>
-                  <TableCell>{doc.validity_days || 'N/A'}</TableCell>
                   <TableCell>{doc.reminder_days || 'N/A'}</TableCell>
                   <TableCell>
                     <Badge className={doc.isUploaded ? 'bg-green-500' : 'bg-yellow-500'}>
@@ -362,7 +336,13 @@ export function KYCDocumentsList({ category, subcategory }) {
         </Card>
         
         {isUploadingDocument && (
-          <Dialog open={isUploadingDocument} onOpenChange={setIsUploadingDocument}>
+          <Dialog open={isUploadingDocument} onOpenChange={(open) => {
+            setIsUploadingDocument(open)
+            if (!open) {
+              setEditingDocument(null)
+              setFile(null)
+            }
+          }}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Upload Document</DialogTitle>
@@ -389,16 +369,6 @@ export function KYCDocumentsList({ category, subcategory }) {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="validity_days">Validity Days</Label>
-                  <Input 
-                    id="validity_days" 
-                    type="number" 
-                    value={editingDocument?.validity_days || ''} 
-                    onChange={handleInputChange} 
-                    required 
-                  />
-                </div>
-                <div>
                   <Label htmlFor="file">Upload Document</Label>
                   <Input id="file" type="file" onChange={handleFileChange} required />
                 </div>
@@ -406,9 +376,9 @@ export function KYCDocumentsList({ category, subcategory }) {
               <div className="flex justify-end mt-4">
                 <Button className="bg-blue-600 text-white mr-2" onClick={handleFileUpload}>Upload</Button>
                 <Button variant="outline" onClick={() => {
-                  setIsUploadingDocument(false);
-                  setEditingDocument(null);
-                  setFile(null);
+                  setIsUploadingDocument(false)
+                  setEditingDocument(null)
+                  setFile(null)
                 }}>Cancel</Button>
               </div>
             </DialogContent>
@@ -438,16 +408,6 @@ export function KYCDocumentsList({ category, subcategory }) {
                     id="expiry_date" 
                     type="date" 
                     value={editingDocument.expiry_date} 
-                    onChange={handleInputChange} 
-                    required 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="validity_days">Validity Days</Label>
-                  <Input 
-                    id="validity_days" 
-                    type="number" 
-                    value={editingDocument.validity_days} 
                     onChange={handleInputChange} 
                     required 
                   />
