@@ -22,11 +22,15 @@ export default function RootLayout({
       <html lang="en">
         <body className={inter.className}>
           <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <div className="flex flex-col flex-grow">
+            <div className="flex-shrink-0">
+              <Sidebar />
+            </div>
+            <div className="flex flex-col flex-grow overflow-hidden">
               <Navbar />
-              <main className="flex-grow overflow-auto p-4">
-                {children}
+              <main className="flex-grow overflow-auto">
+                <div className="min-w-[640px] p-4">
+                  {children}
+                </div>
               </main>
             </div>
           </div>
