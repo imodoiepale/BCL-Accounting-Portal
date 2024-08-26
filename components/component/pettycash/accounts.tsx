@@ -1,7 +1,6 @@
 // @ts-nocheck
 "use client";
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,8 +10,10 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
+import toast, { Toaster } from 'react-hot-toast';
+import { supabase } from '@/lib/supabaseClient'
 
-const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
+
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);
@@ -31,7 +32,6 @@ export function AccountsTab() {
   const [newAccount, setNewAccount] = useState({
     branch_id: '',
     account_number: '',
-    // account_name: '',
     account_type: '',
     balance: '',
     min_amount: '',
@@ -40,6 +40,7 @@ export function AccountsTab() {
     status: 'Active',
     userid: '',
   });
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
     fetchAccounts();
@@ -47,60 +48,71 @@ export function AccountsTab() {
     fetchUsers();
   }, []);
 
-  // Update the table name in the fetchAccounts function
-const fetchAccounts = async () => {
-  const { data, error } = await supabase
-    .from('acc_portal_pettycash_accounts')
-    .select('*, acc_portal_pettycash_branches(branch_name), acc_portal_pettycash_users(name)')
-    .eq('admin_id', userId)
-    .order('id', { ascending: true });
-  if (error) console.error('Error fetching accounts:', error);
-  else setAccounts(data);
-};
+  const fetchAccounts = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_pettycash_accounts')
+      .select('*, acc_portal_pettycash_branches(branch_name), acc_portal_pettycash_users(name)')
+      .eq('admin_id', userId)
+      .order('id', { ascending: true });
+    if (error) {
+      console.error('Error fetching accounts:', error);
+      toast.error('Failed to fetch accounts. Please try again.');
+    } else {
+      setAccounts(data);
+    }
+  };
 
-// Update the table name in the fetchBranches function
-const fetchBranches = async () => {
-  const { data, error } = await supabase
-    .from('acc_portal_pettycash_branches')
-    .select('id, branch_name')
-    .eq('userid', userId);
-  if (error) console.error('Error fetching branches:', error);
-  else setBranches(data);
-};
+  const fetchBranches = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_pettycash_branches')
+      .select('id, branch_name')
+      .eq('userid', userId);
+    if (error) {
+      console.error('Error fetching branches:', error);
+      toast.error('Failed to fetch branches. Please try again.');
+    } else {
+      setBranches(data);
+    }
+  };
 
-// Update the table name in the fetchUsers function
-const fetchUsers = async () => {
-  const { data, error } = await supabase
-    .from('acc_portal_pettycash_users')
-    .select('id, name')
-    .eq('admin_id', userId);
-  if (error) console.error('Error fetching users:', error);
-  else setUsers(data);
-};
+  const fetchUsers = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_pettycash_users')
+      .select('id, name')
+      .eq('admin_id', userId);
+    if (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to fetch users. Please try again.');
+    } else {
+      setUsers(data);
+    }
+  };
 
-// Update the table name in the handleSubmit function
-const handleSubmit = async () => {
-  const { data, error } = await supabase
-    .from('acc_portal_pettycash_accounts')
-    .insert([{ ...newAccount, admin_id: userId }]);
+  const handleSubmit = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_pettycash_accounts')
+      .insert([{ ...newAccount, admin_id: userId }]);
 
-  if (error) console.error('Error adding account:', error);
-  else {
-    fetchAccounts();
-    setNewAccount({
-      branch_id: '',
-      account_number: '',
-      // account_name: '',
-      account_type: '',
-      balance: '',
-      min_amount: '',
-      max_amount: '',
-      currency: '',
-      status: 'Active',
-      userid: '',
-    });
-  }
-};
+    if (error) {
+      console.error('Error adding account:', error);
+      toast.error('Failed to add account. Please try again.');
+    } else {
+      fetchAccounts();
+      setNewAccount({
+        branch_id: '',
+        account_number: '',
+        account_type: '',
+        balance: '',
+        min_amount: '',
+        max_amount: '',
+        currency: '',
+        status: 'Active',
+        userid: '',
+      });
+      toast.success('Account added successfully!');
+      setIsSheetOpen(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
@@ -111,11 +123,9 @@ const handleSubmit = async () => {
     setNewAccount((prev) => ({ ...prev, [id]: value }));
   };
 
-  
   const formFields = [
     { id: 'branch_id', label: 'Branch', type: 'select', options: branches.map(branch => ({ value: branch.id, label: branch.branch_name })) },
     { id: 'userid', label: 'User', type: 'select', options: users.map(user => ({ value: user.id, label: user.name })) },
-    // { id: 'account_name', label: 'Account Name', type: 'text', placeholder: 'Enter account name' },
     { id: 'account_type', label: 'Account Type', type: 'select', options: [ { value: 'Cash', label: 'Cash' }, { value: 'Mpesa', label: 'Mpesa' }, { value: 'Debit Card', label: 'Debit Card' }, { value: 'Credit Card', label: 'Credit Card' }, { value: 'Bank', label: 'Bank' }] },
     { id: 'account_number', label: 'Account Number', type: 'text', placeholder: 'Enter account number' },
     { id: 'balance', label: 'Float Balance', type: 'number', placeholder: 'Enter initial float balance' },
@@ -141,6 +151,7 @@ const handleSubmit = async () => {
 
   return (
     <div className="flex w-full bg-gray-100">
+      <Toaster position="top-right" />
       <main className="flex-1 p-6 w-full">
         <h1 className="text-xl font-semibold mb-4">Accounts</h1>
         <div className="flex justify-between items-center mb-4">
@@ -150,9 +161,9 @@ const handleSubmit = async () => {
               <RefreshCwIcon className="w-4 h-4 mr-1" />
               Refresh
             </Button>
-            <Sheet>
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
-                <Button className="bg-blue-600 text-white">Add New Account</Button>
+                <Button className="bg-blue-600 text-white" onClick={() => setIsSheetOpen(true)}>Add New Account</Button>
               </SheetTrigger>
               <SheetContent>
                 <SheetHeader>
