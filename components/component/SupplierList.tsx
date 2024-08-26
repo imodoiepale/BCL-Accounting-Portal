@@ -14,16 +14,12 @@ import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, UploadI
 import { ScrollArea } from '../ui/scroll-area'
 import { useUser } from '@clerk/clerk-react'
 import { toast, Toaster } from 'react-hot-toast'
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL 
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY 
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);
@@ -52,7 +48,8 @@ export function SupplierList({ type }) {
   const [currentSupplier, setCurrentSupplier] = useState(null)
   const [editField, setEditField] = useState('')
   const [isSheetOpen, setIsSheetOpen] = useState(false)
-
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [supplierToDelete, setSupplierToDelete] = useState(null)
 
   const fetchSuppliers = useCallback(async () => {
     const { data, error } = await supabase
@@ -98,10 +95,8 @@ export function SupplierList({ type }) {
       })
       closeForm()
       toast.success('Supplier added successfully!')
-
     }
   }
-
 
   const closeForm = () => {
     setIsSheetOpen(false)
@@ -136,7 +131,6 @@ export function SupplierList({ type }) {
 
         for (const supplier of suppliers) {
           try {
-            // Use the category from the CSV, fallback to the current type if not present
             const category = supplier.category || type;
             const { data, error } = await supabase
               .from('acc_portal_suppliers')
@@ -165,7 +159,6 @@ export function SupplierList({ type }) {
           toast.error(`Failed to add ${errorCount} supplier${errorCount > 1 ? 's' : ''}.`);
         }
         
-        // Refresh the supplier list after upload
         fetchSuppliers();
       };
       reader.readAsText(selectedFile);
@@ -198,18 +191,32 @@ export function SupplierList({ type }) {
     }
   };
 
-  const handleDelete = async (id) => {
-    const { error } = await supabase
-      .from('acc_portal_suppliers')
-      .delete()
-      .eq('id', id)
-    if (error) {
-      console.error('Error deleting supplier:', error)
-      toast.error('Failed to delete supplier.')
-    } else {
-      fetchSuppliers()
-      toast.success('Supplier deleted successfully!')
+  const handleDeleteClick = (supplier) => {
+    setSupplierToDelete(supplier)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (supplierToDelete) {
+      const { error } = await supabase
+        .from('acc_portal_suppliers')
+        .delete()
+        .eq('id', supplierToDelete.id)
+      if (error) {
+        console.error('Error deleting supplier:', error)
+        toast.error('Failed to delete supplier.')
+      } else {
+        fetchSuppliers()
+        toast.success('Supplier deleted successfully!')
+      }
     }
+    setIsDeleteDialogOpen(false)
+    setSupplierToDelete(null)
+  }
+
+  const handleDeleteCancel = () => {
+    setIsDeleteDialogOpen(false)
+    setSupplierToDelete(null)
   }
 
   const handleEditFieldChange = (e) => {
@@ -259,6 +266,7 @@ export function SupplierList({ type }) {
   
   return (
     <div className="flex w-full bg-gray-100">
+      <Toaster position="top-right" />
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-semibold">Supplier List - {type === 'trading' ? 'Trading Suppliers' : 'Monthly Service Vendors'}</h1>
@@ -330,7 +338,6 @@ export function SupplierList({ type }) {
                     <Label htmlFor="startdate">Start Date</Label>
                     <Input id="startdate" type="date" value={newSupplier.startdate} onChange={handleInputChange} />
                   </div>
-                
                 </div>
                 <div className="pt-4"><Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button></div>
               </SheetContent>
@@ -381,7 +388,7 @@ export function SupplierList({ type }) {
                         <Button variant="ghost" onClick={() => handleEdit(supplier)}>
                           <Edit3Icon className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" onClick={() => handleDelete(supplier.id)}>
+                        <Button variant="ghost" onClick={() => handleDeleteClick(supplier)}>
                           <Trash2Icon className="w-4 h-4" />
                         </Button>
                       </div>
@@ -493,5 +500,22 @@ export function SupplierList({ type }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this supplier? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleDeleteCancel}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  )}
+  )
+}
