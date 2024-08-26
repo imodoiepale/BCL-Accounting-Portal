@@ -19,7 +19,7 @@ import { useState } from "react"
 const navItems = [
   { href: "/", icon: LayoutDashboardIcon, label: "Dashboard" },
   { href: "/profile", icon: User2Icon, label: "Profile" },
-  { href: "/documents", icon: FileIcon, label: "Pending Monthly Uploads" },
+  { href: "/documents", icon: FileIcon, label: "Monthly Documents" },
   { href: "/reports", icon: FileIcon, label: "Reports" },
   { href: "/checklist", icon: CheckIcon, label: "Checklist" },
   { href: "/communication", icon: VoicemailIcon, label: "Communication & Ticket" },
