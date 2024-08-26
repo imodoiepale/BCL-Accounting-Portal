@@ -1,7 +1,6 @@
 // @ts-nocheck
 "use client";
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,9 +11,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useAuth, useUser } from '@clerk/clerk-react';
-
-// Initialize Supabase client
-const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
+import { supabase } from '@/lib/supabaseClient';
+import toast, { Toaster } from 'react-hot-toast';
 
 // Utility function to format date
 const formatDate = (dateString) => {
@@ -25,7 +23,6 @@ const formatDate = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
-
 const staticFloatData = [
   { payment_type: 'mpesa', float_allocated: 10000, float_used: 2500 },
   { payment_type: 'cash', float_allocated: 5000, float_used: 1500 },
@@ -35,8 +32,6 @@ const staticFloatData = [
 
 const calculateFloatData = () => {
   const data = {};
-
-  // Initialize data structure for each payment type
   staticFloatData.forEach(entry => {
     data[entry.payment_type] = {
       allocated: entry.float_allocated,
@@ -44,7 +39,6 @@ const calculateFloatData = () => {
       balance: entry.float_allocated - entry.float_used,
     };
   });
-
   return data;
 };
 
@@ -57,6 +51,7 @@ export function TransactionsTab() {
   const [accounts, setAccounts] = useState([]);
   const [users, setUsers] = useState([]);
   const [floatData, setFloatData] = useState(calculateFloatData());
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const [newPettyCash, setNewPettyCash] = useState({
     amount: '',
@@ -89,6 +84,7 @@ export function TransactionsTab() {
 
     if (error) {
       console.error('Error fetching petty cash entries:', error);
+      toast.error('Failed to fetch petty cash entries');
     } else {
       console.log('Fetched petty cash entries:', data);
       setPettyCashEntries(data);
@@ -103,6 +99,7 @@ export function TransactionsTab() {
 
     if (error) {
       console.error('Error fetching branches:', error);
+      toast.error('Failed to fetch branches');
     } else {
       console.log('Fetched branches:', data);
       setBranches(data);
@@ -117,6 +114,7 @@ export function TransactionsTab() {
 
     if (error) {
       console.error('Error fetching accounts:', error);
+      toast.error('Failed to fetch accounts');
     } else {
       console.log('Fetched accounts:', data);
       setAccounts(data);
@@ -131,13 +129,12 @@ export function TransactionsTab() {
 
     if (error) {
       console.error('Error fetching users:', error);
+      toast.error('Failed to fetch users');
     } else {
       console.log('Fetched users:', data);
       setUsers(data);
     }
   };
-
-  // Update the handleSubmit function
 
   const handleSubmit = async () => {
     let receiptUrl = '';
@@ -154,6 +151,7 @@ export function TransactionsTab() {
 
       if (storageError) {
         console.error('Error uploading receipt:', storageError);
+        toast.error('Error uploading receipt. Please try again.');
         return;
       }
 
@@ -170,8 +168,10 @@ export function TransactionsTab() {
 
     if (error) {
       console.error('Error adding petty cash entry:', error);
+      toast.error('Error adding petty cash entry. Please try again.');
     } else {
       console.log('Added new petty cash entry:', data);
+      toast.success('Petty cash entry added successfully!');
       fetchPettyCashEntries();
       setNewPettyCash({
         amount: '',
@@ -187,27 +187,8 @@ export function TransactionsTab() {
         user_name: '',
         account_type: '',
       });
+      setIsSheetOpen(false);
     }
-  };
-
-  // Update the table name in the updateEntry function
-  const updateEntry = async (entryId, updatedData) => {
-    const { data, error } = await supabase
-      .from('acc_portal_pettycash_entries')
-      .update(updatedData)
-      .eq('id', entryId)
-      .eq('userid', userId);
-    // Handle the result
-  };
-
-  // Update the table name in the deleteEntry function
-  const deleteEntry = async (entryId) => {
-    const { data, error } = await supabase
-      .from('acc_portal_pettycash_entries')
-      .delete()
-      .eq('id', entryId)
-      .eq('userid', userId);
-    // Handle the result
   };
 
   const handleInputChange = (e) => {
@@ -227,14 +208,23 @@ export function TransactionsTab() {
     setNewPettyCash((prev) => ({ ...prev, payment_type: value }));
   };
 
-  // Fields to be displayed in the form
   const formFields = [
-    { id: 'amount', label: 'Amount', type: 'number', placeholder: '1000' },
     { id: 'invoice_number', label: 'Invoice Number', type: 'text', placeholder: 'INV-123456' },
     { id: 'invoice_date', label: 'Invoice Date', type: 'date', placeholder: '' },
-    { id: 'description', label: 'Description', type: 'text', placeholder: 'Description of the petty cash' },
-    { id: 'checked_by', label: 'Checked By', type: 'text', placeholder: 'John Doe' },
-    { id: 'approved_by', label: 'Approved By', type: 'text', placeholder: 'Jane Smith' },
+    {
+      id: 'branch_name',
+      label: 'Branch',
+      type: 'select',
+      options: branches.map(branch => ({ value: branch.branch_name, label: branch.branch_name })),
+      onChange: (value) => setNewPettyCash(prev => ({ ...prev, branch_name: value })),
+    },
+    {
+      id: 'user_name',
+      label: 'User',
+      type: 'select',
+      options: users.map(user => ({ value: user.name, label: user.name })),
+      onChange: (value) => setNewPettyCash(prev => ({ ...prev, user_name: value })),
+    },
     {
       id: 'account_type',
       label: 'Account Type',
@@ -245,13 +235,6 @@ export function TransactionsTab() {
         { value: 'mpesa', label: 'M-Pesa' },
       ],
       onChange: (value) => setNewPettyCash(prev => ({ ...prev, account_type: value })),
-    },
-    {
-      id: 'receipt',
-      label: 'Receipt Image',
-      type: 'file',
-      accept: 'image/*',
-      onChange: handleFileChange,
     },
     {
       id: 'expense_type',
@@ -267,25 +250,19 @@ export function TransactionsTab() {
       ],
       onChange: handleExpenseTypeChange,
     },
+    { id: 'amount', label: 'Amount', type: 'number', placeholder: '1000' },
+    { id: 'description', label: 'Description', type: 'text', placeholder: 'Description of the petty cash' },
+    { id: 'checked_by', label: 'Checked By', type: 'text', placeholder: 'John Doe' },
+    { id: 'approved_by', label: 'Approved By', type: 'text', placeholder: 'Jane Smith' },
     {
-      id: 'branch_name',
-      label: 'Branch',
-      type: 'select',
-      options: branches.map(branch => ({ value: branch.branch_name, label: branch.branch_name })),
-      onChange: (value) => setNewPettyCash(prev => ({ ...prev, branch_name: value })),
+      id: 'receipt',
+      label: 'Receipt Image',
+      type: 'file',
+      accept: 'image/*',
+      onChange: handleFileChange,
     },
-    {
-      id: 'user_name',
-      label: 'User',
-      type: 'select',
-      options: users.map(user => ({ value: user.name, label: user.name })),
-      onChange: (value) => setNewPettyCash(prev => ({ ...prev, user_name: value })),
-    },
-
-
   ];
 
-  // Fields to be displayed in the table
   const tableFields = [
     { label: 'Entry ID', key: 'id', format: (id) => `PC-${id}` },
     { label: 'User', key: 'user_name' },
@@ -316,7 +293,6 @@ export function TransactionsTab() {
                 style={{ width: '100%', height: '70vh', border: 'none', display: 'block', margin: 'auto' }}
                 title="Receipt Preview"
               />
-
             </DialogContent>
           </Dialog>
         ) : 'No Receipt'
@@ -324,43 +300,18 @@ export function TransactionsTab() {
     },
   ];
 
-  const FloatCard = ({ title, allocated, used, balance }) => {
-    return (
-      <Card className="p-2 bg-white shadow-sm rounded-lg flex text-center items-center mb-4">
-        <h3 className="text-md font-semibold text-center p-2 rounded">{title}</h3>
-        <div className="w-px h-12 bg-gray-200 mx-4"></div>
-        <p className="text-sm font-semibold text-blue-600">Allocated: {allocated}</p>
-        <div className="w-px h-12 bg-gray-200 mx-4"></div>
-        <p className="text-sm font-semibold text-red-600">Used: {used}</p>
-        <div className="w-px h-12 bg-gray-200 mx-4"></div>
-        <p className="text-sm font-semibold text-green-600">Balance: {balance}</p>
-      </Card>
-    );
-  };
-
   return (
     <div className="flex w-full bg-gray-100">
       <main className="flex-1 p-6 w-full">
         <h1 className="text-xl font-semibold mb-2">Monthly Petty Cash Entries</h1>
-        {/* <div className=" justify-center space-x-2 grid  grid-cols-4 text">
-          {Object.keys(floatData).map((type) => (
-            <FloatCard
-              key={type}
-              title={`Total ${type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}`}
-              allocated={floatData[type].allocated.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              used={floatData[type].used.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              balance={floatData[type].balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
-          ))}
-        </div> */}
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center space-x-2">
-
             <Input type="search" placeholder="search" className="w-48" />
             <Button variant="outline" className="flex items-center" onClick={fetchPettyCashEntries}>
               <RefreshCwIcon className="w-4 h-4 mr-1" />
               Refresh
             </Button>
-            <Sheet>
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
                 <Button className="bg-blue-600 text-white">Add New Entry</Button>
               </SheetTrigger>
@@ -372,62 +323,7 @@ export function TransactionsTab() {
                   </SheetDescription>
                 </SheetHeader>
                 <div className="flex flex-col pt-4 gap-4">
-                  {[
-                     { id: 'invoice_number', label: 'Invoice Number', type: 'text', placeholder: 'INV-123456' },
-                     { id: 'invoice_date', label: 'Invoice Date', type: 'date', placeholder: '' },
-                    {
-                      id: 'branch_name',
-                      label: 'Branch',
-                      type: 'select',
-                      options: branches.map(branch => ({ value: branch.branch_name, label: branch.branch_name })),
-                      onChange: (value) => setNewPettyCash(prev => ({ ...prev, branch_name: value })),
-                    },
-                    {
-                      id: 'user_name',
-                      label: 'User',
-                      type: 'select',
-                      options: users.map(user => ({ value: user.name, label: user.name })),
-                      onChange: (value) => setNewPettyCash(prev => ({ ...prev, user_name: value })),
-                    },
-                    {
-                      id: 'account_type',
-                      label: 'Account Type',
-                      type: 'select',
-                      options: [
-                        { value: 'cash', label: 'Cash' },
-                        { value: 'credit', label: 'Credit' },
-                        { value: 'mpesa', label: 'M-Pesa' },
-                      ],
-                      onChange: (value) => setNewPettyCash(prev => ({ ...prev, account_type: value })),
-                    },
-                    {
-                      id: 'expense_type',
-                      label: 'Expense Category',
-                      type: 'select',
-                      options: [
-                        { value: 'motor_vehicle_running_exp', label: 'Motor Vehicle Running Exp' },
-                        { value: 'postage_telephone', label: 'Postage & Telephone' },
-                        { value: 'staff_costs', label: 'Staff Costs' },
-                        { value: 'repairs_maintenance', label: 'Repairs & Maintenance' },
-                        { value: 'disallowable_exp', label: 'Disallowable Exp' },
-                        { value: 'non', label: 'Non' },
-                      ],
-                      onChange: handleExpenseTypeChange,
-                    }, 
-                    { id: 'amount', label: 'Amount', type: 'number', placeholder: '1000' },
-                   
-                    { id: 'description', label: 'Description', type: 'text', placeholder: 'Description of the petty cash' },
-                    { id: 'checked_by', label: 'Checked By', type: 'text', placeholder: 'John Doe' },
-                    { id: 'approved_by', label: 'Approved By', type: 'text', placeholder: 'Jane Smith' },
-                    
-                    {
-                      id: 'receipt',
-                      label: 'Receipt Image',
-                      type: 'file',
-                      accept: 'image/*',
-                      onChange: handleFileChange,
-                    },
-                  ].map(({ id, label, type, placeholder, options, onChange, accept }) => (
+                  {formFields.map(({ id, label, type, placeholder, options, onChange, accept }) => (
                     <div key={id} className="space-y-1">
                       <Label htmlFor={id}>{label}</Label>
                       {type === 'select' ? (
