@@ -1,7 +1,6 @@
 // @ts-nocheck
 "use client"
 import React, { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -12,20 +11,16 @@ import { RefreshCwIcon, UploadIcon, EyeIcon, ArrowUpDown, Edit2Icon } from 'luci
 import { toast, Toaster } from 'react-hot-toast'
 import dynamic from 'next/dynamic'
 import { useUser } from '@clerk/clerk-react'
+import { supabase } from '@/lib/supabaseClient'
+
+
 
 const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => mod.Dialog), { ssr: false })
 const DialogContent = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogContent), { ssr: false })
 const DialogHeader = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogHeader), { ssr: false })
 const DialogTitle = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogTitle), { ssr: false })
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL or Anon Key is missing in environment variables.')
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
