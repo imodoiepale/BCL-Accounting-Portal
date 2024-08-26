@@ -65,7 +65,7 @@ export function BranchesTab() {
         contact_number: '',
         email: '',
       });
-      setIsSheetOpen(false);  // Ensure the sheet closes after submission
+      setIsSheetOpen(false);
     }
   };
 
