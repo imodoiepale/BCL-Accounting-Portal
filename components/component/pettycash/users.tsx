@@ -1,20 +1,18 @@
-
 // @ts-nocheck
 "use client";
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
-
-const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
+import { supabase } from '@/lib/supabaseClient';
+import { toast, Toaster } from 'react-hot-toast';
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
@@ -40,13 +38,13 @@ export function UsersTab() {
     role: '',
     branch_id: '',
   });
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
     fetchUsers();
     fetchBranches();
   }, []);
 
-  // Update the table name and joins in the fetchUsers function
   const fetchUsers = async () => {
     const { data, error } = await supabase
       .from('acc_portal_pettycash_users')
@@ -60,8 +58,8 @@ export function UsersTab() {
 
     if (error) {
       console.error('Error fetching users:', error);
+      toast.error('Failed to fetch users. Please try again.');
     } else {
-      // Transform the data to flatten the account_count
       const transformedData = data.map(user => ({
         ...user,
         account_count: user.account_count[0]?.count || 0
@@ -70,24 +68,27 @@ export function UsersTab() {
     }
   };
 
-  // Update the table name in the fetchBranches function
   const fetchBranches = async () => {
     const { data, error } = await supabase
       .from('acc_portal_pettycash_branches')
       .select('id, branch_name')
       .eq('userid', userId);
-    if (error) console.error('Error fetching branches:', error);
+    if (error) {
+      console.error('Error fetching branches:', error);
+      toast.error('Failed to fetch branches. Please try again.');
+    }
     else setBranches(data);
   };
 
-  // Update the table name in the handleSubmit function
   const handleSubmit = async () => {
     const { data, error } = await supabase
       .from('acc_portal_pettycash_users')
       .insert([{ ...newUser, admin_id: userId }]);
 
-    if (error) console.error('Error adding user:', error);
-    else {
+    if (error) {
+      console.error('Error adding user:', error);
+      toast.error('Failed to add user. Please try again.');
+    } else {
       fetchUsers();
       setNewUser({
         name: '',
@@ -95,6 +96,8 @@ export function UsersTab() {
         role: '',
         branch_id: '',
       });
+      toast.success('User added successfully!');
+      setIsSheetOpen(false);  // Close the sheet
     }
   };
 
@@ -106,8 +109,6 @@ export function UsersTab() {
   const handleSelectChange = (id, value) => {
     setNewUser((prev) => ({ ...prev, [id]: value }));
   };
-
-
 
   const formFields = [
     { id: 'name', label: 'Name', type: 'text', placeholder: 'Enter user name' },
@@ -127,7 +128,7 @@ export function UsersTab() {
     { label: 'Name', key: 'name' },
     { label: 'Email', key: 'email' },
     { label: 'Role', key: 'role' },
-    { label: 'Branch', key: 'branches.branch_name' },
+    { label: 'Branch', key: 'acc_portal_pettycash_branches.branch_name' },
     {
       label: 'Number of Accounts',
       key: 'account_count',
@@ -159,6 +160,7 @@ export function UsersTab() {
 
   return (
     <div className="flex w-full bg-gray-100">
+      <Toaster position="top-right" />
       <main className="flex-1 p-6 w-full">
         <h1 className="text-xl font-semibold mb-4">Users</h1>
         <div className="flex justify-between items-center mb-4">
@@ -168,7 +170,7 @@ export function UsersTab() {
               <RefreshCwIcon className="w-4 h-4 mr-1" />
               Refresh
             </Button>
-            <Sheet>
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
                 <Button className="bg-blue-600 text-white">Add New User</Button>
               </SheetTrigger>
