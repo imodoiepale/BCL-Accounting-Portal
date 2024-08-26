@@ -1,7 +1,6 @@
 // @ts-nocheck
 "use client";
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,8 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
-
-const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
+import { supabase } from '@/lib/supabaseClient';
+import toast, { Toaster } from 'react-hot-toast';
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);
@@ -32,47 +31,48 @@ export function BranchesTab() {
     contact_number: '',
     email: '',
   });
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
     fetchBranches();
   }, []);
 
-// Update the table name in the fetchBranches function
-const fetchBranches = async () => {
-  const { data, error } = await supabase
-    .from('acc_portal_pettycash_branches')
-    .select('*')
-    .eq('userid', userId)
-    .order('id', { ascending: true });
-  if (error) console.error('Error fetching branches:', error);
-  else setBranches(data);
-};
+  const fetchBranches = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_pettycash_branches')
+      .select('*')
+      .eq('userid', userId)
+      .order('id', { ascending: true });
+    if (error) console.error('Error fetching branches:', error);
+    else setBranches(data);
+  };
 
-// Update the table name in the handleSubmit function
-const handleSubmit = async () => {
-  const { data, error } = await supabase
-    .from('acc_portal_pettycash_branches')
-    .insert([{ ...newBranch, userid: userId }]);
+  const handleSubmit = async () => {
+    const { error } = await supabase
+      .from('acc_portal_pettycash_branches')
+      .insert([{ ...newBranch, userid: userId }]);
 
-  if (error) console.error('Error adding branch:', error);
-  else {
-    fetchBranches();
-    setNewBranch({
-      branch_name: '',
-      location: '',
-      manager_name: '',
-      contact_number: '',
-      email: '',
-    });
-  }
-};
+    if (error) {
+      toast.error('Error adding branch. Please try again.');
+      console.error('Error adding branch:', error);
+    } else {
+      toast.success('Branch added successfully!');
+      fetchBranches();
+      setNewBranch({
+        branch_name: '',
+        location: '',
+        manager_name: '',
+        contact_number: '',
+        email: '',
+      });
+      setIsSheetOpen(false);  // Ensure the sheet closes after submission
+    }
+  };
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
     setNewBranch((prev) => ({ ...prev, [id]: value }));
   };
-
-
 
   const formFields = [
     { id: 'branch_name', label: 'Branch Name', type: 'text', placeholder: 'Enter branch name' },
@@ -94,6 +94,7 @@ const handleSubmit = async () => {
 
   return (
     <div className="flex w-full bg-gray-100">
+      <Toaster />
       <main className="flex-1 p-6 w-full">
         <h1 className="text-xl font-semibold mb-4">Branches</h1>
         <div className="flex justify-between items-center mb-4">
@@ -103,9 +104,11 @@ const handleSubmit = async () => {
               <RefreshCwIcon className="w-4 h-4 mr-1" />
               Refresh
             </Button>
-            <Sheet>
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
-                <Button className="bg-blue-600 text-white">Add New Branch</Button>
+                <Button className="bg-blue-600 text-white" onClick={() => setIsSheetOpen(true)}>
+                  Add New Branch
+                </Button>
               </SheetTrigger>
               <SheetContent>
                 <SheetHeader>
@@ -129,7 +132,9 @@ const handleSubmit = async () => {
                   ))}
                 </div>
                 <div className="pt-4">
-                  <Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button>
+                  <Button className="bg-blue-600 text-white" onClick={handleSubmit}>
+                    Submit
+                  </Button>
                 </div>
               </SheetContent>
             </Sheet>
