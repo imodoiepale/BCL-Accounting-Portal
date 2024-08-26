@@ -2,7 +2,6 @@
 "use client"
 import React, { useEffect, useMemo, useState } from 'react';
 import { useUser } from '@clerk/clerk-react';
-import { createClient } from '@supabase/supabase-js';
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -43,11 +42,10 @@ import {
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, Mail, Phone, PlusCircle, Upload } from "lucide-react";
 import toast, { Toaster } from 'react-hot-toast';
+import { supabase } from '@/lib/supabaseClient'
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+
+
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

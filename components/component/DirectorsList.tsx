@@ -2,7 +2,6 @@
 // @ts-nocheck
 "use client"
 import React, { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,6 +12,8 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { PlusIcon, RefreshCwIcon, SearchIcon, UploadIcon, DownloadIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { PencilIcon, TrashIcon } from "lucide-react"
+import { supabase } from '@/lib/supabaseClient'
+
 import {
   Dialog,
   DialogContent,
@@ -25,10 +26,6 @@ import { useAuth } from '@clerk/clerk-react'
 import toast, { Toaster } from 'react-hot-toast'
 import Papa from 'papaparse'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
 
 const directorFields = {
   "1. Director's Personal Details": [

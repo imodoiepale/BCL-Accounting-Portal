@@ -1,7 +1,6 @@
 // @ts-nocheck
 "use client"
 import React, { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -15,11 +14,7 @@ import { ScrollArea } from '../ui/scroll-area'
 import { useUser } from '@clerk/clerk-react'
 import { toast, Toaster } from 'react-hot-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL 
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY 
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+import { supabase } from '@/lib/supabaseClient'
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);

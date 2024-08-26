@@ -3,7 +3,6 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -18,12 +17,9 @@ import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, UploadIcon, DownloadI
 import { useUser } from '@clerk/clerk-react'
 import toast, { Toaster } from 'react-hot-toast';
 import { PencilIcon, TrashIcon } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
 
-const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
-const url="https://zyszsqgdlrpnunkegipk.supabase.co"
 
-// Initialize Supabase client
-const supabase = createClient(url, key)
 
 // Utility function to format date
 const formatDate = (dateString) => {
@@ -308,7 +304,7 @@ export function EmployeeList() {
                     <Input id="nhif" placeholder="123456789" value={newEmployee.nhif} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="nssf">MNSSF Number</Label>
+                    <Label htmlFor="nssf">NSSF Number</Label>
                     <Input id="nssf" placeholder="987654321" value={newEmployee.nssf} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">

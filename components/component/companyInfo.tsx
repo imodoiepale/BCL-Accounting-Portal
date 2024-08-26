@@ -1,7 +1,6 @@
 // @ts-nocheck
 "use client"
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,12 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Building2, Users, Mail, Phone, Globe, MapPin, CreditCard, FileText, Calendar } from 'lucide-react';
 import { useAuth, useUser } from '@clerk/nextjs';
 import Link from 'next/link'
+import { supabase } from '@/lib/supabaseClient'
 
-const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
-const url="https://zyszsqgdlrpnunkegipk.supabase.co"
 
-// Initialize Supabase client
-const supabase = createClient(url, key)
+
 
 export function CompanyInfoTab() {
   const { userId } = useAuth();
