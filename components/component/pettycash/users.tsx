@@ -87,7 +87,7 @@ export function UsersTab() {
 
     if (error) {
       console.error('Error adding user:', error);
-      toast.error('Failed to add user. Please try again.');
+      toast.error('Failed to add user',);
     } else {
       fetchUsers();
       setNewUser({
