@@ -61,7 +61,7 @@ export function EmployeeList() {
     nhif: '',
     nssf: '',
     startdate: '',
-    enddate: '', // Added end date
+    enddate: '',
   })
   const [isUploading, setIsUploading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -104,7 +104,7 @@ export function EmployeeList() {
         nhif: '',
         nssf: '',
         startdate: '',
-        enddate: '', // Reset end date
+        enddate: '', 
       })
       toast.success('Employee added successfully!');
       setIsDialogOpen(false);
