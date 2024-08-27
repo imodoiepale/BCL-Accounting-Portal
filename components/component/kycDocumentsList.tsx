@@ -293,63 +293,63 @@ export function KYCDocumentsList({ category, subcategory }) {
           </div>
         </div>
 
-        <Card className="h-full overflow-auto shadow-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px] bg-gray-200 font-medium">No.</TableHead>
-                <TableHead onClick={() => handleSort('name')} className="cursor-pointer bg-gray-200 font-medium">
-                  Document Name {sortColumn === 'name' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-                </TableHead>
-                <TableHead onClick={() => handleSort('department')} className="cursor-pointer bg-gray-200 font-medium">
-                  Department {sortColumn === 'department' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-                </TableHead>
-                <TableHead onClick={() => handleSort('issue_date')} className="cursor-pointer bg-gray-200 font-medium">
-                  Issue Date {sortColumn === 'issue_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-                </TableHead>
-                <TableHead onClick={() => handleSort('expiry_date')} className="cursor-pointer bg-gray-200 font-medium">
-                  Expiry Date {sortColumn === 'expiry_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-                </TableHead>
-                <TableHead onClick={() => handleSort('reminder_days')} className="cursor-pointer bg-gray-200 font-medium">
-                   Days To Expiry {sortColumn === 'reminder_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-                </TableHead>
-                <TableHead className="bg-gray-200 font-medium">Status</TableHead>
-                <TableHead className="bg-gray-200 font-medium">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filterDocuments(sortDocuments(documents)).map((doc, index) => (
-                <TableRow key={doc.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-100'}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell>{doc.name}</TableCell>
-                  <TableCell>{doc.department}</TableCell>
-                  <TableCell>{doc.isUploaded ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
-                  <TableCell>{doc.isUploaded ? (doc.expiry_date ? formatDate(doc.expiry_date) : 'No Expiry') : 'Pending'}</TableCell>
-                  <TableCell className={getDaysToExpiryColor(doc.reminder_days)}>
-                    {doc.reminder_days || 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={doc.isUploaded ? 'bg-green-500' : 'bg-yellow-500'}>
-                      {doc.isUploaded ? 'Uploaded' : 'Pending'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="outline" onClick={() => handleViewUpload(doc)} className="mr-2 hover:bg-gray-200 text-gray-600">
-                      {doc.isUploaded ? <EyeIcon className="w-4 h-4 mr-2" /> : <UploadIcon className="w-4 h-4 mr-2" />}
-                      {doc.isUploaded ? "View" : "Upload"}
-                    </Button>
-                    {doc.isUploaded && (
-                      <Button variant="outline" onClick={() => handleEdit(doc)} className="hover:bg-gray-200 text-gray-600">
-                        <Edit2Icon className="w-4 h-4 mr-2" />
-                        Edit
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+         <Card className="h-full overflow-auto shadow-lg rounded-lg">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[50px] bg-gray-100 text-gray-700 font-semibold">No.</TableHead>
+            <TableHead onClick={() => handleSort('name')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
+              Document Name {sortColumn === 'name' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+            </TableHead>
+            <TableHead onClick={() => handleSort('department')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
+              Department {sortColumn === 'department' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+            </TableHead>
+            <TableHead onClick={() => handleSort('issue_date')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
+              Issue Date {sortColumn === 'issue_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+            </TableHead>
+            <TableHead onClick={() => handleSort('expiry_date')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
+              Expiry Date {sortColumn === 'expiry_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+            </TableHead>
+            <TableHead onClick={() => handleSort('reminder_days')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
+               Days To Expiry {sortColumn === 'reminder_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+            </TableHead>
+            <TableHead className="bg-gray-100 text-gray-700 font-semibold">Status</TableHead>
+            <TableHead className="bg-gray-100 text-gray-700 font-semibold">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filterDocuments(sortDocuments(documents)).map((doc, index) => (
+            <TableRow key={doc.id} className={index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}>
+              <TableCell className="font-medium text-gray-900">{index + 1}</TableCell>
+              <TableCell className="text-gray-800">{doc.name}</TableCell>
+              <TableCell className="text-gray-800">{doc.department}</TableCell>
+              <TableCell className="text-gray-800">{doc.isUploaded ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
+              <TableCell className="text-gray-800">{doc.isUploaded ? (doc.expiry_date ? formatDate(doc.expiry_date) : 'One-off') : 'Pending'}</TableCell>
+              <TableCell className={`font-medium ${getDaysToExpiryColor(doc.reminder_days)}`}>
+                {doc.reminder_days || 'N/A'}
+              </TableCell>
+              <TableCell>
+                <Badge className={doc.isUploaded ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                  {doc.isUploaded ? 'Uploaded' : 'Pending'}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Button variant="outline" onClick={() => handleViewUpload(doc)} className="mr-2 hover:bg-blue-50 text-blue-600 border-blue-200">
+                  {doc.isUploaded ? <EyeIcon className="w-4 h-4 mr-2" /> : <UploadIcon className="w-4 h-4 mr-2" />}
+                  {doc.isUploaded ? "View" : "Upload"}
+                </Button>
+                {doc.isUploaded && (
+                  <Button variant="outline" onClick={() => handleEdit(doc)} className="hover:bg-green-50 text-green-600 border-green-200">
+                    <Edit2Icon className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
         
         {isUploadingDocument && (
           <Dialog open={isUploadingDocument} onOpenChange={(open) => {
