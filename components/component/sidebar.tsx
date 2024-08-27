@@ -22,7 +22,7 @@ import { useAuth } from "@clerk/clerk-react"
 
 const adminNavItems = [
   { href: "/admin", icon: LayoutDashboardIcon, label: "Admin Dashboard" },
-  { href: "/admin/users", icon: User2Icon, label: "User Management" },
+  { href: "/admin/registry", icon: User2Icon, label: "Registry" },
   { href: "/admin/documents", icon: FileIcon, label: "Document Management" },
   { href: "/admin/reports", icon: FileIcon, label: "Report Management" },
   { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings" },
