@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client"
 
+
 import {
   CheckIcon,
   ChevronLeftIcon,
@@ -16,7 +17,18 @@ import Link from "next/link"
 import { usePathname } from 'next/navigation'
 import { useState } from "react"
 
-const navItems = [
+import { useAuth } from "@clerk/clerk-react"
+
+
+const adminNavItems = [
+  { href: "/admin", icon: LayoutDashboardIcon, label: "Admin Dashboard" },
+  { href: "/admin/users", icon: User2Icon, label: "User Management" },
+  { href: "/admin/documents", icon: FileIcon, label: "Document Management" },
+  { href: "/admin/reports", icon: FileIcon, label: "Report Management" },
+  { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings" },
+]
+
+const userNavItems = [
   { href: "/", icon: LayoutDashboardIcon, label: "Dashboard" },
   { href: "/profile", icon: User2Icon, label: "Profile" },
   { href: "/documents", icon: FileIcon, label: "Monthly Documents" },
@@ -27,9 +39,15 @@ const navItems = [
   { href: "/settings", icon: SettingsIcon, label: "Settings" },
 ]
 
+
 export function Sidebar() {
+
+  const { userId } = useAuth()
+  const isAdmin = userId === "user_2jgO1OWpZw3kf1BUnpLpzTiaMhE"
   const pathname = usePathname()
   const [isExpanded, setIsExpanded] = useState(true)
+
+  const navItems = isAdmin ? adminNavItems : userNavItems
 
   return (
     <aside className={`bg-gray-100 transition-all duration-300 ease-in-out ${isExpanded ? 'w-52' : 'w-16'} p-2 hidden md:block relative h-screen`}>
