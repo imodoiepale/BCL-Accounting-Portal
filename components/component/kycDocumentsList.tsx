@@ -13,14 +13,10 @@ import dynamic from 'next/dynamic'
 import { useUser } from '@clerk/clerk-react'
 import { supabase } from '@/lib/supabaseClient'
 
-
-
 const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => mod.Dialog), { ssr: false })
 const DialogContent = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogContent), { ssr: false })
 const DialogHeader = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogHeader), { ssr: false })
 const DialogTitle = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogTitle), { ssr: false })
-
-
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
@@ -37,7 +33,6 @@ const calculateRemainingDays = (issueDate, expiryDate) => {
   
   return remainingDays > 0 ? remainingDays : 0;
 };
-
 
 const getDaysToExpiryColor = (days) => {
   if (days === 'N/A') return 'text-gray-500';
@@ -72,6 +67,7 @@ export function KYCDocumentsList({ category, subcategory }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [viewerUrl, setViewerUrl] = useState(null)
   const [editingDocument, setEditingDocument] = useState(null)
+  const [noExpiryDate, setNoExpiryDate] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -117,8 +113,15 @@ export function KYCDocumentsList({ category, subcategory }) {
   }
 
   const handleInputChange = (e) => {
-    const { id, value } = e.target;
-    setEditingDocument({ ...editingDocument, [id]: value });
+    const { id, value, type, checked } = e.target;
+    if (type === 'checkbox') {
+      setNoExpiryDate(checked);
+      if (checked) {
+        setEditingDocument({ ...editingDocument, expiry_date: null });
+      }
+    } else {
+      setEditingDocument({ ...editingDocument, [id]: value });
+    }
   }
 
   const handleFileChange = (e) => {
@@ -166,16 +169,18 @@ export function KYCDocumentsList({ category, subcategory }) {
         throw new Error(`File upload failed: ${error.message}`)
       }
 
+      const uploadData = {
+        userid: user.id,
+        kyc_id: editingDocument.id,
+        filepath: data.path,
+        issue_date: editingDocument.issue_date,
+        expiry_date: noExpiryDate ? null : editingDocument.expiry_date,
+        reminder_days: noExpiryDate ? null : calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date).toString()
+      };
+
       const { error: insertError } = await supabase
         .from('acc_portal_kyc_uploads')
-        .insert({ 
-          userid: user.id,
-          kyc_id: editingDocument.id,
-          filepath: data.path,
-          issue_date: editingDocument.issue_date,
-          expiry_date: editingDocument.expiry_date,
-          reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date).toString()
-        })
+        .insert(uploadData)
 
       if (insertError) {
         throw new Error(`Document insert failed: ${insertError.message}`)
@@ -187,6 +192,7 @@ export function KYCDocumentsList({ category, subcategory }) {
       setIsUploadingDocument(false)
       setEditingDocument(null)
       setFile(null)
+      setNoExpiryDate(false)
     } catch (error) {
       console.error('Error in handleFileUpload:', error)
       toast.error(error.message)
@@ -199,17 +205,20 @@ export function KYCDocumentsList({ category, subcategory }) {
       issue_date: doc.issue_date || '',
       expiry_date: doc.expiry_date || '',
     })
+    setNoExpiryDate(!doc.expiry_date)
   }
 
   const handleUpdate = async () => {
     try {
+      const updateData = {
+        issue_date: editingDocument.issue_date,
+        expiry_date: noExpiryDate ? null : editingDocument.expiry_date,
+        reminder_days: noExpiryDate ? null : calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date).toString()
+      };
+
       const { error } = await supabase
         .from('acc_portal_kyc_uploads')
-        .update({
-          issue_date: editingDocument.issue_date,
-          expiry_date: editingDocument.expiry_date,
-          reminder_days: calculateRemainingDays(editingDocument.issue_date, editingDocument.expiry_date).toString()
-        })
+        .update(updateData)
         .eq('kyc_id', editingDocument.id)
         .eq('userid', user.id)
 
@@ -221,6 +230,7 @@ export function KYCDocumentsList({ category, subcategory }) {
 
       fetchDocuments()
       setEditingDocument(null)
+      setNoExpiryDate(false)
     } catch (error) {
       console.error('Error in handleUpdate:', error)
       toast.error(error.message)
@@ -314,7 +324,7 @@ export function KYCDocumentsList({ category, subcategory }) {
                   <TableCell>{doc.name}</TableCell>
                   <TableCell>{doc.department}</TableCell>
                   <TableCell>{doc.isUploaded ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
-                  <TableCell>{doc.isUploaded ? formatDate(doc.expiry_date) : 'Pending'}</TableCell>
+                  <TableCell>{doc.isUploaded ? (doc.expiry_date ? formatDate(doc.expiry_date) : 'No Expiry') : 'Pending'}</TableCell>
                   <TableCell className={getDaysToExpiryColor(doc.reminder_days)}>
                     {doc.reminder_days || 'N/A'}
                   </TableCell>
@@ -347,6 +357,7 @@ export function KYCDocumentsList({ category, subcategory }) {
             if (!open) {
               setEditingDocument(null)
               setFile(null)
+              setNoExpiryDate(false)
             }
           }}>
             <DialogContent>
@@ -364,16 +375,28 @@ export function KYCDocumentsList({ category, subcategory }) {
                     required 
                   />
                 </div>
-                <div>
-                  <Label htmlFor="expiry_date">Expiry Date</Label>
-                  <Input 
-                    id="expiry_date" 
-                    type="date" 
-                    value={editingDocument?.expiry_date || ''} 
-                    onChange={handleInputChange} 
-                    required 
+                <div className="flex items-center">
+                  <input 
+                    id="noExpiryDate" 
+                    type="checkbox" 
+                    checked={noExpiryDate}
+                    onChange={handleInputChange}
+                    className="mr-2"
                   />
+                  <Label htmlFor="noExpiryDate">No Expiry Date</Label>
                 </div>
+                {!noExpiryDate && (
+                  <div>
+                    <Label htmlFor="expiry_date">Expiry Date</Label>
+                    <Input 
+                      id="expiry_date" 
+                      type="date" 
+                      value={editingDocument?.expiry_date || ''} 
+                      onChange={handleInputChange} 
+                      required 
+                    />
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="file">Upload Document</Label>
                   <Input id="file" type="file" onChange={handleFileChange} required />
@@ -385,6 +408,7 @@ export function KYCDocumentsList({ category, subcategory }) {
                   setIsUploadingDocument(false)
                   setEditingDocument(null)
                   setFile(null)
+                  setNoExpiryDate(false)
                 }}>Cancel</Button>
               </div>
             </DialogContent>
@@ -392,7 +416,10 @@ export function KYCDocumentsList({ category, subcategory }) {
         )}
 
         {editingDocument && !isUploadingDocument && (
-          <Dialog open={!!editingDocument} onOpenChange={() => setEditingDocument(null)}>
+          <Dialog open={!!editingDocument} onOpenChange={() => {
+            setEditingDocument(null)
+            setNoExpiryDate(false)
+          }}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Edit Document</DialogTitle>
@@ -408,20 +435,35 @@ export function KYCDocumentsList({ category, subcategory }) {
                     required 
                   />
                 </div>
-                <div>
-                  <Label htmlFor="expiry_date">Expiry Date</Label>
-                  <Input 
-                    id="expiry_date" 
-                    type="date" 
-                    value={editingDocument.expiry_date} 
-                    onChange={handleInputChange} 
-                    required 
+                <div className="flex items-center">
+                  <input 
+                    id="noExpiryDate" 
+                    type="checkbox" 
+                    checked={noExpiryDate}
+                    onChange={handleInputChange}
+                    className="mr-2"
                   />
+                  <Label htmlFor="noExpiryDate">No Expiry Date</Label>
                 </div>
+                {!noExpiryDate && (
+                  <div>
+                    <Label htmlFor="expiry_date">Expiry Date</Label>
+                    <Input 
+                      id="expiry_date" 
+                      type="date" 
+                      value={editingDocument.expiry_date || ''} 
+                      onChange={handleInputChange} 
+                      required 
+                    />
+                  </div>
+                )}
               </div>
               <div className="flex justify-end mt-4">
                 <Button className="bg-blue-600 text-white mr-2" onClick={handleUpdate}>Update</Button>
-                <Button variant="outline" onClick={() => setEditingDocument(null)}>Cancel</Button>
+                <Button variant="outline" onClick={() => {
+                  setEditingDocument(null)
+                  setNoExpiryDate(false)
+                }}>Cancel</Button>
               </div>
             </DialogContent>
           </Dialog>
