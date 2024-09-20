@@ -13,9 +13,9 @@ import { Toaster, toast } from 'react-hot-toast';
 import { Check, Search, ArrowUpDown, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import ProfileTab from './ProfileTab';
-import AllCompanies from './AllCompanies'; 
+import AllCompanies from './AllCompanies';
 
-const DataTable = ({ data, columns, onVerify, onSort, sortColumn, sortOrder, onExport }) => {
+const DataTable = ({ data, columns, onVerify, onSort, sortColumn, sortOrder, onExport, verifiedItems }) => {
   const tableRef = useRef(null);
   const headerRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -63,7 +63,7 @@ const DataTable = ({ data, columns, onVerify, onSort, sortColumn, sortOrder, onE
               <TableHead className="text-gray-700 font-bold">INDEX</TableHead>
               {columns.map((column) => (
                 <TableHead 
-                  key={column} 
+                  key={column}
                   className="text-gray-700 font-bold cursor-pointer" 
                   onClick={() => onSort(column)}
                 >
@@ -84,7 +84,7 @@ const DataTable = ({ data, columns, onVerify, onSort, sortColumn, sortOrder, onE
                   <TableCell key={column}>{item[column]}</TableCell>
                 ))}
                 <TableCell>
-                  {item.verified ? (
+                  {verifiedItems[item.id] || item.verified ? (
                     <span className="text-green-500 flex items-center">
                       <Check className="mr-1" /> Verified
                     </span>
@@ -123,6 +123,7 @@ const Page = () => {
   });
   const [companyProfile, setCompanyProfile] = useState(null);
   const [showAllCompanies, setShowAllCompanies] = useState(false);
+  const [verifiedItems, setVerifiedItems] = useState({});
 
   useEffect(() => {
     fetchCompanies();
@@ -162,6 +163,13 @@ const Page = () => {
       toast.error(`Failed to fetch ${activeTab}`);
     } else {
       setTabData(data);
+      const newVerifiedItems = {};
+      data.forEach(item => {
+        if (item.verified) {
+          newVerifiedItems[item.id] = true;
+        }
+      });
+      setVerifiedItems(newVerifiedItems);
     }
   };
 
@@ -218,6 +226,24 @@ const Page = () => {
   const handleVerify = (item) => {
     setSelectedItem(item);
     setDialogOpen(true);
+  };
+
+  const performVerification = async (item) => {
+    const tableName = getTableName(activeTab);
+    const { data, error } = await supabase
+      .from(tableName)
+      .update({ verified: true })
+      .eq('id', item.id);
+
+    if (error) {
+      console.error('Error verifying item:', error);
+      toast.error('Failed to verify item');
+    } else {
+      setVerifiedItems(prev => ({ ...prev, [item.id]: true }));
+      toast.success('Item verified successfully');
+      fetchTabData(); // Refetch the data to update the table
+    }
+    setDialogOpen(false);
   };
 
   const handleTableSort = (column) => {
@@ -281,8 +307,8 @@ const Page = () => {
     return filtered;
   }, [sortedTabData, activeTab, supplierSubTab]);
 
-  const pendingCount = filteredTabData.filter(item => !item.verified).length;
-  const completedCount = filteredTabData.filter(item => item.verified).length;
+  const pendingCount = filteredTabData.filter(item => !verifiedItems[item.id] && !item.verified).length;
+  const completedCount = filteredTabData.filter(item => verifiedItems[item.id] || item.verified).length;
 
   const renderSupplierSubTabs = () => (
     <Tabs value={supplierSubTab} onValueChange={setSupplierSubTab} className="mt-4">
@@ -295,7 +321,7 @@ const Page = () => {
   );
 
   return (
-    <div className="flex flex-col lg:flex-row  p-6 bg-gray-100">
+    <div className="flex flex-col lg:flex-row p-6 bg-gray-100">
       <Toaster position="top-right" />
       <Card className="lg:w-1/5 bg-white shadow">
         <CardHeader className="space-y-4">
@@ -386,6 +412,7 @@ const Page = () => {
                     sortColumn={tableSortColumn}
                     sortOrder={tableSortOrder}
                     onExport={handleExport}
+                    verifiedItems={verifiedItems}
                   />
                 </>
               )}
@@ -396,9 +423,15 @@ const Page = () => {
         </CardContent>
       </Card>
 
-      <VerifyDialog open={dialogOpen} onOpenChange={setDialogOpen} item={selectedItem} onVerify={() => {}} />
+      <VerifyDialog 
+        open={dialogOpen} 
+        onOpenChange={setDialogOpen} 
+        item={selectedItem} 
+        onVerify={performVerification} 
+      />
     </div>
-  );};
+  );
+};
 
 function VerifyDialog({ open, onOpenChange, item, onVerify }) {
   if (!item) return null;
@@ -407,6 +440,12 @@ function VerifyDialog({ open, onOpenChange, item, onVerify }) {
     'name', 'pin', 'contact_name', 'contact_mobile', 'contact_email',
     'status', 'contact_info', 'startdate', 'enddate', 'category'
   ];
+
+  const handleVerify = (e) => {
+    e.preventDefault();
+    onVerify(item);
+    onOpenChange(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -423,7 +462,7 @@ function VerifyDialog({ open, onOpenChange, item, onVerify }) {
           ))}
         </div>
         <DialogFooter>
-          <Button onClick={onVerify} className="w-full bg-green-500 hover:bg-green-600 text-white text-lg py-3">
+          <Button onClick={handleVerify} className="w-full bg-green-500 hover:bg-green-600 text-white text-lg py-3">
             <Check className="mr-2" /> Verify Information
           </Button>
         </DialogFooter>
