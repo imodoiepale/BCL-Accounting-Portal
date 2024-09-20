@@ -113,6 +113,12 @@ const Page = () => {
   const [tableSortColumn, setTableSortColumn] = useState('');
   const [tableSortOrder, setTableSortOrder] = useState('asc');
   const [supplierSubTab, setSupplierSubTab] = useState("all");
+  const [tabCounts, setTabCounts] = useState({
+    suppliers: 0,
+    banks: 0,
+    employees: 0,
+    directors: 0
+  });
 
   useEffect(() => {
     fetchCompanies();
@@ -121,6 +127,7 @@ const Page = () => {
   useEffect(() => {
     if (selectedCompany) {
       fetchTabData();
+      fetchTabCounts();
     }
   }, [selectedCompany, activeTab]);
 
@@ -148,6 +155,28 @@ const Page = () => {
     } else {
       setTabData(data);
     }
+  };
+
+  const fetchTabCounts = async () => {
+    if (!selectedCompany) return;
+
+    const tables = ['acc_portal_suppliers', 'acc_portal_banks', 'acc_portal_employees', 'acc_portal_directors'];
+    const newCounts = {};
+
+    for (const table of tables) {
+      const { count, error } = await supabase
+        .from(table)
+        .select('*', { count: 'exact', head: true })
+        .eq('userid', selectedCompany.userid);
+
+      if (error) {
+        console.error(`Error fetching count for ${table}:`, error);
+      } else {
+        newCounts[table.replace('acc_portal_', '')] = count;
+      }
+    }
+
+    setTabCounts(newCounts);
   };
 
   const handleCompanySelect = (company) => {
@@ -283,10 +312,18 @@ const Page = () => {
           {selectedCompany && (
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="mb-4 bg-gray-100">
-                <TabsTrigger value="suppliers" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">Suppliers</TabsTrigger>
-                <TabsTrigger value="banks" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">Banks</TabsTrigger>
-                <TabsTrigger value="employees" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">Employees</TabsTrigger>
-                <TabsTrigger value="directors" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">Directors</TabsTrigger>
+                <TabsTrigger value="suppliers" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+                  Suppliers ({tabCounts.suppliers})
+                </TabsTrigger>
+                <TabsTrigger value="banks" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+                  Banks ({tabCounts.banks})
+                </TabsTrigger>
+                <TabsTrigger value="employees" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+                  Employees ({tabCounts.employees})
+                </TabsTrigger>
+                <TabsTrigger value="directors" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+                  Directors ({tabCounts.directors})
+                </TabsTrigger>
               </TabsList>
 
               {activeTab === 'suppliers' && renderSupplierSubTabs()}
@@ -312,31 +349,10 @@ const Page = () => {
         </CardContent>
       </Card>
 
-      <VerifyDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        item={selectedItem}
-        onVerify={async () => {
-          try {
-            const { data, error } = await supabase
-              .from(getTableName(activeTab))
-              .update({ verified: true })
-              .eq('id', selectedItem.id);
-
-            if (error) throw error;
-
-            toast.success('Information verified successfully!');
-            setDialogOpen(false);
-            fetchTabData(); // Refresh the data
-          } catch (error) {
-            console.error('Error verifying information:', error);
-            toast.error('Failed to verify information');
-          }
-        }}
-      />
+      <VerifyDialog open={dialogOpen} onOpenChange={setDialogOpen} item={selectedItem} onVerify={() => {}} />
     </div>
   );
-}
+};
 
 function VerifyDialog({ open, onOpenChange, item, onVerify }) {
   if (!item) return null;
