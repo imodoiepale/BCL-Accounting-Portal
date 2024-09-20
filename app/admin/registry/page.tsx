@@ -1,7 +1,7 @@
 //@ts-nocheck
 "use client"
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -197,7 +197,7 @@ const Page = () => {
 
               <div className="mb-4 flex justify-between items-center bg-gray-100 p-2 rounded">
                 <span className="text-red-500">Pending: {pendingCount}</span>
-                <span className="text-green-500">Completed: {completedCount}</span>
+                <span className="text-green-500">Verified: {completedCount}</span>
               </div>
 
               <TabsContent value={activeTab}>
@@ -242,42 +242,87 @@ const Page = () => {
 }
 
 function TableContent({ data, columns, onVerify, onSort, sortColumn, sortOrder }) {
+  const tableRef = useRef(null);
+  const headerRef = useRef(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    const tableElement = tableRef.current;
+    const headerElement = headerRef.current;
+
+    if (tableElement && headerElement) {
+      const handleScroll = () => {
+        const { scrollTop } = tableElement;
+        headerElement.style.transform = `translateY(${scrollTop}px)`;
+      };
+
+      tableElement.addEventListener('scroll', handleScroll);
+      return () => tableElement.removeEventListener('scroll', handleScroll);
+    }
+  }, []);
+
+  const filteredData = useMemo(() => {
+    return data.filter(item =>
+      columns.some(column =>
+        item[column]?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+  }, [data, columns, searchTerm]);
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {columns.map((column) => (
-            <TableHead key={column} className="text-gray-700 cursor-pointer" onClick={() => onSort(column)}>
-              {column.replace('_', ' ').toUpperCase()}
-              {sortColumn === column && (
-                sortOrder === 'asc' ? <ChevronUp className="inline ml-1" /> : <ChevronDown className="inline ml-1" />
-              )}
-            </TableHead>
-          ))}
-          <TableHead className="text-gray-700">ACTION</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {data.map((item) => (
-          <TableRow key={item.id}>
-            {columns.map((column) => (
-              <TableCell key={column}>{item[column]}</TableCell>
+    <div>
+      <div className="mb-4">
+        <Input
+          placeholder="Search table..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
+      <div ref={tableRef} className="overflow-auto max-h-[calc(100vh-400px)] relative">
+        <Table>
+          <TableHeader ref={headerRef} className="sticky top-0 z-10 bg-white">
+            <TableRow>
+              <TableHead className="text-gray-700 font-bold">INDEX</TableHead>
+              {columns.map((column) => (
+                <TableHead 
+                  key={column} 
+                  className="text-gray-700 font-bold cursor-pointer" 
+                  onClick={() => onSort(column)}
+                >
+                  {column.replace('_', ' ').toUpperCase()}
+                  {sortColumn === column && (
+                    sortOrder === 'asc' ? <ChevronUp className="inline ml-1" /> : <ChevronDown className="inline ml-1" />
+                  )}
+                </TableHead>
+              ))}
+              <TableHead className="text-gray-700 font-bold">ACTION</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredData.map((item, index) => (
+              <TableRow key={item.id} className="hover:bg-gray-50">
+                <TableCell className="font-medium">{index + 1}</TableCell>
+                {columns.map((column) => (
+                  <TableCell key={column}>{item[column]}</TableCell>
+                ))}
+                <TableCell>
+                  {item.verified ? (
+                    <span className="text-green-500 flex items-center">
+                      <Check className="mr-1" /> Verified
+                    </span>
+                  ) : (
+                    <Button onClick={() => onVerify(item)} className="bg-blue-500 hover:bg-blue-600 text-white">
+                      Verify
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
             ))}
-            <TableCell>
-              {item.verified ? (
-                <span className="text-green-500 flex items-center">
-                  <Check className="mr-1" /> Verified
-                </span>
-              ) : (
-                <Button onClick={() => onVerify(item)} className="bg-blue-500 hover:bg-blue-600 text-white">
-                  Verify
-                </Button>
-              )}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }
 
