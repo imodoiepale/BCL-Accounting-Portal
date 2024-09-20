@@ -84,7 +84,7 @@ const DataTable = ({ data, columns, onVerify, onSort, sortColumn, sortOrder, onE
                   <TableCell key={column}>{item[column]}</TableCell>
                 ))}
                 <TableCell>
-                  {verifiedItems[item.id] || item.verified ? (
+                  {verifiedItems[item.id] || item.verified || item.verified ? (
                     <span className="text-green-500 flex items-center">
                       <Check className="mr-1" /> Verified
                     </span>
@@ -165,7 +165,7 @@ const Page = () => {
       setTabData(data);
       const newVerifiedItems = {};
       data.forEach(item => {
-        if (item.verified) {
+        if (item.verified || item.status) {
           newVerifiedItems[item.id] = true;
         }
       });
@@ -232,9 +232,9 @@ const Page = () => {
     const tableName = getTableName(activeTab);
     const { data, error } = await supabase
       .from(tableName)
-      .update({ verified: true })
+      .update({ verified: true, verified: true })
       .eq('id', item.id);
-
+  
     if (error) {
       console.error('Error verifying item:', error);
       toast.error('Failed to verify item');
@@ -438,7 +438,7 @@ function VerifyDialog({ open, onOpenChange, item, onVerify }) {
 
   const displayFields = [
     'name', 'pin', 'contact_name', 'contact_mobile', 'contact_email',
-    'status', 'contact_info', 'startdate', 'enddate', 'category'
+    'verified', 'contact_info', 'startdate', 'enddate', 'category'
   ];
 
   const handleVerify = (e) => {
