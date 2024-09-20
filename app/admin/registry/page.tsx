@@ -10,8 +10,10 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from '@/lib/supabaseClient';
 import { Toaster, toast } from 'react-hot-toast';
-import { Check, Search, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Check, Search, ArrowUpDown, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import ProfileTab from './ProfileTab';
+import AllCompanies from './AllCompanies'; 
 
 const DataTable = ({ data, columns, onVerify, onSort, sortColumn, sortOrder, onExport }) => {
   const tableRef = useRef(null);
@@ -106,7 +108,7 @@ const Page = () => {
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("asc");
-  const [activeTab, setActiveTab] = useState("suppliers");
+  const [activeTab, setActiveTab] = useState("profile");
   const [tabData, setTabData] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -119,6 +121,8 @@ const Page = () => {
     employees: 0,
     directors: 0
   });
+  const [companyProfile, setCompanyProfile] = useState(null);
+  const [showAllCompanies, setShowAllCompanies] = useState(false);
 
   useEffect(() => {
     fetchCompanies();
@@ -126,7 +130,11 @@ const Page = () => {
 
   useEffect(() => {
     if (selectedCompany) {
-      fetchTabData();
+      if (activeTab === 'profile') {
+        fetchCompanyProfile();
+      } else {
+        fetchTabData();
+      }
       fetchTabCounts();
     }
   }, [selectedCompany, activeTab]);
@@ -179,8 +187,24 @@ const Page = () => {
     setTabCounts(newCounts);
   };
 
+  const fetchCompanyProfile = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_company')
+      .select('*')
+      .eq('id', selectedCompany.id)
+      .single();
+    if (error) {
+      console.error('Error fetching company profile:', error);
+      toast.error('Failed to fetch company profile');
+    } else {
+      setCompanyProfile(data);
+    }
+  };
+
   const handleCompanySelect = (company) => {
     setSelectedCompany(company);
+    setActiveTab('profile');
+    setShowAllCompanies(false);
   };
 
   const handleSearch = (event) => {
@@ -274,7 +298,14 @@ const Page = () => {
     <div className="flex flex-col lg:flex-row gap-6 p-6 bg-gray-100">
       <Toaster position="top-right" />
       <Card className="lg:w-1/5 bg-white shadow">
-        <CardHeader>
+        <CardHeader className="space-y-4">
+          <Button 
+            onClick={() => setShowAllCompanies(!showAllCompanies)} 
+            className="w-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center"
+          >
+            {showAllCompanies ? <EyeOff className="mr-2" /> : <Eye className="mr-2" />}
+            {showAllCompanies ? "Hide All Companies" : "View All Companies"}
+          </Button>
           <div className="relative">
             <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input
@@ -284,8 +315,9 @@ const Page = () => {
               className="pl-8 border-gray-300 focus:border-blue-500"
             />
           </div>
-          <Button onClick={handleSort} className="mt-2 bg-blue-500 hover:bg-blue-600 text-white">
-            Sort {sortOrder === "asc" ? <ArrowUpDown className="ml-2" /> : <ArrowUpDown className="ml-2" />}
+          <Button onClick={handleSort} className="w-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center">
+            <ArrowUpDown className="mr-2" />
+            Sort {sortOrder === "asc" ? "A-Z" : "Z-A"}
           </Button>
         </CardHeader>
         <CardContent>
@@ -306,12 +338,19 @@ const Page = () => {
 
       <Card className="lg:w-3/4 bg-white shadow">
         <CardHeader>
-          <h2 className="text-2xl font-bold text-gray-700">{selectedCompany?.company_name || "Select a company"}</h2>
+          <h2 className="text-2xl font-bold text-gray-700">
+            {selectedCompany?.company_name || (showAllCompanies ? "All Companies" : "Select a company")}
+          </h2>
         </CardHeader>
         <CardContent>
-          {selectedCompany && (
+          {showAllCompanies ? (
+            <AllCompanies companies={companies} />
+          ) : selectedCompany ? (
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="mb-4 bg-gray-100">
+                <TabsTrigger value="profile" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+                  Profile
+                </TabsTrigger>
                 <TabsTrigger value="suppliers" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
                   Suppliers ({tabCounts.suppliers})
                 </TabsTrigger>
@@ -326,33 +365,40 @@ const Page = () => {
                 </TabsTrigger>
               </TabsList>
 
-              {activeTab === 'suppliers' && renderSupplierSubTabs()}
-
-              <div className="mb-4 flex justify-between items-center bg-gray-100 p-2 rounded">
-                <span className="text-red-500">Pending: {pendingCount}</span>
-                <span className="text-green-500">Verified: {completedCount}</span>
-              </div>
-
-              <TabsContent value={activeTab}>
-                <DataTable
-                  data={filteredTabData}
-                  columns={getDisplayColumns()}
-                  onVerify={handleVerify}
-                  onSort={handleTableSort}
-                  sortColumn={tableSortColumn}
-                  sortOrder={tableSortOrder}
-                  onExport={handleExport}
-                />
+              <TabsContent value="profile">
+                <ProfileTab company={companyProfile} />
               </TabsContent>
+
+              {activeTab !== 'profile' && (
+                <>
+                  {activeTab === 'suppliers' && renderSupplierSubTabs()}
+
+                  <div className="mb-4 flex justify-between items-center bg-gray-100 p-2 rounded">
+                    <span className="text-red-500">Pending: {pendingCount}</span>
+                    <span className="text-green-500">Verified: {completedCount}</span>
+                  </div>    
+
+                  <DataTable
+                    data={filteredTabData}
+                    columns={getDisplayColumns()}
+                    onVerify={handleVerify}
+                    onSort={handleTableSort}
+                    sortColumn={tableSortColumn}
+                    sortOrder={tableSortOrder}
+                    onExport={handleExport}
+                  />
+                </>
+              )}
             </Tabs>
+          ) : (
+            <p>Please select a company or view all companies.</p>
           )}
         </CardContent>
       </Card>
 
       <VerifyDialog open={dialogOpen} onOpenChange={setDialogOpen} item={selectedItem} onVerify={() => {}} />
     </div>
-  );
-};
+  );};
 
 function VerifyDialog({ open, onOpenChange, item, onVerify }) {
   if (!item) return null;
