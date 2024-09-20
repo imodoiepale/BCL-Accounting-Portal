@@ -11,6 +11,95 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { supabase } from '@/lib/supabaseClient';
 import { Toaster, toast } from 'react-hot-toast';
 import { Check, Search, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import * as XLSX from 'xlsx';
+
+const DataTable = ({ data, columns, onVerify, onSort, sortColumn, sortOrder, onExport }) => {
+  const tableRef = useRef(null);
+  const headerRef = useRef(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    const tableElement = tableRef.current;
+    const headerElement = headerRef.current;
+
+    if (tableElement && headerElement) {
+      const handleScroll = () => {
+        const { scrollTop } = tableElement;
+        headerElement.style.transform = `translateY(${scrollTop}px)`;
+      };
+
+      tableElement.addEventListener('scroll', handleScroll);
+      return () => tableElement.removeEventListener('scroll', handleScroll);
+    }
+  }, []);
+
+  const filteredData = useMemo(() => {
+    return data.filter(item =>
+      columns.some(column =>
+        item[column]?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+  }, [data, columns, searchTerm]);
+
+  return (
+    <div>
+      <div className="mb-4 flex justify-between items-center">
+        <Input
+          placeholder="Search table..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+        <Button onClick={onExport} className="bg-green-500 hover:bg-green-600 text-white">
+          Export to Excel
+        </Button>
+      </div>
+      <div ref={tableRef} className="overflow-auto max-h-[calc(100vh-400px)] relative">
+        <Table>
+          <TableHeader ref={headerRef} className="sticky top-0 z-10 bg-white">
+            <TableRow>
+              <TableHead className="text-gray-700 font-bold">INDEX</TableHead>
+              {columns.map((column) => (
+                <TableHead 
+                  key={column} 
+                  className="text-gray-700 font-bold cursor-pointer" 
+                  onClick={() => onSort(column)}
+                >
+                  {column.replace('_', ' ').toUpperCase()}
+                  {sortColumn === column && (
+                    sortOrder === 'asc' ? <ChevronUp className="inline ml-1" /> : <ChevronDown className="inline ml-1" />
+                  )}
+                </TableHead>
+              ))}
+              <TableHead className="text-gray-700 font-bold">ACTION</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredData.map((item, index) => (
+              <TableRow key={item.id} className="hover:bg-gray-50">
+                <TableCell className="font-medium">{index + 1}</TableCell>
+                {columns.map((column) => (
+                  <TableCell key={column}>{item[column]}</TableCell>
+                ))}
+                <TableCell>
+                  {item.verified ? (
+                    <span className="text-green-500 flex items-center">
+                      <Check className="mr-1" /> Verified
+                    </span>
+                  ) : (
+                    <Button onClick={() => onVerify(item)} className="bg-blue-500 hover:bg-blue-600 text-white">
+                      Verify
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
 
 const Page = () => {
   const [companies, setCompanies] = useState([]);
@@ -85,6 +174,13 @@ const Page = () => {
       setTableSortColumn(column);
       setTableSortOrder('asc');
     }
+  };
+
+  const handleExport = () => {
+    const ws = XLSX.utils.json_to_sheet(filteredTabData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, activeTab);
+    XLSX.writeFile(wb, `${selectedCompany.company_name}_${activeTab}.xlsx`);
   };
 
   const filteredCompanies = companies
@@ -201,13 +297,14 @@ const Page = () => {
               </div>
 
               <TabsContent value={activeTab}>
-                <TableContent
+                <DataTable
                   data={filteredTabData}
                   columns={getDisplayColumns()}
                   onVerify={handleVerify}
                   onSort={handleTableSort}
                   sortColumn={tableSortColumn}
                   sortOrder={tableSortOrder}
+                  onExport={handleExport}
                 />
               </TabsContent>
             </Tabs>
@@ -237,91 +334,6 @@ const Page = () => {
           }
         }}
       />
-    </div>
-  );
-}
-
-function TableContent({ data, columns, onVerify, onSort, sortColumn, sortOrder }) {
-  const tableRef = useRef(null);
-  const headerRef = useRef(null);
-  const [searchTerm, setSearchTerm] = useState("");
-
-  useEffect(() => {
-    const tableElement = tableRef.current;
-    const headerElement = headerRef.current;
-
-    if (tableElement && headerElement) {
-      const handleScroll = () => {
-        const { scrollTop } = tableElement;
-        headerElement.style.transform = `translateY(${scrollTop}px)`;
-      };
-
-      tableElement.addEventListener('scroll', handleScroll);
-      return () => tableElement.removeEventListener('scroll', handleScroll);
-    }
-  }, []);
-
-  const filteredData = useMemo(() => {
-    return data.filter(item =>
-      columns.some(column =>
-        item[column]?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    );
-  }, [data, columns, searchTerm]);
-
-  return (
-    <div>
-      <div className="mb-4">
-        <Input
-          placeholder="Search table..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
-      </div>
-      <div ref={tableRef} className="overflow-auto max-h-[calc(100vh-400px)] relative">
-        <Table>
-          <TableHeader ref={headerRef} className="sticky top-0 z-10 bg-white">
-            <TableRow>
-              <TableHead className="text-gray-700 font-bold">INDEX</TableHead>
-              {columns.map((column) => (
-                <TableHead 
-                  key={column} 
-                  className="text-gray-700 font-bold cursor-pointer" 
-                  onClick={() => onSort(column)}
-                >
-                  {column.replace('_', ' ').toUpperCase()}
-                  {sortColumn === column && (
-                    sortOrder === 'asc' ? <ChevronUp className="inline ml-1" /> : <ChevronDown className="inline ml-1" />
-                  )}
-                </TableHead>
-              ))}
-              <TableHead className="text-gray-700 font-bold">ACTION</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredData.map((item, index) => (
-              <TableRow key={item.id} className="hover:bg-gray-50">
-                <TableCell className="font-medium">{index + 1}</TableCell>
-                {columns.map((column) => (
-                  <TableCell key={column}>{item[column]}</TableCell>
-                ))}
-                <TableCell>
-                  {item.verified ? (
-                    <span className="text-green-500 flex items-center">
-                      <Check className="mr-1" /> Verified
-                    </span>
-                  ) : (
-                    <Button onClick={() => onVerify(item)} className="bg-blue-500 hover:bg-blue-600 text-white">
-                      Verify
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
     </div>
   );
 }
