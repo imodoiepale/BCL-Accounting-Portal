@@ -295,7 +295,7 @@ const Page = () => {
   );
 
   return (
-    <div className="flex  lg:flex-row  bg-gray-100">
+    <div className="flex flex-col lg:flex-row  p-6 bg-gray-100">
       <Toaster position="top-right" />
       <Card className="lg:w-1/5 bg-white shadow">
         <CardHeader className="space-y-4">
@@ -376,7 +376,7 @@ const Page = () => {
                   <div className="mb-4 flex justify-between items-center bg-gray-100 p-2 rounded">
                     <span className="text-red-500">Pending: {pendingCount}</span>
                     <span className="text-green-500">Verified: {completedCount}</span>
-                  </div>    
+                  </div> 
 
                   <DataTable
                     data={filteredTabData}
