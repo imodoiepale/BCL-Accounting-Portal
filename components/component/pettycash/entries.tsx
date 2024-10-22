@@ -18,6 +18,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { TableActions } from './TableActions';
 import { PettyCashService } from './PettyCashService';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import Image from 'next/image';
 
 // Utility function to format date
 const formatDate = (dateString) => {
@@ -786,8 +787,23 @@ const columnDefinitions = [
         <div>
           <Label htmlFor="receipt_url">Receipt Image</Label>
           {editedEntry.receipt_url ? (
-            <div>
+            <div className="flex items-center space-x-2">
               <p>Current receipt: {editedEntry.receipt_url}</p>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline">View Receipt</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col items-center justify-center">
+                  <DialogHeader>
+                    <DialogTitle>Receipt Preview</DialogTitle>
+                  </DialogHeader>
+                  <Image
+                    src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${editedEntry.receipt_url}`}
+                    alt="Receipt"
+                    style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
+                  />
+                </DialogContent>
+              </Dialog>
               <Button onClick={() => setEditedEntry({ ...editedEntry, receipt_url: null })}>
                 Remove Receipt
               </Button>
@@ -797,7 +813,16 @@ const columnDefinitions = [
               id="receipt_url"
               name="receipt_url"
               type="file"
-              onChange={(e) => setEditedEntry({ ...editedEntry, receipt_url: e.target.files[0] })}
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    setEditedEntry({ ...editedEntry, receipt_url: event.target.result });
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
             />
           )}
         </div>
