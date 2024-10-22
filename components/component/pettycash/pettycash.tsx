@@ -115,7 +115,7 @@ export function PettyCashManager() {
 
   return (
     <div className="flex w-full bg-muted/40">
-      <main className="flex-1 p-6 w-full">
+      <main className="flex-1 w-full">
         <Card className="mb-6 relative">
           <CardHeader>
             <CardTitle>Petty Cash Manager</CardTitle>

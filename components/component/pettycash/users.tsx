@@ -7,192 +7,299 @@ import { Card } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { RefreshCwIcon } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
-import { supabase } from '@/lib/supabaseClient';
 import { toast, Toaster } from 'react-hot-toast';
+import { TableActions } from './TableActions';
+import { PettyCashService } from './PettyCashService';
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+  return date.toLocaleDateString();
 };
 
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+const formatCurrency = (amount, currency = 'USD') => {
+  if (amount === null || amount === undefined) return '-';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
 };
 
 export function UsersTab() {
   const { userId } = useAuth();
-
   const [users, setUsers] = useState([]);
   const [branches, setBranches] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
     role: '',
     branch_id: '',
+    default_currency: 'USD',
+    cash_balance: 0,
+    credit_balance: 0,
+    mpesa_balance: 0
   });
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
-  useEffect(() => {
-    fetchUsers();
-    fetchBranches();
-  }, []);
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const [usersData, branchesData] = await Promise.all([
+        PettyCashService.fetchRecords('acc_portal_pettycash_users', userId, {
+          select: `
+            *,
+            acc_portal_pettycash_branches(branch_name),
+            account_count:acc_portal_pettycash_accounts(count)
+          `
+        }),
+        PettyCashService.fetchRecords('acc_portal_pettycash_branches', userId)
+      ]);
 
-  const fetchUsers = async () => {
-    const { data, error } = await supabase
-      .from('acc_portal_pettycash_users')
-      .select(`
-        *,
-        acc_portal_pettycash_branches(branch_name),
-        account_count:acc_portal_pettycash_accounts(count)
-      `)
-      .eq('admin_id', userId)
-      .order('id', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching users:', error);
-      toast.error('Failed to fetch users. Please try again.');
-    } else {
-      const transformedData = data.map(user => ({
+      setUsers(usersData.map(user => ({
         ...user,
         account_count: user.account_count[0]?.count || 0
-      }));
-      setUsers(transformedData);
+      })));
+      setBranches(branchesData);
+    } catch (error) {
+      toast.error('Error fetching data');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const fetchBranches = async () => {
-    const { data, error } = await supabase
-      .from('acc_portal_pettycash_branches')
-      .select('id, branch_name')
-      .eq('userid', userId);
-    if (error) {
-      console.error('Error fetching branches:', error);
-      toast.error('Failed to fetch branches. Please try again.');
-    }
-    else setBranches(data);
-  };
+  useEffect(() => {
+    fetchData();
+  }, [userId]);
 
-  const handleSubmit = async () => {
-    const { data, error } = await supabase
-      .from('acc_portal_pettycash_users')
-      .insert([{ ...newUser, admin_id: userId }]);
-
-    if (error) {
-      console.error('Error adding user:', error);
-      toast.error('Failed to add user',);
-    } else {
-      fetchUsers();
+  const handleCreate = async () => {
+    const result = await PettyCashService.createRecord('acc_portal_pettycash_users', newUser, userId);
+    if (result) {
       setNewUser({
         name: '',
         email: '',
         role: '',
         branch_id: '',
+        default_currency: 'USD',
+        cash_balance: 0,
+        credit_balance: 0,
+        mpesa_balance: 0
       });
-      toast.success('User added successfully!');
-      setIsSheetOpen(false);  // Close the sheet
+      setIsSheetOpen(false);
+      fetchData();
     }
-  };
-
-  const handleInputChange = (e) => {
-    const { id, value } = e.target;
-    setNewUser((prev) => ({ ...prev, [id]: value }));
-  };
-
-  const handleSelectChange = (id, value) => {
-    setNewUser((prev) => ({ ...prev, [id]: value }));
   };
 
   const formFields = [
     { id: 'name', label: 'Name', type: 'text', placeholder: 'Enter user name' },
     { id: 'email', label: 'Email', type: 'email', placeholder: 'Enter user email' },
     {
-      id: 'role', label: 'Role', type: 'select', options: [
+      id: 'role',
+      label: 'Role',
+      type: 'select',
+      options: [
         { value: 'admin', label: 'Admin' },
         { value: 'manager', label: 'Manager' },
-        { value: 'cashier', label: 'Cashier' },
+        { value: 'cashier', label: 'Cashier' }
       ]
     },
-    { id: 'branch_id', label: 'Branch', type: 'select', options: branches.map(branch => ({ value: branch.id, label: branch.branch_name })) },
+    {
+      id: 'branch_id',
+      label: 'Branch',
+      type: 'select',
+      options: branches.map(branch => ({
+        value: branch.id.toString(),
+        label: branch.branch_name
+      }))
+    },
+    {
+      id: 'default_currency',
+      label: 'Default Currency',
+      type: 'select',
+      options: [
+        { value: 'USD', label: 'USD' },
+        { value: 'KES', label: 'KES' },
+        { value: 'EUR', label: 'EUR' },
+        { value: 'GBP', label: 'GBP' }
+      ]
+    },
+    {
+      id: 'cash_balance',
+      label: 'Initial Cash Balance',
+      type: 'number',
+      placeholder: '0.00'
+    },
+    {
+      id: 'credit_balance',
+      label: 'Initial Credit Balance',
+      type: 'number',
+      placeholder: '0.00'
+    },
+    {
+      id: 'mpesa_balance',
+      label: 'Initial M-Pesa Balance',
+      type: 'number',
+      placeholder: '0.00'
+    }
   ];
 
+  const EditForm = (user, onSave) => {
+    const [editData, setEditData] = useState(user);
+
+    const handleSubmit = async () => {
+      const result = await PettyCashService.updateRecord('acc_portal_pettycash_users', user.id, editData);
+      if (result) {
+        onSave();
+        fetchData();
+      }
+    };
+
+    return (
+      <div className="flex flex-col pt-4 gap-3">
+        {formFields.map(({ id, label, type, options, placeholder }) => (
+          <div key={id} className="space-y-1">
+            <Label htmlFor={id} className="text-xs">{label}</Label>
+            {type === 'select' ? (
+              <Select
+                value={editData[id]?.toString()}
+                onValueChange={(value) => setEditData({ ...editData, [id]: value })}
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                id={id}
+                type={type}
+                value={editData[id]}
+                onChange={(e) => setEditData({
+                  ...editData,
+                  [id]: type === 'number' ? parseFloat(e.target.value) : e.target.value
+                })}
+                placeholder={placeholder}
+                className="h-8"
+              />
+            )}
+          </div>
+        ))}
+        <Button onClick={handleSubmit} className="bg-blue-600 text-white h-8 mt-2">
+          Save Changes
+        </Button>
+      </div>
+    );
+  };
+
   const tableFields = [
-    { label: 'User ID', key: 'id', format: (id) => `US-${id}` },
+    { label: 'ID', key: 'id', format: (id) => `US-${id}` },
     { label: 'Name', key: 'name' },
     { label: 'Email', key: 'email' },
     { label: 'Role', key: 'role' },
     { label: 'Branch', key: 'acc_portal_pettycash_branches.branch_name' },
+    { label: 'Accounts', key: 'account_count' },
     {
-      label: 'Number of Accounts',
-      key: 'account_count',
-      format: (count) => (
-        <Popover>
-          <PopoverTrigger>{count}</PopoverTrigger>
-          <PopoverContent>
-            <p>This user has {count} account(s).</p>
-          </PopoverContent>
-        </Popover>
-      )
+      label: 'Cash Balance',
+      key: 'cash_balance',
+      format: (value, row) => formatCurrency(value, row.default_currency)
     },
-    { label: 'Created Date', key: 'created_date', format: formatDate },
-    { label: 'Last Spent Amount', key: 'last_spent_amount', format: formatCurrency },
-    { label: 'Last Spent Date', key: 'last_spent_date', format: formatDate },
     {
-      label: 'Balance', key: 'balance', format: (_, user) => (
-        <Popover>
-          <PopoverTrigger>{formatCurrency(user.cash_balance + user.credit_balance + user.mpesa_balance)}</PopoverTrigger>
-          <PopoverContent>
-            <p>Cash: {formatCurrency(user.cash_balance)}</p>
-            <p>Credit: {formatCurrency(user.credit_balance)}</p>
-            <p>M-Pesa: {formatCurrency(user.mpesa_balance)}</p>
-          </PopoverContent>
-        </Popover>
-      )
+      label: 'Credit Balance',
+      key: 'credit_balance',
+      format: (value, row) => formatCurrency(value, row.default_currency)
+    },
+    {
+      label: 'M-Pesa Balance',
+      key: 'mpesa_balance',
+      format: (value, row) => formatCurrency(value, row.default_currency)
+    },
+    {
+      label: 'Last Transaction',
+      key: 'last_spent_amount',
+      format: (value, row) => value ? (
+        `${formatCurrency(value, row.default_currency)} on ${formatDate(row.last_spent_date)}`
+      ) : 'No transactions'
+    },
+    {
+      label: 'Actions',
+      key: 'actions',
+      format: (_, user) => (
+        <TableActions
+          row={user}
+          onEdit={(data) => PettyCashService.updateRecord('acc_portal_pettycash_users', user.id, data)}
+          onDelete={() => PettyCashService.deleteRecord('acc_portal_pettycash_users', user.id)}
+          onVerify={() => PettyCashService.verifyRecord('acc_portal_pettycash_users', user.id)}
+          isVerified={user.is_verified}
+          editForm={EditForm}
+        />
+      ),
     },
   ];
+
+  const filteredUsers = users.filter(user =>
+    user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.role?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="flex w-full bg-gray-100">
       <Toaster position="top-right" />
-      <main className="flex-1 p-6 w-full">
-        <h1 className="text-xl font-semibold mb-4">Users</h1>
+      <main className="flex-1 p-4 w-full">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center space-x-2">
-            <Input type="search" placeholder="Search" className="w-48" />
-            <Button variant="outline" className="flex items-center" onClick={fetchUsers}>
-              <RefreshCwIcon className="w-4 h-4 mr-1" />
-              Refresh
+            <Input
+              type="search"
+              placeholder="Search users..."
+              className="w-64 h-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <Button
+              variant="outline"
+              className="h-8 px-2 flex items-center"
+              onClick={fetchData}
+            >
+              <RefreshCwIcon className="w-4 h-4" />
             </Button>
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
-                <Button className="bg-blue-600 text-white">Add New User</Button>
+                <Button className="bg-blue-600 text-white h-8">Add User</Button>
               </SheetTrigger>
               <SheetContent>
                 <SheetHeader>
                   <SheetTitle>Add New User</SheetTitle>
-                  <SheetDescription>
-                    Enter the details of the new user.
-                  </SheetDescription>
+                  <SheetDescription>Create a new user account</SheetDescription>
                 </SheetHeader>
-                <div className="flex flex-col pt-4 gap-4">
-                  {formFields.map(({ id, label, type, placeholder, options }) => (
+                <div className="flex flex-col pt-4 gap-3">
+                  {formFields.map(({ id, label, type, options, placeholder }) => (
                     <div key={id} className="space-y-1">
-                      <Label htmlFor={id}>{label}</Label>
+                      <Label htmlFor={id} className="text-xs">{label}</Label>
                       {type === 'select' ? (
-                        <Select onValueChange={(value) => handleSelectChange(id, value)} value={newUser[id]}>
-                          <SelectTrigger>
+                        <Select
+                          onValueChange={(value) => setNewUser(prev => ({ ...prev, [id]: value }))}
+                          value={newUser[id]}
+                        >
+                          <SelectTrigger className="h-8">
                             <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
                           </SelectTrigger>
                           <SelectContent>
                             {options.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -200,52 +307,69 @@ export function UsersTab() {
                         <Input
                           id={id}
                           type={type}
-                          placeholder={placeholder}
                           value={newUser[id]}
-                          onChange={handleInputChange}
+                          onChange={(e) => setNewUser(prev => ({
+                            ...prev,
+                            [id]: type === 'number' ? parseFloat(e.target.value) : e.target.value
+                          }))}
+                          placeholder={placeholder}
+                          className="h-8"
                         />
                       )}
                     </div>
                   ))}
-                </div>
-                <div className="pt-4">
-                  <Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button>
+                  <Button onClick={handleCreate} className="bg-blue-600 text-white h-8 mt-2">
+                    Create User
+                  </Button>
                 </div>
               </SheetContent>
             </Sheet>
           </div>
         </div>
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {tableFields.map(({ label }) => (
-                  <TableHead key={label}>{label}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  {tableFields.map(({ key, format }) => (
-                    <TableCell key={key}>
-                      {format ? format(user[key], user) : user[key]}
-                    </TableCell>
+
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {tableFields.map(({ label }) => (
+                    <TableHead key={label} className="py-2 px-3 text-xs whitespace-nowrap">
+                      {label}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={tableFields.length} className="text-center py-2">
+                      Loading...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={tableFields.length} className="text-center py-2">
+                      No users found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      {tableFields.map(({ key, format }) => (
+                        <TableCell key={key} className="py-2 px-3 text-xs whitespace-nowrap">
+                          {format ? format(user[key], user) :
+                            key.includes('.') ?
+                              user[key.split('.')[0]]?.[key.split('.')[1]] :
+                              user[key]}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
-        <div className="flex justify-between items-center mt-4">
-          <Button variant="outline" className="flex items-center">
-            <ChevronLeftIcon className="w-4 h-4" />
-          </Button>
-          <span>1</span>
-          <Button variant="outline" className="flex items-center">
-            <ChevronRightIcon className="w-4 h-4" />
-          </Button>
-        </div>
       </main>
     </div>
   );
