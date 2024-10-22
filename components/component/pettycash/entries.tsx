@@ -8,11 +8,16 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { supabase } from '@/lib/supabaseClient';
 import toast, { Toaster } from 'react-hot-toast';
+
+
+import { TableActions } from './TableActions';
+import { PettyCashService } from './PettyCashService';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Utility function to format date
 const formatDate = (dateString) => {
@@ -52,7 +57,8 @@ export function TransactionsTab() {
   const [users, setUsers] = useState([]);
   const [floatData, setFloatData] = useState(calculateFloatData());
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [currentEntry, setCurrentEntry] = useState(null);
   const [newPettyCash, setNewPettyCash] = useState({
     amount: '',
     invoice_number: '',
@@ -76,102 +82,28 @@ export function TransactionsTab() {
   }, []);
 
   const fetchPettyCashEntries = async () => {
-    const { data, error } = await supabase
-      .from('acc_portal_pettycash_entries')
-      .select('*')
-      .eq('userid', userId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching petty cash entries:', error);
-      toast.error('Failed to fetch petty cash entries');
-    } else {
-      console.log('Fetched petty cash entries:', data);
-      setPettyCashEntries(data);
-    }
+    const entries = await PettyCashService.fetchRecords('acc_portal_pettycash_entries', userId);
+    setPettyCashEntries(entries);
   };
 
   const fetchBranches = async () => {
-    const { data, error } = await supabase
-      .from('acc_portal_pettycash_branches')
-      .select('*')
-      .eq('userid', userId);
-
-    if (error) {
-      console.error('Error fetching branches:', error);
-      toast.error('Failed to fetch branches');
-    } else {
-      console.log('Fetched branches:', data);
-      setBranches(data);
-    }
+    const branchData = await PettyCashService.fetchRecords('acc_portal_pettycash_branches', userId);
+    setBranches(branchData);
   };
 
   const fetchAccounts = async () => {
-    const { data, error } = await supabase
-      .from('acc_portal_pettycash_accounts')
-      .select('id, account_type')
-      .eq('admin_id', userId);
-
-    if (error) {
-      console.error('Error fetching accounts:', error);
-      toast.error('Failed to fetch accounts');
-    } else {
-      console.log('Fetched accounts:', data);
-      setAccounts(data);
-    }
+    const accountData = await PettyCashService.fetchRecords('acc_portal_pettycash_accounts', userId);
+    setAccounts(accountData);
   };
 
   const fetchUsers = async () => {
-    const { data, error } = await supabase
-      .from('acc_portal_pettycash_users')
-      .select('id, name')
-      .eq('admin_id', userId);
-
-    if (error) {
-      console.error('Error fetching users:', error);
-      toast.error('Failed to fetch users');
-    } else {
-      console.log('Fetched users:', data);
-      setUsers(data);
-    }
+    const userData = await PettyCashService.fetchRecords('acc_portal_pettycash_users', userId);
+    setUsers(userData);
   };
 
   const handleSubmit = async () => {
-    let receiptUrl = '';
-
-    if (newPettyCash.receipt_url) {
-      const accountType = newPettyCash.account_type || 'default';
-      const userName = user?.fullName || user?.username || 'unknown_user';
-      const uploadPath = `petty-cash/${userName}/${accountType}/${newPettyCash.receipt_url.name}`;
-
-      const { data: storageData, error: storageError } = await supabase
-        .storage
-        .from('Accounting-Portal')
-        .upload(uploadPath, newPettyCash.receipt_url);
-
-      if (storageError) {
-        console.error('Error uploading receipt:', storageError);
-        toast.error('Error uploading receipt. Please try again.');
-        return;
-      }
-
-      receiptUrl = storageData.path;
-    }
-
-    const { data, error } = await supabase
-      .from('acc_portal_pettycash_entries')
-      .insert([{
-        ...newPettyCash,
-        receipt_url: receiptUrl,
-        userid: userId
-      }]);
-
-    if (error) {
-      console.error('Error adding petty cash entry:', error);
-      toast.error('Error adding petty cash entry. Please try again.');
-    } else {
-      console.log('Added new petty cash entry:', data);
-      toast.success('Petty cash entry added successfully!');
+    const result = await PettyCashService.processTransaction(newPettyCash, newPettyCash.receipt_url, userId);
+    if (result) {
       fetchPettyCashEntries();
       setNewPettyCash({
         amount: '',
@@ -188,13 +120,33 @@ export function TransactionsTab() {
         account_type: '',
       });
       setIsSheetOpen(false);
+      toast.success('Petty cash entry added successfully!');
     }
   };
 
-  const handleInputChange = (e) => {
-    const { id, value } = e.target;
-    setNewPettyCash((prev) => ({ ...prev, [id]: value }));
+  const getSubcategories = (category) => {
+    return subcategoriesMap[category] || [];
   };
+
+  const handleDelete = async (entry) => {
+    const result = await PettyCashService.deleteRecord('acc_portal_pettycash_entries', entry.id);
+    if (result) {
+      fetchPettyCashEntries();
+    }
+  };
+
+  const handleVerify = async (entry) => {
+    const result = await PettyCashService.verifyRecord('acc_portal_pettycash_entries', entry.id);
+    if (result) {
+      fetchPettyCashEntries();
+    }
+  };
+
+
+  const handleInputChange = (e) => {
+    setNewPettyCash((prev) => ({ ...prev, [e.target.id]: e.target.value }));
+  };
+
 
   const handleFileChange = (e) => {
     setNewPettyCash((prev) => ({ ...prev, receipt_url: e.target.files[0] }));
@@ -208,8 +160,43 @@ export function TransactionsTab() {
     setNewPettyCash((prev) => ({ ...prev, payment_type: value }));
   };
 
+  const handleEdit = async (entry) => {
+    setCurrentEntry(entry);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
+    try {
+      const result = await PettyCashService.updateRecord('acc_portal_pettycash_entries', currentEntry.id, {
+        amount: currentEntry.amount,
+        invoice_number: currentEntry.invoice_number,
+        invoice_date: currentEntry.invoice_date,
+        description: currentEntry.description,
+        expense_type: currentEntry.expense_type,
+        payment_type: currentEntry.payment_type,
+        checked_by: currentEntry.checked_by,
+        approved_by: currentEntry.approved_by,
+        branch_name: currentEntry.branch_name,
+        user_name: currentEntry.user_name,
+        account_type: currentEntry.account_type,
+      });
+
+      if (result) {
+        toast.success('Entry updated successfully!');
+        fetchPettyCashEntries();
+        setIsEditDialogOpen(false);
+      } else {
+        toast.error('Failed to update entry. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error updating entry:', error);
+      toast.error('An unexpected error occurred. Please try again.');
+    }
+  };
+
+
   const formFields = [
-    { id: 'invoice_number', label: 'Invoice Number', type: 'text', placeholder: 'INV-123456' },
+   
     { id: 'invoice_date', label: 'Invoice Date', type: 'date', placeholder: '' },
     {
       id: 'branch_name',
@@ -264,7 +251,8 @@ export function TransactionsTab() {
   ];
 
   const tableFields = [
-    { label: 'Entry ID', key: 'id', format: (id) => `PC-${id}` },
+    { label: 'No.', key: 'index', format: (_, index) => index + 1 },
+    // { label: 'Entry ID', key: 'id', format: (id) => `PC-${id}` },
     { label: 'User', key: 'user_name' },
     { label: 'Branch', key: 'branch_name' },
     { label: 'Account Type', key: 'account_type' },
@@ -300,8 +288,529 @@ export function TransactionsTab() {
     },
   ];
 
+  const expenseCategories = [
+  'Office Supplies',
+  'Employee Welfare',
+  'Travel & Transportation',
+  'Client-Related Expenses',
+  'Utilities & Communication',
+  'Maintenance & Repairs',
+  'Miscellaneous Administrative Costs',
+  'Marketing & Promotional Materials',
+  'Training & Development',
+  'Licensing & Subscriptions',
+  'Security & Compliance',
+  'Health & Safety',
+  'Donations & CSR',
+  'Subscriptions & Software Tools',
+  'Legal & Compliance',
+  'Office Utilities',
+  'IT & Equipment',
+  'Recruitment & Human Resources',
+  'Event & Meeting Expenses',
+  'Miscellaneous/Unexpected Expenses'
+];
+
+const subcategoriesMap = {
+  'Office Supplies': [
+    'Stationery',
+    'Printer Supplies',
+    'Office Equipment',
+    'Toner/Ink Refills',
+    'Notepads & Binders',
+    'Whiteboards & Markers',
+    'Filing Folders',
+    'Envelopes',
+    'Business Cards',
+    'Miscellaneous Supplies'
+  ],
+  'Employee Welfare': [
+    'Refreshments',
+    'Team Meals',
+    'Employee Gifts',
+    'Wellness Programs',
+    'Office Snacks',
+    'Team Building Activities',
+    'Celebrations',
+    'Coffee/Tea',
+    'Small Allowances',
+    'Entertainment Expenses'
+  ],
+  'Travel & Transportation': [
+    'Taxi Fare',
+    'Public Transport Fare',
+    'Parking Fees',
+    'Fuel Reimbursement',
+    'Mileage Reimbursement',
+    'Tolls',
+    'Travel Meals',
+    'Lodging for Short Business Trips',
+    'Car Rentals',
+    'Airfare for Short Trips'
+  ],
+  'Client-Related Expenses': [
+    'Client Meetings',
+    'Client Gifts',
+    'Client Entertainment',
+    'Travel for Client Meetings',
+    'Venue Rentals for Client Events',
+    'Client Welcome Packages',
+    'Presentation Materials',
+    'Client Demos',
+    'Conference Room Bookings',
+    'Marketing Gifts'
+  ],
+  'Utilities & Communication': [
+    'Phone Bill Payments',
+    'Internet Bills',
+    'Office Electricity Bills',
+    'Water and Sewerage Payments',
+    'Gas and Heating Costs',
+    'Prepaid Phone Credits',
+    'Mobile Hotspot Services',
+    'Courier Services',
+    'Postage & Delivery',
+    'Cloud Storage Fees'
+  ],
+  'Maintenance & Repairs': [
+    'Building Repairs',
+    'Office Furniture Repairs',
+    'IT Equipment Repairs',
+    'Electrical Fixes',
+    'Plumbing Services',
+    'Maintenance Contracts',
+    'HVAC Maintenance',
+    'Cleaning Equipment Repairs',
+    'Elevator Maintenance',
+    'Pest Control Services'
+  ],
+  'Miscellaneous Administrative Costs': [
+    'Filing Fees',
+    'Legal/Notary Fees',
+    'Bank Charges',
+    'Document Courier Services',
+    'Government Registrations',
+    'Copying/Printing Fees',
+    'Security Deposits',
+    'Postage Stamps',
+    'Small Consultant Fees',
+    'Administrative Fines'
+  ],
+  'Marketing & Promotional Materials': [
+    'Printing Costs',
+    'Brochures & Flyers',
+    'Business Cards',
+    'Branded Merchandise',
+    'Event Sponsorship',
+    'Digital Marketing Ads',
+    'Social Media Boosts',
+    'Website Hosting',
+    'Promotional Giveaways',
+    'Media Coverage Fees'
+  ],
+  'Training & Development': [
+    'Registration for Workshops',
+    'Online Course Subscriptions',
+    'Certification Fees',
+    'Training Materials',
+    'Professional Memberships',
+    'Conference Fees',
+    'In-House Training Costs',
+    'Educational Subscriptions',
+    'Webinars',
+    'Employee Development Programs'
+  ],
+  'Licensing & Subscriptions': [
+    'Software Licenses',
+    'Cloud Services Subscriptions',
+    'Professional Memberships',
+    'Industry Magazine Subscriptions',
+    'Financial Data Feeds',
+    'Compliance Subscriptions',
+    'SaaS Tools Subscriptions',
+    'Newspaper Subscriptions',
+    'Research Data Access',
+    'Tech Support Subscriptions'
+  ],
+  'Security & Compliance': [
+    'Alarm Monitoring',
+    'Security Guard Payments',
+    'Security Camera Maintenance',
+    'ID Card Printing',
+    'Key & Lock Replacements',
+    'Cybersecurity Tools',
+    'Access Control Systems',
+    'Security Audits',
+    'Data Backup Services',
+    'Insurance Payments'
+  ],
+  'Health & Safety': [
+    'First Aid Kits',
+    'PPE (Personal Protective Equipment)',
+    'Fire Extinguishers',
+    'Emergency Drills',
+    'Office Sanitization',
+    'Health Screenings',
+    'Safety Training Costs',
+    'Workplace Safety Inspections',
+    'Air Quality Monitoring',
+    'Evacuation Supplies'
+  ],
+  'Donations & CSR': [
+    'Charitable Contributions',
+    'Event Sponsorships',
+    'Non-Profit Partnerships',
+    'Volunteer Event Costs',
+    'Community Development Projects',
+    'CSR Initiative Expenses',
+    'Scholarships & Grants',
+    'Environmental Contributions',
+    'School Support Programs',
+    'Local Event Sponsorships'
+  ],
+  'Subscriptions & Software Tools': [
+    'Zoom/Video Conferencing Subscriptions',
+    'SaaS Tools',
+    'Email Marketing Tools',
+    'CRM Systems',
+    'Design Software',
+    'Project Management Software',
+    'Financial Software Subscriptions',
+    'Cloud Storage Costs',
+    'Accounting Software',
+    'Data Analytics Tools'
+  ],
+  'Legal & Compliance': [
+    'Lawyer Fees',
+    'Compliance Audits',
+    'Contract Review Fees',
+    'Court Filing Fees',
+    'Regulatory Submissions',
+    'Notary Services',
+    'Intellectual Property Fees',
+    'External Counsel Payments',
+    'Business Permits',
+    'Legal Retainers'
+  ],
+  'Office Utilities': [
+    'Electricity Bills',
+    'Water Bills',
+    'Heating & Cooling',
+    'Gas Bills',
+    'Waste Disposal Services',
+    'Internet Services',
+    'Data Backup Services',
+    'Office Cleaning Services',
+    'Power Generator Maintenance',
+    'Water Filters & Coolers'
+  ],
+  'IT & Equipment': [
+    'Computer Parts & Accessories',
+    'Software Subscriptions',
+    'IT Support Services',
+    'Cloud Storage',
+    'Hardware Repairs',
+    'Office Networking Equipment',
+    'Server Maintenance',
+    'Anti-Virus Software',
+    'License Renewals',
+    'IT Consulting Fees'
+  ],
+  'Recruitment & Human Resources': [
+    'Job Posting Fees',
+    'Background Checks',
+    'Employee Onboarding Kits',
+    'Recruitment Agency Fees',
+    'Interview Travel Expenses',
+    'Temporary Staffing Costs',
+    'HR Software Subscriptions',
+    'Employee Handbooks',
+    'Job Fair Registrations',
+    'Hiring Events'
+  ],
+  'Event & Meeting Expenses': [
+    'Meeting Room Rentals',
+    'Conference Registrations',
+    'Refreshments for Meetings',
+    'Event Hosting Costs',
+    'Conference Materials',
+    'Equipment Rentals (for events)',
+    'AV Equipment Hire',
+    'Conference Travel Costs',
+    'Promotional Materials for Events',
+    'Event Security'
+  ],
+  'Miscellaneous/Unexpected Expenses': [
+    'Cash Shortages',
+    'Miscellaneous Reimbursements',
+    'Unexpected Small Purchases',
+    'Office Party Expenses',
+    'Special Project Fees',
+    'Emergency Purchases',
+    'Temporary Fixes',
+    'Unexpected Vendor Charges',
+    'Equipment Rentals',
+    'Minor Emergencies'
+  ]
+};
+
+
+const columnDefinitions = [
+  {
+    id: 'index',
+    header: '#',
+    size: '40',
+    cellContent: (entry, index) => `${index + 1}`
+  },
+  {
+    id: 'invoice_date',
+    header: 'Date',
+    size: '100',
+    cellContent: entry => formatDate(entry.invoice_date)
+  },
+  {
+    id: 'amount',
+    header: 'Amount',
+    size: '100',
+    cellContent: entry => entry.amount
+  },
+  {
+    id: 'description',
+    header: 'Description',
+    size: '200',
+    cellContent: entry => entry.description
+  },
+  {
+    id: 'expense_type',
+    header: 'Category',
+    size: '120',
+    cellContent: entry => entry.expense_type
+  },
+  {
+    id: 'is_verified',
+    header: 'Status',
+    size: '80',
+    cellContent: entry => entry.is_verified ? 'Verified' : 'Pending'
+  },
+  {
+    id: 'checked_by',
+    header: 'Checked By',
+    size: '120',
+    cellContent: entry => entry.checked_by
+  },
+  {
+    id: 'approved_by',
+    header: 'Approved By',
+    size: '120',
+    cellContent: entry => entry.approved_by
+  },
+  {
+    id: 'receipt_url',
+    header: 'Receipt',
+    size: '100',
+    cellContent: (entry) => (
+      entry.receipt_url ? (
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="link">View Receipt</Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col items-center justify-center">
+            <DialogHeader>
+              <DialogTitle>Receipt Preview</DialogTitle>
+            </DialogHeader>
+            <iframe
+              src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${entry.receipt_url}`}
+              style={{ width: '100%', height: '70vh', border: 'none', display: 'block', margin: 'auto' }}
+              title="Receipt Preview"
+            />
+          </DialogContent>
+        </Dialog>
+      ) : 'No Receipt'
+    )
+  },
+  {
+    id: 'actions',
+    header: 'Actions',
+    size: '100',
+    cellContent: entry => entry
+  }
+];
+
+  const EditForm = ({ entry, onClose, onSubmit }) => {
+    const [editedEntry, setEditedEntry] = useState(entry);
+    const [selectedCategory, setSelectedCategory] = useState(entry.expense_type || '');
+
+    const handleChange = (e) => {
+      setEditedEntry({ ...editedEntry, [e.target.name]: e.target.value });
+    };
+
+    const handleCategoryChange = (value) => {
+      setSelectedCategory(value);
+      setEditedEntry({ ...editedEntry, expense_type: value, subcategory: '' });
+    };
+
+    const handleSubcategoryChange = (value) => {
+      setEditedEntry({ ...editedEntry, subcategory: value });
+    };
+
+    const handleSubmit = (e) => {
+      e.preventDefault();
+      onSubmit(editedEntry);
+      onClose();
+    };
+
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="amount">Amount</Label>
+          <Input
+            id="amount"
+            name="amount"
+            type="number"
+            value={editedEntry.amount}
+            onChange={handleChange}
+          />
+        </div>
+        
+        <div>
+          <Label htmlFor="invoice_date">Invoice Date</Label>
+          <Input
+            id="invoice_date"
+            name="invoice_date"
+            type="date"
+            value={editedEntry.invoice_date}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <Label htmlFor="description">Description</Label>
+          <Input
+            id="description"
+            name="description"
+            value={editedEntry.description}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <Label htmlFor="expense_type">Expense Category</Label>
+          <Select
+            value={selectedCategory}
+            onValueChange={handleCategoryChange}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {expenseCategories.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {selectedCategory && (
+          <div>
+            <Label htmlFor="subcategory">Subcategory</Label>
+            <Select
+              value={editedEntry.subcategory}
+              onValueChange={handleSubcategoryChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select subcategory" />
+              </SelectTrigger>
+              <SelectContent>
+                {subcategoriesMap[selectedCategory].map((subcategory) => (
+                  <SelectItem key={subcategory} value={subcategory}>
+                    {subcategory}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div>
+          <Label htmlFor="payment_type">Payment Type</Label>
+          <Input
+            id="payment_type"
+            name="payment_type"
+            value={editedEntry.payment_type}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <Label htmlFor="checked_by">Checked By</Label>
+          <Input
+            id="checked_by"
+            name="checked_by"
+            value={editedEntry.checked_by}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <Label htmlFor="approved_by">Approved By</Label>
+          <Input
+            id="approved_by"
+            name="approved_by"
+            value={editedEntry.approved_by}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <Label htmlFor="branch_name">Branch</Label>
+          <Input
+            id="branch_name"
+            name="branch_name"
+            value={editedEntry.branch_name}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <Label htmlFor="user_name">User</Label>
+          <Input
+            id="user_name"
+            name="user_name"
+            value={editedEntry.user_name}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <Label htmlFor="account_type">Account Type</Label>
+          <Input
+            id="account_type"
+            name="account_type"
+            value={editedEntry.account_type}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <Label htmlFor="receipt_url">Receipt Image</Label>
+          {editedEntry.receipt_url ? (
+            <div>
+              <p>Current receipt: {editedEntry.receipt_url}</p>
+              <Button onClick={() => setEditedEntry({ ...editedEntry, receipt_url: null })}>
+                Remove Receipt
+              </Button>
+            </div>
+          ) : (
+            <Input
+              id="receipt_url"
+              name="receipt_url"
+              type="file"
+              onChange={(e) => setEditedEntry({ ...editedEntry, receipt_url: e.target.files[0] })}
+            />
+          )}
+        </div>
+        <Button type="submit">Save Changes</Button>
+      </form>
+    );
+  };
+
+
+
   return (
     <div className="flex w-full bg-gray-100">
+      <Toaster position="top-right" />
       <main className="flex-1 p-6 w-full">
         <h1 className="text-xl font-semibold mb-2">Monthly Petty Cash Entries</h1>
         <div className="flex justify-between items-center mb-4">
@@ -365,27 +874,63 @@ export function TransactionsTab() {
             </Sheet>
           </div>
         </div>
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {tableFields.map(({ label }) => (
-                  <TableHead key={label}>{label}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pettyCashEntries.map((entry) => (
-                <TableRow key={entry.id}>
-                  {tableFields.map(({ key, format }) => (
-                    <TableCell key={key}>
-                      {format ? format(entry[key]) : entry[key]}
-                    </TableCell>
+        <Card className="rounded-md border-0 shadow-sm">
+          <div className="relative">
+            <ScrollArea className="h-[calc(100vh-280px)]">
+              <Table>
+                <TableHeader className="sticky top-0 z-10">
+                  <TableRow className="bg-blue-600 hover:bg-blue-600">
+                    {columnDefinitions.map((column) => (
+                      <TableHead
+                        key={column.id}
+                        style={{
+                          width: `${column.size}px`,
+                          minWidth: `${column.size}px`
+                        }}
+                        className="text-white h-8 text-xs font-medium border-r border-blue-500 last:border-r-0 text-center px-2"
+                      >
+                        {column.header}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pettyCashEntries.map((entry, index) => (
+                    <TableRow
+                      key={entry.id}
+                      className="hover:bg-blue-50 border-b border-gray-100 transition-colors [&>td]:h-8"
+                    >
+                      {columnDefinitions.map((column) => (
+                        <TableCell
+                          key={`${entry.id}-${column.id}`}
+                          style={{
+                            width: `${column.size}px`,
+                            minWidth: `${column.size}px`
+                          }}
+                          className="py-1 px-2 text-xs border-r border-gray-100 last:border-r-0"
+                        >
+                          {column.id === 'actions' ? (
+                            <TableActions
+                              row={entry}
+                              onEdit={handleEdit}
+                              onDelete={handleDelete}
+                              onVerify={handleVerify}
+                              isVerified={entry.is_verified}
+                              editForm={(entry, onClose) => (
+                                <EditForm entry={entry} onClose={onClose} onSubmit={handleEditSubmit} />
+                              )}
+                            />
+                          ) : (
+                            column.cellContent(entry, index)
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
                   ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </div>
         </Card>
         <div className="flex justify-between items-center mt-4">
           <Button variant="outline" className="flex items-center">
@@ -396,6 +941,53 @@ export function TransactionsTab() {
             <ChevronRightIcon className="w-4 h-4" />
           </Button>
         </div>
+
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Petty Cash Entry</DialogTitle>
+            </DialogHeader>
+            {currentEntry && (
+              <div className="flex flex-col gap-4">
+                {formFields.map(({ id, label, type, placeholder, options }) => (
+                  <div key={id} className="space-y-1">
+                    <Label htmlFor={id}>{label}</Label>
+                    {type === 'select' ? (
+                      <Select
+                        value={currentEntry[id]}
+                        onValueChange={(value) => setCurrentEntry({ ...currentEntry, [id]: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={`Select ${label}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {options.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id={id}
+                        type={type}
+                        placeholder={placeholder}
+                        value={currentEntry[id] || ''}
+                        onChange={(e) => setCurrentEntry({ ...currentEntry, [id]: e.target.value })}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <DialogFooter>
+              <Button onClick={handleEditSubmit}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+
       </main>
     </div>
   );
