@@ -51,6 +51,23 @@ const calculateFloatData = () => {
 export function TransactionsTab() {
   const { userId } = useAuth();
   const { user } = useUser();
+  const [editedEntry, setEditedEntry] = useState({
+    id: '',
+    amount: '',
+    invoice_number: '',
+    invoice_date: '',
+    description: '',
+    expense_type: '',
+    subcategory: '',
+    payment_type: '',
+    checked_by: '',
+    approved_by: '',
+    branch_name: '',
+    user_name: '',
+    account_type: '',
+    receipt_url: null
+  });
+
 
   const [pettyCashEntries, setPettyCashEntries] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -197,7 +214,7 @@ export function TransactionsTab() {
 
 
   const formFields = [
-   
+
     { id: 'invoice_date', label: 'Invoice Date', type: 'date', placeholder: '' },
     {
       id: 'branch_name',
@@ -251,24 +268,330 @@ export function TransactionsTab() {
     },
   ];
 
-  const tableFields = [
-    { label: 'No.', key: 'index', format: (_, index) => index + 1 },
-    // { label: 'Entry ID', key: 'id', format: (id) => `PC-${id}` },
-    { label: 'User', key: 'user_name' },
-    { label: 'Branch', key: 'branch_name' },
-    { label: 'Account Type', key: 'account_type' },
-    { label: 'Amount', key: 'amount' },
-    { label: 'Invoice Number', key: 'invoice_number' },
-    { label: 'Invoice Date', key: 'invoice_date', format: (date) => formatDate(date) },
-    { label: 'Description', key: 'description' },
-    { label: 'Expense Category', key: 'expense_type' },
-    { label: 'Checked By', key: 'checked_by' },
-    { label: 'Approved By', key: 'approved_by' },
+
+
+  const expenseCategories = [
+    'Office Supplies',
+    'Employee Welfare',
+    'Travel & Transportation',
+    'Client-Related Expenses',
+    'Utilities & Communication',
+    'Maintenance & Repairs',
+    'Miscellaneous Administrative Costs',
+    'Marketing & Promotional Materials',
+    'Training & Development',
+    'Licensing & Subscriptions',
+    'Security & Compliance',
+    'Health & Safety',
+    'Donations & CSR',
+    'Subscriptions & Software Tools',
+    'Legal & Compliance',
+    'Office Utilities',
+    'IT & Equipment',
+    'Recruitment & Human Resources',
+    'Event & Meeting Expenses',
+    'Miscellaneous/Unexpected Expenses'
+  ];
+
+  const subcategoriesMap = {
+    'Office Supplies': [
+      'Stationery',
+      'Printer Supplies',
+      'Office Equipment',
+      'Toner/Ink Refills',
+      'Notepads & Binders',
+      'Whiteboards & Markers',
+      'Filing Folders',
+      'Envelopes',
+      'Business Cards',
+      'Miscellaneous Supplies'
+    ],
+    'Employee Welfare': [
+      'Refreshments',
+      'Team Meals',
+      'Employee Gifts',
+      'Wellness Programs',
+      'Office Snacks',
+      'Team Building Activities',
+      'Celebrations',
+      'Coffee/Tea',
+      'Small Allowances',
+      'Entertainment Expenses'
+    ],
+    'Travel & Transportation': [
+      'Taxi Fare',
+      'Public Transport Fare',
+      'Parking Fees',
+      'Fuel Reimbursement',
+      'Mileage Reimbursement',
+      'Tolls',
+      'Travel Meals',
+      'Lodging for Short Business Trips',
+      'Car Rentals',
+      'Airfare for Short Trips'
+    ],
+    'Client-Related Expenses': [
+      'Client Meetings',
+      'Client Gifts',
+      'Client Entertainment',
+      'Travel for Client Meetings',
+      'Venue Rentals for Client Events',
+      'Client Welcome Packages',
+      'Presentation Materials',
+      'Client Demos',
+      'Conference Room Bookings',
+      'Marketing Gifts'
+    ],
+    'Utilities & Communication': [
+      'Phone Bill Payments',
+      'Internet Bills',
+      'Office Electricity Bills',
+      'Water and Sewerage Payments',
+      'Gas and Heating Costs',
+      'Prepaid Phone Credits',
+      'Mobile Hotspot Services',
+      'Courier Services',
+      'Postage & Delivery',
+      'Cloud Storage Fees'
+    ],
+    'Maintenance & Repairs': [
+      'Building Repairs',
+      'Office Furniture Repairs',
+      'IT Equipment Repairs',
+      'Electrical Fixes',
+      'Plumbing Services',
+      'Maintenance Contracts',
+      'HVAC Maintenance',
+      'Cleaning Equipment Repairs',
+      'Elevator Maintenance',
+      'Pest Control Services'
+    ],
+    'Miscellaneous Administrative Costs': [
+      'Filing Fees',
+      'Legal/Notary Fees',
+      'Bank Charges',
+      'Document Courier Services',
+      'Government Registrations',
+      'Copying/Printing Fees',
+      'Security Deposits',
+      'Postage Stamps',
+      'Small Consultant Fees',
+      'Administrative Fines'
+    ],
+    'Marketing & Promotional Materials': [
+      'Printing Costs',
+      'Brochures & Flyers',
+      'Business Cards',
+      'Branded Merchandise',
+      'Event Sponsorship',
+      'Digital Marketing Ads',
+      'Social Media Boosts',
+      'Website Hosting',
+      'Promotional Giveaways',
+      'Media Coverage Fees'
+    ],
+    'Training & Development': [
+      'Registration for Workshops',
+      'Online Course Subscriptions',
+      'Certification Fees',
+      'Training Materials',
+      'Professional Memberships',
+      'Conference Fees',
+      'In-House Training Costs',
+      'Educational Subscriptions',
+      'Webinars',
+      'Employee Development Programs'
+    ],
+    'Licensing & Subscriptions': [
+      'Software Licenses',
+      'Cloud Services Subscriptions',
+      'Professional Memberships',
+      'Industry Magazine Subscriptions',
+      'Financial Data Feeds',
+      'Compliance Subscriptions',
+      'SaaS Tools Subscriptions',
+      'Newspaper Subscriptions',
+      'Research Data Access',
+      'Tech Support Subscriptions'
+    ],
+    'Security & Compliance': [
+      'Alarm Monitoring',
+      'Security Guard Payments',
+      'Security Camera Maintenance',
+      'ID Card Printing',
+      'Key & Lock Replacements',
+      'Cybersecurity Tools',
+      'Access Control Systems',
+      'Security Audits',
+      'Data Backup Services',
+      'Insurance Payments'
+    ],
+    'Health & Safety': [
+      'First Aid Kits',
+      'PPE (Personal Protective Equipment)',
+      'Fire Extinguishers',
+      'Emergency Drills',
+      'Office Sanitization',
+      'Health Screenings',
+      'Safety Training Costs',
+      'Workplace Safety Inspections',
+      'Air Quality Monitoring',
+      'Evacuation Supplies'
+    ],
+    'Donations & CSR': [
+      'Charitable Contributions',
+      'Event Sponsorships',
+      'Non-Profit Partnerships',
+      'Volunteer Event Costs',
+      'Community Development Projects',
+      'CSR Initiative Expenses',
+      'Scholarships & Grants',
+      'Environmental Contributions',
+      'School Support Programs',
+      'Local Event Sponsorships'
+    ],
+    'Subscriptions & Software Tools': [
+      'Zoom/Video Conferencing Subscriptions',
+      'SaaS Tools',
+      'Email Marketing Tools',
+      'CRM Systems',
+      'Design Software',
+      'Project Management Software',
+      'Financial Software Subscriptions',
+      'Cloud Storage Costs',
+      'Accounting Software',
+      'Data Analytics Tools'
+    ],
+    'Legal & Compliance': [
+      'Lawyer Fees',
+      'Compliance Audits',
+      'Contract Review Fees',
+      'Court Filing Fees',
+      'Regulatory Submissions',
+      'Notary Services',
+      'Intellectual Property Fees',
+      'External Counsel Payments',
+      'Business Permits',
+      'Legal Retainers'
+    ],
+    'Office Utilities': [
+      'Electricity Bills',
+      'Water Bills',
+      'Heating & Cooling',
+      'Gas Bills',
+      'Waste Disposal Services',
+      'Internet Services',
+      'Data Backup Services',
+      'Office Cleaning Services',
+      'Power Generator Maintenance',
+      'Water Filters & Coolers'
+    ],
+    'IT & Equipment': [
+      'Computer Parts & Accessories',
+      'Software Subscriptions',
+      'IT Support Services',
+      'Cloud Storage',
+      'Hardware Repairs',
+      'Office Networking Equipment',
+      'Server Maintenance',
+      'Anti-Virus Software',
+      'License Renewals',
+      'IT Consulting Fees'
+    ],
+    'Recruitment & Human Resources': [
+      'Job Posting Fees',
+      'Background Checks',
+      'Employee Onboarding Kits',
+      'Recruitment Agency Fees',
+      'Interview Travel Expenses',
+      'Temporary Staffing Costs',
+      'HR Software Subscriptions',
+      'Employee Handbooks',
+      'Job Fair Registrations',
+      'Hiring Events'
+    ],
+    'Event & Meeting Expenses': [
+      'Meeting Room Rentals',
+      'Conference Registrations',
+      'Refreshments for Meetings',
+      'Event Hosting Costs',
+      'Conference Materials',
+      'Equipment Rentals (for events)',
+      'AV Equipment Hire',
+      'Conference Travel Costs',
+      'Promotional Materials for Events',
+      'Event Security'
+    ],
+    'Miscellaneous/Unexpected Expenses': [
+      'Cash Shortages',
+      'Miscellaneous Reimbursements',
+      'Unexpected Small Purchases',
+      'Office Party Expenses',
+      'Special Project Fees',
+      'Emergency Purchases',
+      'Temporary Fixes',
+      'Unexpected Vendor Charges',
+      'Equipment Rentals',
+      'Minor Emergencies'
+    ]
+  };
+
+
+  const columnDefinitions = [
     {
-      label: 'Receipt Photo',
-      key: 'receipt_url',
-      format: (url) => (
-        url ? (
+      id: 'index',
+      header: '#',
+      size: '40',
+      cellContent: (entry, index) => `${index + 1}`
+    },
+    {
+      id: 'invoice_date',
+      header: 'Date',
+      size: '100',
+      cellContent: entry => formatDate(entry.invoice_date)
+    },
+    {
+      id: 'amount',
+      header: 'Amount',
+      size: '100',
+      cellContent: entry => entry.amount
+    },
+    {
+      id: 'description',
+      header: 'Description',
+      size: '200',
+      cellContent: entry => entry.description
+    },
+    {
+      id: 'expense_type',
+      header: 'Category',
+      size: '120',
+      cellContent: entry => entry.expense_type
+    },
+    {
+      id: 'is_verified',
+      header: 'Status',
+      size: '80',
+      cellContent: entry => entry.is_verified ? 'Verified' : 'Pending'
+    },
+    {
+      id: 'checked_by',
+      header: 'Checked By',
+      size: '120',
+      cellContent: entry => entry.checked_by
+    },
+    {
+      id: 'approved_by',
+      header: 'Approved By',
+      size: '120',
+      cellContent: entry => entry.approved_by
+    },
+    {
+      id: 'receipt_url',
+      header: 'Receipt',
+      size: '100',
+      cellContent: (entry) => (
+        entry.receipt_url ? (
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="link">View Receipt</Button>
@@ -277,365 +600,24 @@ export function TransactionsTab() {
               <DialogHeader>
                 <DialogTitle>Receipt Preview</DialogTitle>
               </DialogHeader>
-              <iframe
-                src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${url}`}
-                style={{ width: '100%', height: '70vh', border: 'none', display: 'block', margin: 'auto' }}
-                title="Receipt Preview"
+              <Image
+                src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${editedEntry.receipt_url}`}
+                alt="Receipt"
+                layout="fill"
+                objectFit="contain"
               />
             </DialogContent>
           </Dialog>
         ) : 'No Receipt'
-      ),
+      )
     },
+    {
+      id: 'actions',
+      header: 'Actions',
+      size: '100',
+      cellContent: entry => entry
+    }
   ];
-
-  const expenseCategories = [
-  'Office Supplies',
-  'Employee Welfare',
-  'Travel & Transportation',
-  'Client-Related Expenses',
-  'Utilities & Communication',
-  'Maintenance & Repairs',
-  'Miscellaneous Administrative Costs',
-  'Marketing & Promotional Materials',
-  'Training & Development',
-  'Licensing & Subscriptions',
-  'Security & Compliance',
-  'Health & Safety',
-  'Donations & CSR',
-  'Subscriptions & Software Tools',
-  'Legal & Compliance',
-  'Office Utilities',
-  'IT & Equipment',
-  'Recruitment & Human Resources',
-  'Event & Meeting Expenses',
-  'Miscellaneous/Unexpected Expenses'
-];
-
-const subcategoriesMap = {
-  'Office Supplies': [
-    'Stationery',
-    'Printer Supplies',
-    'Office Equipment',
-    'Toner/Ink Refills',
-    'Notepads & Binders',
-    'Whiteboards & Markers',
-    'Filing Folders',
-    'Envelopes',
-    'Business Cards',
-    'Miscellaneous Supplies'
-  ],
-  'Employee Welfare': [
-    'Refreshments',
-    'Team Meals',
-    'Employee Gifts',
-    'Wellness Programs',
-    'Office Snacks',
-    'Team Building Activities',
-    'Celebrations',
-    'Coffee/Tea',
-    'Small Allowances',
-    'Entertainment Expenses'
-  ],
-  'Travel & Transportation': [
-    'Taxi Fare',
-    'Public Transport Fare',
-    'Parking Fees',
-    'Fuel Reimbursement',
-    'Mileage Reimbursement',
-    'Tolls',
-    'Travel Meals',
-    'Lodging for Short Business Trips',
-    'Car Rentals',
-    'Airfare for Short Trips'
-  ],
-  'Client-Related Expenses': [
-    'Client Meetings',
-    'Client Gifts',
-    'Client Entertainment',
-    'Travel for Client Meetings',
-    'Venue Rentals for Client Events',
-    'Client Welcome Packages',
-    'Presentation Materials',
-    'Client Demos',
-    'Conference Room Bookings',
-    'Marketing Gifts'
-  ],
-  'Utilities & Communication': [
-    'Phone Bill Payments',
-    'Internet Bills',
-    'Office Electricity Bills',
-    'Water and Sewerage Payments',
-    'Gas and Heating Costs',
-    'Prepaid Phone Credits',
-    'Mobile Hotspot Services',
-    'Courier Services',
-    'Postage & Delivery',
-    'Cloud Storage Fees'
-  ],
-  'Maintenance & Repairs': [
-    'Building Repairs',
-    'Office Furniture Repairs',
-    'IT Equipment Repairs',
-    'Electrical Fixes',
-    'Plumbing Services',
-    'Maintenance Contracts',
-    'HVAC Maintenance',
-    'Cleaning Equipment Repairs',
-    'Elevator Maintenance',
-    'Pest Control Services'
-  ],
-  'Miscellaneous Administrative Costs': [
-    'Filing Fees',
-    'Legal/Notary Fees',
-    'Bank Charges',
-    'Document Courier Services',
-    'Government Registrations',
-    'Copying/Printing Fees',
-    'Security Deposits',
-    'Postage Stamps',
-    'Small Consultant Fees',
-    'Administrative Fines'
-  ],
-  'Marketing & Promotional Materials': [
-    'Printing Costs',
-    'Brochures & Flyers',
-    'Business Cards',
-    'Branded Merchandise',
-    'Event Sponsorship',
-    'Digital Marketing Ads',
-    'Social Media Boosts',
-    'Website Hosting',
-    'Promotional Giveaways',
-    'Media Coverage Fees'
-  ],
-  'Training & Development': [
-    'Registration for Workshops',
-    'Online Course Subscriptions',
-    'Certification Fees',
-    'Training Materials',
-    'Professional Memberships',
-    'Conference Fees',
-    'In-House Training Costs',
-    'Educational Subscriptions',
-    'Webinars',
-    'Employee Development Programs'
-  ],
-  'Licensing & Subscriptions': [
-    'Software Licenses',
-    'Cloud Services Subscriptions',
-    'Professional Memberships',
-    'Industry Magazine Subscriptions',
-    'Financial Data Feeds',
-    'Compliance Subscriptions',
-    'SaaS Tools Subscriptions',
-    'Newspaper Subscriptions',
-    'Research Data Access',
-    'Tech Support Subscriptions'
-  ],
-  'Security & Compliance': [
-    'Alarm Monitoring',
-    'Security Guard Payments',
-    'Security Camera Maintenance',
-    'ID Card Printing',
-    'Key & Lock Replacements',
-    'Cybersecurity Tools',
-    'Access Control Systems',
-    'Security Audits',
-    'Data Backup Services',
-    'Insurance Payments'
-  ],
-  'Health & Safety': [
-    'First Aid Kits',
-    'PPE (Personal Protective Equipment)',
-    'Fire Extinguishers',
-    'Emergency Drills',
-    'Office Sanitization',
-    'Health Screenings',
-    'Safety Training Costs',
-    'Workplace Safety Inspections',
-    'Air Quality Monitoring',
-    'Evacuation Supplies'
-  ],
-  'Donations & CSR': [
-    'Charitable Contributions',
-    'Event Sponsorships',
-    'Non-Profit Partnerships',
-    'Volunteer Event Costs',
-    'Community Development Projects',
-    'CSR Initiative Expenses',
-    'Scholarships & Grants',
-    'Environmental Contributions',
-    'School Support Programs',
-    'Local Event Sponsorships'
-  ],
-  'Subscriptions & Software Tools': [
-    'Zoom/Video Conferencing Subscriptions',
-    'SaaS Tools',
-    'Email Marketing Tools',
-    'CRM Systems',
-    'Design Software',
-    'Project Management Software',
-    'Financial Software Subscriptions',
-    'Cloud Storage Costs',
-    'Accounting Software',
-    'Data Analytics Tools'
-  ],
-  'Legal & Compliance': [
-    'Lawyer Fees',
-    'Compliance Audits',
-    'Contract Review Fees',
-    'Court Filing Fees',
-    'Regulatory Submissions',
-    'Notary Services',
-    'Intellectual Property Fees',
-    'External Counsel Payments',
-    'Business Permits',
-    'Legal Retainers'
-  ],
-  'Office Utilities': [
-    'Electricity Bills',
-    'Water Bills',
-    'Heating & Cooling',
-    'Gas Bills',
-    'Waste Disposal Services',
-    'Internet Services',
-    'Data Backup Services',
-    'Office Cleaning Services',
-    'Power Generator Maintenance',
-    'Water Filters & Coolers'
-  ],
-  'IT & Equipment': [
-    'Computer Parts & Accessories',
-    'Software Subscriptions',
-    'IT Support Services',
-    'Cloud Storage',
-    'Hardware Repairs',
-    'Office Networking Equipment',
-    'Server Maintenance',
-    'Anti-Virus Software',
-    'License Renewals',
-    'IT Consulting Fees'
-  ],
-  'Recruitment & Human Resources': [
-    'Job Posting Fees',
-    'Background Checks',
-    'Employee Onboarding Kits',
-    'Recruitment Agency Fees',
-    'Interview Travel Expenses',
-    'Temporary Staffing Costs',
-    'HR Software Subscriptions',
-    'Employee Handbooks',
-    'Job Fair Registrations',
-    'Hiring Events'
-  ],
-  'Event & Meeting Expenses': [
-    'Meeting Room Rentals',
-    'Conference Registrations',
-    'Refreshments for Meetings',
-    'Event Hosting Costs',
-    'Conference Materials',
-    'Equipment Rentals (for events)',
-    'AV Equipment Hire',
-    'Conference Travel Costs',
-    'Promotional Materials for Events',
-    'Event Security'
-  ],
-  'Miscellaneous/Unexpected Expenses': [
-    'Cash Shortages',
-    'Miscellaneous Reimbursements',
-    'Unexpected Small Purchases',
-    'Office Party Expenses',
-    'Special Project Fees',
-    'Emergency Purchases',
-    'Temporary Fixes',
-    'Unexpected Vendor Charges',
-    'Equipment Rentals',
-    'Minor Emergencies'
-  ]
-};
-
-
-const columnDefinitions = [
-  {
-    id: 'index',
-    header: '#',
-    size: '40',
-    cellContent: (entry, index) => `${index + 1}`
-  },
-  {
-    id: 'invoice_date',
-    header: 'Date',
-    size: '100',
-    cellContent: entry => formatDate(entry.invoice_date)
-  },
-  {
-    id: 'amount',
-    header: 'Amount',
-    size: '100',
-    cellContent: entry => entry.amount
-  },
-  {
-    id: 'description',
-    header: 'Description',
-    size: '200',
-    cellContent: entry => entry.description
-  },
-  {
-    id: 'expense_type',
-    header: 'Category',
-    size: '120',
-    cellContent: entry => entry.expense_type
-  },
-  {
-    id: 'is_verified',
-    header: 'Status',
-    size: '80',
-    cellContent: entry => entry.is_verified ? 'Verified' : 'Pending'
-  },
-  {
-    id: 'checked_by',
-    header: 'Checked By',
-    size: '120',
-    cellContent: entry => entry.checked_by
-  },
-  {
-    id: 'approved_by',
-    header: 'Approved By',
-    size: '120',
-    cellContent: entry => entry.approved_by
-  },
-  {
-    id: 'receipt_url',
-    header: 'Receipt',
-    size: '100',
-    cellContent: (entry) => (
-      entry.receipt_url ? (
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="link">View Receipt</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col items-center justify-center">
-            <DialogHeader>
-              <DialogTitle>Receipt Preview</DialogTitle>
-            </DialogHeader>
-            <iframe
-              src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${entry.receipt_url}`}
-              style={{ width: '100%', height: '70vh', border: 'none', display: 'block', margin: 'auto' }}
-              title="Receipt Preview"
-            />
-          </DialogContent>
-        </Dialog>
-      ) : 'No Receipt'
-    )
-  },
-  {
-    id: 'actions',
-    header: 'Actions',
-    size: '100',
-    cellContent: entry => entry
-  }
-];
 
   const EditForm = ({ entry, onClose, onSubmit }) => {
     const [editedEntry, setEditedEntry] = useState(entry);
@@ -672,7 +654,7 @@ const columnDefinitions = [
             onChange={handleChange}
           />
         </div>
-        
+
         <div>
           <Label htmlFor="invoice_date">Invoice Date</Label>
           <Input
@@ -797,11 +779,14 @@ const columnDefinitions = [
                   <DialogHeader>
                     <DialogTitle>Receipt Preview</DialogTitle>
                   </DialogHeader>
-                  <Image
-                    src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${editedEntry.receipt_url}`}
-                    alt="Receipt"
-                    style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
-                  />
+                  <div className="relative w-full h-[70vh]">
+                    <Image
+                      src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${editedEntry.receipt_url}`}
+                      alt="Receipt"
+                      layout="fill"
+                      objectFit="contain"
+                    />
+                  </div>
                 </DialogContent>
               </Dialog>
               <Button onClick={() => setEditedEntry({ ...editedEntry, receipt_url: null })}>
@@ -830,8 +815,6 @@ const columnDefinitions = [
       </form>
     );
   };
-
-
 
   return (
     <div className="flex w-full bg-gray-100">
