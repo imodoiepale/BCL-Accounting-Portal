@@ -16,6 +16,8 @@ import { format } from 'date-fns';
 import { PettyCashService } from './PettyCashService';
 import { TableActions } from './TableActions';
 
+import { supabase } from '@/lib/supabaseClient';
+
 const formatDate = (dateString: string): string => {
   return format(new Date(dateString), 'dd/MM/yyyy');
 };
@@ -23,12 +25,14 @@ const formatDate = (dateString: string): string => {
 interface Branch {
   id: string;
   userid: string;
-  branch_name: string;
-  location: string;
-  manager_name: string;
-  contact_number: string;
-  email: string;
-  created_date: string;
+  data: {
+    branch_name: string;
+    location: string;
+    manager_name: string;
+    contact_number: string;
+    email: string;
+  };
+  created_at: string;
   is_verified?: boolean;
 }
 
@@ -72,10 +76,16 @@ const BranchDialog: React.FC<BranchDialogProps> = ({
       if (!prev) return prev;
       return {
         ...prev,
-        [name]: value
+        data: {
+          ...prev.data,
+          [name]: value
+        }
       };
     });
   };
+
+  
+
 
   const formFields = [
     { name: 'branch_name', label: 'Branch Name', type: 'text', required: true },
@@ -89,7 +99,7 @@ const BranchDialog: React.FC<BranchDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Add New Branch' : 'Edit Branch'}</DialogTitle>
+          <DialogTitle>{mode === 'create' ? 'Add New Branch' : 'Confirm Edited Fields'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           {formFields.map(({ name, label, type, required }) => (
@@ -99,10 +109,10 @@ const BranchDialog: React.FC<BranchDialogProps> = ({
                 id={name}
                 name={name}
                 type={type}
-                value={formData?.[name] || ''}
+                value={formData?.data?.[name] || ''}
                 onChange={handleInputChange}
                 className="h-8"
-                required={required}
+                // required={required}
               />
             </div>
           ))}
@@ -128,6 +138,60 @@ const BranchDialog: React.FC<BranchDialogProps> = ({
   );
 };
 
+const BranchForm: React.FC<{
+  entry: Branch;
+  onClose: () => void;
+  onSubmit: (data: Branch) => Promise<void>;
+}> = ({ entry, onClose, onSubmit }) => {
+  const [formData, setFormData] = useState(entry);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      data: {
+        ...prev.data,
+        [name]: value
+      }
+    }));
+  };
+
+  const formFields = [
+    { name: 'branch_name', label: 'Branch Name', type: 'text' },
+    { name: 'location', label: 'Location', type: 'text' },
+    { name: 'manager_name', label: 'Manager Name', type: 'text' },
+    { name: 'contact_number', label: 'Contact Number', type: 'tel' },
+    { name: 'email', label: 'Email', type: 'email' }
+  ];
+
+  return (
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      onSubmit(formData);
+    }} 
+    className="space-y-4 pt-4">
+      {formFields.map(({ name, label, type }) => (
+        <div key={name} className="space-y-1.5">
+          <Label htmlFor={name}>{label}</Label>
+          <Input
+            id={name}
+            name={name}
+            type={type}
+            value={formData.data[name]}
+            onChange={handleInputChange}
+            className="h-8"
+          />
+        </div>
+      ))}
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button type="submit">Save Changes</Button>
+      </div>
+    </form>
+  );
+};
+
+
 export function BranchesTab() {
   const { userId } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -147,9 +211,11 @@ export function BranchesTab() {
     setIsLoading(true);
     try {
       const data = await PettyCashService.fetchRecords('acc_portal_pettycash_branches', userId, {
-        orderBy: { column: 'created_date', ascending: false }
+        orderBy: { column: 'id', ascending: false }
       });
-      setBranches(data);
+      // Parse branches array from the JSONB data
+      const parsedBranches = data[0]?.data?.branches || [];
+      setBranches(parsedBranches);
     } catch (error) {
       toast.error('Failed to fetch branches');
     } finally {
@@ -168,15 +234,78 @@ export function BranchesTab() {
       branch: {
         id: '',
         userid: userId,
-        branch_name: '',
-        location: '',
-        manager_name: '',
-        contact_number: '',
-        email: '',
-        created_date: new Date().toISOString()
+        data: {
+          branch_name: '',
+          location: '',
+          manager_name: '',
+          contact_number: '',
+          email: '',
+          created_at: new Date().toISOString()
+        }
       }
     });
   };
+
+  const createRecord = async (table: string, data: any, userId: string) => {
+    try {
+      const { data: existingRecord } = await supabase
+        .from(table)
+        .select('*')
+        .eq('userid', userId)
+        .single();
+
+      let recordData;
+
+      if (existingRecord) {
+        // If record exists, append to existing branches
+        const currentBranches = existingRecord.data.branches || [];
+        recordData = {
+          ...existingRecord,
+          data: {
+            branches: [...currentBranches, {
+              branch_name: data.data.branch_name,
+              location: data.data.location,
+              manager_name: data.data.manager_name,
+              contact_number: data.data.contact_number,
+              email: data.data.email,
+              created_at: new Date().toISOString()
+            }]
+          }
+        };
+      } else {
+        // Create new record with first branch
+        recordData = {
+          userid: userId,
+          data: {
+            branches: [{
+              branch_name: data.data.branch_name,
+              location: data.data.location,
+              manager_name: data.data.manager_name,
+              contact_number: data.data.contact_number,
+              email: data.data.email,
+              created_at: new Date().toISOString()
+            }]
+          },
+          created_at: new Date().toISOString()
+        };
+      }
+
+      const { data: result, error } = await supabase
+        .from(table)
+        .upsert([recordData])
+        .select();
+
+      if (error) throw error;
+
+      toast.success('Branch added successfully!');
+      return result;
+    } catch (error) {
+      console.error(`Error creating ${table}:`, error);
+      toast.error(`Failed to create branch. Please try again.`);
+      return null;
+    }
+  };
+
 
   const handleEditBranch = (branch: Branch) => {
     setDialogState({
@@ -186,30 +315,70 @@ export function BranchesTab() {
     });
   };
 
+  const toastConfig = {
+  duration: 2000,
+  dismissible: true,
+  position: 'top-right'
+};
+
   const handleSaveBranch = async (branch: Branch) => {
     try {
       if (dialogState.mode === 'create') {
-        await PettyCashService.createRecord('acc_portal_pettycash_branches', branch, userId);
-        toast.success('Branch created successfully');
+        const result = await createRecord('acc_portal_pettycash_branches', branch, userId);
+        if (result) {
+          // Add new branch to existing state
+          setBranches(currentBranches => [...currentBranches, {
+            ...branch.data,
+            created_at: new Date().toISOString()
+          }]);
+          toast.success('Branch created successfully');
+        }
       } else {
         await PettyCashService.updateRecord('acc_portal_pettycash_branches', branch.id, branch);
         toast.success('Branch updated successfully');
       }
-      fetchBranches();
     } catch (error) {
       toast.error('Failed to save branch');
     }
   };
 
-  const handleDeleteBranch = async (branch: Branch) => {
+
+  const handleDeleteBranch = async (branchToDelete: Branch) => {
     try {
-      await PettyCashService.deleteRecord('acc_portal_pettycash_branches', branch.id);
+      const { data: currentRecord } = await supabase
+        .from('acc_portal_pettycash_branches')
+        .select('*')
+        .eq('userid', userId)
+        .single();
+
+      const updatedBranches = currentRecord.data.branches.filter(
+        (branch) => branch.branch_name !== branchToDelete.branch_name
+      );
+
+      const { data: result, error } = await supabase
+        .from('acc_portal_pettycash_branches')
+        .update({
+          data: { branches: updatedBranches }
+        })
+        .eq('userid', userId)
+        .select();
+
+      if (error) throw error;
+
+      // Update state directly
+      setBranches(currentBranches =>
+        currentBranches.filter(branch => branch.branch_name !== branchToDelete.branch_name)
+      );
+
       toast.success('Branch deleted successfully');
-      fetchBranches();
     } catch (error) {
+      console.error('Delete error:', error);
       toast.error('Failed to delete branch');
     }
   };
+
+
+
 
   const handleVerifyBranch = async (branch: Branch) => {
     try {
@@ -262,7 +431,7 @@ export function BranchesTab() {
     {
       header: 'Created Date',
       width: '120px',
-      cell: (branch: Branch) => formatDate(branch.created_date)
+      cell: (branch: Branch) => formatDate(branch.created_at)
     },
     {
       header: 'Actions',
@@ -270,10 +439,14 @@ export function BranchesTab() {
       cell: (branch: Branch) => (
         <TableActions
           row={branch}
-          onEdit={() => handleEditBranch(branch)}
-          onDelete={() => handleDeleteBranch(branch)}
-          onVerify={() => handleVerifyBranch(branch)}
+          onEdit={handleEditBranch}
+          onDelete={handleDeleteBranch}
+          onVerify={handleVerifyBranch}
           isVerified={branch.is_verified}
+          editForm={BranchForm}
+          editFormProps={{
+            onClose: () => setDialogState({ isOpen: false, mode: 'create', branch: null })
+          }}
         />
       )
     }
@@ -292,7 +465,7 @@ export function BranchesTab() {
                 placeholder="Search branches..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 h-8 w-64"
+                className="pl-8 h-8 w-64 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -301,20 +474,20 @@ export function BranchesTab() {
               variant="outline"
               size="sm"
               onClick={fetchBranches}
-              className="h-8"
+              className="h-8 border border-gray-300 text-gray-600 hover:bg-gray-100 hover:border-gray-400"
             >
               <RefreshCwIcon className="h-4 w-4" />
             </Button>
             <Button
               onClick={handleCreateBranch}
-              className="h-8 bg-blue-600 text-white"
+              className="h-8 bg-blue-600 text-white hover:bg-blue-700"
             >
               Add New Branch
             </Button>
           </div>
         </div>
 
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden bg-white shadow rounded-md">
           <ScrollArea className="h-[calc(100vh-200px)]">
             <Table>
               <TableHeader>
@@ -335,7 +508,7 @@ export function BranchesTab() {
                   <TableRow>
                     <TableCell
                       colSpan={columnDefinitions.length}
-                      className="h-32 text-center"
+                      className="h-32 text-center text-gray-500"
                     >
                       Loading branches...
                     </TableCell>
@@ -344,7 +517,7 @@ export function BranchesTab() {
                   <TableRow>
                     <TableCell
                       colSpan={columnDefinitions.length}
-                      className="h-32 text-center"
+                      className="h-32 text-center text-gray-500"
                     >
                       No branches found
                     </TableCell>
@@ -353,13 +526,13 @@ export function BranchesTab() {
                   filteredBranches.map((branch, index) => (
                     <TableRow
                       key={branch.id}
-                      className="hover:bg-blue-50 border-b border-gray-100 transition-colors [&>td]:h-8"
+                      className="hover:bg-blue-50 border-b border-gray-100 transition-colors"
                     >
                       {columnDefinitions.map((col, colIndex) => (
                         <TableCell
                           key={`${branch.id}-${colIndex}`}
                           style={{ width: col.width }}
-                          className="py-1 px-2 text-xs border-r border-gray-100 last:border-r-0"
+                          className="py-2 px-2 text-xs border-r border-gray-100 last:border-r-0"
                         >
                           {col.cell(branch, index)}
                         </TableCell>
@@ -379,10 +552,8 @@ export function BranchesTab() {
           onSave={handleSaveBranch}
           mode={dialogState.mode}
         />
-
       </main>
     </div>
   );
 }
-
 export default BranchesTab;

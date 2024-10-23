@@ -18,10 +18,10 @@ export class PettyCashService {
                     query = query
                         .eq('admin_id', userId)
                         .select(`
-                        *,
-                        acc_portal_pettycash_branches(branch_name),
-                        account_count:acc_portal_pettycash_accounts(count)
-                    `);
+                    *,
+                    acc_portal_pettycash_branches(branch_name),
+                    account_count:acc_portal_pettycash_accounts(count)
+                `);
                     break;
                 case 'acc_portal_pettycash_branches':
                     query = query.eq('userid', userId);
@@ -41,6 +41,11 @@ export class PettyCashService {
             const { data, error } = await query;
 
             if (error) throw error;
+
+            if (data.length === 0) {
+                toast.info(`No data found for ${table}.`);
+                return [];
+            }
 
             // Transform data if needed
             if (table === 'acc_portal_pettycash_users') {
@@ -260,6 +265,99 @@ export class PettyCashService {
             return null;
         }
     }
+
+    // Add these methods to your existing PettyCashService class
+
+    static async importSuppliers(suppliers: any[], userId: string) {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_suppliers')
+                .insert(
+                    suppliers.map(supplier => ({
+                        userid: userId,
+                        data: supplier
+                    }))
+                );
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error importing suppliers:', error);
+            throw error;
+        }
+    }
+
+    static async getSuppliersStats(userId: string) {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_suppliers')
+                .select('data->supplierType')
+                .eq('userid', userId);
+
+            if (error) throw error;
+
+            const stats = {
+                total: data.length,
+                corporate: data.filter(s => s.data.supplierType === 'Corporate').length,
+                individual: data.filter(s => s.data.supplierType === 'Individual').length
+            };
+
+            return stats;
+        } catch (error) {
+            console.error('Error getting supplier stats:', error);
+            throw error;
+        }
+    }
+
+    static async searchSuppliers(userId: string, query: string) {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_suppliers')
+                .select('*')
+                .eq('userid', userId)
+                .or(`
+        data->>'supplierName'.ilike.%${query}%,
+        data->>'email'.ilike.%${query}%,
+        data->>'pin'.ilike.%${query}%
+      `);
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error searching suppliers:', error);
+            throw error;
+        }
+    }
+
+    static async validateSupplierData(data: any) {
+        const requiredFields = ['supplierName', 'supplierType', 'pin', 'mobile', 'email'];
+        const missingFields = requiredFields.filter(field => !data[field]);
+
+        if (missingFields.length > 0) {
+            throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(data.email)) {
+            throw new Error('Invalid email format');
+        }
+
+        // Validate mobile format (assuming Kenyan format)
+        const mobileRegex = /^\+254\d{9}$/;
+        if (!mobileRegex.test(data.mobile)) {
+            throw new Error('Invalid mobile format. Use format: +254XXXXXXXXX');
+        }
+
+        // Validate PIN format (assuming Kenyan format)
+        const pinRegex = /^[A-Z]\d{9}[A-Z]$/;
+        if (!pinRegex.test(data.pin)) {
+            throw new Error('Invalid PIN format. Use format: A123456789P');
+        }
+
+        return true;
+    }
+
 }
 
 export default PettyCashService;

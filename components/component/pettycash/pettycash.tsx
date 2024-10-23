@@ -16,6 +16,7 @@ import { AccountsTab } from './accounts';
 import { TransactionsTab } from './entries';
 import { PettyCashSettings } from './settings';
 import { PettyCashReportsTab } from './reports';
+import SuppliersTab from './suppliers';
 
 const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
 
@@ -125,7 +126,7 @@ export function PettyCashManager() {
 
         <Tabs defaultValue="transactions" onValueChange={setCurrentTab}>
           <TabsList>
-            {['branches', 'users', 'accounts', 'transactions', 'reports'].map((tab) => (
+            {['branches', 'users', 'accounts','suppliers', 'transactions', 'reports'].map((tab) => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -143,6 +144,9 @@ export function PettyCashManager() {
           </TabsContent>
           <TabsContent value="accounts">
             <AccountsTab supabase={supabase} userId={userId} settings={settings.accounts} />
+          </TabsContent>
+          <TabsContent value="suppliers">
+            <SuppliersTab />
           </TabsContent>
           <TabsContent value="transactions">
             <TransactionsTab settings={settings.transactions} />
