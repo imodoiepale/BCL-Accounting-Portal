@@ -28,9 +28,8 @@ export class PettyCashService {
                     query = query.eq('userid', userId);
                     break;
                 case 'acc_portal_pettycash_entries':
-                    query = query.eq('userid', userId);
-                    break;
-            }
+                    query = query.eq('userid', userId).order('invoice_date', { ascending: true });
+                    break;            }
 
             if (options.orderBy) {
                 query = query.order(options.orderBy.column, { ascending: options.orderBy.ascending });

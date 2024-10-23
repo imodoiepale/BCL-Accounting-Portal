@@ -1,5 +1,6 @@
 // @ts-nocheck
 "use client";
+// EntriesTab.tsx
 import React, { useState, useEffect } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,811 +8,677 @@ import { Card } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import { useAuth, useUser } from '@clerk/clerk-react';
-import { supabase } from '@/lib/supabaseClient';
-import toast, { Toaster } from 'react-hot-toast';
-
-
-import { TableActions } from './TableActions';
-import { PettyCashService } from './PettyCashService';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { RefreshCwIcon, Search, FilterIcon, Download, RotateCcw } from 'lucide-react';
+import { useAuth } from '@clerk/clerk-react';
+import { toast, Toaster } from 'react-hot-toast';
 import Image from 'next/image';
+import { format } from 'date-fns';
+import { PettyCashService } from './PettyCashService';
+import { TableActions } from './TableActions';
+import { CategoryFilter } from './CategoryFilter';
+import { EXPENSE_CATEGORIES, getCategoryName, getSubcategoryName } from './expenseCategories';
+import EditEntryForm from './EditEntryForm';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 
-// Utility function to format date
-const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-based
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-KE', {
+    style: 'currency',
+    currency: 'KES',
+    minimumFractionDigits: 2
+  }).format(amount);
 };
 
-const staticFloatData = [
-  { payment_type: 'mpesa', float_allocated: 10000, float_used: 2500 },
-  { payment_type: 'cash', float_allocated: 5000, float_used: 1500 },
-  { payment_type: 'credit_card', float_allocated: 2000, float_used: 500 },
-  { payment_type: 'debit_card', float_allocated: 2000, float_used: 500 },
-];
+interface PettyCashEntry {
+  id: string;
+  amount: number;
+  invoice_number: string;
+  invoice_date: string;
+  description: string;
+  category_code: string;
+  subcategory_code: string;
+  payment_type: string;
+  checked_by: string;
+  approved_by: string;
+  branch_name: string;
+  user_name: string;
+  account_type: string;
+  receipt_url: string | null;
+  is_verified: boolean;
+  created_at: string;
+}
 
-const calculateFloatData = () => {
-  const data = {};
-  staticFloatData.forEach(entry => {
-    data[entry.payment_type] = {
-      allocated: entry.float_allocated,
-      used: entry.float_used,
-      balance: entry.float_allocated - entry.float_used,
-    };
-  });
-  return data;
-};
+interface EntryDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  entry: PettyCashEntry | null;
+  onSave: (entry: PettyCashEntry) => Promise<void>;
+  mode: 'create' | 'edit';
+}
 
-export function TransactionsTab() {
-  const { userId } = useAuth();
-  const { user } = useUser();
-  const [editedEntry, setEditedEntry] = useState({
-    id: '',
-    amount: '',
-    invoice_number: '',
-    invoice_date: '',
-    description: '',
-    expense_type: '',
-    subcategory: '',
-    payment_type: '',
-    checked_by: '',
-    approved_by: '',
-    branch_name: '',
-    user_name: '',
-    account_type: '',
-    receipt_url: null
-  });
-
-
-  const [pettyCashEntries, setPettyCashEntries] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [accounts, setAccounts] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [floatData, setFloatData] = useState(calculateFloatData());
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [currentEntry, setCurrentEntry] = useState(null);
-  const [newPettyCash, setNewPettyCash] = useState({
-    amount: '',
-    invoice_number: '',
-    invoice_date: '',
-    description: '',
-    receipt_url: null,
-    expense_type: '',
-    payment_type: '',
-    checked_by: '',
-    approved_by: '',
-    branch_name: '',
-    user_name: '',
-    account_type: '',
-  });
+const EntryDialog: React.FC<EntryDialogProps> = ({
+  isOpen,
+  onClose,
+  entry,
+  onSave,
+  mode
+}) => {
+  const [formData, setFormData] = useState<PettyCashEntry | null>(entry);
+  const [selectedCategory, setSelectedCategory] = useState(entry?.category_code || '');
+  const [selectedSubcategory, setSelectedSubcategory] = useState(entry?.subcategory_code || '');
+  const [fileUpload, setFileUpload] = useState<File | null>(null);
 
   useEffect(() => {
-    fetchPettyCashEntries();
-    fetchBranches();
-    fetchAccounts();
-    fetchUsers();
-  }, []);
+    setFormData(entry);
+    setSelectedCategory(entry?.category_code || '');
+    setSelectedSubcategory(entry?.subcategory_code || '');
+  }, [entry]);
 
-  const fetchPettyCashEntries = async () => {
-    const entries = await PettyCashService.fetchRecords('acc_portal_pettycash_entries', userId);
-    setPettyCashEntries(entries);
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData) return;
 
-  const fetchBranches = async () => {
-    const branchData = await PettyCashService.fetchRecords('acc_portal_pettycash_branches', userId);
-    setBranches(branchData);
-  };
-
-  const fetchAccounts = async () => {
-    const accountData = await PettyCashService.fetchRecords('acc_portal_pettycash_accounts', userId);
-    setAccounts(accountData);
-  };
-
-  const fetchUsers = async () => {
-    const userData = await PettyCashService.fetchRecords('acc_portal_pettycash_users', userId);
-    setUsers(userData);
-  };
-
-  const handleSubmit = async () => {
-    const result = await PettyCashService.processTransaction(newPettyCash, newPettyCash.receipt_url, userId);
-    if (result) {
-      fetchPettyCashEntries();
-      setNewPettyCash({
-        amount: '',
-        invoice_number: '',
-        invoice_date: '',
-        description: '',
-        receipt_url: null,
-        expense_type: '',
-        payment_type: '',
-        checked_by: '',
-        approved_by: '',
-        branch_name: '',
-        user_name: '',
-        account_type: '',
-      });
-      setIsSheetOpen(false);
-      toast.success('Petty cash entry added successfully!');
-    }
-  };
-
-  const getSubcategories = (category) => {
-    return subcategoriesMap[category] || [];
-  };
-
-  const handleDelete = async (entry) => {
-    const result = await PettyCashService.deleteRecord('acc_portal_pettycash_entries', entry.id);
-    if (result) {
-      fetchPettyCashEntries();
-    }
-  };
-
-  const handleVerify = async (entry) => {
-    const result = await PettyCashService.verifyRecord('acc_portal_pettycash_entries', entry.id);
-    if (result) {
-      fetchPettyCashEntries();
-    }
-  };
-
-
-  const handleInputChange = (e) => {
-    setNewPettyCash((prev) => ({ ...prev, [e.target.id]: e.target.value }));
-  };
-
-
-  const handleFileChange = (e) => {
-    setNewPettyCash((prev) => ({ ...prev, receipt_url: e.target.files[0] }));
-  };
-
-  const handleExpenseTypeChange = (value) => {
-    setNewPettyCash((prev) => ({ ...prev, expense_type: value }));
-  };
-
-  const handlePaymentTypeChange = (value) => {
-    setNewPettyCash((prev) => ({ ...prev, payment_type: value }));
-  };
-
-  const handleEdit = async (entry) => {
-    setCurrentEntry(entry);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleEditSubmit = async () => {
     try {
-      const result = await PettyCashService.updateRecord('acc_portal_pettycash_entries', currentEntry.id, {
-        amount: currentEntry.amount,
-        invoice_number: currentEntry.invoice_number,
-        invoice_date: currentEntry.invoice_date,
-        description: currentEntry.description,
-        expense_type: currentEntry.expense_type,
-        payment_type: currentEntry.payment_type,
-        checked_by: currentEntry.checked_by,
-        approved_by: currentEntry.approved_by,
-        branch_name: currentEntry.branch_name,
-        user_name: currentEntry.user_name,
-        account_type: currentEntry.account_type,
-      });
+      const updatedEntry = {
+        ...formData,
+        category_code: selectedCategory,
+        subcategory_code: selectedSubcategory
+      };
 
-      if (result) {
-        toast.success('Entry updated successfully!');
-        fetchPettyCashEntries();
-        setIsEditDialogOpen(false);
-      } else {
-        toast.error('Failed to update entry. Please try again.');
+      if (fileUpload) {
+        // Handle file upload here
+        const uploadPath = `receipts/${formData.id}/${fileUpload.name}`;
+        const receiptUrl = await PettyCashService.uploadReceipt(fileUpload, uploadPath);
+        updatedEntry.receipt_url = receiptUrl;
       }
+
+      await onSave(updatedEntry);
+      onClose();
     } catch (error) {
-      console.error('Error updating entry:', error);
-      toast.error('An unexpected error occurred. Please try again.');
+      toast.error('Failed to save entry');
+      console.error('Error saving entry:', error);
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type } = e.target;
+    setFormData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [name]: type === 'number' ? parseFloat(value) : value
+      };
+    });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{mode === 'create' ? 'Add New Entry' : 'Edit Entry'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="amount">Amount (KES)</Label>
+            <Input
+              id="amount"
+              name="amount"
+              type="number"
+              step="0.01"
+              value={formData?.amount || ''}
+              onChange={handleInputChange}
+              className="h-8"
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="invoice_date">Invoice Date</Label>
+            <Input
+              id="invoice_date"
+              name="invoice_date"
+              type="date"
+              value={formData?.invoice_date || ''}
+              onChange={handleInputChange}
+              className="h-8"
+              required
+            />
+          </div>
+
+          <CategoryFilter
+            selectedCategory={selectedCategory}
+            selectedSubcategory={selectedSubcategory}
+            onCategoryChange={setSelectedCategory}
+            onSubcategoryChange={setSelectedSubcategory}
+          />
+
+          <div className="space-y-1.5">
+            <Label htmlFor="description">Description</Label>
+            <Input
+              id="description"
+              name="description"
+              value={formData?.description || ''}
+              onChange={handleInputChange}
+              className="h-8"
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="receipt">Receipt</Label>
+            <Input
+              id="receipt"
+              name="receipt"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFileUpload(e.target.files?.[0] || null)}
+              className="h-8"
+            />
+          </div>
+
+          {formData?.receipt_url && (
+            <div className="relative h-40 w-full">
+              <Image
+                src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${formData.receipt_url}`}
+                alt="Current receipt"
+                fill
+                style={{ objectFit: 'contain' }}
+              />
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="h-8"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="h-8 bg-blue-600 text-white"
+            >
+              {mode === 'create' ? 'Create' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+export function TransactionsTab() {
+  const { userId } = useAuth();
+  const [entries, setEntries] = useState<PettyCashEntry[]>([]);
+  const [branches, setBranches] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('ALL');
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+  const [newPettyCash, setNewPettyCash] = useState<NewPettyCashEntry>({
+    invoice_date: '',
+    branch_id: '',
+    user_id: '',
+    account_type: '',
+    category_code: '',
+    subcategory_code: '',
+    amount: '',
+    description: '',
+    checked_by: '',
+    approved_by: '',
+    receipt_url: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  });
 
   const formFields = [
-
-    { id: 'invoice_date', label: 'Invoice Date', type: 'date', placeholder: '' },
     {
-      id: 'branch_name',
-      label: 'Branch',
-      type: 'select',
-      options: branches.map(branch => ({ value: branch.branch_name, label: branch.branch_name })),
-      onChange: (value) => setNewPettyCash(prev => ({ ...prev, branch_name: value })),
+      id: 'invoice_date',
+      label: 'Invoice Date',
+      type: 'date',
+      required: true
     },
     {
-      id: 'user_name',
+      id: 'branch_id',
+      label: 'Branch',
+      type: 'select',
+      placeholder: 'Select Branch',
+      required: true,
+      options: branches.map(branch => ({
+        value: branch.id.toString(),
+        label: branch.branch_name
+      }))
+    },
+    {
+      id: 'user_id',
       label: 'User',
       type: 'select',
-      options: users.map(user => ({ value: user.name, label: user.name })),
-      onChange: (value) => setNewPettyCash(prev => ({ ...prev, user_name: value })),
+      placeholder: 'Select User',
+      required: true,
+      options: users.map(user => ({
+        value: user.id.toString(),
+        label: user.name
+      }))
     },
     {
       id: 'account_type',
       label: 'Account Type',
       type: 'select',
+      placeholder: 'Select Account Type',
+      required: true,
       options: [
         { value: 'cash', label: 'Cash' },
-        { value: 'credit', label: 'Credit' },
         { value: 'mpesa', label: 'M-Pesa' },
-      ],
-      onChange: (value) => setNewPettyCash(prev => ({ ...prev, account_type: value })),
+        { value: 'credit_card', label: 'Credit Card' },
+        { value: 'debit_card', label: 'Debit Card' }
+      ]
     },
     {
-      id: 'expense_type',
+      id: 'category_code',
       label: 'Expense Category',
       type: 'select',
-      options: [
-        { value: 'motor_vehicle_running_exp', label: 'Motor Vehicle Running Exp' },
-        { value: 'postage_telephone', label: 'Postage & Telephone' },
-        { value: 'staff_costs', label: 'Staff Costs' },
-        { value: 'repairs_maintenance', label: 'Repairs & Maintenance' },
-        { value: 'disallowable_exp', label: 'Disallowable Exp' },
-        { value: 'non', label: 'Non' },
-      ],
-      onChange: handleExpenseTypeChange,
-    },
-    { id: 'amount', label: 'Amount', type: 'number', placeholder: '1000' },
-    { id: 'description', label: 'Description', type: 'text', placeholder: 'Description of the petty cash' },
-    { id: 'checked_by', label: 'Checked By', type: 'text', placeholder: 'John Doe' },
-    { id: 'approved_by', label: 'Approved By', type: 'text', placeholder: 'Jane Smith' },
-    {
-      id: 'receipt',
-      label: 'Receipt Image',
-      type: 'file',
-      accept: 'image/*',
-      onChange: handleFileChange,
-    },
-  ];
-
-
-
-  const expenseCategories = [
-    'Office Supplies',
-    'Employee Welfare',
-    'Travel & Transportation',
-    'Client-Related Expenses',
-    'Utilities & Communication',
-    'Maintenance & Repairs',
-    'Miscellaneous Administrative Costs',
-    'Marketing & Promotional Materials',
-    'Training & Development',
-    'Licensing & Subscriptions',
-    'Security & Compliance',
-    'Health & Safety',
-    'Donations & CSR',
-    'Subscriptions & Software Tools',
-    'Legal & Compliance',
-    'Office Utilities',
-    'IT & Equipment',
-    'Recruitment & Human Resources',
-    'Event & Meeting Expenses',
-    'Miscellaneous/Unexpected Expenses'
-  ];
-
-  const subcategoriesMap = {
-    'Office Supplies': [
-      'Stationery',
-      'Printer Supplies',
-      'Office Equipment',
-      'Toner/Ink Refills',
-      'Notepads & Binders',
-      'Whiteboards & Markers',
-      'Filing Folders',
-      'Envelopes',
-      'Business Cards',
-      'Miscellaneous Supplies'
-    ],
-    'Employee Welfare': [
-      'Refreshments',
-      'Team Meals',
-      'Employee Gifts',
-      'Wellness Programs',
-      'Office Snacks',
-      'Team Building Activities',
-      'Celebrations',
-      'Coffee/Tea',
-      'Small Allowances',
-      'Entertainment Expenses'
-    ],
-    'Travel & Transportation': [
-      'Taxi Fare',
-      'Public Transport Fare',
-      'Parking Fees',
-      'Fuel Reimbursement',
-      'Mileage Reimbursement',
-      'Tolls',
-      'Travel Meals',
-      'Lodging for Short Business Trips',
-      'Car Rentals',
-      'Airfare for Short Trips'
-    ],
-    'Client-Related Expenses': [
-      'Client Meetings',
-      'Client Gifts',
-      'Client Entertainment',
-      'Travel for Client Meetings',
-      'Venue Rentals for Client Events',
-      'Client Welcome Packages',
-      'Presentation Materials',
-      'Client Demos',
-      'Conference Room Bookings',
-      'Marketing Gifts'
-    ],
-    'Utilities & Communication': [
-      'Phone Bill Payments',
-      'Internet Bills',
-      'Office Electricity Bills',
-      'Water and Sewerage Payments',
-      'Gas and Heating Costs',
-      'Prepaid Phone Credits',
-      'Mobile Hotspot Services',
-      'Courier Services',
-      'Postage & Delivery',
-      'Cloud Storage Fees'
-    ],
-    'Maintenance & Repairs': [
-      'Building Repairs',
-      'Office Furniture Repairs',
-      'IT Equipment Repairs',
-      'Electrical Fixes',
-      'Plumbing Services',
-      'Maintenance Contracts',
-      'HVAC Maintenance',
-      'Cleaning Equipment Repairs',
-      'Elevator Maintenance',
-      'Pest Control Services'
-    ],
-    'Miscellaneous Administrative Costs': [
-      'Filing Fees',
-      'Legal/Notary Fees',
-      'Bank Charges',
-      'Document Courier Services',
-      'Government Registrations',
-      'Copying/Printing Fees',
-      'Security Deposits',
-      'Postage Stamps',
-      'Small Consultant Fees',
-      'Administrative Fines'
-    ],
-    'Marketing & Promotional Materials': [
-      'Printing Costs',
-      'Brochures & Flyers',
-      'Business Cards',
-      'Branded Merchandise',
-      'Event Sponsorship',
-      'Digital Marketing Ads',
-      'Social Media Boosts',
-      'Website Hosting',
-      'Promotional Giveaways',
-      'Media Coverage Fees'
-    ],
-    'Training & Development': [
-      'Registration for Workshops',
-      'Online Course Subscriptions',
-      'Certification Fees',
-      'Training Materials',
-      'Professional Memberships',
-      'Conference Fees',
-      'In-House Training Costs',
-      'Educational Subscriptions',
-      'Webinars',
-      'Employee Development Programs'
-    ],
-    'Licensing & Subscriptions': [
-      'Software Licenses',
-      'Cloud Services Subscriptions',
-      'Professional Memberships',
-      'Industry Magazine Subscriptions',
-      'Financial Data Feeds',
-      'Compliance Subscriptions',
-      'SaaS Tools Subscriptions',
-      'Newspaper Subscriptions',
-      'Research Data Access',
-      'Tech Support Subscriptions'
-    ],
-    'Security & Compliance': [
-      'Alarm Monitoring',
-      'Security Guard Payments',
-      'Security Camera Maintenance',
-      'ID Card Printing',
-      'Key & Lock Replacements',
-      'Cybersecurity Tools',
-      'Access Control Systems',
-      'Security Audits',
-      'Data Backup Services',
-      'Insurance Payments'
-    ],
-    'Health & Safety': [
-      'First Aid Kits',
-      'PPE (Personal Protective Equipment)',
-      'Fire Extinguishers',
-      'Emergency Drills',
-      'Office Sanitization',
-      'Health Screenings',
-      'Safety Training Costs',
-      'Workplace Safety Inspections',
-      'Air Quality Monitoring',
-      'Evacuation Supplies'
-    ],
-    'Donations & CSR': [
-      'Charitable Contributions',
-      'Event Sponsorships',
-      'Non-Profit Partnerships',
-      'Volunteer Event Costs',
-      'Community Development Projects',
-      'CSR Initiative Expenses',
-      'Scholarships & Grants',
-      'Environmental Contributions',
-      'School Support Programs',
-      'Local Event Sponsorships'
-    ],
-    'Subscriptions & Software Tools': [
-      'Zoom/Video Conferencing Subscriptions',
-      'SaaS Tools',
-      'Email Marketing Tools',
-      'CRM Systems',
-      'Design Software',
-      'Project Management Software',
-      'Financial Software Subscriptions',
-      'Cloud Storage Costs',
-      'Accounting Software',
-      'Data Analytics Tools'
-    ],
-    'Legal & Compliance': [
-      'Lawyer Fees',
-      'Compliance Audits',
-      'Contract Review Fees',
-      'Court Filing Fees',
-      'Regulatory Submissions',
-      'Notary Services',
-      'Intellectual Property Fees',
-      'External Counsel Payments',
-      'Business Permits',
-      'Legal Retainers'
-    ],
-    'Office Utilities': [
-      'Electricity Bills',
-      'Water Bills',
-      'Heating & Cooling',
-      'Gas Bills',
-      'Waste Disposal Services',
-      'Internet Services',
-      'Data Backup Services',
-      'Office Cleaning Services',
-      'Power Generator Maintenance',
-      'Water Filters & Coolers'
-    ],
-    'IT & Equipment': [
-      'Computer Parts & Accessories',
-      'Software Subscriptions',
-      'IT Support Services',
-      'Cloud Storage',
-      'Hardware Repairs',
-      'Office Networking Equipment',
-      'Server Maintenance',
-      'Anti-Virus Software',
-      'License Renewals',
-      'IT Consulting Fees'
-    ],
-    'Recruitment & Human Resources': [
-      'Job Posting Fees',
-      'Background Checks',
-      'Employee Onboarding Kits',
-      'Recruitment Agency Fees',
-      'Interview Travel Expenses',
-      'Temporary Staffing Costs',
-      'HR Software Subscriptions',
-      'Employee Handbooks',
-      'Job Fair Registrations',
-      'Hiring Events'
-    ],
-    'Event & Meeting Expenses': [
-      'Meeting Room Rentals',
-      'Conference Registrations',
-      'Refreshments for Meetings',
-      'Event Hosting Costs',
-      'Conference Materials',
-      'Equipment Rentals (for events)',
-      'AV Equipment Hire',
-      'Conference Travel Costs',
-      'Promotional Materials for Events',
-      'Event Security'
-    ],
-    'Miscellaneous/Unexpected Expenses': [
-      'Cash Shortages',
-      'Miscellaneous Reimbursements',
-      'Unexpected Small Purchases',
-      'Office Party Expenses',
-      'Special Project Fees',
-      'Emergency Purchases',
-      'Temporary Fixes',
-      'Unexpected Vendor Charges',
-      'Equipment Rentals',
-      'Minor Emergencies'
-    ]
-  };
-
-
-  const columnDefinitions = [
-    {
-      id: 'index',
-      header: '#',
-      size: '40',
-      cellContent: (entry, index) => `${index + 1}`
-    },
-    {
-      id: 'invoice_date',
-      header: 'Date',
-      size: '100',
-      cellContent: entry => formatDate(entry.invoice_date)
+      placeholder: 'Select Expense Category',
+      required: true,
+      options: EXPENSE_CATEGORIES.map(category => ({
+        value: category.code,
+        label: category.name
+      }))
     },
     {
       id: 'amount',
-      header: 'Amount',
-      size: '100',
-      cellContent: entry => entry.amount
+      label: 'Amount',
+      type: 'number',
+      required: true,
+      placeholder: '0.00'
     },
     {
       id: 'description',
-      header: 'Description',
-      size: '200',
-      cellContent: entry => entry.description
-    },
-    {
-      id: 'expense_type',
-      header: 'Category',
-      size: '120',
-      cellContent: entry => entry.expense_type
-    },
-    {
-      id: 'is_verified',
-      header: 'Status',
-      size: '80',
-      cellContent: entry => entry.is_verified ? 'Verified' : 'Pending'
+      label: 'Description',
+      type: 'text',
+      required: true,
+      placeholder: 'Enter description'
     },
     {
       id: 'checked_by',
-      header: 'Checked By',
-      size: '120',
-      cellContent: entry => entry.checked_by
+      label: 'Checked By',
+      type: 'text',
+      required: false,
+      placeholder: 'Enter name'
     },
     {
       id: 'approved_by',
-      header: 'Approved By',
-      size: '120',
-      cellContent: entry => entry.approved_by
+      label: 'Approved By',
+      type: 'text',
+      required: false,
+      placeholder: 'Enter name'
     },
     {
       id: 'receipt_url',
-      header: 'Receipt',
-      size: '100',
-      cellContent: (entry) => (
-        entry.receipt_url ? (
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="link">View Receipt</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col items-center justify-center">
-              <DialogHeader>
-                <DialogTitle>Receipt Preview</DialogTitle>
-              </DialogHeader>
-              <Image
-                src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${editedEntry.receipt_url}`}
-                alt="Receipt"
-                layout="fill"
-                objectFit="contain"
-              />
-            </DialogContent>
-          </Dialog>
-        ) : 'No Receipt'
-      )
-    },
-    {
-      id: 'actions',
-      header: 'Actions',
-      size: '100',
-      cellContent: entry => entry
+      label: 'Receipt Image',
+      type: 'file',
+      accept: 'image/*',
+      required: false
     }
   ];
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setNewPettyCash(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+
+
+  const [receiptPreview, setReceiptPreview] = useState<{
+    isOpen: boolean;
+    url: string | null;
+  }>({
+    isOpen: false,
+    url: null
+  });
+
+  const handleViewReceipt = (entry: PettyCashEntry) => {
+    if (entry.receipt_url) {
+      setReceiptPreview({
+        isOpen: true,
+        url: entry.receipt_url
+      });
+    }
+  };
+
+  const [dialogState, setDialogState] = useState<{
+    isOpen: boolean;
+    mode: 'create' | 'edit';
+    entry: PettyCashEntry | null;
+  }>({
+    isOpen: false,
+    mode: 'create',
+    entry: null
+  });
+
+  const fetchEntries = async () => {
+    setIsLoading(true);
+    try {
+      const data = await PettyCashService.fetchRecords('acc_portal_pettycash_entries', userId);
+      setEntries(data);
+    } catch (error) {
+      toast.error('Failed to fetch entries');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEntries();
+  }, [userId]);
+
+  const handleCreateEntry = () => {
+    setDialogState({
+      isOpen: true,
+      mode: 'create',
+      entry: null
+    });
+  };
+
+  const handleEditEntry = (entry: PettyCashEntry) => {
+    setDialogState({
+      isOpen: true,
+      mode: 'edit',
+      entry
+    });
+  };
+
+  const handleSaveEntry = async (entry: PettyCashEntry) => {
+    try {
+      if (dialogState.mode === 'create') {
+        await PettyCashService.createRecord('acc_portal_pettycash_entries', entry, userId);
+        toast.success('Entry created successfully');
+      } else {
+        await PettyCashService.updateRecord('acc_portal_pettycash_entries', entry.id, entry);
+        toast.success('Entry updated successfully');
+      }
+      fetchEntries();
+    } catch (error) {
+      toast.error('Failed to save entry');
+    }
+  };
+
+  const handleDeleteEntry = async (entry: PettyCashEntry) => {
+    try {
+      await PettyCashService.deleteRecord('acc_portal_pettycash_entries', entry.id);
+      toast.success('Entry deleted successfully');
+      fetchEntries();
+    } catch (error) {
+      toast.error('Failed to delete entry');
+    }
+  };
+
+  const handleVerifyEntry = async (entry: PettyCashEntry) => {
+    try {
+      await PettyCashService.verifyRecord('acc_portal_pettycash_entries', entry.id);
+      toast.success('Entry verified successfully');
+      fetchEntries();
+    } catch (error) {
+      toast.error('Failed to verify entry');
+    }
+  };
+
+  const handleEditSubmit = async (updatedEntry: PettyCashEntry) => {
+    try {
+      await PettyCashService.updateRecord('acc_portal_pettycash_entries', updatedEntry.id, {
+        ...updatedEntry,
+        category_code: updatedEntry.category_code === 'ALL' ? '' : updatedEntry.category_code,
+        subcategory_code: updatedEntry.subcategory_code === 'ALL' ? '' : updatedEntry.subcategory_code
+      });
+      toast.success('Entry updated successfully');
+      fetchEntries();
+    } catch (error) {
+      toast.error('Failed to update entry');
+      console.error('Error updating entry:', error);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (file) {
+    setNewPettyCash(prev => ({
+      ...prev,
+      receipt_url: file
+    }));
+  }
+};
+
+  const handleSubmit = async () => {
+    try {
+      let receiptUrl = null;
+      if (newPettyCash.receipt_url instanceof File) {
+        const uploadPath = `receipts/${Date.now()}_${newPettyCash.receipt_url.name}`;
+        receiptUrl = await PettyCashService.uploadReceipt(newPettyCash.receipt_url, uploadPath);
+      }
+
+      const entryData = {
+        ...newPettyCash,
+        receipt_url: receiptUrl,
+        userid: userId
+      };
+
+      await PettyCashService.createRecord('acc_portal_pettycash_entries', entryData, userId);
+      toast.success('Entry created successfully');
+      setIsSheetOpen(false);
+      setNewPettyCash({
+        id: '',
+        amount: '',
+        invoice_number: '',
+        invoice_date: '',
+        description: '',
+        category_code: '',
+        subcategory_code: '',
+        payment_type: '',
+        branch_id: '',
+        user_id: '',
+        checked_by: '',
+        approved_by: '',
+        account_type: '',
+        receipt_url: null,
+        created_at: new Date().toISOString(),
+        is_verified: false
+      });
+      fetchEntries();
+    } catch (error) {
+      console.error('Error creating entry:', error);
+      toast.error('Failed to create entry');
+    }
+  };
+
+  const filteredEntries = entries.filter(entry => {
+    const matchesSearch =
+      entry.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      entry.invoice_number?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesCategory = selectedCategory === 'ALL' || entry.category_code === selectedCategory;
+    const matchesSubcategory = selectedSubcategory === 'ALL' || entry.subcategory_code === selectedSubcategory;
+
+    return matchesSearch && matchesCategory && matchesSubcategory;
+  });
+
+  const columnDefinitions = [
+    {
+      header: '#',
+      width: '40px',
+      cell: (_: any, index: number) => index + 1
+    },
+    {
+      header: 'Date',
+      width: '100px',
+      cell: (entry: PettyCashEntry) => format(new Date(entry.invoice_date), 'dd/MM/yyyy')
+    },
+    {
+      header: 'Amount',
+      width: '120px',
+      cell: (entry: PettyCashEntry) => formatCurrency(entry.amount)
+    },
+    {
+      header: 'Description',
+      width: '200px',
+      cell: (entry: PettyCashEntry) => entry.description
+    },
+    {
+      header: 'Category',
+      width: '150px',
+      cell: (entry: PettyCashEntry) => getCategoryName(entry.category_code)
+    },
+    {
+      header: 'Subcategory',
+      width: '150px',
+      cell: (entry: PettyCashEntry) => getSubcategoryName(entry.category_code, entry.subcategory_code)
+    },
+    {
+      header: 'Checked By',
+      width: '120px',
+      cell: (entry: PettyCashEntry) => entry.checked_by || '-'
+    },
+    {
+      header: 'Approved By',
+      width: '120px',
+      cell: (entry: PettyCashEntry) => entry.approved_by || '-'
+    },
+    {
+      header: 'Receipt',
+      width: '100px',
+      cell: (entry: PettyCashEntry) => entry.receipt_url ? (
+        <Button
+          variant="link"
+          className="h-8 px-2 text-xs"
+          onClick={() => handleViewReceipt(entry)}
+        >
+          View Receipt
+        </Button>
+      ) : <div className="flex justify-center"><span className="text-red-500 font-bold text-center">No Receipt</span></div>
+    },
+    {
+      header: 'Status',
+      width: '100px',
+      cell: (entry: PettyCashEntry) => (
+        <span className={`px-2 py-1 rounded-full text-xs ${entry.approved_by ? 'bg-green-100 text-green-800' :
+          entry.checked_by ? 'bg-yellow-100 text-yellow-800' :
+            'bg-gray-100 text-gray-800'
+          }`}>
+          {entry.approved_by ? 'Approved' :
+            entry.checked_by ? 'Checked' :
+              'Pending'}
+        </span>
+      )
+    },
+    {
+      header: 'Actions',
+      width: '100px',
+      cell: (entry: PettyCashEntry) => (
+        <TableActions
+          row={entry}
+          onEdit={() => handleEditEntry(entry)}
+          onDelete={() => handleDeleteEntry(entry)}
+          onVerify={() => handleVerifyEntry(entry)}
+          isVerified={Boolean(entry.approved_by)}
+          editForm={EditEntryForm}
+          editFormProps={{
+            branches,
+            users
+          }}
+        />
+      )
+    }
+  ];
   const EditForm = ({ entry, onClose, onSubmit }) => {
     const [editedEntry, setEditedEntry] = useState(entry);
-    const [selectedCategory, setSelectedCategory] = useState(entry.expense_type || '');
+    const [selectedCategory, setSelectedCategory] = useState(entry?.category_code || 'ALL');
+    const [selectedSubcategory, setSelectedSubcategory] = useState(entry?.subcategory_code || 'ALL');
 
-    const handleChange = (e) => {
-      setEditedEntry({ ...editedEntry, [e.target.name]: e.target.value });
-    };
-
-    const handleCategoryChange = (value) => {
-      setSelectedCategory(value);
-      setEditedEntry({ ...editedEntry, expense_type: value, subcategory: '' });
-    };
-
-    const handleSubcategoryChange = (value) => {
-      setEditedEntry({ ...editedEntry, subcategory: value });
-    };
-
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
       e.preventDefault();
-      onSubmit(editedEntry);
+      await onSubmit(editedEntry);
       onClose();
     };
 
     return (
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="amount">Amount</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="amount">Amount (KES)</Label>
           <Input
             id="amount"
             name="amount"
             type="number"
+            step="0.01"
             value={editedEntry.amount}
-            onChange={handleChange}
+            onChange={(e) => setEditedEntry({ ...editedEntry, amount: parseFloat(e.target.value) })}
+            className="h-8"
+            required
           />
         </div>
 
-        <div>
+        <div className="space-y-1.5">
           <Label htmlFor="invoice_date">Invoice Date</Label>
           <Input
             id="invoice_date"
             name="invoice_date"
             type="date"
             value={editedEntry.invoice_date}
-            onChange={handleChange}
+            onChange={(e) => setEditedEntry({ ...editedEntry, invoice_date: e.target.value })}
+            className="h-8"
+            required
           />
         </div>
-        <div>
+
+        <CategoryFilter
+          selectedCategory={selectedCategory}
+          selectedSubcategory={selectedSubcategory}
+          onCategoryChange={setSelectedCategory}
+          onSubcategoryChange={setSelectedSubcategory}
+        />
+
+        <div className="space-y-1.5">
           <Label htmlFor="description">Description</Label>
           <Input
             id="description"
             name="description"
             value={editedEntry.description}
-            onChange={handleChange}
+            onChange={(e) => setEditedEntry({ ...editedEntry, description: e.target.value })}
+            className="h-8"
+            required
           />
         </div>
-        <div>
-          <Label htmlFor="expense_type">Expense Category</Label>
-          <Select
-            value={selectedCategory}
-            onValueChange={handleCategoryChange}
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="h-8"
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
-            <SelectContent>
-              {expenseCategories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {selectedCategory && (
-          <div>
-            <Label htmlFor="subcategory">Subcategory</Label>
-            <Select
-              value={editedEntry.subcategory}
-              onValueChange={handleSubcategoryChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select subcategory" />
-              </SelectTrigger>
-              <SelectContent>
-                {subcategoriesMap[selectedCategory].map((subcategory) => (
-                  <SelectItem key={subcategory} value={subcategory}>
-                    {subcategory}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        <div>
-          <Label htmlFor="payment_type">Payment Type</Label>
-          <Input
-            id="payment_type"
-            name="payment_type"
-            value={editedEntry.payment_type}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="checked_by">Checked By</Label>
-          <Input
-            id="checked_by"
-            name="checked_by"
-            value={editedEntry.checked_by}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="approved_by">Approved By</Label>
-          <Input
-            id="approved_by"
-            name="approved_by"
-            value={editedEntry.approved_by}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="branch_name">Branch</Label>
-          <Input
-            id="branch_name"
-            name="branch_name"
-            value={editedEntry.branch_name}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="user_name">User</Label>
-          <Input
-            id="user_name"
-            name="user_name"
-            value={editedEntry.user_name}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="account_type">Account Type</Label>
-          <Input
-            id="account_type"
-            name="account_type"
-            value={editedEntry.account_type}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="receipt_url">Receipt Image</Label>
-          {editedEntry.receipt_url ? (
-            <div className="flex items-center space-x-2">
-              <p>Current receipt: {editedEntry.receipt_url}</p>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline">View Receipt</Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col items-center justify-center">
-                  <DialogHeader>
-                    <DialogTitle>Receipt Preview</DialogTitle>
-                  </DialogHeader>
-                  <div className="relative w-full h-[70vh]">
-                    <Image
-                      src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${editedEntry.receipt_url}`}
-                      alt="Receipt"
-                      layout="fill"
-                      objectFit="contain"
-                    />
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Button onClick={() => setEditedEntry({ ...editedEntry, receipt_url: null })}>
-                Remove Receipt
-              </Button>
-            </div>
-          ) : (
-            <Input
-              id="receipt_url"
-              name="receipt_url"
-              type="file"
-              onChange={(e) => {
-                const file = e.target.files[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (event) => {
-                    setEditedEntry({ ...editedEntry, receipt_url: event.target.result });
-                  };
-                  reader.readAsDataURL(file);
-                }
-              }}
-            />
-          )}
-        </div>
-        <Button type="submit">Save Changes</Button>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            className="h-8 bg-blue-600 text-white"
+          >
+            Save Changes
+          </Button>
+        </DialogFooter>
       </form>
     );
   };
@@ -819,184 +686,329 @@ export function TransactionsTab() {
   return (
     <div className="flex w-full bg-gray-100">
       <Toaster position="top-right" />
-      <main className="flex-1 p-6 w-full">
-        <h1 className="text-xl font-semibold mb-2">Monthly Petty Cash Entries</h1>
+      <main className="flex-1 p-4 w-full">
         <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center space-x-2">
-            <Input type="search" placeholder="search" className="w-48" />
-            <Button variant="outline" className="flex items-center" onClick={fetchPettyCashEntries}>
-              <RefreshCwIcon className="w-4 h-4 mr-1" />
-              Refresh
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="search"
+                placeholder="Search entries..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-8 w-64"
+              />
+            </div>
+            <CategoryFilter
+              selectedCategory={selectedCategory}
+              selectedSubcategory={selectedSubcategory}
+              onCategoryChange={setSelectedCategory}
+              onSubcategoryChange={setSelectedSubcategory}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchEntries}
+              className="h-8"
+            >
+              <RefreshCwIcon className="h-4 w-4" />
             </Button>
-            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button className="bg-blue-600 text-white">Add New Entry</Button>
-              </SheetTrigger>
-              <SheetContent className="overflow-y-auto">
-                <SheetHeader>
-                  <SheetTitle>Add Petty Cash Entry</SheetTitle>
-                  <SheetDescription>
-                    This section includes adding all the details of a petty cash entry to the system.
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="flex flex-col pt-4 gap-4">
-                  {formFields.map(({ id, label, type, placeholder, options, onChange, accept }) => (
-                    <div key={id} className="space-y-1">
-                      <Label htmlFor={id}>{label}</Label>
-                      {type === 'select' ? (
-                        <Select onValueChange={onChange} value={newPettyCash[id]}>
-                          <SelectTrigger>
-                            <SelectValue placeholder={`Select ${label}`} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {options.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : type === 'file' ? (
-                        <Input
-                          id={id}
-                          type={type}
-                          accept={accept}
-                          onChange={onChange}
-                        />
-                      ) : (
-                        <Input
-                          id={id}
-                          type={type}
-                          placeholder={placeholder}
-                          value={newPettyCash[id]}
-                          onChange={handleInputChange}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="pt-4">
-                  <Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button>
-                </div>
-              </SheetContent>
-            </Sheet>
+            <Button
+              onClick={handleCreateEntry}
+              className="h-8 bg-blue-600 text-white"
+            >
+              Add New Entry
+            </Button>
           </div>
         </div>
-        <Card className="rounded-md border-0 shadow-sm">
-          <div className="relative">
-            <ScrollArea className="h-[calc(100vh-280px)]">
-              <Table>
-                <TableHeader className="sticky top-0 z-10">
-                  <TableRow className="bg-blue-600 hover:bg-blue-600">
-                    {columnDefinitions.map((column) => (
-                      <TableHead
-                        key={column.id}
-                        style={{
-                          width: `${column.size}px`,
-                          minWidth: `${column.size}px`
-                        }}
-                        className="text-white h-8 text-xs font-medium border-r border-blue-500 last:border-r-0 text-center px-2"
-                      >
-                        {column.header}
-                      </TableHead>
-                    ))}
+
+        <Card className="overflow-hidden">
+          <ScrollArea className="h-[calc(100vh-200px)]">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-600 hover:bg-blue-600">
+                  {columnDefinitions.map((col, index) => (
+                    <TableHead
+                      key={index}
+                      style={{ width: col.width }}
+                      className="text-white h-8 text-xs font-medium border-r border-blue-500 last:border-r-0"
+                    >
+                      {col.header}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columnDefinitions.length}
+                      className="h-32 text-center"
+                    >
+                      Loading entries...
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pettyCashEntries.map((entry, index) => (
+                ) : filteredEntries.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columnDefinitions.length}
+                      className="h-32 text-center"
+                    >
+                      No entries found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredEntries.map((entry, index) => (
                     <TableRow
                       key={entry.id}
                       className="hover:bg-blue-50 border-b border-gray-100 transition-colors [&>td]:h-8"
                     >
-                      {columnDefinitions.map((column) => (
+                      {columnDefinitions.map((col, colIndex) => (
                         <TableCell
-                          key={`${entry.id}-${column.id}`}
-                          style={{
-                            width: `${column.size}px`,
-                            minWidth: `${column.size}px`
-                          }}
+                          key={`${entry.id}-${colIndex}`}
+                          style={{ width: col.width }}
                           className="py-1 px-2 text-xs border-r border-gray-100 last:border-r-0"
                         >
-                          {column.id === 'actions' ? (
-                            <TableActions
-                              row={entry}
-                              onEdit={handleEdit}
-                              onDelete={handleDelete}
-                              onVerify={handleVerify}
-                              isVerified={entry.is_verified}
-                              editForm={(entry, onClose) => (
-                                <EditForm entry={entry} onClose={onClose} onSubmit={handleEditSubmit} />
-                              )}
-                            />
-                          ) : (
-                            column.cellContent(entry, index)
-                          )}
+                          {col.cell(entry, index)}
                         </TableCell>
                       ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </div>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
         </Card>
-        <div className="flex justify-between items-center mt-4">
-          <Button variant="outline" className="flex items-center">
-            <ChevronLeftIcon className="w-4 h-4" />
-          </Button>
-          <span>1</span>
-          <Button variant="outline" className="flex items-center">
-            <ChevronRightIcon className="w-4 h-4" />
-          </Button>
-        </div>
 
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Petty Cash Entry</DialogTitle>
+        {/* Receipt Preview Dialog */}
+        <Dialog
+          open={receiptPreview.isOpen}
+          onOpenChange={(open) => setReceiptPreview(prev => ({ ...prev, isOpen: open }))}
+        >
+          <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+            <DialogHeader className="p-4 border-b">
+              <DialogTitle>Receipt Preview</DialogTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setReceiptPreview(prev => ({ ...prev, rotation: ((prev.rotation || 0) + 90) % 360 }))}
+                >
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  Rotate
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const link = document.createElement('a')
+                    link.href = `https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${receiptPreview.url}`
+                    link.download = `receipt-${receiptPreview.url}`
+                    link.click()
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Download
+                </Button>
+              </div>
             </DialogHeader>
-            {currentEntry && (
-              <div className="flex flex-col gap-4">
-                {formFields.map(({ id, label, type, placeholder, options }) => (
-                  <div key={id} className="space-y-1">
-                    <Label htmlFor={id}>{label}</Label>
-                    {type === 'select' ? (
-                      <Select
-                        value={currentEntry[id]}
-                        onValueChange={(value) => setCurrentEntry({ ...currentEntry, [id]: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={`Select ${label}`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {options.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        id={id}
-                        type={type}
-                        placeholder={placeholder}
-                        value={currentEntry[id] || ''}
-                        onChange={(e) => setCurrentEntry({ ...currentEntry, [id]: e.target.value })}
-                      />
-                    )}
-                  </div>
-                ))}
+            {receiptPreview.url && (
+              <div className="relative w-full h-[calc(90vh-100px)] bg-gray-50">
+                <Image
+                  src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${receiptPreview.url}`}
+                  alt="Receipt"
+                  fill
+                  style={{ 
+                    objectFit: 'contain',
+                    transform: `rotate(${receiptPreview.rotation || 0}deg)`,
+                    transition: 'transform 0.3s ease-in-out'
+                  }}
+                  priority
+                />
               </div>
             )}
-            <DialogFooter>
-              <Button onClick={handleEditSubmit}>Save Changes</Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
 
+        {/* Update the EntryDialog SheetContent to be wider */}
+        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+          <SheetContent className="sm:max-w-2xl overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Add New Entry</SheetTitle>
+              <SheetDescription>
+                Add a new petty cash entry with all details.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="flex flex-col pt-4 gap-4">
+              {formFields.map(({ id, label, type, placeholder, options, required, accept }) => (
+                <div key={id} className="space-y-1.5">
+                  <Label htmlFor={id}>{label}</Label>
+                  {type === 'select' ? (
+                    <Select
+                      value={newPettyCash[id]}
+                      onValueChange={(value) => setNewPettyCash(prev => ({ ...prev, [id]: value }))}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder={placeholder} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {options?.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : type === 'file' ? (
+                    <div className="space-y-2">
+                      <Input
+                        id={id}
+                        type={type}
+                        accept={accept}
+                        onChange={(e) => setNewPettyCash(prev => ({
+                          ...prev,
+                          [id]: e.target.files?.[0] || null
+                        }))}
+                        className="h-9"
+                      />
+                      {newPettyCash.receipt_url && (
+                        <div className="relative h-[200px] bg-gray-50 rounded-md overflow-hidden">
+                          <Image
+                            src={URL.createObjectURL(newPettyCash.receipt_url)}
+                            alt="Receipt preview"
+                            fill
+                            style={{ objectFit: 'contain' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Input
+                      id={id}
+                      type={type}
+                      value={newPettyCash[id]}
+                      onChange={(e) => setNewPettyCash(prev => ({
+                        ...prev,
+                        [id]: e.target.value
+                      }))}
+                      placeholder={placeholder}
+                      required={required}
+                      className="h-9"
+                    />
+                  )}
+                </div>
+              ))}
+
+              <div className="pt-4">
+                <Button
+                  className="w-full h-9 bg-blue-600 text-white"
+                  onClick={handleSubmit}
+                >
+                  Submit Entry
+                </Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Entry Form Dialog */}
+        <EntryDialog
+          isOpen={dialogState.isOpen}
+          onClose={() => setDialogState({ isOpen: false, mode: 'create', entry: null })}
+          entry={dialogState.entry}
+          onSave={handleSaveEntry}
+          mode={dialogState.mode}
+        />
 
       </main>
     </div>
   );
 }
+
+// Receipt Preview Component
+const ReceiptPreview: React.FC<{ url: string }> = ({ url }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        variant="link"
+        className="h-8 px-2 text-xs"
+        onClick={() => setIsOpen(true)}
+      >
+        View Receipt
+      </Button>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle>Receipt Preview</DialogTitle>
+          </DialogHeader>
+          <div className="relative w-full h-[calc(90vh-100px)] overflow-hidden">
+            <Image
+              src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${url}`}
+              alt="Receipt"
+              fill
+              style={{ objectFit: 'contain' }}
+              priority
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+// Utility function for amount input formatting
+const formatAmountInput = (value: string): string => {
+  // Remove all non-digit characters except decimal point
+  const cleanedValue = value.replace(/[^\d.]/g, '');
+
+  // Ensure only one decimal point
+  const parts = cleanedValue.split('.');
+  if (parts.length > 2) {
+    parts.splice(2);
+  }
+
+  // Limit decimal places to 2
+  if (parts[1]) {
+    parts[1] = parts[1].slice(0, 2);
+  }
+
+  // Add commas for thousands
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+  return parts.join('.');
+};
+
+// Amount Input Component
+const AmountInput: React.FC<{
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}> = ({ value, onChange, className }) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formattedValue = formatAmountInput(e.target.value);
+    onChange(formattedValue);
+  };
+
+  return (
+    <div className="relative">
+      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">
+        KSh
+      </span>
+      <Input
+        type="text"
+        value={value}
+        onChange={handleChange}
+        className={`pl-12 ${className}`}
+        placeholder="0.00"
+      />
+    </div>
+  );
+};
+
+
+export default TransactionsTab;

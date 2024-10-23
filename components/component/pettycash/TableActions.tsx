@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { MoreHorizontal, Check, X, Pencil, Trash2 } from "lucide-react";
 import {
     DropdownMenu,
@@ -24,18 +24,29 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
-export const TableActions = ({
+interface TableActionsProps {
+    row: any;
+    onEdit: (row: any) => void;
+    onDelete: (row: any) => void;
+    onVerify?: (row: any) => void;
+    isVerified?: boolean;
+    editForm: React.ComponentType<any>;  // Accept component instead of function
+    editFormProps?: any;                 // Additional props for the form
+    showVerify?: boolean;
+}
+
+export const TableActions: React.FC<TableActionsProps> = ({
     row,
     onEdit,
     onDelete,
     onVerify,
     isVerified = false,
-    editForm,
+    editForm: EditForm,
+    editFormProps = {},
     showVerify = true
 }) => {
-    const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
-    const [showEditSheet, setShowEditSheet] = React.useState(false);
-
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [showEditSheet, setShowEditSheet] = useState(false);
     return (
         <div className="flex items-center gap-2">
             {showVerify && (
@@ -114,10 +125,15 @@ export const TableActions = ({
                             Make changes to the record here. Click save when done.
                         </SheetDescription>
                     </SheetHeader>
-                    {editForm(row, () => {
-                        setShowEditSheet(false);
-                        onEdit(row);
-                    })}
+                    <EditForm
+                        entry={row}
+                        onClose={() => setShowEditSheet(false)}
+                        onSubmit={async (updatedData) => {
+                            await onEdit(updatedData);
+                            setShowEditSheet(false);
+                        }}
+                        {...editFormProps}
+                    />
                 </SheetContent>
             </Sheet>
         </div>
