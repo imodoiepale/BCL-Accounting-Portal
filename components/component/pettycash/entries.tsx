@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RefreshCwIcon, Search, FilterIcon, Download, RotateCcw } from 'lucide-react';
+import { RefreshCwIcon, Search, FilterIcon, Download, RotateCcw, Loader2 } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { toast, Toaster } from 'react-hot-toast';
 import Image from 'next/image';
@@ -72,16 +72,38 @@ const EntryDialog: React.FC<EntryDialogProps> = ({
   onSave,
   mode
 }) => {
+
+  const { userId } = useAuth();
   const [formData, setFormData] = useState<PettyCashEntry | null>(entry);
   const [selectedCategory, setSelectedCategory] = useState(entry?.category_code || '');
   const [selectedSubcategory, setSelectedSubcategory] = useState(entry?.subcategory_code || '');
   const [fileUpload, setFileUpload] = useState<File | null>(null);
-
+  const[branches, setBranches] = useState([]);
+  const [users, setUsers] = useState([]);
   useEffect(() => {
     setFormData(entry);
     setSelectedCategory(entry?.category_code || '');
     setSelectedSubcategory(entry?.subcategory_code || '');
   }, [entry]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [branchesData, usersData] = await Promise.all([
+          PettyCashService.fetchRecords('acc_portal_pettycash_branches', userId),
+          PettyCashService.fetchRecords('acc_portal_pettycash_users', userId)
+        ]);
+
+        setBranches(branchesData);
+        setUsers(usersData);
+      } catch (error) {
+        toast.error('Failed to fetch data');
+      }
+    };
+
+    fetchData();
+  }, [userId]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,99 +144,153 @@ const EntryDialog: React.FC<EntryDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-5xl">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Add New Entry' : 'Edit Entry'}</DialogTitle>
+          <DialogTitle className="text-xl font-bold">
+            {mode === 'create' ? 'Add New Entry' : 'Edit Entry'}
+          </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="amount">Amount (KES)</Label>
-            <Input
-              id="amount"
-              name="amount"
-              type="number"
-              step="0.01"
-              value={formData?.amount || ''}
-              onChange={handleInputChange}
-              className="h-8"
-              required
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Left Column */}
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="amount">Amount (KES)</Label>
+              <AmountInput
+                value={formData?.amount || ''}
+                onChange={handleInputChange}
+                className="h-9"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="account_type">Account Type</Label>
+              <Select
+                value={formData?.account_type || ''}
+                onValueChange={(value) => handleInputChange({
+                  target: { name: 'account_type', value }
+                })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select Account Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="mpesa">M-Pesa</SelectItem>
+                  <SelectItem value="bank">Bank Transfer</SelectItem>
+                  <SelectItem value="credit_card">Credit Card</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="branch">Branch</Label>
+              <Select
+                value={formData?.branch_id || ''}
+                onValueChange={(value) => handleInputChange({
+                  target: { name: 'branch_id', value }
+                })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select Branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map(branch => (
+                    <SelectItem key={branch.id} value={branch.id.toString()}>
+                      {branch.branch_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="user">User</Label>
+              <Select
+                value={formData?.user_id || ''}
+                onValueChange={(value) => handleInputChange({
+                  target: { name: 'user_id', value }
+                })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select User" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map(user => (
+                    <SelectItem key={user.id} value={user.id.toString()}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+
+            <CategoryFilter
+              selectedCategory={selectedCategory}
+              selectedSubcategory={selectedSubcategory}
+              onCategoryChange={setSelectedCategory}
+              onSubcategoryChange={setSelectedSubcategory}
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="invoice_date">Invoice Date</Label>
-            <Input
-              id="invoice_date"
-              name="invoice_date"
-              type="date"
-              value={formData?.invoice_date || ''}
-              onChange={handleInputChange}
-              className="h-8"
-              required
-            />
+          {/* Right Column */}
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="invoice_date">Invoice Date</Label>
+              <Input
+                type="date"
+                value={formData?.invoice_date || ''}
+                onChange={handleInputChange}
+                className="h-9"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="description">Description</Label>
+              <Input
+                value={formData?.description || ''}
+                onChange={handleInputChange}
+                className="h-9"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="receipt">Receipt</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setFileUpload(e.target.files?.[0] || null)}
+                className="h-9"
+              />
+            </div>
           </div>
+        </div>
 
-          <CategoryFilter
-            selectedCategory={selectedCategory}
-            selectedSubcategory={selectedSubcategory}
-            onCategoryChange={setSelectedCategory}
-            onSubcategoryChange={setSelectedSubcategory}
-          />
-
-          <div className="space-y-1.5">
-            <Label htmlFor="description">Description</Label>
-            <Input
-              id="description"
-              name="description"
-              value={formData?.description || ''}
-              onChange={handleInputChange}
-              className="h-8"
-              required
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="receipt">Receipt</Label>
-            <Input
-              id="receipt"
-              name="receipt"
-              type="file"
-              accept="image/*"
-              onChange={(e) => setFileUpload(e.target.files?.[0] || null)}
-              className="h-8"
-            />
-          </div>
-
-          {formData?.receipt_url && (
-            <div className="relative h-40 w-full">
+        {/* Receipt Preview */}
+        {formData?.receipt_url && (
+          <div className="mt-4">
+            <Label>Current Receipt</Label>
+            <div className="relative h-[200px] mt-2 bg-gray-50 rounded-lg overflow-hidden">
               <Image
                 src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${formData.receipt_url}`}
-                alt="Current receipt"
+                alt="Receipt preview"
                 fill
                 style={{ objectFit: 'contain' }}
               />
             </div>
-          )}
+          </div>
+        )}
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="h-8"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="h-8 bg-blue-600 text-white"
-            >
-              {mode === 'create' ? 'Create' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </form>
+        <DialogFooter className="mt-6">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="submit" className="bg-blue-600 text-white">
+            {mode === 'create' ? 'Create Entry' : 'Save Changes'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
+
   );
 };
 export function TransactionsTab() {
@@ -455,14 +531,14 @@ export function TransactionsTab() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (file) {
-    setNewPettyCash(prev => ({
-      ...prev,
-      receipt_url: file
-    }));
-  }
-};
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewPettyCash(prev => ({
+        ...prev,
+        receipt_url: file
+      }));
+    }
+  };
 
   const handleSubmit = async () => {
     try {
@@ -529,9 +605,28 @@ export function TransactionsTab() {
       cell: (entry: PettyCashEntry) => format(new Date(entry.invoice_date), 'dd/MM/yyyy')
     },
     {
+      header: <div className="text-center">Account Type</div>,
+      width: '120px',
+      cell: (entry: PettyCashEntry) => (
+        <span className="capitalize">
+          {entry.account_type?.replace('_', ' ') || '-'}
+        </span>
+      )
+    },
+    {
       header: 'Amount',
       width: '120px',
       cell: (entry: PettyCashEntry) => formatCurrency(entry.amount)
+    },
+    {
+      header: 'Branch',
+      width: '150px',
+      cell: (entry: PettyCashEntry) => entry.branch_name || '-'
+    },
+    {
+      header: 'User',
+      width: '200px',
+      cell: (entry: PettyCashEntry) => entry.user_name || '-'
     },
     {
       header: 'Description',
@@ -549,12 +644,12 @@ export function TransactionsTab() {
       cell: (entry: PettyCashEntry) => getSubcategoryName(entry.category_code, entry.subcategory_code)
     },
     {
-      header: 'Checked By',
+      header: <div className="text-center"> Checked By</div>,
       width: '120px',
       cell: (entry: PettyCashEntry) => entry.checked_by || '-'
     },
     {
-      header: 'Approved By',
+      header: <div className="text-center"> Approved By</div>,
       width: '120px',
       cell: (entry: PettyCashEntry) => entry.approved_by || '-'
     },
@@ -802,11 +897,21 @@ export function TransactionsTab() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    const link = document.createElement('a')
-                    link.href = `https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${receiptPreview.url}`
-                    link.download = `receipt-${receiptPreview.url}`
-                    link.click()
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${receiptPreview.url}`)
+                      const blob = await response.blob()
+                      const url = window.URL.createObjectURL(blob)
+                      const link = document.createElement('a')
+                      link.href = url
+                      link.download = `receipt-${receiptPreview.url}`
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                      window.URL.revokeObjectURL(url)
+                    } catch (error) {
+                      console.error('Download failed:', error)
+                    }
                   }}
                 >
                   <Download className="h-4 w-4 mr-1" />
@@ -815,17 +920,25 @@ export function TransactionsTab() {
               </div>
             </DialogHeader>
             {receiptPreview.url && (
-              <div className="relative w-full h-[calc(90vh-100px)] bg-gray-50">
+              <div className="relative w-full h-[calc(90vh-100px)] bg-gray-50 group">
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 animate-pulse">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                </div>
                 <Image
                   src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${receiptPreview.url}`}
                   alt="Receipt"
                   fill
-                  style={{ 
+                  className="transition-transform duration-300 ease-in-out hover:scale-150 cursor-zoom-in"
+                  style={{
                     objectFit: 'contain',
                     transform: `rotate(${receiptPreview.rotation || 0}deg)`,
                     transition: 'transform 0.3s ease-in-out'
                   }}
                   priority
+                  onLoadingComplete={(image) => {
+                    image.classList.remove('opacity-0')
+                    image.classList.add('opacity-100')
+                  }}
                 />
               </div>
             )}

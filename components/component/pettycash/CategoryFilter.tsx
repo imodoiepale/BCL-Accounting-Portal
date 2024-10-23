@@ -30,7 +30,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
     return (
         <div className={`flex items-center gap-4 ${className}`}>
             <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">Category</Label>
+                {/* <Label className="text-xs">Category</Label> */}
                 <Select value={selectedCategory} onValueChange={onCategoryChange}>
                     <SelectTrigger className="h-8 w-[200px]">
                         <SelectValue placeholder="Select category" />
@@ -47,7 +47,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             </div>
 
             <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">Subcategory</Label>
+                {/* <Label className="text-xs">Subcategory</Label> */}
                 <Select
                     value={selectedSubcategory}
                     onValueChange={onSubcategoryChange}
