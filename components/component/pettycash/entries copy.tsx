@@ -577,13 +577,13 @@ export function TransactionsTab() {
     {
       id: 'checked_by',
       header: 'Checked By',
-      size: '120',
+      size: '80',
       cellContent: entry => entry.checked_by
     },
     {
       id: 'approved_by',
       header: 'Approved By',
-      size: '120',
+      size: '80',
       cellContent: entry => entry.approved_by
     },
     {

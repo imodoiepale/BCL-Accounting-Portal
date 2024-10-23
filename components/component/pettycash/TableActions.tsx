@@ -49,7 +49,7 @@ export const TableActions: React.FC<TableActionsProps> = ({
     const [showEditSheet, setShowEditSheet] = useState(false);
     return (
         <div className="flex items-center gap-2">
-            {showVerify && (
+            {/* {showVerify && (
                 <Badge
                     variant={isVerified ? "success" : "destructive"}
                     className="h-6 cursor-default"
@@ -61,7 +61,7 @@ export const TableActions: React.FC<TableActionsProps> = ({
                     )}
                     {isVerified ? "Verified" : "Unverified"}
                 </Badge>
-            )}
+            )} */}
 
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>

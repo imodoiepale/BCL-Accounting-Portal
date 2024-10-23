@@ -10,7 +10,6 @@ export class PettyCashService {
         try {
             let query = supabase.from(table).select(options.select || '*');
 
-            // Add filters based on the table
             switch (table) {
                 case 'acc_portal_pettycash_accounts':
                     query = query.eq('admin_id', userId);
@@ -19,17 +18,21 @@ export class PettyCashService {
                     query = query
                         .eq('admin_id', userId)
                         .select(`
-              *,
-              acc_portal_pettycash_branches(branch_name),
-              account_count:acc_portal_pettycash_accounts(count)
-            `);
+                        *,
+                        acc_portal_pettycash_branches(branch_name),
+                        account_count:acc_portal_pettycash_accounts(count)
+                    `);
                     break;
                 case 'acc_portal_pettycash_branches':
                     query = query.eq('userid', userId);
                     break;
+                case 'acc_portal_pettycash_users':
+                    query = query.eq('userid', userId);
+                    break;
                 case 'acc_portal_pettycash_entries':
                     query = query.eq('userid', userId).order('invoice_date', { ascending: true });
-                    break;            }
+                    break;
+            }
 
             if (options.orderBy) {
                 query = query.order(options.orderBy.column, { ascending: options.orderBy.ascending });
