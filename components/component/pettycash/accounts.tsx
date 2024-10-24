@@ -32,7 +32,8 @@ const ACCOUNT_TYPES = [
 const CASH_TYPES = [
   { value: 'Cash', label: 'Cash' },
   { value: 'Mpesa', label: 'Mpesa' },
-  { value: 'Card', label: 'Card' }
+  { value: 'Card', label: 'Card' },
+  { value: 'Credit', label: 'Credit' }
 ] as const;
 
 // Types
@@ -159,8 +160,72 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
     </div>
   );
 };
+interface AccountDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  account: AccountData | null;
+  onSave: (account: AccountData) => Promise<void>;
+  mode: 'create' | 'edit';
+  users: Option[];
+}
 
-// Account Form Component
+const AccountDialog: React.FC<AccountDialogProps> = ({
+  isOpen,
+  onClose,
+  account,
+  onSave,
+  mode,
+  users
+}) => {
+  const initialFormData: AccountData = {
+    accountUser: [],
+    pettyCashType: [],
+    accountNumber: '',
+    accountType: 'Corporate',
+    minFloatBalance: 0,
+    minFloatAlert: 0,
+    maxOpeningFloat: 0,
+    approvedLimitAmount: 0,
+    startDate: new Date().toISOString(),
+    endDate: null,
+    status: 'Active'
+  };
+
+  const [formData, setFormData] = useState(mode === 'create' ? initialFormData : account);
+
+  useEffect(() => {
+    setFormData(mode === 'create' ? initialFormData : account);
+  }, [account, mode]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    if (!formData) return;
+
+    try {
+      await onSave(formData);
+      onClose();
+    } catch (error) {
+      toast.error('Failed to save account');
+      console.error('Error saving account:', error);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{mode === 'create' ? 'Add New Account' : 'Edit Account'}</DialogTitle>
+        </DialogHeader>
+        <AccountForm 
+          onSubmit={handleSubmit}
+          initialData={formData}
+          users={users}
+          mode={mode}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const AccountForm: React.FC<{
   onSubmit: (data: AccountData) => void;
   initialData?: AccountData | null;
@@ -169,7 +234,7 @@ const AccountForm: React.FC<{
 }> = ({ onSubmit, initialData, users, mode = 'create' }) => {
   const [formData, setFormData] = useState<AccountData>(initialData || {
     accountUser: '',
-    pettyCashType: [],
+    pettyCashType: '',
     accountNumber: '',
     accountType: 'Corporate',
     minFloatBalance: 0,
@@ -181,258 +246,148 @@ const AccountForm: React.FC<{
     status: 'Active'
   });
 
-  useEffect(() => {
-    // Update status when endDate changes
-    const newStatus = formData.endDate && new Date(formData.endDate) <= new Date()
-      ? 'Inactive'
-      : 'Active';
-    if (newStatus !== formData.status) {
-      setFormData(prev => ({ ...prev, status: newStatus }));
-    }
-  }, [formData.endDate]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validation
-    if (formData.accountUser.length === 0) {
-      toast.error('Please select at least one user');
-      return;
-    }
-
-    if (formData.pettyCashType.length === 0) {
-      toast.error('Please select at least one petty cash type');
-      return;
-    }
-
-    if (formData.minFloatBalance > formData.maxOpeningFloat) {
-      toast.error('Minimum float balance cannot be greater than maximum opening float');
-      return;
-    }
-
-    if (formData.minFloatAlert > formData.minFloatBalance) {
-      toast.error('Minimum float alert cannot be greater than minimum float balance');
-      return;
-    }
-
-    onSubmit(formData);
-  };
-
-  const handleDateSelect = (field: 'startDate' | 'endDate', date: Date | null) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type } = e.target;
     setFormData(prev => ({
       ...prev,
-      [field]: date ? date.toISOString() : null,
+      [name]: type === 'number' ? parseFloat(value) : value
     }));
   };
 
-  const cashTypes = ['Cash', 'Mpesa', 'Card'];
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const formFields = [
+    {
+      name: 'accountUser',
+      label: 'Petty Cash Account User',
+      type: 'select',
+      options: users.map(user => ({
+        value: user.name,
+        label: user.name
+      })),
+      required: true
+    },
+    {
+      name: 'pettyCashType',
+      label: 'Petty Cash Type',
+      type: 'select',
+      options: [
+        { value: 'Cash', label: 'Cash' },
+        { value: 'Mpesa', label: 'Mpesa' },
+        { value: 'Card', label: 'Card' },
+        { value: 'Credit', label: 'Credit' }
+      ],
+      required: true
+    },
+    {
+      name: 'accountNumber',
+      label: 'Account Number',
+      type: 'text',
+      required: true
+    },
+    {
+      name: 'accountType',
+      label: 'Account Type',
+      type: 'select',
+      options: [
+        { value: 'Corporate', label: 'Corporate' },
+        { value: 'Personal', label: 'Personal' }
+      ],
+      required: true
+    },
+    {
+      name: 'minFloatBalance',
+      label: 'Minimum Float Balance',
+      type: 'number',
+      required: true
+    },
+    {
+      name: 'minFloatAlert',
+      label: 'Minimum Float Alert',
+      type: 'number',
+      required: true
+    },
+    {
+      name: 'maxOpeningFloat',
+      label: 'Maximum Opening Float',
+      type: 'number',
+      required: true
+    },
+    {
+      name: 'approvedLimitAmount',
+      label: 'Approved Limit Amount',
+      type: 'number',
+      required: true
+    },
+    {
+      name: 'startDate',
+      label: 'Start Date',
+      type: 'date',
+      required: true
+    },
+    {
+      name: 'endDate',
+      label: 'End Date',
+      type: 'date',
+      required: false
+    },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'Active', label: 'Active' },
+        { value: 'Inactive', label: 'Inactive' }
+      ],
+      required: true
+    }
+  ];
+
+
   return (
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label>Petty Cash Account User *</Label>
-          <div className="grid grid-cols-1 gap-2">
-            {users.map(user => (
-              <label key={user.id} className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  name="accountUser"
-                  value={user.id}
-                  checked={formData.accountUser === user.id}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    accountUser: e.target.value
-                  }))}
-                  className="form-radio h-4 w-4"
-                />
-                <span className="text-sm">{user.name}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Petty Cash Type *</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {cashTypes.map(type => (
-              <label key={type} className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={formData.pettyCashType.includes(type as any)}
-                  onChange={(e) => {
-                    const updatedTypes = e.target.checked
-                      ? [...formData.pettyCashType, type]
-                      : formData.pettyCashType.filter(t => t !== type);
-                    setFormData(prev => ({
-                      ...prev,
-                      pettyCashType: updatedTypes as ('Cash' | 'Mpesa' | 'Card')[]
-                    }));
-                  }}
-                  className="form-checkbox h-4 w-4"
-                />
-                <span className="text-sm">{type}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-
-      <div className="space-y-2">
-        <Label htmlFor="accountNumber">Account Number *</Label>
-        <Input
-          id="accountNumber"
-          value={formData.accountNumber}
-          onChange={(e) => setFormData(prev => ({
-            ...prev,
-            accountNumber: e.target.value
-          }))}
-          required
-          placeholder="Enter account number"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="accountType">Account Type *</Label>
-        <Select
-          value={formData.accountType}
-          onValueChange={(value: 'Corporate' | 'Personal') =>
-            setFormData(prev => ({ ...prev, accountType: value }))
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select account type" />
-          </SelectTrigger>
-          <SelectContent>
-            {ACCOUNT_TYPES.map(type => (
-              <SelectItem key={type.value} value={type.value}>
-                {type.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="minFloatBalance">Minimum Float Balance *</Label>
-          <Input
-            id="minFloatBalance"
-            type="number"
-            min="0"
-            step="0.01"
-            value={formData.minFloatBalance}
-            onChange={(e) => setFormData(prev => ({
-              ...prev,
-              minFloatBalance: parseFloat(e.target.value)
-            }))}
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="minFloatAlert">Minimum Float Alert *</Label>
-          <Input
-            id="minFloatAlert"
-            type="number"
-            min="0"
-            step="0.01"
-            value={formData.minFloatAlert}
-            onChange={(e) => setFormData(prev => ({
-              ...prev,
-              minFloatAlert: parseFloat(e.target.value)
-            }))}
-            required
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="maxOpeningFloat">Maximum Opening Float *</Label>
-          <Input
-            id="maxOpeningFloat"
-            type="number"
-            min="0"
-            step="0.01"
-            value={formData.maxOpeningFloat}
-            onChange={(e) => setFormData(prev => ({
-              ...prev,
-              maxOpeningFloat: parseFloat(e.target.value)
-            }))}
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="approvedLimitAmount">Approved Limit Amount *</Label>
-          <Input
-            id="approvedLimitAmount"
-            type="number"
-            min="0"
-            step="0.01"
-            value={formData.approvedLimitAmount}
-            onChange={(e) => setFormData(prev => ({
-              ...prev,
-              approvedLimitAmount: parseFloat(e.target.value)
-            }))}
-            required
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Start Date *</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full justify-start text-left">
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {formData.startDate ? format(new Date(formData.startDate), 'PP') : 'Select date'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={formData.startDate ? new Date(formData.startDate) : undefined}
-                onSelect={(date) => handleDateSelect('startDate', date)}
-                initialFocus
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      onSubmit(formData);
+    }} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 max-w-4xl">
+        {formFields.map(({ name, label, type, options, required }) => (
+          <div key={name} className="space-y-1.5">
+            <Label htmlFor={name}>{label}{required && ' *'}</Label>
+            {type === 'select' ? (
+              <Select
+                value={formData[name]}
+                onValueChange={(value) => handleSelectChange(name, value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {options?.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                id={name}
+                name={name}
+                type={type}
+                value={formData[name]}
+                onChange={handleInputChange}
+                className="h-8"
+                required={required}
               />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        <div className="space-y-2">
-          <Label>End Date</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full justify-start text-left">
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {formData.endDate ? format(new Date(formData.endDate), 'PP') : 'No end date'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={formData.endDate ? new Date(formData.endDate) : undefined}
-                onSelect={(date) => handleDateSelect('endDate', date)}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+            )}
+          </div>
+        ))}
       </div>
-
-      <div className="space-y-2">
-        <Label>Status</Label>
-        <div className={cn(
-          "p-2 rounded-md text-center font-medium",
-          formData.status === 'Active'
-            ? "bg-green-100 text-green-800"
-            : "bg-red-100 text-red-800"
-        )}>
-          {formData.status}
-        </div>
-      </div>
-
       <DialogFooter>
         <Button type="submit" className="bg-blue-600 text-white">
           {mode === 'create' ? 'Create Account' : 'Update Account'}
@@ -440,16 +395,25 @@ const AccountForm: React.FC<{
       </DialogFooter>
     </form>
   );
-  };
+};
+
 
 // Main AccountsTab Component
 export function AccountsTab() {
   const { userId } = useAuth();
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [users, setUsers] = useState<Option[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [dialogState, setDialogState] = useState<{
+    isOpen: boolean;
+    mode: 'create' | 'edit';
+    account: AccountData | null;
+  }>({
+    isOpen: false,
+    mode: 'create',
+    account: null
+  });
+
   const [searchQuery, setSearchQuery] = useState('');
 
   // Table Definitions
@@ -549,8 +513,10 @@ export function AccountsTab() {
       cell: (account: Account) => (
         <TableActions
           row={account}
-          onEdit={() => setEditingAccount(account)}
+          onEdit={() => handleEditAccount(account)}
           onDelete={() => handleDeleteAccount(account)}
+          onVerify={() => handleVerifyAccount(account)}
+          isVerified={account.status === 'Active'}
         />
       )
     }
@@ -560,26 +526,14 @@ export function AccountsTab() {
   const fetchAccounts = async () => {
     setIsLoading(true);
     try {
-      const data = await PettyCashService.fetchRecords('acc_portal_pettycash_accounts', userId);
-      setAccounts(data);
+      const response = await PettyCashService.fetchAccountRecords(userId);
+      setAccounts(response?.data?.accounts || []);
     } catch (error) {
       console.error('Error fetching accounts:', error);
       toast.error('Failed to fetch accounts');
+      setAccounts([]);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchUsers = async () => {
-    try {
-      const data = await PettyCashService.fetchRecords('acc_portal_pettycash_users', userId);
-      setUsers(data.map(user => ({
-        label: user.name,
-        value: user.id.toString()
-      })));
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      toast.error('Failed to fetch users');
     }
   };
 
@@ -588,50 +542,102 @@ export function AccountsTab() {
     fetchUsers();
   }, [userId]);
 
-  // Account Management Functions
-  const handleAddAccount = async (data: AccountData) => {
-    try {
-      await PettyCashService.createRecord('acc_portal_pettycash_accounts', {
-        userid: userId,
-        data: data
-      });
-      toast.success('Account created successfully');
-      fetchAccounts();
-      setIsDialogOpen(false);
-    } catch (error) {
-      console.error('Error creating account:', error);
-      toast.error('Failed to create account');
-    }
+
+  const handleCreateAccount = () => {
+    setDialogState({
+      isOpen: true,
+      mode: 'create',
+      account: {
+        accountUser: [],
+        pettyCashType: [],
+        accountNumber: '',
+        accountType: 'Corporate',
+        minFloatBalance: 0,
+        minFloatAlert: 0,
+        maxOpeningFloat: 0,
+        approvedLimitAmount: 0,
+        startDate: new Date().toISOString(),
+        endDate: null,
+        status: 'Active'
+      }
+    });
   };
 
-  const handleEditAccount = async (data: AccountData) => {
-    if (!editingAccount) return;
+  const handleEditAccount = (account: AccountData) => {
+    setDialogState({
+      isOpen: true,
+      mode: 'edit',
+      account: {
+        accountUser: account.accountUser,
+        pettyCashType: account.pettyCashType,
+        accountNumber: account.accountNumber,
+        accountType: account.accountType,
+        minFloatBalance: account.minFloatBalance,
+        minFloatAlert: account.minFloatAlert,
+        maxOpeningFloat: account.maxOpeningFloat,
+        approvedLimitAmount: account.approvedLimitAmount,
+        startDate: account.startDate,
+        endDate: account.endDate,
+        status: account.status
+      }
+    });
+  };
+
+  const handleSaveAccount = async (account: AccountData) => {
     try {
-      await PettyCashService.updateRecord(
-        'acc_portal_pettycash_accounts',
-        editingAccount.id,
-        {
-          userid: userId,
-          data: data
+      if (dialogState.mode === 'create') {
+        const result = await PettyCashService.createAccountRecord(
+          'acc_portal_pettycash_accounts',
+          account,
+          userId
+        );
+        if (result) {
+          toast.success('Account created successfully');
+          fetchAccounts();
         }
-      );
-      toast.success('Account updated successfully');
-      fetchAccounts();
-      setEditingAccount(null);
+      } else {
+        await PettyCashService.updateAccountRecord(
+          account.accountNumber,
+          account,
+          userId
+        );
+        toast.success('Account updated successfully');
+        fetchAccounts();
+      }
+      setDialogState({ isOpen: false, mode: 'create', account: null });
     } catch (error) {
-      console.error('Error updating account:', error);
-      toast.error('Failed to update account');
+      console.error('Error saving account:', error);
+      toast.error(dialogState.mode === 'create' ? 'Failed to create account' : 'Failed to update account');
     }
   };
 
-  const handleDeleteAccount = async (account: Account) => {
+  const handleDeleteAccount = async (accountToDelete: AccountData) => {
     try {
-      await PettyCashService.deleteRecord('acc_portal_pettycash_accounts', account.id);
+      await PettyCashService.deleteAccountRecord(accountToDelete.accountNumber, userId);
       toast.success('Account deleted successfully');
       fetchAccounts();
     } catch (error) {
-      console.error('Error deleting account:', error);
       toast.error('Failed to delete account');
+    }
+  };
+
+  const handleVerifyAccount = async (account: AccountData) => {
+    try {
+      await PettyCashService.verifyAccountRecord(account.accountNumber, userId);
+      toast.success('Account verified successfully');
+      fetchAccounts();
+    } catch (error) {
+      toast.error('Failed to verify account');
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const usersData = await PettyCashService.fetchUserRecords(userId);
+      setUsers(usersData);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to fetch users');
     }
   };
 
@@ -675,7 +681,7 @@ export function AccountsTab() {
               <RefreshCwIcon className="h-4 w-4" />
             </Button>
             <Button
-              onClick={() => setIsDialogOpen(true)}
+              onClick={handleCreateAccount}
               className="h-8 bg-blue-600 text-white"
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -712,12 +718,30 @@ export function AccountsTab() {
                     </TableCell>
                   </TableRow>
                 ) : filteredAccounts.length === 0 ? (
-                  <TableRow>
+                    <TableRow>
                     <TableCell
                       colSpan={columnDefinitions.length}
-                      className="h-32 text-center text-gray-500"
+                      className="h-32 text-center"
                     >
-                      No accounts found
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="rounded-full bg-gray-100 p-3 mb-2">
+                          <Search className="h-6 w-6 text-gray-400" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">No Accounts Found</span>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {searchQuery
+                            ? 'No accounts match your search criteria'
+                            : 'Get started by adding your first account'}
+                        </p>
+                        {!searchQuery && (
+                          <Button
+                            onClick={handleCreateAccount}
+                            className="mt-3 bg-blue-600 text-white"
+                          >
+                            Add New Account
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -743,30 +767,14 @@ export function AccountsTab() {
           </ScrollArea>
         </Card>
 
-        {/* Account Form Dialog */}
-        <Dialog
-          open={isDialogOpen || editingAccount !== null}
-          onOpenChange={(open) => {
-            if (!open) {
-              setIsDialogOpen(false);
-              setEditingAccount(null);
-            }
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingAccount ? 'Edit Account' : 'Add New Account'}
-              </DialogTitle>
-            </DialogHeader>
-            <AccountForm
-              onSubmit={editingAccount ? handleEditAccount : handleAddAccount}
-              initialData={editingAccount?.data}
-              users={users}
-              mode={editingAccount ? 'edit' : 'create'}
-            />
-          </DialogContent>
-        </Dialog>
+        <AccountDialog
+          isOpen={dialogState.isOpen}
+          onClose={() => setDialogState({ isOpen: false, mode: 'create', account: null })}
+          account={dialogState.account}
+          onSave={handleSaveAccount}
+          mode={dialogState.mode}
+          users={users}
+        />
       </main>
     </div>
   );

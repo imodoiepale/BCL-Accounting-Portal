@@ -20,19 +20,28 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from 'react-hot-toast';
 
 interface TableActionsProps {
     row: any;
-    onEdit: (row: any) => void;
+    onEdit: (row: any) => void; // Changed to just call the callback
     onDelete: (row: any) => void;
     onVerify?: (row: any) => void;
     isVerified?: boolean;
-    editForm: React.ComponentType<any>;  // Accept component instead of function
-    editFormProps?: any;                 // Additional props for the form
+    editFormProps?: any;
     showVerify?: boolean;
+    dialogTitle?: string;
+    dialogDescription?: string;
+    deleteWarning?: string;
 }
 
 export const TableActions: React.FC<TableActionsProps> = ({
@@ -41,37 +50,43 @@ export const TableActions: React.FC<TableActionsProps> = ({
     onDelete,
     onVerify,
     isVerified = false,
-    editForm: EditForm,
-    editFormProps = {},
-    showVerify = true
+    showVerify = true,
+    dialogTitle = "Edit Record",
+    dialogDescription = "Make changes to this record. Click save when you're done.",
+    deleteWarning = "This action cannot be undone. This will permanently delete the record and remove all associated data."
 }) => {
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const [showEditSheet, setShowEditSheet] = useState(false);
-    return (
-        <div className="flex items-center gap-2">
-            {/* {showVerify && (
-                <Badge
-                    variant={isVerified ? "success" : "destructive"}
-                    className="h-6 cursor-default"
-                >
-                    {isVerified ? (
-                        <Check className="h-3 w-3 mr-1" />
-                    ) : (
-                        <X className="h-3 w-3 mr-1" />
-                    )}
-                    {isVerified ? "Verified" : "Unverified"}
-                </Badge>
-            )} */}
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const handleEditClick = () => {
+        onEdit(row);
+    };
+
+    const handleDelete = async () => {
+        setIsSubmitting(true);
+        try {
+            await onDelete(row);
+            setShowDeleteDialog(false);
+            toast.success('Record deleted successfully');
+        } catch (error) {
+            console.error('Error deleting record:', error);
+            toast.error('Failed to delete record');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="h-8 w-8 p-0">
                         <MoreHorizontal className="h-4 w-4" />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuItem onClick={() => setShowEditSheet(true)}>
+                    <DropdownMenuItem onClick={handleEditClick}>
                         <Pencil className="mr-2 h-4 w-4" />
                         Edit
                     </DropdownMenuItem>
@@ -82,7 +97,7 @@ export const TableActions: React.FC<TableActionsProps> = ({
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete
                     </DropdownMenuItem>
-                    {showVerify && !isVerified && (
+                    {showVerify && !isVerified && onVerify && (
                         <DropdownMenuItem onClick={() => onVerify(row)}>
                             <Check className="mr-2 h-4 w-4" />
                             Verify
@@ -96,47 +111,21 @@ export const TableActions: React.FC<TableActionsProps> = ({
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the record
-                            and remove all associated data.
-                        </AlertDialogDescription>
+                        <AlertDialogDescription>{deleteWarning}</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={() => {
-                                onDelete(row);
-                                setShowDeleteDialog(false);
-                            }}
-                            className="bg-red-600"
+                            onClick={handleDelete}
+                            className="bg-red-600 hover:bg-red-700"
+                            disabled={isSubmitting}
                         >
-                            Delete
+                            {isSubmitting ? 'Deleting...' : 'Delete'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-
-            {/* Edit Sheet */}
-            <Sheet open={showEditSheet} onOpenChange={setShowEditSheet}>
-                <SheetContent>
-                    <SheetHeader>
-                        <SheetTitle>Edit Record</SheetTitle>
-                        <SheetDescription>
-                            Make changes to the record here. Click save when done.
-                        </SheetDescription>
-                    </SheetHeader>
-                    <EditForm
-                        entry={row}
-                        onClose={() => setShowEditSheet(false)}
-                        onSubmit={async (updatedData) => {
-                            await onEdit(updatedData);
-                            setShowEditSheet(false);
-                        }}
-                        {...editFormProps}
-                    />
-                </SheetContent>
-            </Sheet>
-        </div>
+        </>
     );
 };
 
