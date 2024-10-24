@@ -60,15 +60,32 @@ const UserDialog: React.FC<UserDialogProps> = ({
   mode,
   branches
 }) => {
-  const [formData, setFormData] = useState<User | null>(user);
+  const initialFormData = {
+    id: '',
+    name: '',
+    email: '',
+    role: 'user',
+    branch_id: undefined, // Changed from emformFields pty string to undefined
+    default_currency: 'KES',
+    cash_balance: 0,
+    credit_balance: 0,
+    mpesa_balance: 0,
+    created_date: new Date().toISOString(),
+    is_verified: false
+  };
+
+  const [formData, setFormData] = useState(mode === 'create' ? initialFormData : user);
 
   useEffect(() => {
-    setFormData(user);
-  }, [user]);
+    setFormData(mode === 'create' ? initialFormData : user);
+  }, [user, mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData) return;
+    if (!formData?.branch_id) {
+      toast.error('Please select a branch');
+      return;
+    }
 
     try {
       await onSave(formData);
@@ -78,31 +95,32 @@ const UserDialog: React.FC<UserDialogProps> = ({
       console.error('Error saving user:', error);
     }
   };
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
-    setFormData(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        [name]: type === 'number' ? parseFloat(value) : value
-      };
-    });
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'number' ? (value === '' ? 0 : parseFloat(value)) : value
+    }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        [name]: value
-      };
-    });
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'branch_id' ? value : value // Store branch_name for branch_id
+    }));
+  };
+
+  const getSelectValue = (name: string): string | undefined => {
+    if (name === 'branch_id') {
+      return formData?.branch_id || undefined;
+    }
+    const value = formData?.[name];
+    return value ? value.toString() : undefined;
   };
 
   const formFields = [
     { name: 'name', label: 'Name', type: 'text', required: true },
-    { name: 'email', label: 'Email', type: 'email', required: true },
+    { name: 'email', label: 'Email', type: 'email'},
     {
       name: 'role',
       label: 'Role',
@@ -118,11 +136,12 @@ const UserDialog: React.FC<UserDialogProps> = ({
       name: 'branch_id',
       label: 'Branch',
       type: 'select',
-      options: branches.map(branch => ({
-        value: branch.id.toString(),
-        label: branch.branch_name
-      })),
-      required: true
+      options: branches?.map(branch => ({
+        value: branch.branch_name, // Use branch_name as the value
+        label: `${branch.branch_name} - ${branch.location}` // Show both name and location
+      })) || [],
+      required: true,
+      placeholder: 'Select Branch'
     },
     {
       name: 'default_currency',
@@ -136,9 +155,27 @@ const UserDialog: React.FC<UserDialogProps> = ({
       ],
       required: true
     },
-    { name: 'cash_balance', label: 'Cash Balance', type: 'number' },
-    { name: 'credit_balance', label: 'Credit Balance', type: 'number' },
-    { name: 'mpesa_balance', label: 'M-Pesa Balance', type: 'number' }
+    {
+      name: 'cash_balance',
+      label: 'Cash Balance',
+      type: 'number',
+      required: false,
+      defaultValue: '0'
+    },
+    {
+      name: 'credit_balance',
+      label: 'Credit Balance',
+      type: 'number',
+      required: false,
+      defaultValue: '0'
+    },
+    {
+      name: 'mpesa_balance',
+      label: 'M-Pesa Balance',
+      type: 'number',
+      required: false,
+      defaultValue: '0'
+    }
   ];
 
   return (
@@ -148,16 +185,16 @@ const UserDialog: React.FC<UserDialogProps> = ({
           <DialogTitle>{mode === 'create' ? 'Add New User' : 'Edit User'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {formFields.map(({ name, label, type, options, required }) => (
+          {formFields.map(({ name, label, type, options, required, defaultValue, placeholder }) => (
             <div key={name} className="space-y-1.5">
-              <Label htmlFor={name}>{label}</Label>
+              <Label htmlFor={name}>{label}{required && ' *'}</Label>
               {type === 'select' ? (
                 <Select
-                  value={formData?.[name]?.toString()}
+                  value={getSelectValue(name)}
                   onValueChange={(value) => handleSelectChange(name, value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
+                    <SelectValue placeholder={placeholder || `Select ${label.toLowerCase()}`} />
                   </SelectTrigger>
                   <SelectContent>
                     {options?.map((option) => (
@@ -172,7 +209,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
                   id={name}
                   name={name}
                   type={type}
-                  value={formData?.[name] || ''}
+                  value={formData?.[name]?.toString() || defaultValue || ''}
                   onChange={handleInputChange}
                   className="h-8"
                   required={required}
@@ -181,18 +218,10 @@ const UserDialog: React.FC<UserDialogProps> = ({
             </div>
           ))}
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="h-8"
-            >
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              className="h-8 bg-blue-600 text-white"
-            >
+            <Button type="submit" className="bg-blue-600 text-white">
               {mode === 'create' ? 'Create' : 'Save Changes'}
             </Button>
           </DialogFooter>
@@ -208,11 +237,7 @@ export function UsersTab() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [dialogState, setDialogState] = useState<{
-    isOpen: boolean;
-    mode: 'create' | 'edit';
-    user: User | null;
-  }>({
+  const [dialogState, setDialogState] = useState({
     isOpen: false,
     mode: 'create',
     user: null
@@ -221,18 +246,56 @@ export function UsersTab() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [usersData, branchesData] = await Promise.all([
-        PettyCashService.fetchRecords('acc_portal_pettycash_users', userId),
-        PettyCashService.fetchRecords('acc_portal_pettycash_branches', userId)
+      const [usersData, branchesResponse] = await Promise.all([
+        PettyCashService.fetchUserRecords(userId),
+        PettyCashService.fetchBranchRecords(userId)
       ]);
-      setUsers(usersData);
+
+      // Extract branches from the JSONB structure
+      const branchesData = branchesResponse?.data?.branches || [];
+
+      if (!usersData || usersData.length === 0) {
+        setUsers([]);
+        setBranches(branchesData);
+        return;
+      }
+
+      const usersWithBranches = usersData.map(user => ({
+        ...user,
+        branch_info: branchesData.find(b => b.branch_name === user.branch_id)
+      }));
+
+      setUsers(usersWithBranches);
       setBranches(branchesData);
     } catch (error) {
+      console.error('Error fetching data:', error);
       toast.error('Failed to fetch data');
+      setUsers([]);
+      setBranches([]);
     } finally {
       setIsLoading(false);
     }
   };
+
+
+  const flattenUserData = (userData: any) => {
+  if (!userData) return null;
+  
+  return {
+    name: userData.name,
+    email: userData.email,
+    role: userData.role,
+    branch_id: userData.branch_id,
+    default_currency: userData.default_currency,
+    cash_balance: userData.cash_balance || 0,
+    credit_balance: userData.credit_balance || 0,
+    mpesa_balance: userData.mpesa_balance || 0,
+    created_date: userData.created_date,
+    is_verified: userData.is_verified || false,
+    acc_portal_pettycash_branches: userData.acc_portal_pettycash_branches
+  };
+};
+
 
   useEffect(() => {
     fetchData();
@@ -243,17 +306,16 @@ export function UsersTab() {
       isOpen: true,
       mode: 'create',
       user: {
-        id: '',
-        admin_id: userId,
         name: '',
         email: '',
-        role: '',
-        branch_id: null,
-        created_date: new Date().toISOString(),
+        role: 'user',
+        branch_id: '',
         default_currency: 'KES',
         cash_balance: 0,
         credit_balance: 0,
-        mpesa_balance: 0
+        mpesa_balance: 0,
+        created_date: new Date().toISOString(),
+        is_verified: false
       }
     });
   };
@@ -262,28 +324,43 @@ export function UsersTab() {
     setDialogState({
       isOpen: true,
       mode: 'edit',
-      user
+      user: {
+        ...user,
+        branch_id: user.branch_id || '' // Ensure branch_id is set properly
+      }
     });
   };
 
-  const handleSaveUser = async (user: User) => {
+  const handleSaveUser = async (userData: User) => {
     try {
       if (dialogState.mode === 'create') {
-        await PettyCashService.createRecord('acc_portal_pettycash_users', user, userId);
-        toast.success('User created successfully');
+        // Create new user record
+        const result = await PettyCashService.createUserRecord(userId, {
+          ...userData,
+          branch_id: userData.branch_id // This should be branch_name from selected branch
+        });
+        if (result) {
+          toast.success('User created successfully');
+          fetchData();
+        }
       } else {
-        await PettyCashService.updateRecord('acc_portal_pettycash_users', user.id, user);
+        // Update existing user
+        await PettyCashService.updateUserRecord(userId, userData.email, {
+          ...userData,
+          branch_id: userData.branch_id // This should be branch_name from selected branch
+        });
         toast.success('User updated successfully');
+        fetchData();
       }
-      fetchData();
+      setDialogState({ isOpen: false, mode: 'create', user: null });
     } catch (error) {
-      toast.error('Failed to save user');
+      console.error('Error saving user:', error);
+      toast.error(dialogState.mode === 'create' ? 'Failed to create user' : 'Failed to update user');
     }
   };
-
   const handleDeleteUser = async (user: User) => {
     try {
-      await PettyCashService.deleteRecord('acc_portal_pettycash_users', user.id);
+      await PettyCashService.deleteUserRecord(userId, user.email);
       toast.success('User deleted successfully');
       fetchData();
     } catch (error) {
@@ -331,7 +408,7 @@ export function UsersTab() {
     {
       header: 'Branch',
       width: '150px',
-      cell: (user: User) => user.acc_portal_pettycash_branches?.branch_name || '-'
+      cell: (user: User) => user.branch_info?.branch_name || '-'
     },
     {
       header: 'Cash Balance',
@@ -359,10 +436,13 @@ export function UsersTab() {
       cell: (user: User) => (
         <TableActions
           row={user}
-          onEdit={() => handleEditUser(user)}
-          onDelete={() => handleDeleteUser(user)}
-          onVerify={() => handleVerifyUser(user)}
+          onEdit={handleEditUser}
+          onDelete={handleDeleteUser}
+          onVerify={handleVerifyUser}
           isVerified={user.is_verified}
+          dialogTitle="Edit User"
+          dialogDescription="Update user information"
+          deleteWarning="Are you sure you want to delete this user? This action cannot be undone."
         />
       )
     }
@@ -426,7 +506,10 @@ export function UsersTab() {
                       colSpan={columnDefinitions.length}
                       className="h-32 text-center"
                     >
-                      Loading users...
+                      <div className="flex flex-col items-center justify-center">
+                        <RefreshCwIcon className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+                        <span className="text-sm text-gray-500">Loading users...</span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : filteredUsers.length === 0 ? (
@@ -435,18 +518,36 @@ export function UsersTab() {
                       colSpan={columnDefinitions.length}
                       className="h-32 text-center"
                     >
-                      No users found
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="rounded-full bg-gray-100 p-3 mb-2">
+                          <Search className="h-6 w-6 text-gray-400" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">No Users Found</span>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {searchQuery
+                            ? 'No users match your search criteria'
+                            : 'Get started by adding your first user'}
+                        </p>
+                        {!searchQuery && (
+                          <Button
+                            onClick={handleCreateUser}
+                            className="mt-3 bg-blue-600 text-white"
+                          >
+                            Add New User
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredUsers.map((user, index) => (
                     <TableRow
-                      key={user.id}
+                      key={user.id || user.email}
                       className="hover:bg-blue-50 border-b border-gray-100 transition-colors [&>td]:h-8"
                     >
                       {columnDefinitions.map((col, colIndex) => (
                         <TableCell
-                          key={`${user.id}-${colIndex}`}
+                          key={`${user.id || user.email}-${colIndex}`}
                           style={{ width: col.width }}
                           className="py-1 px-2 text-xs border-r border-gray-100 last:border-r-0"
                         >
@@ -469,7 +570,6 @@ export function UsersTab() {
           mode={dialogState.mode}
           branches={branches}
         />
-
       </main>
     </div>
   );
