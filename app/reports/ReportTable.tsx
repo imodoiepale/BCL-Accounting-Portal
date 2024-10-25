@@ -41,7 +41,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, Mail, Phone, PlusCircle, Upload } from "lucide-react";
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabaseClient'
 
 
@@ -164,10 +164,10 @@ const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fet
     setEmailSending(true);
     const missingDocs = getMissingDocuments(supplier);
     const missingDocsText = missingDocs.map(doc => `${MONTHS[doc.month]} ${doc.year}`).join(', ');
-    
+
     const username = user?.username || 'User';
-    const userEmail = user?.email || process.env.EMAIL_FROM_ADDRESS; 
-  
+    const userEmail = user?.email || process.env.EMAIL_FROM_ADDRESS;
+
     try {
       const emailData = {
         to: supplier.email,
@@ -177,7 +177,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fet
         fromName: username,
         fromEmail: userEmail,
       };
-      
+
       const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: {
@@ -185,7 +185,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fet
         },
         body: JSON.stringify(emailData),
       });
-  
+
       if (response.ok) {
         const result = await response.json();
         console.log('Email sent successfully:', result);
@@ -294,7 +294,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fet
         }
 
         // Update the local state to reflect the new upload
-        const updatedEntity = {...selectedEntity};
+        const updatedEntity = { ...selectedEntity };
         if (!updatedEntity.months[selectedMonth.month]) {
           updatedEntity.months[selectedMonth.month] = {};
         }
@@ -304,7 +304,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fet
         updatedEntity.months[selectedMonth.month].endDate = endDate.toISOString().split('T')[0];
 
         // Update the data state
-        setData(prevData => prevData.map(entity => 
+        setData(prevData => prevData.map(entity =>
           entity.id === updatedEntity.id ? updatedEntity : entity
         ));
 
@@ -407,13 +407,13 @@ const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fet
         const startDateString = row.original.startDate;
         const cellDate = new Date(visibleMonths[index].date);
         const currentDate = new Date();
-        
+
         let startDate: Date | null = parseDate(startDateString);
-        
+
         let cellContent;
         let bgColor;
         let tooltipContent;
-      
+
         if (!startDate) {
           cellContent = '❓';
           bgColor = 'bg-gray-300';
@@ -447,7 +447,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fet
           bgColor = 'bg-red-200';
           tooltipContent = <p>Missing document</p>;
         }
-      
+
         return (
           <div className={cellDate.getMonth() === currentMonthIndex && cellDate.getFullYear() === new Date().getFullYear() ? "flex justify-center text-center" : ""}>
             <TooltipProvider>
@@ -499,7 +499,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fet
                   <h3 className="text-xl font-semibold mb-4">Missing Monthly Documents</h3>
                   <ScrollArea className="h-[300px] rounded-md border p-4">
                     <ul className="grid grid-cols-2 gap-4">
-                    {getMissingDocuments(entity).map((doc) => (
+                      {getMissingDocuments(entity).map((doc) => (
                         <li key={`${doc.month}-${doc.year}`} className="flex justify-between items-center bg-gray-100 p-3 rounded-lg">
                           <span className="font-medium">{MONTHS[doc.month]} {doc.year}</span>
                           <Button
@@ -568,7 +568,7 @@ const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fet
 
   return (
     <div className="w-[2000px]">
-      <Toaster position="top-right" />
+
       <div className="flex items-start py-4">
         <div className="flex gap-4 items-center flex-grow">
           <DateRangePicker
@@ -633,9 +633,9 @@ const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fet
                     {header.isPlaceholder
                       ? null
                       : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
                   </TableHead>
                 ))}
               </TableRow>
@@ -711,12 +711,12 @@ const ReportTable: React.FC<ReportTableProps> = ({ data: initialData, title, fet
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label htmlFor="document">Document:</label>
-                <Input 
-                  id="document" 
-                  type="file" 
-                  className="col-span-3" 
+                <Input
+                  id="document"
+                  type="file"
+                  className="col-span-3"
                   onChange={handleFileChange}
-                  required 
+                  required
                 />
               </div>
             </div>

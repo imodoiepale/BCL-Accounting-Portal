@@ -70,7 +70,6 @@ export function SuppliersTab() {
       setSuppliers(data);
     } catch (error) {
       console.error('Error fetching suppliers:', error);
-      toast.error('Failed to fetch suppliers');
     } finally {
       setIsLoading(false);
     }
@@ -123,7 +122,7 @@ export function SuppliersTab() {
     }
   };
 
-   const handleSubmit = async (formData: SupplierData) => {
+  const handleSubmit = async (formData: SupplierData) => {
     try {
       if (editingSupplier) {
         await PettyCashService.updateRecord('acc_portal_pettycash_suppliers', editingSupplier.id, {
@@ -220,7 +219,7 @@ export function SuppliersTab() {
 
   return (
     <div className="flex w-full bg-gray-100">
-      <Toaster position="top-right" />
+
       <main className="flex-1 p-4 w-full">
         <Tabs defaultValue="all" onValueChange={(value) => setSelectedType(value as typeof selectedType)}>
           <div className="flex justify-between items-center mb-4">
@@ -289,32 +288,46 @@ export function SuppliersTab() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={columnDefinitions.length}
-                        className="h-32 text-center"
-                      >
-                        <RefreshCwIcon className="h-4 w-4 animate-spin mx-auto" />
-                        Loading suppliers...
+                      <TableCell colSpan={columnDefinitions.length} className="h-32 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <RefreshCwIcon className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+                          <span className="text-sm text-gray-500">Loading suppliers...</span>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : filteredSuppliers.length === 0 ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={columnDefinitions.length}
-                        className="h-32 text-center"
-                      >
-                        No suppliers found
+                      <TableCell colSpan={columnDefinitions.length} className="h-32 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="rounded-full bg-gray-100 p-3 mb-2">
+                            <Search className="h-6 w-6 text-gray-400" />
+                          </div>
+                          <span className="text-sm font-medium text-gray-900">No Suppliers Found</span>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {searchQuery
+                              ? 'No suppliers match your search criteria'
+                              : 'Get started by adding your first supplier'}
+                          </p>
+                          {!searchQuery && (
+                            <Button
+                              onClick={() => setIsDialogOpen(true)}
+                              className="mt-3 bg-blue-600 text-white"
+                            >
+                              Add New Supplier
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredSuppliers.map((supplier, index) => (
                       <TableRow
-                        key={supplier.id}
+                        key={supplier.id || index}
                         className="hover:bg-blue-50 border-b border-gray-100 transition-colors [&>td]:h-8"
                       >
                         {columnDefinitions.map((col, colIndex) => (
                           <TableCell
-                            key={`${supplier.id}-${colIndex}`}
+                            key={`${supplier.id || index}-${colIndex}`}
                             style={{ width: col.width }}
                             className="py-1 px-2 text-xs border-r border-gray-100 last:border-r-0"
                           >
@@ -325,6 +338,7 @@ export function SuppliersTab() {
                     ))
                   )}
                 </TableBody>
+
               </Table>
             </ScrollArea>
           </Card>

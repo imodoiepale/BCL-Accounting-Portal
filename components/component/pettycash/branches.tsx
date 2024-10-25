@@ -434,7 +434,7 @@ export function BranchesTab() {
 
   return (
     <div className="flex w-full bg-gray-100">
-      <Toaster position="top-right" />
+
       <main className="flex-1 p-4 w-full">
         {/* Search and Actions */}
         <div className="flex justify-between items-center mb-4">

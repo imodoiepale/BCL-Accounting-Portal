@@ -120,7 +120,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
 
   const formFields = [
     { name: 'name', label: 'Name', type: 'text', required: true },
-    { name: 'email', label: 'Email', type: 'email'},
+    { name: 'email', label: 'Email', type: 'email' },
     {
       name: 'role',
       label: 'Role',
@@ -279,22 +279,22 @@ export function UsersTab() {
 
 
   const flattenUserData = (userData: any) => {
-  if (!userData) return null;
-  
-  return {
-    name: userData.name,
-    email: userData.email,
-    role: userData.role,
-    branch_id: userData.branch_id,
-    default_currency: userData.default_currency,
-    cash_balance: userData.cash_balance || 0,
-    credit_balance: userData.credit_balance || 0,
-    mpesa_balance: userData.mpesa_balance || 0,
-    created_date: userData.created_date,
-    is_verified: userData.is_verified || false,
-    acc_portal_pettycash_branches: userData.acc_portal_pettycash_branches
+    if (!userData) return null;
+
+    return {
+      name: userData.name,
+      email: userData.email,
+      role: userData.role,
+      branch_id: userData.branch_id,
+      default_currency: userData.default_currency,
+      cash_balance: userData.cash_balance || 0,
+      credit_balance: userData.credit_balance || 0,
+      mpesa_balance: userData.mpesa_balance || 0,
+      created_date: userData.created_date,
+      is_verified: userData.is_verified || false,
+      acc_portal_pettycash_branches: userData.acc_portal_pettycash_branches
+    };
   };
-};
 
 
   useEffect(() => {
@@ -450,7 +450,7 @@ export function UsersTab() {
 
   return (
     <div className="flex w-full bg-gray-100">
-      <Toaster position="top-right" />
+
       <main className="flex-1 p-4 w-full">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-4">
