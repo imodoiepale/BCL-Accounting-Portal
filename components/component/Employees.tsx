@@ -15,7 +15,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, UploadIcon, DownloadIcon } from 'lucide-react'
 import { useUser } from '@clerk/clerk-react'
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { PencilIcon, TrashIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -24,7 +24,7 @@ import { supabase } from '@/lib/supabaseClient'
 // Utility function to format date
 const formatDate = (dateString) => {
   let date;
-  
+
   // Check if the date is in DD/MM/YYYY format
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
     const [day, month, year] = dateString.split('/');
@@ -86,7 +86,7 @@ export function EmployeeList() {
     const { data, error } = await supabase
       .from('acc_portal_employees')
       .insert([{ ...newEmployee, userid: user?.id, status: 'true' }])
-    if (error){
+    if (error) {
       console.error('Error adding employee:', error);
       toast.error('Failed to add employee.');
     } else {
@@ -100,7 +100,7 @@ export function EmployeeList() {
         nhif: '',
         nssf: '',
         startdate: '',
-        enddate: '', 
+        enddate: '',
       })
       toast.success('Employee added successfully!');
       setIsDialogOpen(false);
@@ -317,12 +317,12 @@ export function EmployeeList() {
                   </div>
                 </div>
                 <div className="pt-4"><Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button></div>
-               </SheetContent>
+              </SheetContent>
             </Sheet>
           </div>
         </div>
         <Card>
-        <Table>
+          <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>EMP ID</TableHead>
@@ -341,7 +341,7 @@ export function EmployeeList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((employee,index) => (
+              {employees.map((employee, index) => (
                 <TableRow key={employee.id}>
                   <TableCell>EMP-{index + 1}</TableCell>
                   <TableCell>{employee.name}</TableCell>

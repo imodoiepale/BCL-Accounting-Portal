@@ -34,11 +34,11 @@ const formatDate = (dateString) => {
 
 const calculateRemainingDays = (issueDate, expiryDate) => {
   if (!issueDate || !expiryDate) return 'N/A';
-  
+
   const today = new Date();
   const expiry = new Date(expiryDate);
   const remainingDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-  
+
   return remainingDays > 0 ? remainingDays : 0;
 };
 
@@ -180,7 +180,7 @@ export function DirectorsDocumentsList() {
 
       const { error: insertError } = await supabase
         .from('acc_portal_kyc_uploads')
-        .insert({ 
+        .insert({
           userid: userId,
           kyc_id: editingDocument.id,
           filepath: data.path,
@@ -268,7 +268,7 @@ export function DirectorsDocumentsList() {
 
   const filterDocuments = (docs) => {
     if (!searchTerm) return docs
-    return docs.filter(doc => 
+    return docs.filter(doc =>
       doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       directors.find(d => d.id === doc.director_id)?.full_name.toLowerCase().includes(searchTerm.toLowerCase())
     )
@@ -276,16 +276,16 @@ export function DirectorsDocumentsList() {
 
   return (
     <div className="flex w-full bg-gray-100">
-      <Toaster position="top-right" />
+
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-semibold">KYC Documents - {category} {subcategory && `- ${subcategory}`}</h1>
           <div className="flex items-center space-x-2">
-            
-            <Input 
-              type="search" 
-              placeholder="Search documents" 
-              className="w-48 bg-gray-200 border-gray-300 focus:border-blue-500 focus:ring-blue-500" 
+
+            <Input
+              type="search"
+              placeholder="Search documents"
+              className="w-48 bg-gray-200 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -353,7 +353,7 @@ export function DirectorsDocumentsList() {
             </TableBody>
           </Table>
         </Card>
-        
+
         {isUploadingDocument && (
           <Dialog open={isUploadingDocument} onOpenChange={(open) => {
             setIsUploadingDocument(open)
@@ -369,22 +369,22 @@ export function DirectorsDocumentsList() {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="issue_date">Issue Date</Label>
-                  <Input 
-                    id="issue_date" 
-                    type="date" 
-                    value={editingDocument?.issue_date || ''} 
-                    onChange={handleInputChange} 
-                    required 
+                  <Input
+                    id="issue_date"
+                    type="date"
+                    value={editingDocument?.issue_date || ''}
+                    onChange={handleInputChange}
+                    required
                   />
                 </div>
                 <div>
                   <Label htmlFor="expiry_date">Expiry Date</Label>
-                  <Input 
-                    id="expiry_date" 
-                    type="date" 
-                    value={editingDocument?.expiry_date || ''} 
-                    onChange={handleInputChange} 
-                    required 
+                  <Input
+                    id="expiry_date"
+                    type="date"
+                    value={editingDocument?.expiry_date || ''}
+                    onChange={handleInputChange}
+                    required
                   />
                 </div>
                 <div>
@@ -413,22 +413,22 @@ export function DirectorsDocumentsList() {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="issue_date">Issue Date</Label>
-                  <Input 
-                    id="issue_date" 
-                    type="date" 
-                    value={editingDocument.issue_date} 
-                    onChange={handleInputChange} 
-                    required 
+                  <Input
+                    id="issue_date"
+                    type="date"
+                    value={editingDocument.issue_date}
+                    onChange={handleInputChange}
+                    required
                   />
                 </div>
                 <div>
                   <Label htmlFor="expiry_date">Expiry Date</Label>
-                  <Input 
-                    id="expiry_date" 
-                    type="date" 
-                    value={editingDocument.expiry_date} 
-                    onChange={handleInputChange} 
-                    required 
+                  <Input
+                    id="expiry_date"
+                    type="date"
+                    value={editingDocument.expiry_date}
+                    onChange={handleInputChange}
+                    required
                   />
                 </div>
               </div>
@@ -439,7 +439,7 @@ export function DirectorsDocumentsList() {
             </DialogContent>
           </Dialog>
         )}
-        
+
         {viewerUrl && <FileViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />}
       </main>
     </div>

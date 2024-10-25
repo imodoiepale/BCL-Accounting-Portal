@@ -62,9 +62,9 @@ const DataTable = ({ data, columns, onVerify, onSort, sortColumn, sortOrder, onE
             <TableRow>
               <TableHead className="text-gray-700 font-bold">INDEX</TableHead>
               {columns.map((column) => (
-                <TableHead 
+                <TableHead
                   key={column}
-                  className="text-gray-700 font-bold cursor-pointer" 
+                  className="text-gray-700 font-bold cursor-pointer"
                   onClick={() => onSort(column)}
                 >
                   {column.replace('_', ' ').toUpperCase()}
@@ -234,7 +234,7 @@ const Page = () => {
       .from(tableName)
       .update({ verified: true, verified: true })
       .eq('id', item.id);
-  
+
     if (error) {
       console.error('Error verifying item:', error);
       toast.error('Failed to verify item');
@@ -322,11 +322,11 @@ const Page = () => {
 
   return (
     <div className="flex flex-col lg:flex-row p-6 bg-gray-100">
-      <Toaster position="top-right" />
+
       <Card className="lg:w-1/5 bg-white shadow">
         <CardHeader className="space-y-4">
-          <Button 
-            onClick={() => setShowAllCompanies(!showAllCompanies)} 
+          <Button
+            onClick={() => setShowAllCompanies(!showAllCompanies)}
             className="w-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center"
           >
             {showAllCompanies ? <EyeOff className="mr-2" /> : <Eye className="mr-2" />}
@@ -402,7 +402,7 @@ const Page = () => {
                   <div className="mb-4 flex justify-between items-center bg-gray-100 p-2 rounded">
                     <span className="text-red-500">Pending: {pendingCount}</span>
                     <span className="text-green-500">Verified: {completedCount}</span>
-                  </div> 
+                  </div>
 
                   <DataTable
                     data={filteredTabData}
@@ -423,11 +423,11 @@ const Page = () => {
         </CardContent>
       </Card>
 
-      <VerifyDialog 
-        open={dialogOpen} 
-        onOpenChange={setDialogOpen} 
-        item={selectedItem} 
-        onVerify={performVerification} 
+      <VerifyDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        item={selectedItem}
+        onVerify={performVerification}
       />
     </div>
   );

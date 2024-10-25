@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RefreshCwIcon, Search, FilterIcon, Download, RotateCcw, Loader2 } from 'lucide-react';
+import { RefreshCwIcon, Search, FilterIcon, Download, RotateCcw, Loader2, Eye } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { toast, Toaster } from 'react-hot-toast';
 import Image from 'next/image';
@@ -34,7 +34,7 @@ const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('en-KE', {
     style: 'currency',
     currency: 'KES',
-    minimumFractionDigits: 2
+    minimumFractionDigits: 0
   }).format(amount);
 };
 
@@ -55,6 +55,13 @@ interface PettyCashEntry {
   receipt_url: string | null;
   is_verified: boolean;
   created_at: string;
+  supplier_name: string;
+  supplier_pin: string;
+  purchase_type: string;
+  paid_via: string;
+  petty_cash_account: string;
+  bill_upload_url: string;
+  payment_proof_url: string;
 }
 
 interface EntryDialogProps {
@@ -304,6 +311,7 @@ export function TransactionsTab() {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedSubcategory, setSelectedSubcategory] = useState('ALL');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const [newPettyCash, setNewPettyCash] = useState<NewPettyCashEntry>({
     invoice_date: '',
@@ -408,6 +416,54 @@ export function TransactionsTab() {
       type: 'file',
       accept: 'image/*',
       required: false
+    }, {
+      name: 'supplier_name',
+      label: 'Supplier Name',
+      type: 'text',
+      required: true
+    },
+    {
+      name: 'supplier_pin',
+      label: 'Supplier PIN/ID',
+      type: 'text',
+      required: true
+    },
+    {
+      name: 'purchase_type',
+      label: 'Type of Purchase',
+      type: 'select',
+      options: [
+        { value: 'goods', label: 'Goods' },
+        { value: 'services', label: 'Services' },
+        { value: 'assets', label: 'Assets' }
+      ],
+      required: true
+    },
+    {
+      name: 'paid_via',
+      label: 'Paid Via/By',
+      type: 'text',
+      required: true
+    },
+    {
+      name: 'petty_cash_account',
+      label: 'Petty Cash Account Number',
+      type: 'text',
+      required: true
+    },
+    {
+      name: 'bill_upload',
+      label: 'Bill/PCV Upload',
+      type: 'file',
+      accept: '.pdf,.jpg,.jpeg,.png',
+      required: true
+    },
+    {
+      name: 'payment_proof',
+      label: 'Payment Proof',
+      type: 'file',
+      accept: '.pdf,.jpg,.jpeg,.png',
+      required: true
     }
   ];
 
@@ -597,42 +653,53 @@ export function TransactionsTab() {
     {
       header: '#',
       width: '40px',
-      cell: (_: any, index: number) => index + 1
+      cell: (_: any, index: number) => <div className="font-bold text-center">{index + 1}</div>
     },
     {
       header: 'Date',
       width: '100px',
       cell: (entry: PettyCashEntry) => format(new Date(entry.invoice_date), 'dd/MM/yyyy')
     },
+    // {
+    //   header: 'Branch',
+    //   width: '40px',
+    //   cell: (entry: PettyCashEntry) => <div className="text-center">{entry.branch_name || '-'}</div>
+    // },
+    {
+      header: <div className="">User</div>,
+      width: '350px',
+      cell: (entry: PettyCashEntry) => <div className="text-nowrap ">{entry.user_name || '-'}</div>
+    },
     {
       header: <div className="text-center">Account Type</div>,
       width: '120px',
       cell: (entry: PettyCashEntry) => (
-        <span className="capitalize">
+        <div className="capitalize text-center">
           {entry.account_type?.replace('_', ' ') || '-'}
-        </span>
+        </div>
       )
     },
     {
-      header: 'Amount',
+      header: <div className="text-center">Account No.</div>,
       width: '120px',
-      cell: (entry: PettyCashEntry) => formatCurrency(entry.amount)
+      cell: (entry: PettyCashEntry) => entry.petty_cash_account || '-'
     },
     {
-      header: 'Branch',
+      header: 'Supplier Name',
       width: '150px',
-      cell: (entry: PettyCashEntry) => entry.branch_name || '-'
+      cell: (entry: PettyCashEntry) => entry.supplier_name || '-'
     },
     {
-      header: 'User',
-      width: '200px',
-      cell: (entry: PettyCashEntry) => entry.user_name || '-'
+      header: 'Supplier PIN/ID',
+      width: '120px',
+      cell: (entry: PettyCashEntry) => entry.supplier_pin || '-'
     },
     {
-      header: 'Description',
-      width: '200px',
-      cell: (entry: PettyCashEntry) => entry.description
+      header: 'Purchase Type',
+      width: '120px',
+      cell: (entry: PettyCashEntry) => entry.purchase_type || '-'
     },
+    
     {
       header: 'Category',
       width: '150px',
@@ -644,27 +711,73 @@ export function TransactionsTab() {
       cell: (entry: PettyCashEntry) => getSubcategoryName(entry.category_code, entry.subcategory_code)
     },
     {
-      header: <div className="text-center"> Checked By</div>,
+      header: 'Amount',
+      width: '120px',
+      cell: (entry: PettyCashEntry) => formatCurrency(entry.amount)
+    },
+   
+   
+    {
+      header: 'Description',
+      width: '50px',
+      cell: (entry: PettyCashEntry) => {
+
+        return (
+          <div
+            className={`transition-all duration-300 cursor-pointer relative ${isExpanded ? 'w-[300px]' : 'w-[200px]'}`}
+            onClick={() => setIsExpanded(!isExpanded)}
+            title={entry.description}
+          >
+            <span className={`block  ${isExpanded ? 'max-w-[300px]' : 'max-w-[200px]'}`}>
+              {entry.description.split(/[\s,]+/).slice(0, 7).join(' ')}
+              {/* {entry.description.split(/[\s,]+/).length > 7? '...' : ''} */}
+            </span>
+          </div>
+        );
+      }
+    },
+    
+    // {
+    //   header: <div className="text-center"> Paid Via/By</div>,
+    //   width: '120px',
+    //   cell: (entry: PettyCashEntry) => entry.checked_by || '-'
+    // },
+    // {
+    //   header: <div className="text-center"> Approved By</div>,
+    //   width: '120px',
+    //   cell: (entry: PettyCashEntry) => entry.approved_by || '-'
+    // },
+   
+    {
+      header: 'Paid Via/By',
       width: '120px',
       cell: (entry: PettyCashEntry) => entry.checked_by || '-'
     },
+   
+    // {
+    //   header: 'Bill/PCV',
+    //   width: '100px',
+    //   cell: (entry: PettyCashEntry) => entry.bill_upload_url ? (
+    //     <Button variant="link" onClick={() => handleViewBill(entry)}>View Bill</Button>
+    //   ) : '-'
+    // },
     {
-      header: <div className="text-center"> Approved By</div>,
-      width: '120px',
-      cell: (entry: PettyCashEntry) => entry.approved_by || '-'
+      header: 'Payment Proof',
+      width: '100px',
+      cell: (entry: PettyCashEntry) => entry.payment_proof_url ? (
+        <Button variant="link" onClick={() => handleViewPaymentProof(entry)}>View Proof</Button>
+      ) : '-'
     },
     {
-      header: 'Receipt',
+      header: 'Bill/PCV Upload',
       width: '100px',
       cell: (entry: PettyCashEntry) => entry.receipt_url ? (
         <Button
-          variant="link"
-          className="h-8 px-2 text-xs"
+          className="h-6 px-1.5 text-[11px] bg-blue-500 flex text-white items-center gap-0.5"
           onClick={() => handleViewReceipt(entry)}
         >
-          View Receipt
-        </Button>
-      ) : <div className="flex justify-center"><span className="text-red-500 font-bold text-center">No Receipt</span></div>
+          <Eye size={12} /> View
+        </Button>      ) : <div className="flex justify-center"><span className="text-red-500 font-bold text-center">Missing</span></div>
     },
     {
       header: 'Status',
@@ -822,7 +935,7 @@ export function TransactionsTab() {
         <Card className="overflow-hidden">
           <ScrollArea className="h-[calc(100vh-200px)]">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 bg-blue-800 z-10">
                 <TableRow className="bg-blue-600 hover:bg-blue-600">
                   {columnDefinitions.map((col, index) => (
                     <TableHead
@@ -1051,7 +1164,7 @@ const ReceiptPreview: React.FC<{ url: string }> = ({ url }) => {
         className="h-8 px-2 text-xs"
         onClick={() => setIsOpen(true)}
       >
-        View Receipt
+        Receipt
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

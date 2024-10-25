@@ -620,7 +620,7 @@ export function SupplierList({ type }) {
 
   return (
     <div className="flex w-full bg-gray-100">
-      <Toaster position="top-right" />
+
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-semibold">Supplier List - {type === 'trading' ? 'Trading Suppliers' : 'Monthly Service Vendors'}</h1>

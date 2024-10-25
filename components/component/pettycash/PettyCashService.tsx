@@ -57,23 +57,18 @@ export class PettyCashService {
                 case 'acc_portal_pettycash_users':
                     query = query
                         .eq('admin_id', userId)
-                        .select(`
-                    *,
-                    acc_portal_pettycash_branches(branch_name),
-                    account_count:acc_portal_pettycash_accounts(count)
-                `);
+                        .select('*');
                     break;
                 case 'acc_portal_pettycash_branches':
                     query = query.eq('userid', userId);
                     break;
-                case 'acc_portal_pettycash_users':
+                case 'acc_portal_pettycash_suppliers':
                     query = query.eq('userid', userId);
                     break;
                 case 'acc_portal_pettycash_entries':
                     query = query.eq('userid', userId).order('invoice_date', { ascending: true });
                     break;
             }
-
             if (options.orderBy) {
                 query = query.order(options.orderBy.column, { ascending: options.orderBy.ascending });
             }
@@ -83,18 +78,16 @@ export class PettyCashService {
             if (error) throw error;
 
             if (data.length === 0) {
-                toast.info(`No data found for ${table}.`);
+                toast.error(`No data found `);
                 return [];
             }
 
-            // Transform data if needed
             if (table === 'acc_portal_pettycash_users') {
                 return data.map(user => ({
                     ...user,
                     account_count: user.account_count[0]?.count || 0
                 }));
             }
-
 
             return data;
         } catch (error) {
@@ -755,55 +748,82 @@ export class PettyCashService {
         }
     }
 
-    static async fetchAccountRecords(userId: string) {
+    static async fetchUserRecords(userId: string) {
         try {
+            console.log('Fetching user records for userId:', userId);
+
             const { data: record, error } = await supabase
-                .from('acc_portal_pettycash_accounts')
+                .from('acc_portal_pettycash_users')
                 .select('*')
                 .eq('userid', userId)
                 .single();
 
-            if (error && error.code === 'PGRST116') {
-                // No data found
-                return { data: { accounts: [] } };
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    console.log('No users found, returning empty array');
+                    return [];
+                }
+                throw error;
             }
 
-            if (error) throw error;
+            // Ensure we have users data
+            const users = record?.data?.users || [];
+            console.log('Found users:', users);
 
-            return record;
+            return users;
         } catch (error) {
-            console.error('Error fetching accounts:', error);
-            return { data: { accounts: [] } };
+            console.error('Error in fetchUserRecords:', error);
+            return [];
         }
     }
 
-    static async createAccountRecord(userId: string, accountData: AccountData) {
+    static async createAccountRecord(userId: string, accountData: any) {
         try {
+            console.log('Creating account record with:', { userId, accountData });
+
+            // First, fetch existing record for this user
             const { data: existingRecord } = await supabase
                 .from('acc_portal_pettycash_accounts')
                 .select('*')
                 .eq('userid', userId)
                 .single();
 
+            // Prepare the account entry
             const accountEntry = {
-                ...accountData,
-                accountUser: accountData.accountUser, // This will now contain the user's name
+                accountUser: accountData.accountUser,
+                pettyCashType: accountData.pettyCashType,
+                accountNumber: accountData.accountNumber,
+                accountType: accountData.accountType,
+                minFloatBalance: Number(accountData.minFloatBalance),
+                minFloatAlert: Number(accountData.minFloatAlert),
+                maxOpeningFloat: Number(accountData.maxOpeningFloat),
+                approvedLimitAmount: Number(accountData.approvedLimitAmount),
+                startDate: accountData.startDate,
+                endDate: accountData.endDate,
+                status: accountData.status,
                 created_at: new Date().toISOString()
             };
 
-            const recordData = existingRecord
-                ? {
+            let recordData;
+            if (existingRecord) {
+                // If record exists, append to existing accounts array
+                const currentAccounts = existingRecord.data?.accounts || [];
+                recordData = {
                     ...existingRecord,
                     data: {
-                        accounts: [...(existingRecord.data?.accounts || []), accountEntry]
+                        accounts: [...currentAccounts, accountEntry]
                     }
-                }
-                : {
+                };
+            } else {
+                // If no record exists, create new record with single account
+                recordData = {
                     userid: userId,
                     data: {
                         accounts: [accountEntry]
-                    }
+                    },
+                    created_at: new Date().toISOString()
                 };
+            }
 
             const { data: result, error } = await supabase
                 .from('acc_portal_pettycash_accounts')
@@ -813,40 +833,64 @@ export class PettyCashService {
             if (error) throw error;
             return result;
         } catch (error) {
-            console.error('Error creating account:', error);
+            console.error('Error in createAccountRecord:', error);
             throw error;
         }
     }
 
-
-    static async updateAccountRecord(accountNumber: string, account: AccountData, userId: string) {
+    static async fetchAccountRecords(userId: string) {
         try {
-            const { data: record, error: fetchError } = await supabase
+            const { data: record, error } = await supabase
                 .from('acc_portal_pettycash_accounts')
                 .select('*')
                 .eq('userid', userId)
                 .single();
 
-            if (fetchError) throw fetchError;
+            if (error) {
+                if (error.code === 'PGRST116') { // No data found
+                    return { data: { accounts: [] } };
+                }
+                throw error;
+            }
 
-            const currentAccounts = record?.data?.accounts || [];
-            const updatedAccounts = currentAccounts.map(existingAccount =>
-                existingAccount.accountNumber === accountNumber ? {
+            // Return the accounts array from inside the data object
+            return record.data?.accounts || [];
+        } catch (error) {
+            console.error('Error fetching accounts:', error);
+            throw error;
+        }
+    }
+
+    static async updateAccountRecord(accountNumber: string, accountData: any, userId: string) {
+        try {
+            const { data: record } = await supabase
+                .from('acc_portal_pettycash_accounts')
+                .select('*')
+                .eq('userid', userId)
+                .single();
+
+            if (!record) throw new Error('No record found');
+
+            // Find and update the specific account in the accounts array
+            const currentAccounts = record.data?.accounts || [];
+            const updatedAccounts = currentAccounts.map(account =>
+                account.accountNumber === accountNumber ? {
                     ...account,
-                    created_at: existingAccount.created_at,
-                    status: account.endDate && new Date(account.endDate) <= new Date() ? 'Inactive' : 'Active'
-                } : existingAccount
+                    ...accountData,
+                    updated_at: new Date().toISOString()
+                } : account
             );
 
-            const { data: result, error: updateError } = await supabase
+            const { data: result, error } = await supabase
                 .from('acc_portal_pettycash_accounts')
                 .update({
-                    data: { accounts: updatedAccounts }
+                    data: { accounts: updatedAccounts },
+                    updated_at: new Date().toISOString()
                 })
                 .eq('userid', userId)
                 .select();
 
-            if (updateError) throw updateError;
+            if (error) throw error;
             return result;
         } catch (error) {
             console.error('Error updating account:', error);
@@ -862,14 +906,19 @@ export class PettyCashService {
                 .eq('userid', userId)
                 .single();
 
-            const updatedAccounts = record.data.accounts.filter(
+            if (!record) throw new Error('No record found');
+
+            // Filter out the account to be deleted
+            const currentAccounts = record.data?.accounts || [];
+            const updatedAccounts = currentAccounts.filter(
                 account => account.accountNumber !== accountNumber
             );
 
             const { data: result, error } = await supabase
                 .from('acc_portal_pettycash_accounts')
                 .update({
-                    data: { accounts: updatedAccounts }
+                    data: { accounts: updatedAccounts },
+                    updated_at: new Date().toISOString()
                 })
                 .eq('userid', userId)
                 .select();
