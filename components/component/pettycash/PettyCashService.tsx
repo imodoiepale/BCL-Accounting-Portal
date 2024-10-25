@@ -52,11 +52,11 @@ export class PettyCashService {
 
             switch (table) {
                 case 'acc_portal_pettycash_accounts':
-                    query = query.eq('admin_id', userId);
+                    query = query.eq('userid', userId);
                     break;
                 case 'acc_portal_pettycash_users':
                     query = query
-                        .eq('admin_id', userId)
+                        .eq('userid', userId)
                         .select('*');
                     break;
                 case 'acc_portal_pettycash_branches':
@@ -104,10 +104,10 @@ export class PettyCashService {
             // Add specific fields based on table
             switch (table) {
                 case 'acc_portal_pettycash_accounts':
-                    recordData.admin_id = userId;
+                    recordData.userid = userId;
                     break;
                 case 'acc_portal_pettycash_users':
-                    recordData.admin_id = userId;
+                    recordData.userid = userId;
                     break;
                 case 'acc_portal_pettycash_branches':
                     recordData.userid = userId;
@@ -958,6 +958,22 @@ export class PettyCashService {
         } catch (error) {
             console.error('Error verifying account:', error);
             throw error;
+        }
+    }
+
+    // Add to PettyCashService.tsx
+    static async getNextEntryNumber(userId: string) {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_entries')
+                .select('id')
+                .eq('userid', userId);
+
+            if (error) throw error;
+            return (data?.length || 0) + 1;
+        } catch (error) {
+            console.error('Error getting next entry number:', error);
+            return 1;
         }
     }
 
