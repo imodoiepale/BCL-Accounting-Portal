@@ -435,7 +435,6 @@ export function EmployeeList() {
             <ChevronRightIcon className="w-4 h-4" />
           </Button>
         </div>
-        <Toaster />
       </main>
     </div>
   )

@@ -15,8 +15,8 @@ import { UsersTab } from './users';
 import { AccountsTab } from './accounts';
 import { TransactionsTab } from './entries';
 import { PettyCashSettings } from './settings';
-import { PettyCashReportsTab } from './reports';
 import SuppliersTab from './suppliers';
+import PettyCashReportsTab from './reports';
 
 const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
 
