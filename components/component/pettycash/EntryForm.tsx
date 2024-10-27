@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { PettyCashService } from './PettyCashService';
 import { cn } from "@/lib/utils";
 import { toast } from 'react-hot-toast';
+import Image from 'next/image';
 
 interface SupplierData {
   supplierName: string;
@@ -75,7 +76,7 @@ const PettyCashEntryForm = ({
     const fetchSuppliers = async () => {
       try {
         const data = await PettyCashService.fetchRecords('acc_portal_pettycash_suppliers', userId);
-        setSuppliers(data);
+        setSuppliers(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Error fetching suppliers:', error);
         toast.error('Failed to fetch suppliers');
@@ -276,7 +277,7 @@ const PettyCashEntryForm = ({
     }
   };
 
-  const renderSupplierSection = () => (
+ const renderSupplierSection = () => (
     <div className="grid grid-cols-2 gap-4 mb-4">
       <div className="col-span-2">
         <Label>Select Supplier Type</Label>
@@ -313,54 +314,51 @@ const PettyCashEntryForm = ({
                 aria-expanded={openSupplier}
                 className="w-full justify-between"
               >
-                {selectedSupplier ? selectedSupplier.data.supplierName : "Select supplier..."}
-                <Check className={cn(
-                  "ml-2 h-4 w-4",
-                  selectedSupplier ? "opacity-100" : "opacity-0"
-                )} />
+                {selectedSupplier ? selectedSupplier.data?.supplierName : "Select supplier..."}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[400px] p-0">
               <Command>
-                <CommandInput
-                  placeholder="Search suppliers..."
+                <CommandInput 
+                  placeholder="Search suppliers..." 
                   value={supplierSearchQuery}
                   onValueChange={setSupplierSearchQuery}
                 />
                 <CommandEmpty>No supplier found.</CommandEmpty>
                 <CommandGroup>
                   <ScrollArea className="h-72">
-                    {suppliers
-                      .filter(supplier =>
-                        supplier.data.supplierName.toLowerCase().includes(supplierSearchQuery.toLowerCase()) ||
-                        (supplier.data.pin || '').toLowerCase().includes(supplierSearchQuery.toLowerCase()) ||
-                        (supplier.data.idNumber || '').toLowerCase().includes(supplierSearchQuery.toLowerCase())
-                      )
-                      .map((supplier) => (
-                        <CommandItem
-                          key={supplier.id}
-                          onSelect={() => {
-                            setSelectedSupplier(supplier);
-                            setOpenSupplier(false);
-                            setFormData(prev => ({
-                              ...prev,
-                              supplier_name: supplier.data.supplierName,
-                              supplier_pin: supplier.data.supplierType === 'Corporate'
-                                ? supplier.data.pin
-                                : supplier.data.idNumber
-                            }));
-                          }}
-                        >
-                          <div className="flex flex-col">
-                            <span>{supplier.data.supplierName}</span>
-                            <span className="text-sm text-gray-500">
-                              {supplier.data.supplierType === 'Corporate'
-                                ? `PIN: ${supplier.data.pin}`
-                                : `ID: ${supplier.data.idNumber}`}
-                            </span>
-                          </div>
-                        </CommandItem>
-                      ))}
+                    {suppliers.filter(supplier => {
+                      const searchLower = supplierSearchQuery.toLowerCase();
+                      return (
+                        supplier.data?.supplierName?.toLowerCase().includes(searchLower) ||
+                        supplier.data?.pin?.toLowerCase().includes(searchLower) ||
+                        supplier.data?.idNumber?.toLowerCase().includes(searchLower)
+                      );
+                    }).map((supplier) => (
+                      <CommandItem
+                        key={supplier.id}
+                        onSelect={() => {
+                          setSelectedSupplier(supplier);
+                          setOpenSupplier(false);
+                          setFormData(prev => ({
+                            ...prev,
+                            supplier_name: supplier.data?.supplierName || '',
+                            supplier_pin: supplier.data?.supplierType === 'Corporate' 
+                              ? supplier.data?.pin 
+                              : supplier.data?.idNumber || ''
+                          }));
+                        }}
+                      >
+                        <div className="flex flex-col">
+                          <span>{supplier.data?.supplierName}</span>
+                          <span className="text-sm text-gray-500">
+                            {supplier.data?.supplierType === 'Corporate' 
+                              ? `PIN: ${supplier.data?.pin}` 
+                              : `ID: ${supplier.data?.idNumber}`}
+                          </span>
+                        </div>
+                      </CommandItem>
+                    ))}
                   </ScrollArea>
                 </CommandGroup>
               </Command>
@@ -421,9 +419,8 @@ const PettyCashEntryForm = ({
         };
 
         await PettyCashService.createRecord('acc_portal_pettycash_suppliers', {
-          userid: userId,
           data: supplierData
-        });
+        }, userId);
       }
 
       await onSubmit(finalData);
@@ -474,13 +471,13 @@ const PettyCashEntryForm = ({
             {field.id === 'receipt_url' && (formData.receipt_url || receiptPreview) && (
               <div className="relative h-[100px] bg-gray-50 rounded-md overflow-hidden">
                 {formData.receipt_url instanceof File ? (
-                  <img
+                  <Image
                     src={receiptPreview!}
                     alt="Receipt preview"
                     className="w-full h-full object-contain"
                   />
                 ) : (
-                  <img
+                  <Image
                     src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${formData.receipt_url}`}
                     alt="Receipt"
                     className="w-full h-full object-contain"
@@ -491,13 +488,13 @@ const PettyCashEntryForm = ({
             {field.id === 'payment_proof_url' && (formData.payment_proof_url || paymentProofPreview) && (
               <div className="relative h-[100px] bg-gray-50 rounded-md overflow-hidden">
                 {formData.payment_proof_url instanceof File ? (
-                  <img
+                  <Image
                     src={paymentProofPreview!}
                     alt="Payment proof preview"
                     className="w-full h-full object-contain"
                   />
                 ) : (
-                  <img
+                  <Image
                     src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${formData.payment_proof_url}`}
                     alt="Payment proof"
                     className="w-full h-full object-contain"
