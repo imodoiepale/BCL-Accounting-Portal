@@ -78,30 +78,30 @@ interface EntryDialogProps {
   currentEntries: PettyCashEntry[];  // Add this type
 }
 
-  const formFields = [
-    { name: 'invoice_date', label: 'Invoice Date', type: 'date', required: true },
-    { name: 'branch_id', label: 'Branch', type: 'select', required: true },
-    { name: 'user_id', label: 'User', type: 'select', required: true },
-    { name: 'account_type', label: 'Account Type', type: 'select', required: true },
-    { name: 'petty_cash_account', label: 'Petty Cash Account', type: 'text', required: true },
-    { name: 'supplier_name', label: 'Supplier Name', type: 'text', required: true },
-    { name: 'supplier_pin', label: 'Supplier PIN/ID', type: 'text', required: true },
-    {
-      name: 'purchase_type', label: 'Purchase Type', type: 'select', required: true,
-      options: [
-        { value: 'goods', label: 'Goods' },
-        { value: 'services', label: 'Services' },
-        { value: 'assets', label: 'Assets' }
-      ]
-    },
-    { name: 'amount', label: 'Amount', type: 'number', required: true },
-    { name: 'description', label: 'Description', type: 'text', required: true },
-    { name: 'paid_via', label: 'Paid Via/By', type: 'text', required: true },
-    { name: 'checked_by', label: 'Checked By', type: 'text' },
-    { name: 'approved_by', label: 'Approved By', type: 'text' },
-    { name: 'receipt_url', label: 'Bill/PCV Upload', type: 'file', accept: 'image/*' },
-    { name: 'payment_proof_url', label: 'Payment Proof', type: 'file', accept: 'image/*' }
-  ];
+const formFields = [
+  { name: 'invoice_date', label: 'Invoice Date', type: 'date', required: true },
+  { name: 'branch_id', label: 'Branch', type: 'select', required: true },
+  { name: 'user_id', label: 'User', type: 'select', required: true },
+  { name: 'account_type', label: 'Account Type', type: 'select', required: true },
+  { name: 'petty_cash_account', label: 'Petty Cash Account', type: 'text', required: true },
+  { name: 'supplier_name', label: 'Supplier Name', type: 'text', required: true },
+  { name: 'supplier_pin', label: 'Supplier PIN/ID', type: 'text', required: true },
+  {
+    name: 'purchase_type', label: 'Purchase Type', type: 'select', required: true,
+    options: [
+      { value: 'goods', label: 'Goods' },
+      { value: 'services', label: 'Services' },
+      { value: 'assets', label: 'Assets' }
+    ]
+  },
+  { name: 'amount', label: 'Amount', type: 'number', required: true },
+  { name: 'description', label: 'Description', type: 'text', required: true },
+  { name: 'paid_via', label: 'Paid Via/By', type: 'text', required: true },
+  { name: 'checked_by', label: 'Checked By', type: 'text' },
+  { name: 'approved_by', label: 'Approved By', type: 'text' },
+  { name: 'receipt_url', label: 'Bill/PCV Upload', type: 'file', accept: 'image/*' },
+  { name: 'payment_proof_url', label: 'Payment Proof', type: 'file', accept: 'image/*' }
+];
 
 const EntryDialog: React.FC<EntryDialogProps> = ({
   isOpen,
@@ -159,9 +159,18 @@ export function TransactionsTab() {
     updated_at: new Date().toISOString()
   });
 
-  const [suppliers, setSuppliers] = useState([])
-  const [openSupplier, setOpenSupplier] = useState(false)
-  const [selectedSupplier, setSelectedSupplier] = useState(null)
+  const [paymentProofPreview, setPaymentProofPreview] = useState<{
+    isOpen: boolean;
+    url: string | null;
+  }>({
+    isOpen: false,
+    url: null
+  });
+
+  const [suppliers, setSuppliers] = useState([]);
+  const [openSupplier, setOpenSupplier] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [isNewSupplier, setIsNewSupplier] = useState(false);
 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -300,39 +309,46 @@ export function TransactionsTab() {
 
   const handleSubmit = async () => {
     try {
+      // If it's a new supplier, create supplier record first
+      if (isNewSupplier) {
+        const supplierData = {
+          supplierName: newPettyCash.supplier_name,
+          pin: newPettyCash.supplier_pin,
+          // Add other required supplier fields
+          supplierType: 'Individual',
+          mobile: '',  // You might want to add these fields to your form
+          email: '',   // You might want to add these fields to your form
+        };
+
+        await PettyCashService.createRecord('acc_portal_pettycash_suppliers', supplierData, userId);
+      }
+
       let receiptUrl = null;
+      let paymentProofUrl = null;
+
+      // Handle receipt upload
       if (newPettyCash.receipt_url instanceof File) {
         const uploadPath = `receipts/${Date.now()}_${newPettyCash.receipt_url.name}`;
         receiptUrl = await PettyCashService.uploadReceipt(newPettyCash.receipt_url, uploadPath);
       }
 
+      // Handle payment proof upload
+      if (newPettyCash.payment_proof_url instanceof File) {
+        const uploadPath = `payment_proofs/${Date.now()}_${newPettyCash.payment_proof_url.name}`;
+        paymentProofUrl = await PettyCashService.uploadReceipt(newPettyCash.payment_proof_url, uploadPath);
+      }
+
       const entryData = {
         ...newPettyCash,
         receipt_url: receiptUrl,
+        payment_proof_url: paymentProofUrl,
         userid: userId
       };
 
       await PettyCashService.createRecord('acc_portal_pettycash_entries', entryData, userId);
       toast.success('Entry created successfully');
       setIsSheetOpen(false);
-      setNewPettyCash({
-        id: '',
-        amount: '',
-        invoice_number: '',
-        invoice_date: '',
-        description: '',
-        category_code: '',
-        subcategory_code: '',
-        payment_type: '',
-        branch_id: '',
-        user_id: '',
-        checked_by: '',
-        approved_by: '',
-        account_type: '',
-        receipt_url: null,
-        created_at: new Date().toISOString(),
-        is_verified: false
-      });
+      resetForm();
       fetchEntries();
     } catch (error) {
       console.error('Error creating entry:', error);
@@ -599,6 +615,180 @@ export function TransactionsTab() {
     );
   };
 
+  const handleViewPaymentProof = (entry: PettyCashEntry) => {
+    if (entry.payment_proof_url) {
+      setPaymentProofPreview({
+        isOpen: true,
+        url: entry.payment_proof_url
+      });
+    }
+  };
+
+  const SupplierSelection = () => (
+    <div className="grid gap-4">
+      <div className="space-y-2">
+        <Label>Select Supplier Type</Label>
+        <Select
+          onValueChange={(value) => {
+            setIsNewSupplier(value === 'new');
+            setSelectedSupplier(null);
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose supplier type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="existing">Existing Supplier</SelectItem>
+            <SelectItem value="new">New Supplier</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {!isNewSupplier ? (
+        <div className="space-y-2">
+          <Label>Search Existing Supplier</Label>
+          <Popover open={openSupplier} onOpenChange={setOpenSupplier}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={openSupplier}
+                className="w-full justify-between"
+              >
+                {selectedSupplier ? selectedSupplier.supplierName : "Select supplier..."}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[400px] p-0">
+              <Command>
+                <CommandInput placeholder="Search suppliers..." />
+                <CommandEmpty>No supplier found.</CommandEmpty>
+                <CommandGroup>
+                  <ScrollArea className="h-72">
+                    {suppliers.map((supplier) => (
+                      <CommandItem
+                        key={supplier.id}
+                        onSelect={() => {
+                          setSelectedSupplier(supplier);
+                          setOpenSupplier(false);
+                          // Update form data with supplier details
+                          setNewPettyCash(prev => ({
+                            ...prev,
+                            supplier_name: supplier.supplierName,
+                            supplier_pin: supplier.pin
+                          }));
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedSupplier?.id === supplier.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {supplier.supplierName}
+                      </CommandItem>
+                    ))}
+                  </ScrollArea>
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      ) : (
+        // New supplier form fields
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Supplier Name</Label>
+            <Input
+              value={newPettyCash.supplier_name}
+              onChange={(e) => handleInputChange('supplier_name', e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Supplier PIN</Label>
+            <Input
+              value={newPettyCash.supplier_pin}
+              onChange={(e) => handleInputChange('supplier_pin', e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const PaymentProofPreviewDialog = () => (
+    <Dialog
+      open={paymentProofPreview.isOpen}
+      onOpenChange={(open) => setPaymentProofPreview(prev => ({ ...prev, isOpen: open }))}
+    >
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+        <DialogHeader className="p-4 border-b">
+          <DialogTitle>Payment Proof Preview</DialogTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPaymentProofPreview(prev => ({
+                ...prev,
+                rotation: ((prev.rotation || 0) + 90) % 360
+              }))}
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Rotate
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const response = await fetch(
+                    `https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${paymentProofPreview.url}`
+                  );
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = `payment-proof-${paymentProofPreview.url}`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  window.URL.revokeObjectURL(url);
+                } catch (error) {
+                  console.error('Download failed:', error);
+                }
+              }}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+          </div>
+        </DialogHeader>
+        {paymentProofPreview.url && (
+          <div className="relative w-full h-[calc(90vh-100px)] bg-gray-50 group">
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 animate-pulse">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+            <Image
+              src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${paymentProofPreview.url}`}
+              alt="Payment Proof"
+              fill
+              className="transition-transform duration-300 ease-in-out hover:scale-150 cursor-zoom-in"
+              style={{
+                objectFit: 'contain',
+                transform: `rotate(${paymentProofPreview.rotation || 0}deg)`,
+                transition: 'transform 0.3s ease-in-out'
+              }}
+              priority
+              onLoadingComplete={(image) => {
+                image.classList.remove('opacity-0');
+                image.classList.add('opacity-100');
+              }}
+            />
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
     <div className="flex w-full bg-gray-100">
       <Toaster position="top-right" />
@@ -765,6 +955,7 @@ export function TransactionsTab() {
             )}
           </DialogContent>
         </Dialog>
+        <PaymentProofPreviewDialog />
 
         {/* Update the EntryDialog SheetContent to be wider */}
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
@@ -854,8 +1045,11 @@ export function TransactionsTab() {
           entry={dialogState.entry}
           onSave={handleSaveEntry}
           mode={dialogState.mode}
-          currentEntries={entries}  // Pass the entries array here
+          currentEntries={entries}
+          userId={userId}  // Add this prop
         />
+
+
 
       </main>
     </div>
