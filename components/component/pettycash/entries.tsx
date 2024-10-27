@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RefreshCwIcon, Search, FilterIcon, Download, RotateCcw, Loader2, Eye } from 'lucide-react';
+import { RefreshCwIcon, Search, FilterIcon, Download, RotateCcw, Loader2, Eye, Check } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { toast, Toaster } from 'react-hot-toast';
 import Image from 'next/image';
