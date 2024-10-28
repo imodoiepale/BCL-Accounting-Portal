@@ -16,11 +16,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, UploadIcon, DownloadIcon, EditIcon, TrashIcon } from 'lucide-react'
 import { useUser } from '@clerk/clerk-react'
 import { toast } from 'react-hot-toast'
+import { supabase } from '@/lib/supabaseClient'
 
-const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
-const url="https://zyszsqgdlrpnunkegipk.supabase.co"
 
-const supabase = createClient(url, key)
+
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);

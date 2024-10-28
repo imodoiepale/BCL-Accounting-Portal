@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 // @ts-nocheck
 "use client";
+
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useAuth } from '@clerk/clerk-react';
@@ -9,11 +10,12 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Cog } from 'lucide-react';
-import BranchesTab from './branches';
-import UsersTab from './users';
-import AccountsTab from './accounts';
+import { BranchesTab } from './branches';
+import { UsersTab } from './users';
+import { AccountsTab } from './accounts';
 import { TransactionsTab } from './entries';
-import PettyCashSettings from './settings';
+import { PettyCashSettings } from './settings';
+import SuppliersTab from './suppliers';
 import PettyCashReportsTab from './reports';
 
 const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
@@ -56,7 +58,6 @@ export function PettyCashManager() {
     fetchAccountsToReplenish();
   }, []);
 
-  // Update the table name in the fetchAccountsToReplenish function
   const fetchAccountsToReplenish = async () => {
     const { data, error } = await supabase
       .from('acc_portal_pettycash_accounts')
@@ -72,17 +73,14 @@ export function PettyCashManager() {
   };
 
   const handleReplenishAll = () => {
-    // Implement the logic to replenish all accounts
     console.log('Replenishing all accounts');
   };
 
   const handleReplenishAccount = (accountId) => {
-    // Implement the logic to replenish a specific account
     console.log('Replenishing account', accountId);
   };
 
   const handleExportToExcel = () => {
-    // Implement the logic to export the replenishment data to Excel
     console.log('Exporting to Excel');
   };
 
@@ -115,7 +113,7 @@ export function PettyCashManager() {
 
   return (
     <div className="flex w-full bg-muted/40">
-      <main className="flex-1 p-6 w-full">
+      <main className="flex-1 w-full">
         <Card className="mb-6 relative">
           <CardHeader>
             <CardTitle>Petty Cash Manager</CardTitle>
@@ -128,7 +126,7 @@ export function PettyCashManager() {
 
         <Tabs defaultValue="transactions" onValueChange={setCurrentTab}>
           <TabsList>
-            {['branches', 'users', 'accounts', 'transactions', 'reports'].map((tab) => (
+            {['branches', 'users', 'accounts','suppliers', 'transactions', 'reports'].map((tab) => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -146,6 +144,9 @@ export function PettyCashManager() {
           </TabsContent>
           <TabsContent value="accounts">
             <AccountsTab supabase={supabase} userId={userId} settings={settings.accounts} />
+          </TabsContent>
+          <TabsContent value="suppliers">
+            <SuppliersTab />
           </TabsContent>
           <TabsContent value="transactions">
             <TransactionsTab settings={settings.transactions} />

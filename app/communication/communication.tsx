@@ -6,15 +6,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { createClient } from '@supabase/supabase-js';
 import { DataTable } from './data-table';
 import { Pencil, Trash2, Info, Upload, MessageSquare, CheckCircle, Star } from "lucide-react";
 import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
+import { supabase } from '@/lib/supabaseClient'
 
-const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function TicketSystem() {
   const { user } = useUser();
@@ -135,7 +132,7 @@ export default function TicketSystem() {
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error submitting/updating ticket:', error);
-      alert('Error submitting/updating ticket. Please try again.');
+      alert('Error submitting/updating ticket.');
     }
   };
 
