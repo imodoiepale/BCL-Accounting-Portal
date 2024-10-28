@@ -126,10 +126,6 @@ export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
     return <div>Loading...</div>;
   }
 
-  if (!companyData) {
-    return <div>No company data found</div>;
-  }
-
   return (
     <div className="space-y-6 w-full">
       {missingFields.length > 0 && (
