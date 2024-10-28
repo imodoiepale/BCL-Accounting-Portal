@@ -3,7 +3,6 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -16,19 +15,16 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, UploadIcon, DownloadIcon } from 'lucide-react'
 import { useUser } from '@clerk/clerk-react'
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { PencilIcon, TrashIcon } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
 
-const key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing"
-const url="https://zyszsqgdlrpnunkegipk.supabase.co"
 
-// Initialize Supabase client
-const supabase = createClient(url, key)
 
 // Utility function to format date
 const formatDate = (dateString) => {
   let date;
-  
+
   // Check if the date is in DD/MM/YYYY format
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
     const [day, month, year] = dateString.split('/');
@@ -61,7 +57,7 @@ export function EmployeeList() {
     nhif: '',
     nssf: '',
     startdate: '',
-    enddate: '', // Added end date
+    enddate: '',
   })
   const [isUploading, setIsUploading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -90,7 +86,7 @@ export function EmployeeList() {
     const { data, error } = await supabase
       .from('acc_portal_employees')
       .insert([{ ...newEmployee, userid: user?.id, status: 'true' }])
-    if (error){
+    if (error) {
       console.error('Error adding employee:', error);
       toast.error('Failed to add employee.');
     } else {
@@ -104,7 +100,7 @@ export function EmployeeList() {
         nhif: '',
         nssf: '',
         startdate: '',
-        enddate: '', // Reset end date
+        enddate: '',
       })
       toast.success('Employee added successfully!');
       setIsDialogOpen(false);
@@ -308,7 +304,7 @@ export function EmployeeList() {
                     <Input id="nhif" placeholder="123456789" value={newEmployee.nhif} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="nssf">MNSSF Number</Label>
+                    <Label htmlFor="nssf">NSSF Number</Label>
                     <Input id="nssf" placeholder="987654321" value={newEmployee.nssf} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
@@ -321,12 +317,12 @@ export function EmployeeList() {
                   </div>
                 </div>
                 <div className="pt-4"><Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button></div>
-               </SheetContent>
+              </SheetContent>
             </Sheet>
           </div>
         </div>
         <Card>
-        <Table>
+          <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>EMP ID</TableHead>
@@ -345,7 +341,7 @@ export function EmployeeList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((employee,index) => (
+              {employees.map((employee, index) => (
                 <TableRow key={employee.id}>
                   <TableCell>EMP-{index + 1}</TableCell>
                   <TableCell>{employee.name}</TableCell>
@@ -439,7 +435,6 @@ export function EmployeeList() {
             <ChevronRightIcon className="w-4 h-4" />
           </Button>
         </div>
-        <Toaster />
       </main>
     </div>
   )

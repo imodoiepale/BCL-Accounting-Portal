@@ -8,11 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabaseClient'
 
-const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const DocumentUploadDialog = ({ isOpen, onClose, supplier, selectedMonth }) => {
   const [closingBalance, setClosingBalance] = useState('');

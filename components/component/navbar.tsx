@@ -113,7 +113,6 @@ function SearchIcon(props) {
   )
 }
 
-
 function XIcon(props) {
   return (
     <svg

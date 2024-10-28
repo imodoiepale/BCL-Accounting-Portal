@@ -43,6 +43,23 @@ export function DataTable<TData, TValue>({
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [sorting, setSorting] = React.useState<SortingState>([])
+  const tableRef = React.useRef<HTMLDivElement>(null);
+  const headerRef = React.useRef<HTMLTableSectionElement>(null);
+
+  React.useEffect(() => {
+    const tableElement = tableRef.current;
+    const headerElement = headerRef.current;
+
+    if (tableElement && headerElement) {
+      const handleScroll = () => {
+        const { scrollTop } = tableElement;
+        headerElement.style.transform = `translateY(${scrollTop}px)`;
+      };
+
+      tableElement.addEventListener('scroll', handleScroll);
+      return () => tableElement.removeEventListener('scroll', handleScroll);
+    }
+  }, []);
 
   const table = useReactTable({
     data,
@@ -133,19 +150,30 @@ export function DataTable<TData, TValue>({
     </>
   ), [statusCounts, getColumnCount, columns]);
 
-   return (
+  return (
     <div className="space-y-4 w-full">
       <DataTableToolbar table={table} />
       <div className="rounded-md border overflow-hidden">
-        <div className="overflow-y-auto max-h-[calc(100vh-300px)]"> {/* Adjust 300px as needed */}
+        <div 
+          ref={tableRef}
+          className="overflow-auto max-h-[calc(100vh-300px)]"
+          style={{ position: 'relative' }}
+        >
           <Table>
-            <TableHeader className="sticky top-0 z-10 bg-white dark:bg-gray-800">
+            <TableHeader 
+              ref={headerRef}
+              className="sticky top-0 z-10 bg-white dark:bg-gray-800"
+              style={{ position: 'sticky', top: 0, zIndex: 10 }}
+            >
               {renderHeaderRows()}
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="text-xs font-extrabold whitespace-normal" 
-                    style={{ minHeight: '60px' }}>
+                    <TableHead 
+                      key={header.id} 
+                      className="text-xs font-extrabold whitespace-normal"
+                      style={{ minHeight: '60px' }}
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -175,7 +203,7 @@ export function DataTable<TData, TValue>({
                 <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center">
                     No results.
-                  </TableCell>
+                    </TableCell>
                 </TableRow>
               )}
             </TableBody>

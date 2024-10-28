@@ -14,9 +14,11 @@ const supabase = createClient(
 
 interface CombinedMonthlyDocsProps {
   type: 'supplier' | 'bank';
+  Stype?: 'trading' | 'monthly';
   selectedMonth?: string | null;
   isCurrentMonth: boolean;
 }
+
 
 const formatDate = (dateString: string) => 
   dateString ? new Date(dateString).toLocaleDateString('en-GB', {
@@ -52,37 +54,38 @@ const getDateRange = (month: string | null, isCurrentMonth: boolean) => {
 };
 
 
-  export function CombinedMonthlyDocs({ type, selectedMonth, isCurrentMonth }: CombinedMonthlyDocsProps) {
-    const { userId } = useAuth();
-    const [data, setData] = useState<any[]>([]);
-    const [displayMonth, setDisplayMonth] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
-  
-    const fetchData = useCallback(async () => {
-      if (!userId) return;
-  
-      setIsLoading(true);
-      try {
-        const { startDate, endDate } = getDateRange(selectedMonth, isCurrentMonth);
-        
-        const [{ data: mainData }, { data: uploadData }] = await Promise.all([
-          supabase
-            .from(type === 'supplier' ? 'acc_portal_suppliers' : 'acc_portal_banks')
-            .select('*')
-            .eq('userid', userId)
-            .order('id', { ascending: true }),
-          supabase
-            .from('acc_portal_monthly_files_upload')
-            .select('*')
-            .eq('userid', userId)
-            .eq('document_type', type === 'supplier' ? 'supplier statement' : 'bank statement')
-            .gte('docs_date_range', startDate.toISOString())
-            .lte('docs_date_range_end', endDate.toISOString())
-        ]);
-  
-        if (!mainData || !uploadData) throw new Error('Failed to fetch data');
-  
-        const uploadMap = new Map(uploadData.map(item => [item[`${type}_id`], item])); 
+export function CombinedMonthlyDocs({ type, Stype, selectedMonth, isCurrentMonth }: CombinedMonthlyDocsProps) {
+  const { userId } = useAuth();
+  const [data, setData] = useState<any[]>([]);
+  const [displayMonth, setDisplayMonth] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    if (!userId) return;
+
+    setIsLoading(true);
+    try {
+      const { startDate, endDate } = getDateRange(selectedMonth, isCurrentMonth);
+      
+      const [{ data: mainData }, { data: uploadData }] = await Promise.all([
+        supabase
+          .from(type === 'supplier' ? 'acc_portal_suppliers' : 'acc_portal_banks')
+          .select('*')
+          .eq('userid', userId)
+          .eq(type === 'supplier' && Stype ? 'category' : 'id', type === 'supplier' && Stype ? Stype : 'id')
+          .order('id', { ascending: true }),
+        supabase
+          .from('acc_portal_monthly_files_upload')
+          .select('*')
+          .eq('userid', userId)
+          .eq('document_type', type === 'supplier' ? 'supplier statement' : 'bank statement')
+          .gte('docs_date_range', startDate.toISOString())
+          .lte('docs_date_range_end', endDate.toISOString())
+      ]);
+
+      if (!mainData || !uploadData) throw new Error('Failed to fetch data');
+
+      const uploadMap = new Map(uploadData.map(item => [item[`${type}_id`], item]));
 
       const transformedData = mainData.map(item => {
         const latestUpload = uploadMap.get(item.id) || {};
@@ -137,7 +140,7 @@ const getDateRange = (month: string | null, isCurrentMonth: boolean) => {
   return (
     <main className="flex flex-col justify-start w-full">
       <p className="text-lg mb-4">
-        {type === 'supplier' ? 'Supplier' : 'Bank'} Statements for <span className="font-semibold text-blue-700">{displayMonth}</span>
+        {type === 'supplier' ? `${Stype} Supplier` : 'Bank'} Statements for <span className="font-semibold text-blue-700">{displayMonth}</span>
       </p>
       <div className="border-b border-gray-200 shadow sm:rounded-lg">
         {isLoading ? (
@@ -154,8 +157,9 @@ const getDateRange = (month: string | null, isCurrentMonth: boolean) => {
   );
 }
 
-export function PreviousMonths({ type }: { type: 'supplier' | 'bank' }) {
+export function PreviousMonths({ type, Stype }: { type: 'supplier' | 'bank', Stype?: 'trading' | 'monthly' }) {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
 
   const months = useMemo(() => {
     const result = [];
@@ -185,10 +189,11 @@ export function PreviousMonths({ type }: { type: 'supplier' | 'bank' }) {
           ))}
         </div>
       </div>
-      <div className="w-full md:w-3/4 lg:w-4/5 p-4">
+      <div className="w-full p-4">
         {selectedMonth && (
           <CombinedMonthlyDocs 
             type={type}
+            Stype={Stype}
             selectedMonth={selectedMonth}
             isCurrentMonth={false}
           />

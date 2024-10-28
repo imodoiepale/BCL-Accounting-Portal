@@ -1,231 +1,673 @@
 // @ts-nocheck
+
 "use client";
+
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { Card } from "@/components/ui/card";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { format } from 'date-fns';
+import { RefreshCwIcon, Search, Plus } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
+import { toast, Toaster } from 'react-hot-toast';
+import { PettyCashService } from './PettyCashService';
+import { TableActions } from './TableActions';
+import { Badge } from "@/components/ui/badge";
 
-const supabase = createClient('https://zyszsqgdlrpnunkegipk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing');
+// Constants
+const ACCOUNT_TYPES = [
+  { value: 'Corporate', label: 'Corporate' },
+  { value: 'Personal', label: 'Personal' }
+];
 
-const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+const CASH_TYPES = [
+  { value: 'Cash', label: 'Cash' },
+  { value: 'Mpesa', label: 'Mpesa' },
+  { value: 'Card', label: 'Card' },
+  { value: 'Credit', label: 'Credit' }
+];
+
+// Types
+interface AccountData {
+  id?: string;
+  accountUser: string;
+  pettyCashType: string;
+  accountNumber: string;
+  accountType: string;
+  minFloatBalance: number;
+  minFloatAlert: number;
+  maxOpeningFloat: number;
+  approvedLimitAmount: number;
+  startDate: string;
+  endDate: string | null;
+  status: 'Active' | 'Inactive';
+  created_at?: string;
+}
+
+interface AccountDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  account: AccountData | null;
+  onSave: (account: AccountData) => Promise<void>;
+  mode: 'create' | 'edit';
+  users: { value: string; label: string; }[];
+}
+
+const AccountDialog: React.FC<AccountDialogProps> = ({
+  isOpen,
+  onClose,
+  account,
+  onSave,
+  mode,
+  users
+}) => {
+  const initialFormData: AccountData = {
+    accountUser: '',
+    pettyCashType: '',
+    accountNumber: '',
+    accountType: 'Corporate',
+    minFloatBalance: 0,
+    minFloatAlert: 0,
+    maxOpeningFloat: 0,
+    approvedLimitAmount: 0,
+    startDate: new Date().toISOString(),
+    endDate: null,
+    status: 'Active'
+  };
+
+  const [formData, setFormData] = useState<AccountData>(initialFormData);
+
+  useEffect(() => {
+    setFormData(mode === 'create' ? initialFormData : account || initialFormData);
+  }, [account, mode]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'number' ? Number(value) : value
+    }));
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const validateAccountData = (data: AccountData) => {
+  const errors: string[] = [];
+
+  // Required fields validation
+  if (!data.accountUser) errors.push('Account User is required');
+  if (!data.pettyCashType) errors.push('Petty Cash Type is required');
+  if (!data.accountNumber) errors.push('Account Number is required');
+  if (!data.accountType) errors.push('Account Type is required');
+
+  // Numeric fields validation
+  if (isNaN(Number(data.minFloatBalance))) errors.push('Minimum Float Balance must be a number');
+  if (isNaN(Number(data.minFloatAlert))) errors.push('Minimum Float Alert must be a number');
+  if (isNaN(Number(data.maxOpeningFloat))) errors.push('Maximum Opening Float must be a number');
+  if (isNaN(Number(data.approvedLimitAmount))) errors.push('Approved Limit Amount must be a number');
+
+  // Date validation
+  if (!data.startDate) errors.push('Start Date is required');
+  if (data.endDate && new Date(data.endDate) <= new Date(data.startDate)) {
+    errors.push('End Date must be after Start Date');
+  }
+
+  return errors;
+  };
+  
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validate the form data
+    const validationErrors = validateAccountData(formData);
+    if (validationErrors.length > 0) {
+      validationErrors.forEach(error => toast.error(error));
+      return;
+    }
+
+    try {
+      await onSave(formData);
+      onClose();
+    } catch (error) {
+      toast.error('Failed to save account');
+      console.error('Error saving account:', error);
+    }
+  };
+
+  const formFields = [
+    {
+      name: 'accountUser',
+      label: 'Account User',
+      type: 'select',
+      options: users,
+      required: true
+    },
+    {
+      name: 'pettyCashType',
+      label: 'Petty Cash Type',
+      type: 'select',
+      options: CASH_TYPES,
+      required: true
+    },
+    {
+      name: 'accountNumber',
+      label: 'Account Number',
+      type: 'text',
+      required: true
+    },
+    {
+      name: 'accountType',
+      label: 'Account Type',
+      type: 'select',
+      options: ACCOUNT_TYPES,
+      required: true
+    },
+    {
+      name: 'minFloatBalance',
+      label: 'Minimum Float Balance',
+      type: 'number',
+      required: true
+    },
+    {
+      name: 'minFloatAlert',
+      label: 'Minimum Float Alert',
+      type: 'number',
+      required: true
+    },
+    {
+      name: 'maxOpeningFloat',
+      label: 'Maximum Opening Float',
+      type: 'number',
+      required: true
+    },
+    {
+      name: 'approvedLimitAmount',
+      label: 'Approved Limit Amount',
+      type: 'number',
+      required: true
+    },
+    {
+      name: 'startDate',
+      label: 'Start Date',
+      type: 'date',
+      required: true
+    },
+    {
+      name: 'endDate',
+      label: 'End Date',
+      type: 'date',
+      required: false
+    },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'Active', label: 'Active' },
+        { value: 'Inactive', label: 'Inactive' }
+      ],
+      required: true
+    }
+  ];
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{mode === 'create' ? 'Add New Account' : 'Edit Account'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {formFields.map(({ name, label, type, options, required }) => (
+            <div key={name} className="space-y-1.5">
+              <Label htmlFor={name}>{label}{required && ' *'}</Label>
+              {type === 'select' ? (
+                <Select
+                  value={formData[name]?.toString()}
+                  onValueChange={(value) => handleSelectChange(name, value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {options?.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id={name}
+                  name={name}
+                  type={type}
+                  value={formData[name]?.toString() || ''}
+                  onChange={handleInputChange}
+                  required={required}
+                  className="h-8"
+                />
+              )}
+            </div>
+          ))}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-blue-600 text-white">
+              {mode === 'create' ? 'Create Account' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 export function AccountsTab() {
   const { userId } = useAuth();
-
-  const [accounts, setAccounts] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [newAccount, setNewAccount] = useState({
-    branch_id: '',
-    account_number: '',
-    // account_name: '',
-    account_type: '',
-    balance: '',
-    min_amount: '',
-    max_amount: '',
-    currency: '',
-    status: 'Active',
-    userid: '',
+  const [accounts, setAccounts] = useState<AccountData[]>([]);
+  const [users, setUsers] = useState<{ value: string; label: string; }[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dialogState, setDialogState] = useState({
+    isOpen: false,
+    mode: 'create' as const,
+    account: null as AccountData | null
   });
 
+  const fetchAccountsData = async () => {
+    setIsLoading(true);
+    try {
+      const accountsData = await PettyCashService.fetchAccountRecords(userId);
+
+      // accountsData is now the accounts array from inside data.accounts
+      const formattedAccounts = accountsData.map(account => ({
+        accountUser: account.accountUser || '',
+        pettyCashType: account.pettyCashType || '',
+        accountNumber: account.accountNumber || '',
+        accountType: account.accountType || 'Corporate',
+        minFloatBalance: Number(account.minFloatBalance) || 0,
+        minFloatAlert: Number(account.minFloatAlert) || 0,
+        maxOpeningFloat: Number(account.maxOpeningFloat) || 0,
+        approvedLimitAmount: Number(account.approvedLimitAmount) || 0,
+        startDate: account.startDate || new Date().toISOString(),
+        endDate: account.endDate || null,
+        status: account.status || 'Active',
+        created_at: account.created_at || new Date().toISOString()
+      }));
+
+      setAccounts(formattedAccounts);
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+      toast.error('Failed to fetch accounts');
+      setAccounts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+  const fetchUsers = async () => {
+    try {
+      const usersData = await PettyCashService.fetchUserRecords(userId);
+      const formattedUsers = usersData.map(user => ({
+        value: user.name,
+        label: user.name
+      }));
+      setUsers(formattedUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to fetch users');
+      setUsers([]);
+    }
+  };
+
   useEffect(() => {
-    fetchAccounts();
-    fetchBranches();
-    fetchUsers();
-  }, []);
+    if (userId) {
+      fetchAccountsData();
+      fetchUsers();
+    }
+  }, [userId]);
 
-  // Update the table name in the fetchAccounts function
-const fetchAccounts = async () => {
-  const { data, error } = await supabase
-    .from('acc_portal_pettycash_accounts')
-    .select('*, acc_portal_pettycash_branches(branch_name), acc_portal_pettycash_users(name)')
-    .eq('admin_id', userId)
-    .order('id', { ascending: true });
-  if (error) console.error('Error fetching accounts:', error);
-  else setAccounts(data);
-};
-
-// Update the table name in the fetchBranches function
-const fetchBranches = async () => {
-  const { data, error } = await supabase
-    .from('acc_portal_pettycash_branches')
-    .select('id, branch_name')
-    .eq('userid', userId);
-  if (error) console.error('Error fetching branches:', error);
-  else setBranches(data);
-};
-
-// Update the table name in the fetchUsers function
-const fetchUsers = async () => {
-  const { data, error } = await supabase
-    .from('acc_portal_pettycash_users')
-    .select('id, name')
-    .eq('admin_id', userId);
-  if (error) console.error('Error fetching users:', error);
-  else setUsers(data);
-};
-
-// Update the table name in the handleSubmit function
-const handleSubmit = async () => {
-  const { data, error } = await supabase
-    .from('acc_portal_pettycash_accounts')
-    .insert([{ ...newAccount, admin_id: userId }]);
-
-  if (error) console.error('Error adding account:', error);
-  else {
-    fetchAccounts();
-    setNewAccount({
-      branch_id: '',
-      account_number: '',
-      // account_name: '',
-      account_type: '',
-      balance: '',
-      min_amount: '',
-      max_amount: '',
-      currency: '',
-      status: 'Active',
-      userid: '',
+  const handleCreateAccount = () => {
+    setDialogState({
+      isOpen: true,
+      mode: 'create',
+      account: null
     });
-  }
-};
+  };
+  const handleEditAccount = (account: AccountData) => {
+    // Account data is now directly accessible without .data nesting
+    if (!account) {
+      toast.error('Invalid account data');
+      return;
+    }
 
-  const handleInputChange = (e) => {
-    const { id, value } = e.target;
-    setNewAccount((prev) => ({ ...prev, [id]: value }));
+    setDialogState({
+      isOpen: true,
+      mode: 'edit',
+      account: {
+        accountUser: account.accountUser || '',
+        pettyCashType: account.pettyCashType || '',
+        accountNumber: account.accountNumber || '',
+        accountType: account.accountType || 'Corporate',
+        minFloatBalance: Number(account.minFloatBalance) || 0,
+        minFloatAlert: Number(account.minFloatAlert) || 0,
+        maxOpeningFloat: Number(account.maxOpeningFloat) || 0,
+        approvedLimitAmount: Number(account.approvedLimitAmount) || 0,
+        startDate: account.startDate || new Date().toISOString(),
+        endDate: account.endDate || null,
+        status: account.status || 'Active'
+      }
+    });
   };
 
-  const handleSelectChange = (id, value) => {
-    setNewAccount((prev) => ({ ...prev, [id]: value }));
+  const handleDeleteAccount = async (account: AccountData) => {
+    try {
+      // Account number is now directly accessible
+      await PettyCashService.deleteAccountRecord(account.accountNumber, userId);
+      toast.success('Account deleted successfully');
+      fetchAccountsData();
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      toast.error('Failed to delete account');
+    }
   };
 
-  
-  const formFields = [
-    { id: 'branch_id', label: 'Branch', type: 'select', options: branches.map(branch => ({ value: branch.id, label: branch.branch_name })) },
-    { id: 'userid', label: 'User', type: 'select', options: users.map(user => ({ value: user.id, label: user.name })) },
-    // { id: 'account_name', label: 'Account Name', type: 'text', placeholder: 'Enter account name' },
-    { id: 'account_type', label: 'Account Type', type: 'select', options: [ { value: 'Cash', label: 'Cash' }, { value: 'Mpesa', label: 'Mpesa' }, { value: 'Debit Card', label: 'Debit Card' }, { value: 'Credit Card', label: 'Credit Card' }, { value: 'Bank', label: 'Bank' }] },
-    { id: 'account_number', label: 'Account Number', type: 'text', placeholder: 'Enter account number' },
-    { id: 'balance', label: 'Float Balance', type: 'number', placeholder: 'Enter initial float balance' },
-    { id: 'min_amount', label: 'Minimum Amount', type: 'number', placeholder: 'Enter minimum amount' },
-    { id: 'max_amount', label: 'Maximum Amount', type: 'number', placeholder: 'Enter maximum amount' },
-    { id: 'currency', label: 'Currency', type: 'select', options: [{ value: 'KES', label: 'KES' },{ value: 'USD', label: 'USD' }, { value: 'EUR', label: 'EUR' }, { value: 'GBP', label: 'GBP' }] },
-    { id: 'status', label: 'Status', type: 'select', options: [{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }] },
+  const handleSaveAccount = async (accountData: AccountData) => {
+    try {
+      if (dialogState.mode === 'create') {
+        // Format data for creation ensuring all required fields are present
+        const formattedAccount = {
+          accountUser: accountData.accountUser,
+          pettyCashType: accountData.pettyCashType,
+          accountNumber: accountData.accountNumber,
+          accountType: accountData.accountType,
+          minFloatBalance: Number(accountData.minFloatBalance),
+          minFloatAlert: Number(accountData.minFloatAlert),
+          maxOpeningFloat: Number(accountData.maxOpeningFloat),
+          approvedLimitAmount: Number(accountData.approvedLimitAmount),
+          startDate: accountData.startDate,
+          endDate: accountData.endDate,
+          status: accountData.status
+        };
+
+        // Validate the formatted data before sending to service
+        if (!formattedAccount.accountUser || !formattedAccount.pettyCashType || !formattedAccount.accountNumber) {
+          throw new Error('Required fields are missing');
+        }
+
+        const result = await PettyCashService.createAccountRecord(userId, formattedAccount);
+        if (result) {
+          toast.success('Account created successfully');
+          await fetchAccountsData(); // Use a different name to avoid confusion
+        }
+      } else {
+        await PettyCashService.updateAccountRecord(accountData.accountNumber, accountData, userId);
+        toast.success('Account updated successfully');
+        await fetchAccountsData();
+      }
+      setDialogState({ isOpen: false, mode: 'create', account: null });
+    } catch (error) {
+      console.error('Error saving account:', error);
+      toast.error(error.message || (dialogState.mode === 'create' ? 'Failed to create account' : 'Failed to update account'));
+    }
+  };
+
+
+
+  const columnDefinitions = [
+    {
+      header: '#',
+      width: '40px',
+      cell: (_: any, index: number) => index + 1
+    },
+    {
+      header: 'Account User',
+      width: '150px',
+      cell: (account: AccountData) => account.accountUser || '-'
+    },
+    {
+      header: 'Petty Cash Type',
+      width: '120px',
+      cell: (account: AccountData) => (
+        <Badge variant="outline" className="text-xs">
+          {account.pettyCashType || '-'}
+        </Badge>
+      )
+    },
+    {
+      header: 'Account Number',
+      width: '120px',
+      cell: (account: AccountData) => account.accountNumber || '-'
+    },
+    {
+      header: 'Account Type',
+      width: '100px',
+          cell: (account: AccountData) => (
+            <div className="text-center">
+              {account.accountType || '-'}
+            </div>
+          )    },
+    {
+      header: 'Min Float Balance',
+      width: '120px',
+      cell: (account: AccountData) => account.minFloatBalance?.toLocaleString('en-KE', {
+        style: 'currency',
+        currency: 'KES'
+      }) || '-'
+    },
+    {
+      header: 'Min Float Alert',
+      width: '120px',
+      cell: (account: AccountData) => account.minFloatAlert?.toLocaleString('en-KE', {
+        style: 'currency',
+        currency: 'KES'
+      }) || '-'
+    },
+    {
+      header: 'Max Opening Float',
+      width: '120px',
+      cell: (account: AccountData) => account.maxOpeningFloat?.toLocaleString('en-KE', {
+        style: 'currency',
+        currency: 'KES'
+      }) || '-'
+    },
+    {
+      header: 'Approved Limit',
+      width: '120px',
+      cell: (account: AccountData) => account.approvedLimitAmount?.toLocaleString('en-KE', {
+        style: 'currency',
+        currency: 'KES'
+      }) || '-'
+    },
+    {
+      header: 'Start Date',
+      width: '100px',
+      cell: (account: AccountData) => account.startDate ?
+        format(new Date(account.startDate), 'dd/MM/yyyy') : '-'
+    },
+    {
+      header: 'End Date',
+      width: '100px',
+      cell: (account: AccountData) => account.endDate ? (
+        <span className="text-red-600 font-bold">
+          {format(new Date(account.endDate), 'dd/MM/yyyy')}
+        </span>
+      ) : (
+        <span className="text-green-600 font-bold">To Date</span>
+      )
+    },
+    {
+      header: 'Status',
+      width: '80px',
+      cell: (account: AccountData) => (
+        <Badge variant={account.status === 'Active' ? 'success' : 'destructive'}>
+          {account.status || '-'}
+        </Badge>
+      )
+    },
+    {
+      header: 'Actions',
+      width: '100px',
+      cell: (account: AccountData) => (
+        <TableActions
+          row={account}
+          onEdit={handleEditAccount}
+          onDelete={handleDeleteAccount}
+          dialogTitle="Edit Account"
+          dialogDescription="Update account information"
+          deleteWarning="Are you sure you want to delete this account? This action cannot be undone."
+        />
+      )
+    }
   ];
 
-  const tableFields = [
-    { label: 'Account ID', key: 'id', format: (id) => `AC-${id}` },
-    { label: 'Branch Name', key: 'acc_portal_pettycash_branches.branch_name' },
-    { label: 'User', key: 'acc_portal_pettycash_users.name' },
-    { label: 'Account Type', key: 'account_type' },
-    { label: 'Account Number', key: 'account_number' },
-    { label: 'Currency', key: 'currency' },
-    { label: 'Float Balance', key: 'balance', format: (balance) => `${parseFloat(balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-    { label: 'Min Amount', key: 'min_amount', format: (amount) => `${parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-    { label: 'Max Amount', key: 'max_amount', format: (amount) => `${parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },   
-    { label: 'Created Date', key: 'created_date', format: (date) => formatDate(date) },
-    { label: 'Status', key: 'status' },
-  ];
+
+  const filteredAccounts = accounts.filter(account => {
+    const searchString = searchQuery.toLowerCase();
+    return (
+      account.accountNumber?.toLowerCase().includes(searchString) ||
+      account.accountType?.toLowerCase().includes(searchString) ||
+      account.pettyCashType?.toLowerCase().includes(searchString) ||
+      account.accountUser?.toLowerCase().includes(searchString)
+    );
+  });
 
   return (
     <div className="flex w-full bg-gray-100">
-      <main className="flex-1 p-6 w-full">
-        <h1 className="text-xl font-semibold mb-4">Accounts</h1>
+      
+      <main className="flex-1 p-4 w-full">
         <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center space-x-2">
-            <Input type="search" placeholder="Search" className="w-48" />
-            <Button variant="outline" className="flex items-center" onClick={fetchAccounts}>
-              <RefreshCwIcon className="w-4 h-4 mr-1" />
-              Refresh
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="search"
+                placeholder="Search accounts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-8 w-64"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchAccountsData}
+              className="h-8"
+            >
+              <RefreshCwIcon className="h-4 w-4" />
             </Button>
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button className="bg-blue-600 text-white">Add New Account</Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle>Add New Account</SheetTitle>
-                  <SheetDescription>
-                    Enter the details of the new account.
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="flex flex-col pt-4 gap-4">
-                  {formFields.map(({ id, label, type, placeholder, options }) => (
-                    <div key={id} className="space-y-1">
-                      <Label htmlFor={id}>{label}</Label>
-                      {type === 'select' ? (
-                        <Select onValueChange={(value) => handleSelectChange(id, value)} value={newAccount[id]}>
-                          <SelectTrigger>
-                            <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {options.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          id={id}
-                          type={type}
-                          placeholder={placeholder}
-                          value={newAccount[id]}
-                          onChange={handleInputChange}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="pt-4">
-                  <Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button>
-                </div>
-              </SheetContent>
-            </Sheet>
+            <Button
+              onClick={handleCreateAccount}
+              className="h-8 bg-blue-600 text-white"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add New Account
+            </Button>
           </div>
         </div>
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {tableFields.map(({ label }) => (
-                  <TableHead key={label}>{label}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {accounts.map((account) => (
-                <TableRow key={account.id}>
-                  {tableFields.map(({ key, format }) => (
-                    <TableCell key={key}>
-                      {format ? format(account[key]) : key.includes('.') ? account[key.split('.')[0]][key.split('.')[1]] : account[key]}
-                    </TableCell>
+
+        <Card className="overflow-hidden">
+          <ScrollArea className="h-[calc(100vh-200px)]">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-600 hover:bg-blue-600">
+                  {columnDefinitions.map((col, index) => (
+                    <TableHead
+                      key={index}
+                      style={{ width: col.width }}
+                      className="text-white h-8 text-xs font-medium border-r border-blue-500 last:border-r-0"
+                    >
+                      {col.header}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columnDefinitions.length}
+                      className="h-32 text-center"
+                    >
+                      <div className="flex flex-col items-center justify-center">
+                        <RefreshCwIcon className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+                        <span className="text-sm text-gray-500">Loading accounts...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredAccounts.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columnDefinitions.length}
+                      className="h-32 text-center"
+                    >
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="rounded-full bg-gray-100 p-3 mb-2">
+                          <Search className="h-6 w-6 text-gray-400" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">No Accounts Found</span>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {searchQuery
+                            ? 'No accounts match your search criteria'
+                            : 'Get started by adding your first account'}
+                        </p>
+                        {!searchQuery && (
+                          <Button
+                            onClick={handleCreateAccount}
+                            className="mt-3 bg-blue-600 text-white"
+                          >
+                            Add New Account
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredAccounts.map((account, index) => (
+                    <TableRow
+                      key={account.id || index}
+                      className="hover:bg-blue-50 border-b border-gray-100 transition-colors [&>td]:h-8"
+                    >
+                      {columnDefinitions.map((col, colIndex) => (
+                        <TableCell
+                          key={`${account.id || index}-${colIndex}`}
+                          style={{ width: col.width }}
+                          className="py-1 px-2 text-xs border-r border-gray-100 last:border-r-0"
+                        >
+                          {col.cell(account, index)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
         </Card>
-        <div className="flex justify-between items-center mt-4">
-          <Button variant="outline" className="flex items-center">
-            <ChevronLeftIcon className="w-4 h-4" />
-          </Button>
-          <span>1</span>
-          <Button variant="outline" className="flex items-center">
-            <ChevronRightIcon className="w-4 h-4" />
-          </Button>
-        </div>
+
+        <AccountDialog
+          isOpen={dialogState.isOpen}
+          onClose={() => setDialogState({ isOpen: false, mode: 'create', account: null })}
+          account={dialogState.account}
+          onSave={handleSaveAccount}
+          mode={dialogState.mode}
+          users={users}
+        />
       </main>
     </div>
   );
