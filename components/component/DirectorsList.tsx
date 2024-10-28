@@ -26,6 +26,9 @@ import { useAuth } from '@clerk/clerk-react'
 import toast, { Toaster } from 'react-hot-toast'
 import Papa from 'papaparse'
 
+interface DirectorsProps {
+  selectedUserId: string;
+}
 
 const directorFields = {
   "1. Director's Personal Details": [
@@ -141,7 +144,7 @@ const CSVUploadDialog = ({ isOpen, onClose, onUpload }) => {
   );
 };
 
-export function DirectorsList() {
+export function DirectorsList({ selectedUserId }: DirectorsProps) {
   const { userId } = useAuth();
   const [directors, setDirectors] = useState([]);
   const [newDirector, setNewDirector] = useState({});
@@ -155,26 +158,33 @@ export function DirectorsList() {
 
   const fields = Object.values(directorFields).flatMap(category => category.map(field => field.id));
 
+  
+  const userIdentifier = selectedUserId ||  userId;
+
   const fetchDirectors = useCallback(async () => {
+    if (!userIdentifier) return;
+      
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('acc_portal_directors')
-      .select('*')
-      .eq('userid', userId)
-      .order('id', { ascending: true });
-    setIsLoading(false);
-    if (error) {
+    try {
+      const { data, error } = await supabase
+        .from('acc_portal_directors')
+        .select('*')
+        .eq('userid', userIdentifier)
+
+      if (error) throw error;
+      setDirectors(data || []);
+    } catch (error) {
       console.error('Error fetching directors:', error);
-      toast.error("Failed to fetch directors. Please try again.");
-    } else {
-      setDirectors(data);
+      toast.error('Failed to fetch directors');
+    } finally {
+      setIsLoading(false);
     }
-  }, [userId]);
+  }, [userIdentifier]);
 
   useEffect(() => {
     fetchDirectors();
   }, [fetchDirectors]);
-
+  
   const handleInputChange = (e, directorId = null) => {
     const { id, value } = e.target;
     if (directorId) {

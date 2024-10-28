@@ -14,10 +14,12 @@ import { useAuth, useUser } from '@clerk/nextjs';
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 
+interface CompanyInfoProps {
+  selectedUserId: string;
+}
 
-
-
-export function CompanyInfoTab() {
+export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
+  const { user } = useUser();
   const { userId } = useAuth();
   const [companyData, setCompanyData] = useState(null);
   const [directors, setDirectors] = useState([]);
@@ -27,39 +29,36 @@ export function CompanyInfoTab() {
   const [formData, setFormData] = useState({});
 
   useEffect(() => {
-    fetchCompanyData();
     fetchDirectors();
   }, []);
 
-  const fetchCompanyData = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('acc_portal_company')
-        .select('*')
-        .single()
-        .eq("userid", userId)
+  const userIdentifier = selectedUserId || userId;
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // No data found for the user, likely a new company
-          setCompanyData({});
-          checkMissingFields({});
-        } else {
-          throw error;
-        }
-      } else {
-        setCompanyData(data || {});
-        checkMissingFields(data || {});
+  useEffect(() => {
+    const fetchCompanyData = async () => {
+      if (!userIdentifier) return;
+      
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('acc_portal_company')
+          .select('*')
+          .eq('userid', userIdentifier)
+          .single();
+
+        if (error) throw error;
+        setCompanyData(data);
+      } catch (error) {
+        console.error('Error fetching company data:', error);
+        toast.error('Failed to fetch company data');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching company data:', error);
-      setCompanyData({});
-      checkMissingFields({});
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+
+    fetchCompanyData();
+  }, [userIdentifier]);
+
 
   const fetchDirectors = async () => {
     try {
@@ -125,6 +124,10 @@ export function CompanyInfoTab() {
 
   if (isLoading) {
     return <div>Loading...</div>;
+  }
+
+  if (!companyData) {
+    return <div>No company data found</div>;
   }
 
   return (

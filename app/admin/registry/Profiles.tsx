@@ -1,41 +1,16 @@
-
-
 /* eslint-disable react/no-unescaped-entities */
 //@ts-nocheck
 
 "use client";
 
-import {
-  ColumnDef,
-  ColumnFiltersState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  SortingState,
-  useReactTable,
-} from "@tanstack/react-table";
+import { ColumnDef, ColumnFiltersState, flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, SortingState, useReactTable,} from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown } from "lucide-react";
 import { useEffect, useState } from 'react';
-
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger,} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
 import { BankList } from "@/components/component/BankList";
 import { DirectorsList } from "@/components/component/DirectorsList";
 import { CompanyInfoTab } from "@/components/component/companyInfo";
@@ -46,6 +21,12 @@ import { InsurancePolicy } from "@/components/component/InsurancePolicy";
 import { DirectorsDocumentsList } from "@/components/component/DirectorsDocumentsList";
 import { useRouter } from 'next/navigation';
 
+
+interface ProfileProps {
+  company: {
+    userid: string;
+  };
+}
 
 const DataTable = ({ columns, data }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -166,8 +147,8 @@ const generateMockData = (prefix, count) =>
     details: `Details for ${prefix}${i + 1}`,
   }));
 
-export default function Profile() {
-
+export default function Profile({ company }: ProfileProps) {
+ 
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("company-info");
 
@@ -207,6 +188,11 @@ export default function Profile() {
       header: "Details",
     },
   ];
+  
+  if (!company?.userid) {
+    return <div>Please select a company</div>;
+  }
+
 
   return (
     <div className="p-4 w-full">
@@ -231,17 +217,17 @@ export default function Profile() {
             <TabsContent value="company-info-tab">
               <div className="space-y-4">
                 <h3 className="text-lg font-bold">Company's Information</h3>
-                <CompanyInfoTab />
+                <CompanyInfoTab selectedUserId={company.userid} />
               </div>
             </TabsContent>
             <TabsContent value="directors-info">
-              <DirectorsList />
+              <DirectorsList selectedUserId={company.userid} />
             </TabsContent>
             <TabsContent value="employee-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Employees' Information</h3>
                 <h2 className="text-xl font-semibold mb-2">Employees</h2>
-                <EmployeeList />
+                <EmployeeList selectedUserId={company.userid} />
               </div>
             </TabsContent>
             <TabsContent value="suppliers-info">
@@ -254,13 +240,13 @@ export default function Profile() {
                 <TabsContent value="trading-suppliers">
                   <div className="space-y-4">
                     <h4 className="text-md font-medium">Trading Suppliers</h4>
-                    <SupplierList type="trading" />
+                    <SupplierList type="trading" selectedUserId={company.userid} />
                   </div>
                 </TabsContent>
                 <TabsContent value="monthly-service-vendors">
                   <div className="space-y-4">
                     <h4 className="text-md font-medium">Monthly Service Vendors</h4>
-                    <SupplierList type="monthly" />
+                    <SupplierList type="monthly" selectedUserId={company.userid} />
                   </div>
                 </TabsContent>
               </Tabs>
@@ -269,7 +255,7 @@ export default function Profile() {
             <TabsContent value="insurances-info">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Insurances' Information</h3>
-                <InsurancePolicy />
+                <InsurancePolicy selectedUserId={company.userid} />
               </div>
             </TabsContent>
             <TabsContent value="deposits-info">
@@ -325,7 +311,11 @@ export default function Profile() {
             <TabsContent value="banks-info">
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold mb-2">Banks</h2>
-                <BankList />
+                {company?.userid ? (
+                  <BankList selectedUserId={company.userid} />
+                ) : (
+                  <div className="text-center text-gray-500">No company selected</div>
+                )}
               </div>
             </TabsContent>
           </Tabs>
