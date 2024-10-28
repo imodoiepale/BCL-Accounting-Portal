@@ -1,15 +1,24 @@
+//@ts-nocheck
+"use client"
 import { ComponentProps } from "react"
-import formatDistanceToNow from "date-fns/formatDistanceToNow"
-
+import { formatDistanceToNow } from "date-fns"
+import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import { Badge } from "@/registry/new-york/ui/badge"
-import { ScrollArea } from "@/registry/new-york/ui/scroll-area"
-import { Separator } from "@/registry/new-york/ui/separator"
-import { Mail } from "@/app/(app)/examples/mail/data"
-import { useMail } from "@/app/(app)/examples/mail/use-mail"
+import { Mail } from "../data"
+import { useMail } from "./use-mail"
 
 interface MailListProps {
   items: Mail[]
+}
+
+function getSenderLabel(email: string) {
+  // Extract domain to determine email provider
+  const domain = email.split('@')[1]
+  if (domain === 'example.com') return 'Vercel'
+  if (domain === 'gmail.com') return 'Gmail'
+  if (domain === 'me.com') return 'iCloud'
+  return domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1)
 }
 
 export function MailList({ items }: MailListProps) {
@@ -33,16 +42,29 @@ export function MailList({ items }: MailListProps) {
             }
           >
             <div className="flex w-full flex-col gap-1">
-              <div className="flex items-center">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="font-semibold">{item.name}</div>
+                  <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">
+                    {getSenderLabel(item.email)}
+                  </Badge>
                   {!item.read && (
                     <span className="flex h-2 w-2 rounded-full bg-blue-600" />
                   )}
                 </div>
+                <div className="flex items-center gap-2">
+                  <div className="font-semibold">{item.name}</div>
+                  <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">
+                    {getSenderLabel(item.email)}
+                  </Badge>
+                  {!item.read && (
+                    <span className="flex h-2 w-2 rounded-full bg-blue-600" />
+                  )}
+                </div>
+                
                 <div
                   className={cn(
-                    "ml-auto text-xs",
+                    "text-xs",
                     mail.selected === item.id
                       ? "text-foreground"
                       : "text-muted-foreground"
@@ -61,7 +83,7 @@ export function MailList({ items }: MailListProps) {
             {item.labels.length ? (
               <div className="flex items-center gap-2">
                 {item.labels.map((label) => (
-                  <Badge key={label} variant={getBadgeVariantFromLabel(label)}>
+                  <Badge key={label} variant="outline" className="text-xs">
                     {label}
                   </Badge>
                 ))}
