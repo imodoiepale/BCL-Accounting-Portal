@@ -1,4 +1,6 @@
+// components/EditEntryForm.tsx
 // @ts-nocheck
+// components/EntryForm.tsx
 import React, { useState, useEffect } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -6,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DialogFooter } from "@/components/ui/dialog";
 import { EXPENSE_CATEGORIES } from './expenseCategories';
-import { Check, Loader2 } from "lucide-react";
+import { Check } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,60 +17,31 @@ import { cn } from "@/lib/utils";
 import { toast } from 'react-hot-toast';
 import Image from 'next/image';
 
-interface PettyCashEntry {
-  id?: string;
-  invoice_date: string;
-  user_name: string;
-  account_type: string;
-  petty_cash_account: string;
-  supplier_name: string;
-  supplier_pin: string;
-  purchase_type: string;
-  category_code: string;
-  category_name: string; // Added for full category name
-  subcategory_code: string;
-  subcategory_name: string; // Added for full subcategory name
-  amount: number | string;
-  description: string;
-  paid_via: string;
-  checked_by: string;
-  approved_by: string;
-  receipt_url: File | string | null;
-  payment_proof_url: File | string | null;
-  created_at: string;
-  is_verified: boolean;
-  branch_name?: string;
-}
-
 interface SupplierData {
+  supplierName: string;
+  supplierType: 'Corporate' | 'Individual';
+  pin: string;
+  idNumber: string;
+  mobile: string;
+  email: string;
+  tradingType: 'Purchase Only' | 'Expense Only' | 'Both Purchase + Expense';
+}
+
+interface Supplier {
   id: string;
-  data: {
-    supplierName: string;
-    supplierType: 'Corporate' | 'Individual';
-    pin: string;
-    idNumber: string;
-    mobile: string;
-    email: string;
-  };
+  userid: string;
+  data: SupplierData;
+  created_at: string;
 }
 
-interface PettyCashEntryFormProps {
-  mode: 'create' | 'edit';
-  initialData: PettyCashEntry | null;
-  onSubmit: (entry: PettyCashEntry) => Promise<void>;
-  onClose: () => void;
-  userId: string;
-}
-
-const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
+const PettyCashEntryForm = ({
   mode = 'create',
   initialData = null,
   onSubmit,
   onClose,
   userId
 }) => {
-  // Initial form state
-  const initialFormState: PettyCashEntry = {
+  const initialFormState = {
     invoice_date: '',
     user_name: '',
     account_type: '',
@@ -77,9 +50,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     supplier_pin: '',
     purchase_type: '',
     category_code: '',
-    category_name: '',
     subcategory_code: '',
-    subcategory_name: '',
     amount: '',
     description: '',
     paid_via: '',
@@ -88,28 +59,21 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     receipt_url: null,
     payment_proof_url: null,
     created_at: new Date().toISOString(),
-    is_verified: false,
-    branch_name: ''
+    is_verified: false
   };
 
-  // State management
-  const [formData, setFormData] = useState<PettyCashEntry>(initialData || initialFormState);
-  const [suppliers, setSuppliers] = useState<SupplierData[]>([]);
+  const [formData, setFormData] = useState(initialData || initialFormState);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [openSupplier, setOpenSupplier] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<SupplierData | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isNewSupplier, setIsNewSupplier] = useState(false);
   const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Fetch suppliers on component mount
   useEffect(() => {
     const fetchSuppliers = async () => {
-      if (!userId) {
-        console.error('UserId is undefined');
-        return;
-      }
       try {
         const data = await PettyCashService.fetchRecords('acc_portal_pettycash_suppliers', userId);
         setSuppliers(Array.isArray(data) ? data : []);
@@ -124,14 +88,8 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
   // Update form when initialData changes
   useEffect(() => {
     if (initialData) {
-      setFormData({
-        ...initialData,
-        category_name: EXPENSE_CATEGORIES[initialData.category_code]?.name || '',
-        subcategory_name: EXPENSE_CATEGORIES[initialData.category_code]?.subcategories.find(
-          sub => sub.code === initialData.subcategory_code
-        )?.name || ''
-      });
-
+      setFormData(initialData);
+      // Find matching supplier
       const matchingSupplier = suppliers.find(s => s.data.supplierName === initialData.supplier_name);
       if (matchingSupplier) {
         setSelectedSupplier(matchingSupplier);
@@ -140,7 +98,6 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     }
   }, [initialData, suppliers]);
 
-  // Form field definitions
   const formFields = [
     // Basic Information
     [
@@ -152,8 +109,24 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         colSpan: 1
       },
       {
+        id: 'invoice_number',
+        label: 'Invoice Number',
+        type: 'text',
+        required: true,
+        colSpan: 1
+      }
+    ],
+    [
+      {
         id: 'user_name',
         label: 'User',
+        type: 'text',
+        required: true,
+        colSpan: 1
+      },
+      {
+        id: 'branch_name',
+        label: 'Branch',
         type: 'text',
         required: true,
         colSpan: 1
@@ -180,7 +153,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         colSpan: 1
       }
     ],
-    // Purchase Information
+    // Transaction Details
     [
       {
         id: 'purchase_type',
@@ -202,7 +175,6 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         colSpan: 1
       }
     ],
-    // Categories
     [
       {
         id: 'category_code',
@@ -229,36 +201,37 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         colSpan: 1
       }
     ],
-    // Description and Payment
     [
       {
         id: 'description',
         label: 'Description',
         type: 'text',
         required: true,
-        colSpan: 1
-      },
+        colSpan: 2
+      }
+    ],
+    // Approval Information
+    [
       {
         id: 'paid_via',
         label: 'Paid Via/By',
         type: 'text',
         required: true,
         colSpan: 1
-      }
-    ],
-    // Approval Information
-    [
+      },
       {
         id: 'checked_by',
         label: 'Checked By',
         type: 'text',
         colSpan: 1
-      },
+      }
+    ],
+    [
       {
         id: 'approved_by',
         label: 'Approved By',
         type: 'text',
-        colSpan: 1
+        colSpan: 2
       }
     ],
     // File Uploads
@@ -280,28 +253,18 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     ]
   ];
 
-  // Event Handlers
   const handleInputChange = (fieldId: string, value: any) => {
-    setFormData(prev => {
-      const newData = { ...prev, [fieldId]: value };
+    setFormData(prev => ({
+      ...prev,
+      [fieldId]: value
+    }));
 
-      // Handle category changes
-      if (fieldId === 'category_code') {
-        const category = EXPENSE_CATEGORIES[value];
-        newData.category_name = category?.name || '';
-        newData.subcategory_code = '';
-        newData.subcategory_name = '';
-      }
-
-      // Handle subcategory changes
-      if (fieldId === 'subcategory_code' && prev.category_code) {
-        const subcategory = EXPENSE_CATEGORIES[prev.category_code]?.subcategories
-          .find(sub => sub.code === value);
-        newData.subcategory_name = subcategory?.name || '';
-      }
-
-      return newData;
-    });
+    if (fieldId === 'category_code') {
+      setFormData(prev => ({
+        ...prev,
+        subcategory_code: ''
+      }));
+    }
 
     // Handle file previews
     if (fieldId === 'receipt_url' && value instanceof File) {
@@ -314,10 +277,119 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     }
   };
 
+ const renderSupplierSection = () => (
+    <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="col-span-2">
+        <Label>Select Supplier Type</Label>
+        <Select
+          value={isNewSupplier ? 'new' : 'existing'}
+          onValueChange={(value) => {
+            setIsNewSupplier(value === 'new');
+            setSelectedSupplier(null);
+            setFormData(prev => ({
+              ...prev,
+              supplier_name: '',
+              supplier_pin: ''
+            }));
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose supplier type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="existing">Existing Supplier</SelectItem>
+            <SelectItem value="new">New Supplier</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {!isNewSupplier ? (
+        <div className="col-span-2">
+          <Label>Search Existing Supplier</Label>
+          <Popover open={openSupplier} onOpenChange={setOpenSupplier}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={openSupplier}
+                className="w-full justify-between"
+              >
+                {selectedSupplier ? selectedSupplier.data?.supplierName : "Select supplier..."}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[400px] p-0">
+              <Command>
+                <CommandInput 
+                  placeholder="Search suppliers..." 
+                  value={supplierSearchQuery}
+                  onValueChange={setSupplierSearchQuery}
+                />
+                <CommandEmpty>No supplier found.</CommandEmpty>
+                <CommandGroup>
+                  <ScrollArea className="h-72">
+                    {suppliers.filter(supplier => {
+                      const searchLower = supplierSearchQuery.toLowerCase();
+                      return (
+                        supplier.data?.supplierName?.toLowerCase().includes(searchLower) ||
+                        supplier.data?.pin?.toLowerCase().includes(searchLower) ||
+                        supplier.data?.idNumber?.toLowerCase().includes(searchLower)
+                      );
+                    }).map((supplier) => (
+                      <CommandItem
+                        key={supplier.id}
+                        onSelect={() => {
+                          setSelectedSupplier(supplier);
+                          setOpenSupplier(false);
+                          setFormData(prev => ({
+                            ...prev,
+                            supplier_name: supplier.data?.supplierName || '',
+                            supplier_pin: supplier.data?.supplierType === 'Corporate' 
+                              ? supplier.data?.pin 
+                              : supplier.data?.idNumber || ''
+                          }));
+                        }}
+                      >
+                        <div className="flex flex-col">
+                          <span>{supplier.data?.supplierName}</span>
+                          <span className="text-sm text-gray-500">
+                            {supplier.data?.supplierType === 'Corporate' 
+                              ? `PIN: ${supplier.data?.pin}` 
+                              : `ID: ${supplier.data?.idNumber}`}
+                          </span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </ScrollArea>
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      ) : (
+        <>
+          <div className="col-span-1">
+            <Label>Supplier Name<span className="text-red-500">*</span></Label>
+            <Input
+              value={formData.supplier_name}
+              onChange={(e) => handleInputChange('supplier_name', e.target.value)}
+              required
+            />
+          </div>
+          <div className="col-span-1">
+            <Label>Supplier PIN/ID<span className="text-red-500">*</span></Label>
+            <Input
+              value={formData.supplier_pin}
+              onChange={(e) => handleInputChange('supplier_pin', e.target.value)}
+              required
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-
     try {
       let finalData = { ...formData };
 
@@ -334,20 +406,20 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         finalData.payment_proof_url = paymentProofUrl;
       }
 
-      // Handle new supplier creation
+      // If it's a new supplier, create supplier record first
       if (isNewSupplier) {
         const supplierData = {
           supplierName: formData.supplier_name,
-          supplierType: 'Individual',
+          supplierType: 'Individual', // Default to Individual for new suppliers
           pin: formData.supplier_pin,
           idNumber: formData.supplier_pin,
-          mobile: '',
-          email: ''
+          mobile: '',  // These could be added to the form if needed
+          email: '',   // These could be added to the form if needed
+          tradingType: 'Both Purchase + Expense'
         };
 
         await PettyCashService.createRecord('acc_portal_pettycash_suppliers', {
-          data: supplierData,
-          userid: userId
+          data: supplierData
         }, userId);
       }
 
@@ -357,151 +429,28 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
       if (receiptPreview) URL.revokeObjectURL(receiptPreview);
       if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
 
-      onClose();
     } catch (error) {
       console.error('Error submitting form:', error);
       toast.error('Failed to submit entry');
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  // Render Functions
-  const renderSupplierSection = () => (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label>Supplier Type</Label>
-        <Select
-          value={isNewSupplier ? 'new' : 'existing'}
-          onValueChange={(value) => {
-            setIsNewSupplier(value === 'new');
-            setSelectedSupplier(null);
-            setFormData(prev => ({
-              ...prev,
-              supplier_name: '',
-              supplier_pin: ''
-            }));
-          }}
-        >
-          <SelectTrigger className="h-8">
-            <SelectValue placeholder="Choose supplier type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="existing">Existing Supplier</SelectItem>
-            <SelectItem value="new">New Supplier</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {!isNewSupplier ? (
-        <div className="space-y-2">
-          <Label>Search Existing Supplier</Label>
-          <Popover open={openSupplier} onOpenChange={setOpenSupplier}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={openSupplier}
-                className="w-full justify-between h-8"
-              >
-                {selectedSupplier ? selectedSupplier.data.supplierName : "Select supplier..."}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[400px] p-0">
-              <Command>
-                <CommandInput
-                  placeholder="Search suppliers..."
-                  value={supplierSearchQuery}
-                  onValueChange={setSupplierSearchQuery}
-                />
-                <CommandEmpty>No supplier found.</CommandEmpty>
-                <CommandGroup>
-                  <ScrollArea className="h-72">
-                    {suppliers
-                      .filter(supplier => {
-                        const searchLower = supplierSearchQuery.toLowerCase();
-                        return (
-                          supplier.data.supplierName?.toLowerCase().includes(searchLower) ||
-                          supplier.data.pin?.toLowerCase().includes(searchLower) ||
-                          supplier.data.idNumber?.toLowerCase().includes(searchLower)
-                        );
-                      })
-                      .map((supplier) => (
-                        <CommandItem
-                          key={supplier.id}
-                          onSelect={() => {
-                            setSelectedSupplier(supplier);
-                            setOpenSupplier(false);
-                            setFormData(prev => ({
-                              ...prev,
-                              supplier_name: supplier.data.supplierName,
-                              supplier_pin: supplier.data.supplierType === 'Corporate'
-                                ? supplier.data.pin
-                                : supplier.data.idNumber
-                            }));
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedSupplier?.id === supplier.id ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          <div className="flex flex-col">
-                            <span>{supplier.data.supplierName}</span>
-                            <span className="text-xs text-gray-500">
-                              {supplier.data.supplierType === 'Corporate'
-                                ? `PIN: ${supplier.data.pin}`
-                                : `ID: ${supplier.data.idNumber}`}
-                            </span>
-                          </div>
-                        </CommandItem>
-                      ))}
-                  </ScrollArea>
-                </CommandGroup>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Supplier Name<span className="text-red-500">*</span></Label>
-            <Input
-              value={formData.supplier_name}
-              onChange={(e) => handleInputChange('supplier_name', e.target.value)}
-              className="h-8"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Supplier PIN/ID<span className="text-red-500">*</span></Label>
-            <Input
-              value={formData.supplier_pin}
-              onChange={(e) => handleInputChange('supplier_pin', e.target.value)}
-              className="h-8"
-              required
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderField = (field: any) => {
+  const renderField = (field) => {
     switch (field.type) {
       case 'select':
         return (
           <Select
             value={formData[field.id]?.toString()}
             onValueChange={(value) => handleInputChange(field.id, value)}
-            disabled={field.disabled}
+            disabled={field.disabled || !field.options?.length}
           >
-            <SelectTrigger className="h-8">
-              <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+            <SelectTrigger className="h-9">
+              <SelectValue // Continuing from the previous code...
+
+                placeholder={`Select ${field.label.toLowerCase()}`} />
             </SelectTrigger>
             <SelectContent>
-              {field.options?.map((option: any) => (
+              {field.options?.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -517,47 +466,57 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
               type="file"
               accept={field.accept}
               onChange={(e) => handleInputChange(field.id, e.target.files?.[0])}
-              className="h-8"
+              className="h-9"
             />
             {field.id === 'receipt_url' && (formData.receipt_url || receiptPreview) && (
-              <div className="relative h-20 bg-gray-50 rounded-md overflow-hidden">
+              <div className="relative h-[100px] bg-gray-50 rounded-md overflow-hidden">
                 {formData.receipt_url instanceof File ? (
                   <Image
                     src={receiptPreview!}
                     alt="Receipt preview"
-                    fill
-                    className="object-contain"
+                    className="w-full h-full object-contain"
                   />
-                ) : formData.receipt_url && (
+                ) : (
                   <Image
                     src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${formData.receipt_url}`}
                     alt="Receipt"
-                    fill
-                    className="object-contain"
+                    className="w-full h-full object-contain"
                   />
                 )}
               </div>
             )}
             {field.id === 'payment_proof_url' && (formData.payment_proof_url || paymentProofPreview) && (
-              <div className="relative h-20 bg-gray-50 rounded-md overflow-hidden">
+              <div className="relative h-[100px] bg-gray-50 rounded-md overflow-hidden">
                 {formData.payment_proof_url instanceof File ? (
                   <Image
                     src={paymentProofPreview!}
                     alt="Payment proof preview"
-                    fill
-                    className="object-contain"
+                    className="w-full h-full object-contain"
                   />
-                ) : formData.payment_proof_url && (
+                ) : (
                   <Image
                     src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${formData.payment_proof_url}`}
                     alt="Payment proof"
-                    fill
-                    className="object-contain"
+                    className="w-full h-full object-contain"
                   />
                 )}
               </div>
             )}
           </div>
+        );
+
+      case 'number':
+        return (
+          <Input
+            type="number"
+            value={formData[field.id] || ''}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            className="h-9"
+            required={field.required}
+            disabled={field.disabled}
+            step="0.01"
+            min="0"
+          />
         );
 
       default:
@@ -566,7 +525,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
             type={field.type}
             value={formData[field.id] || ''}
             onChange={(e) => handleInputChange(field.id, e.target.value)}
-            className="h-8"
+            className="h-9"
             required={field.required}
             disabled={field.disabled}
           />
@@ -589,78 +548,61 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     if (incompleteFields.length === 0) return null;
 
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-2 mt-4">
-        <h4 className="text-sm font-medium text-yellow-800">Required fields missing:</h4>
-        <ul className="text-xs text-yellow-700 mt-1 grid grid-cols-2 gap-1">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-4">
+        <h4 className="text-sm font-medium text-yellow-800 mb-1">Required fields missing:</h4>
+        <ul className="text-sm text-yellow-700 list-disc list-inside grid grid-cols-4 gap-2">
           {incompleteFields.map(field => (
-            <li key={field.id} className="list-disc list-inside">
-              {field.label}
-            </li>
+            <li key={field.id}>{field.label}</li>
           ))}
         </ul>
       </div>
     );
   };
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 px-2">
-      {/* Supplier Section */}
+    <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+      {/* Render supplier section first */}
       {renderSupplierSection()}
 
-      {/* Form Fields */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-        {formFields.map((row, rowIndex) => (
-          <React.Fragment key={rowIndex}>
-            {row.map((field) => (
-              <div
-                key={field.id}
-                className={cn(
-                  "space-y-1",
-                  field.colSpan === 2 ? "col-span-2" : "col-span-1"
-                )}
-              >
-                <Label className="text-sm">
-                  {field.label}
-                  {field.required && <span className="text-red-500">*</span>}
-                </Label>
-                {renderField(field)}
-              </div>
-            ))}
-          </React.Fragment>
-        ))}
-      </div>
+      {/* Render all other form fields */}
+      {formFields.map((row, rowIndex) => (
+        <div key={rowIndex} className="grid grid-cols-2 gap-4">
+          {row.map((field) => (
+            <div
+              key={field.id}
+              className={`space-y-1.5 ${field.colSpan === 2 ? 'col-span-2' : ''}`}
+            >
+              <Label htmlFor={field.id}>
+                {field.label}
+                {field.required && <span className="text-red-500 ml-1">*</span>}
+              </Label>
+              {renderField(field)}
+            </div>
+          ))}
+        </div>
+      ))}
 
       {/* Validation Status */}
       {renderValidationStatus()}
 
-      {/* Form Actions */}
-      <DialogFooter className="gap-2 pt-2">
+      <DialogFooter>
         <Button
           type="button"
           variant="outline"
           onClick={onClose}
-          className="h-8"
-          disabled={isLoading}
+          className="h-9"
         >
           Cancel
         </Button>
         <Button
           type="submit"
-          className="h-8 bg-blue-600 text-white"
-          disabled={isLoading || formFields
+          className="h-9 bg-blue-600 text-white"
+          disabled={formFields
             .flat()
             .filter(field => field.required)
             .some(field => !formData[field.id])
           }
         >
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {mode === 'create' ? 'Creating...' : 'Saving...'}
-            </>
-          ) : (
-            mode === 'create' ? 'Create Entry' : 'Save Changes'
-          )}
+          {mode === 'create' ? 'Create Entry' : 'Save Changes'}
         </Button>
       </DialogFooter>
     </form>

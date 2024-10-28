@@ -119,10 +119,13 @@ const EntryDialog: React.FC<EntryDialogProps> = ({
           </DialogTitle>
         </DialogHeader>
         <PettyCashEntryForm
-          mode={mode}
-          initialData={entry}
-          onSubmit={onSave}
-          onClose={onClose}
+          mode="create"
+          initialData={null}
+          onSubmit={async (data) => {
+            // Handle the submission result
+            await fetchEntries(); // Refresh your entries list
+          }}
+          onClose={() => setDialogOpen(false)}
         />
       </DialogContent>
     </Dialog>
@@ -1046,11 +1049,8 @@ export function TransactionsTab() {
           onSave={handleSaveEntry}
           mode={dialogState.mode}
           currentEntries={entries}
-          userId={userId}  // Add this prop
+          userId={userId}
         />
-
-
-
       </main>
     </div>
   );
