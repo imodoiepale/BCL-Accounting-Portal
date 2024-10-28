@@ -45,7 +45,11 @@ const formatDate = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
-export function EmployeeList() {
+interface EmployeeList {
+  selectedUserId: string;
+}
+
+export function EmployeeList({ selectedUserId }: EmployeeList) {
   const { user } = useUser();
   const [employees, setEmployees] = useState([])
   const [newEmployee, setNewEmployee] = useState({
@@ -64,15 +68,17 @@ export function EmployeeList() {
   const [editingEmployee, setEditingEmployee] = useState(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
+  const userIdentifier = selectedUserId ||  user?.id;
+
   const fetchEmployees = useCallback(async () => {
     const { data, error } = await supabase
       .from('acc_portal_employees')
       .select('*')
-      .eq('userid', user?.id)
+      .eq('userid', userIdentifier)
       .order('id', { ascending: true });
     if (error) console.error('Error fetching employees:', error)
     else setEmployees(data)
-  }, [user?.id])
+  }, [userIdentifier])
 
   useEffect(() => {
     fetchEmployees()

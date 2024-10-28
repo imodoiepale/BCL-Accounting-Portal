@@ -61,6 +61,7 @@ const CompanySidebar = ({ onCompanySelect, showAllCompanies, onToggleView }) => 
 
   const handleCompanySelect = (company) => {
     setSelectedCompany(company.id);
+    console.log('Selected company userid:', company.userid);
     onCompanySelect(company);
   };
 
