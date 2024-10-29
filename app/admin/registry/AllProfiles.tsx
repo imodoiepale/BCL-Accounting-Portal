@@ -1,5 +1,3 @@
-
-
 /* eslint-disable react/no-unescaped-entities */
 //@ts-nocheck
 
@@ -24,6 +22,7 @@ import { DirectorsDocumentsList } from "@/components/component/DirectorsDocument
 import { supabase } from '@/lib/supabaseClient';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
+import GroupedRowTable from './GroupedDataTable';
 interface AllProfilesProps {
   companies: Array<{
     id: number;
@@ -54,7 +53,26 @@ interface AllProfilesProps {
 }
 
 const companyInfoColumns = [
+  { accessorKey: "index",  header: "#", cell: ({ row }) => row.index + 1 },
   { id: 'company_name', accessorKey: 'company_name', header: 'Company Name' },
+  {
+    id: 'completeness',
+    header: 'Missing Fields',
+    cell: ({ row }) => {
+      const fields = Object.keys(row.original);
+      const nonEmptyFields = fields.filter(field => 
+        row.original[field] !== null && 
+        row.original[field] !== ''
+      );
+      const missingCount = fields.length - nonEmptyFields.length;
+      
+      return (
+        <Badge variant={missingCount > 0 ? "destructive" : "success"}>
+          {missingCount > 0 ? `${missingCount} Missing` : 'Complete'}
+        </Badge>
+      );
+    }
+  },
   { id: 'company_type', accessorKey: 'company_type', header: 'Company Type' },
   { id: 'registration_number', accessorKey: 'registration_number', header: 'Registration Number' },
   { id: 'date_established', accessorKey: 'date_established', header: 'Date Established' },
@@ -88,6 +106,24 @@ const directorColumns = [
   // },
   { accessorKey: "company_name", header: "Company Name" },
   {
+    id: 'completeness',
+    header: 'Missing Fields',
+    cell: ({ row }) => {
+      const fields = Object.keys(row.original);
+      const nonEmptyFields = fields.filter(field => 
+        row.original[field] !== null && 
+        row.original[field] !== ''
+      );
+      const missingCount = fields.length - nonEmptyFields.length;
+      
+      return (
+        <div className='text-red-500 font-semibold'>
+        {missingCount > 0 ? `${missingCount} Missing` : ''}
+        </div>
+      );
+    }
+  },
+  {
     accessorKey: "full_name",
     header: "Director Name",
   },
@@ -119,6 +155,24 @@ const directorColumns = [
 
 const bankColumns = [
   { id: 'company_name', header: 'Company Name' },
+  {
+    id: 'completeness',
+    header: 'Missing Fields',
+    cell: ({ row }) => {
+      const fields = Object.keys(row.original);
+      const nonEmptyFields = fields.filter(field => 
+        row.original[field] !== null && 
+        row.original[field] !== ''
+      );
+      const missingCount = fields.length - nonEmptyFields.length;
+      
+      return (
+        <div className='text-red-500 font-semibold'>
+      {missingCount > 0 ? `${missingCount} Missing` : ''}
+      </div>
+      );
+    }
+  },
   { id: 'name', header: 'Bank Name' },
   { id: 'account_number', header: 'Account Number' },
   { id: 'branch', header: 'Branch' },
@@ -148,7 +202,7 @@ const pathname = usePathname();
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        // Fetch all data in parallel with proper joins
+        // Fetch all data in parallel
         const [
           { data: companiesData },
           { data: suppliersData },
@@ -156,51 +210,23 @@ const pathname = usePathname();
           { data: employeesData },
           { data: banksData }
         ] = await Promise.all([
-          supabase
-            .from('acc_portal_company')
-            .select('*'),
-          supabase
-            .from('acc_portal_pettycash_suppliers')
-            .select(`
-              *,
-              acc_portal_company!inner(
-                company_name
-              )
-            `)
-            .eq('acc_portal_pettycash_suppliers.userid', 'acc_portal_company.userid'),
-          supabase
-            .from('acc_portal_directors')
-            .select(`
-              *,
-              acc_portal_company!inner(
-                company_name
-              )
-            `),
-          supabase
-            .from('acc_portal_employees')
-            .select(`
-              *,
-              acc_portal_company!inner(
-                company_name
-              )
-            `),
-          supabase
-            .from('acc_portal_banks')
-            .select(`
-              *,
-              acc_portal_company!inner(
-                company_name
-              )
-            `)
+          supabase.from('acc_portal_company').select('*'),
+          supabase.from('acc_portal_pettycash_suppliers').select('*'),
+          supabase.from('acc_portal_directors').select('*'),
+          supabase.from('acc_portal_employees').select('*'),
+          supabase.from('acc_portal_banks').select('*')
         ]);
-    
-        // Create company name mapping
+
+  
+        // Create a mapping of userid to company name
         const companyMapping = companiesData?.reduce((acc, company) => {
           acc[company.userid] = company.company_name;
           return acc;
         }, {});
-    
-        // Transform suppliers data
+
+        console.log('Company Mapping:', companyMapping);
+  
+        // Transform suppliers data with company names
         const transformedSuppliers = suppliersData?.map(supplier => ({
           id: supplier.id,
           company_name: companyMapping[supplier.userid],
@@ -210,46 +236,45 @@ const pathname = usePathname();
           mobile: supplier.data.mobile,
           idNumber: supplier.data.idNumber,
           supplierType: supplier.data.supplierType,
-          tradingType: supplier.data.tradingType,
-          created_at: supplier.created_at,
-          updated_at: supplier.updated_at
+          tradingType: supplier.data.tradingType
         }));
-    
-        // Transform directors data
+
+        console.log('Transformed Suppliers:', transformedSuppliers);
+  
+        // Transform other data with company names
         const transformedDirectors = directorsData?.map(director => ({
           ...director,
           company_name: companyMapping[director.userid]
         }));
-    
-        // Transform employees data
+
+        console.log('Transformed Directors:', transformedDirectors);
+  
         const transformedEmployees = employeesData?.map(employee => ({
           ...employee,
           company_name: companyMapping[employee.userid]
         }));
-    
-        // Transform banks data
+
+        console.log('Transformed Employees:', transformedEmployees);
+  
         const transformedBanks = banksData?.map(bank => ({
           ...bank,
           company_name: companyMapping[bank.userid]
         }));
-    
+
+        console.log('Transformed Banks:', transformedBanks);
+  
         // Set all transformed data to state
         setCompanies(companiesData || []);
         setSuppliers(transformedSuppliers || []);
         setDirectors(transformedDirectors || []);
         setEmployees(transformedEmployees || []);
         setBanks(transformedBanks || []);
-    
-        console.log('Transformed Suppliers:', transformedSuppliers);
-        console.log('Transformed Directors:', transformedDirectors);
-        console.log('Transformed Employees:', transformedEmployees);
-        console.log('Transformed Banks:', transformedBanks);
-    
+  
       } catch (error) {
         console.error('Error fetching data:', error);
       }
     };
-    
+  
     fetchAllData();
   }, []);
   
@@ -272,6 +297,25 @@ const pathname = usePathname();
         columnVisibility,
       },
     });
+  
+    const enhancedColumns = columns.map(col => ({
+      ...col,
+      header: () => {
+        const totalRows = data.length;
+        const emptyCount = data.filter(row => !row[col.accessorKey]).length;
+        
+        return (
+          <div className="flex flex-col items-center">
+            <span className="font-bold">{col.header}</span>
+            {col.accessorKey !== 'index' && (
+              <Badge variant={emptyCount > 0 ? "destructive" : "success"} className="mt-1">
+                {emptyCount > 0 ? `${emptyCount} Missing` : 'Complete'}
+              </Badge>
+            )}
+          </div>
+        );
+      }
+    }));
   
     return (
       <div className="space-y-4">
@@ -368,7 +412,24 @@ const GroupedTable = ({ data, columns }) => {
   );
 };
 
+// Add summary row at the bottom of the table
+const TableSummary = ({ data }) => {
+  const totalCompanies = data.length;
+  const completeCompanies = data.filter(company => {
+    const missingFields = requiredFields.filter(field => !company[field]);
+    return missingFields.length === 0;
+  }).length;
 
+  return (
+    <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+      <div className="flex justify-between">
+        <span>Total Companies: {totalCompanies}</span>
+        <span>Complete Profiles: {completeCompanies}</span>
+        <span>Incomplete Profiles: {totalCompanies - completeCompanies}</span>
+      </div>
+    </div>
+  );
+}
   return (
     <div className="w-full space-y-4">
       <Tabs value={activeMainTab} onValueChange={setActiveMainTab}>
@@ -398,23 +459,20 @@ const GroupedTable = ({ data, columns }) => {
   />
 </TabsContent>
 
-<TabsContent value="directors-info">
-  <DataTable 
-    columns={directorColumns}
-    data={directors}
-    title="Directors"
-  />
-</TabsContent>
 <TabsContent value="banks-info">
-  <DataTable 
-    columns={bankColumns.map(col => ({
-      accessorKey: col.id,
-      header: col.header,
-    }))}
+  <GroupedRowTable 
+    columns={[
+      { accessorKey: "name", header: "Bank Name" },
+      { accessorKey: "account_number", header: "Account Number" },
+      { accessorKey: "branch", header: "Branch" },
+      { accessorKey: "currency", header: "Currency" }
+    ]}
     data={banks}
     title="Banks"
+    onExport={handleExport}
   />
 </TabsContent>
+
 <TabsContent value="suppliers-info">
   <Tabs defaultValue="trading">
     <TabsList>
@@ -422,9 +480,8 @@ const GroupedTable = ({ data, columns }) => {
       <TabsTrigger value="monthly">Monthly Service Vendors</TabsTrigger>
     </TabsList>
     <TabsContent value="trading">
-      <DataTable
+      <GroupedRowTable
         columns={[
-          { accessorKey: "company_name", header: "Company Name" },
           { accessorKey: "supplierName", header: "Supplier Name" },
           { accessorKey: "pin", header: "PIN" },
           { accessorKey: "idNumber", header: "ID Number" },
@@ -435,12 +492,12 @@ const GroupedTable = ({ data, columns }) => {
         ]}
         data={suppliers.filter(s => s.tradingType === "Purchase Only")}
         title="Trading Suppliers"
+        onExport={handleExport}
       />
     </TabsContent>
     <TabsContent value="monthly">
-      <DataTable
+      <GroupedRowTable
         columns={[
-          { accessorKey: "company_name", header: "Company Name" },
           { accessorKey: "supplierName", header: "Supplier Name" },
           { accessorKey: "pin", header: "PIN" },
           { accessorKey: "idNumber", header: "ID Number" },
@@ -451,15 +508,32 @@ const GroupedTable = ({ data, columns }) => {
         ]}
         data={suppliers.filter(s => s.tradingType !== "Purchase Only")}
         title="Monthly Service Vendors"
+        onExport={handleExport}
       />
     </TabsContent>
   </Tabs>
 </TabsContent>
 
-<TabsContent value="employee-info">
-  <DataTable 
+<TabsContent value="directors-info">
+  <GroupedRowTable 
     columns={[
-      { accessorKey: "company_name", header: "Company Name" },
+      { accessorKey: "full_name", header: "Director Name" },
+      { accessorKey: "job_position", header: "Position" },
+      { accessorKey: "mobile_number", header: "Phone" },
+      { accessorKey: "email_address", header: "Email" },
+      { accessorKey: "id_number", header: "ID Number" },
+      { accessorKey: "shares_held", header: "Shares Held" },
+      { accessorKey: "nationality", header: "Nationality" }
+    ]}
+    data={directors}
+    title="Directors"
+    onExport={handleExport}
+  />
+</TabsContent>
+
+<TabsContent value="employee-info">
+  <GroupedRowTable 
+    columns={[
       { accessorKey: "name", header: "Employee Name" },
       { accessorKey: "id_number", header: "ID Number" },
       { accessorKey: "kra_pin", header: "KRA PIN" },
@@ -478,9 +552,9 @@ const GroupedTable = ({ data, columns }) => {
     ]}
     data={employees}
     title="Employees"
+    onExport={handleExport}
   />
 </TabsContent>
-
 <TabsContent value="insurance-info">
   <GroupedTable 
     columns={[
