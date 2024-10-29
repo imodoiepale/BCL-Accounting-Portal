@@ -24,7 +24,7 @@ const getRandomDirectors = () => {
   }))
 }
 
-export default function CompanyDocs() {
+export default function DirectorsDocs() {
   // State management
   const [visibleDocs, setVisibleDocs] = useState<number[]>([])
   const [showColumns, setShowColumns] = useState(defaultColumns)

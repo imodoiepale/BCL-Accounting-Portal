@@ -22,6 +22,7 @@ import { InsurancePolicy } from "@/components/component/InsurancePolicy";
 import { KYCDocumentsList } from "@/components/component/kycDocumentsList";
 import { DirectorsDocumentsList } from "@/components/component/DirectorsDocumentsList";
 import { supabase } from '@/lib/supabaseClient';
+import DirectorsDocs from '../documents/new/directors';
 
 interface AllProfilesProps {
   companies: Array<{
@@ -377,7 +378,8 @@ const DataTable = ({ columns, data, onExport, title }) => {
                   <KYCDocumentsList category="company-docs" selectedUserId={company.userid} />
                 </TabsContent>
                 <TabsContent value="director-docs">
-                  <DirectorsDocumentsList selectedUserId={company.userid} />
+                  {/* <DirectorsDocumentsList selectedUserId={company.userid} /> */}
+<DirectorsDocs/>
                 </TabsContent>
                 <TabsContent value="supplier-docs">
                   <KYCDocumentsList category="suppliers-docs" selectedUserId={company.userid} />

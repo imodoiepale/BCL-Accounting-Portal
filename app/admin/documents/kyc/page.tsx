@@ -1,109 +1,109 @@
-'use client'
+  "use client"
+  import React from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import CompanyDocs from "./documenttable";
 
-import { useState } from 'react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Search, SortAsc, SortDesc } from "lucide-react"
-
-export default function DocumentManagement() {
-  const [selectedCompany, setSelectedCompany] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
-
-  const companies = [
-    "Company A", "Company B", "Company C", "Company D", "Company E",
-    "Company F", "Company G", "Company H", "Company I", "Company J"
-  ]
-
-  const kycSubTabs = [
-    "Company's Documents", "Directors' Documents", "Suppliers' Documents",
-    "Banks' Documents", "Employees' Documents", "Insurance Policy Documents",
-    "Deposits' Documents", "Fixed Assets Register"
-  ]
-
-  const filteredAndSortedCompanies = companies
-    .filter(company => 
-      company.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortOrder === "asc") {
-        return a.localeCompare(b)
-      }
-      return b.localeCompare(a)
-    })
-
+const DataTableWithDocuments = ({ category }: { category: string }) => {
   return (
-    <div className="flex h-screen bg-background">
-      {/* Left column: Companies list */}
-      <div className="w-[180px] border-r">
-        <div className="p-2 border-b">
-          <h2 className="text-sm font-semibold mb-2">Companies</h2>
-          <div className="relative mb-2">
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-7 h-7 text-xs"
-            />
-            <Search className="absolute left-2 top-1.5 h-4 w-4 text-muted-foreground" />
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-between text-xs py-1 h-7"
-            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-          >
-            Sort {sortOrder === "asc" ? "A-Z" : "Z-A"}
-            {sortOrder === "asc" ? (
-              <SortAsc className="h-3 w-3 ml-1" />
-            ) : (
-              <SortDesc className="h-3 w-3 ml-1" />
-            )}
-          </Button>
-        </div>
-        <ScrollArea className="h-[calc(100vh-120px)]">
-          <div className="p-1">
-            {filteredAndSortedCompanies.map((company) => (
-              <Button
-                key={company}
-                variant={selectedCompany === company ? "secondary" : "ghost"}
-                className="w-full justify-start mb-1 text-xs h-7 px-2"
-                onClick={() => setSelectedCompany(company)}
-              >
-                {company}
-              </Button>
-            ))}
-          </div>
-        </ScrollArea>
-      </div>
-
-      {/* Right column: Document tabs */}
-      <div className="flex-1 p-4 overflow-hidden">
-        <h2 className="text-xl font-semibold mb-4">
-          {selectedCompany ? `${selectedCompany} Documents` : "Select a Company"}
-        </h2>
-        <Tabs defaultValue={kycSubTabs[0]} className="w-full">
-          <ScrollArea className="w-full">
-            <TabsList className="flex w-max py-1 px-2">
-              {kycSubTabs.map((tab) => (
-                <TabsTrigger key={tab} value={tab} className="text-sm whitespace-nowrap">
-                  {tab}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </ScrollArea>
-          {kycSubTabs.map((tab) => (
-            <TabsContent key={tab} value={tab}>
-              <div className="p-4 border rounded-lg mt-4">
-                <h3 className="text-base font-semibold mb-2">{tab}</h3>
-                <p className="text-sm text-muted-foreground">Document list for {tab} will be displayed here.</p>
-              </div>
-            </TabsContent>
-          ))}
-        </Tabs>
-      </div>
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium">{category} Documents</h3>
+      <CompanyDocs />
     </div>
-  )
+  );
+};
+export default function KYCDocuments() {
+  return (
+    <div className="p-4 w-full">
+      <h1 className="text-xl font-bold mb-4">KYC Documents</h1>
+      <Tabs defaultValue="company-docs">
+        <TabsList className="mb-4">
+          <TabsTrigger value="company-docs">Company Documents</TabsTrigger>
+          <TabsTrigger value="directors-docs">Director Documents</TabsTrigger>
+          <TabsTrigger value="suppliers-docs">Supplier Documents</TabsTrigger>
+          <TabsTrigger value="banks-docs">Bank Documents</TabsTrigger>
+          <TabsTrigger value="employee-docs">Employee Documents</TabsTrigger>
+          <TabsTrigger value="insurance-docs">Insurance Policy Documents</TabsTrigger>
+          <TabsTrigger value="deposits-docs">Deposit Documents</TabsTrigger>
+          <TabsTrigger value="fixed-assets-docs">Fixed Assets Register</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="company-docs">
+          <Tabs defaultValue="kra">
+            <TabsList className="mb-4">
+              <TabsTrigger value="kra">KRA Documents</TabsTrigger>
+              <TabsTrigger value="sheria">Sheria Documents</TabsTrigger>
+            </TabsList>
+            <TabsContent value="kra">
+              <DataTableWithDocuments category="KRA" />
+            </TabsContent>
+            <TabsContent value="sheria">
+              <DataTableWithDocuments category="Sheria" />
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+
+        <TabsContent value="directors-docs">
+          <DataTableWithDocuments category="Directors" />
+        </TabsContent>
+
+        <TabsContent value="suppliers-docs">
+          <Tabs defaultValue="trading-suppliers">
+            <TabsList className="mb-4">
+              <TabsTrigger value="trading-suppliers">Trading Suppliers - Documents</TabsTrigger>
+              <TabsTrigger value="monthly-service-vendors">Monthly Service Vendors - Documents</TabsTrigger>
+            </TabsList>
+            <TabsContent value="trading-suppliers">
+              <DataTableWithDocuments category="Trading Suppliers" />
+            </TabsContent>
+            <TabsContent value="monthly-service-vendors">
+              <DataTableWithDocuments category="Monthly Service Vendors" />
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+
+        <TabsContent value="banks-docs">
+          <DataTableWithDocuments category="Banks" />
+        </TabsContent>
+
+        <TabsContent value="employee-docs">
+          <DataTableWithDocuments category="Employees" />
+        </TabsContent>
+
+        <TabsContent value="insurance-docs">
+          <DataTableWithDocuments category="Insurance" />
+        </TabsContent>
+
+        <TabsContent value="deposits-docs">
+          <DataTableWithDocuments category="Deposits" />
+        </TabsContent>
+
+        <TabsContent value="fixed-assets-docs">
+          <Tabs defaultValue="computer-equipment">
+            <TabsList className="mb-4">
+              <TabsTrigger value="computer-equipment">Computer & Equipments</TabsTrigger>
+              <TabsTrigger value="furniture-fitting">Furniture Fitting & Equip 12.5%</TabsTrigger>
+              <TabsTrigger value="land-building">Land & Building</TabsTrigger>
+              <TabsTrigger value="plant-equipment">Plant & Equipment - 12.5 %</TabsTrigger>
+              <TabsTrigger value="motor-vehicles">Motor Vehicles - 25 %</TabsTrigger>
+            </TabsList>
+            <TabsContent value="computer-equipment">
+              <DataTableWithDocuments category="Computer Equipment" />
+            </TabsContent>
+            <TabsContent value="furniture-fitting">
+              <DataTableWithDocuments category="Furniture Fitting" />
+            </TabsContent>
+            <TabsContent value="land-building">
+              <DataTableWithDocuments category="Land Building" />
+            </TabsContent>
+            <TabsContent value="plant-equipment">
+              <DataTableWithDocuments category="Plant Equipment" />
+            </TabsContent>
+            <TabsContent value="motor-vehicles">
+              <DataTableWithDocuments category="Motor Vehicles" />
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
 }
