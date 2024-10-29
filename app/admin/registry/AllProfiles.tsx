@@ -33,6 +33,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import * as XLSX from 'xlsx';
+import DocsTable from '../documents/new/page';
+import CompanyDocs from '../documents/new/company';
 
 // Utility function to generate mock data
 const generateMockData = (prefix, count) => {
@@ -197,6 +199,13 @@ export default function AllProfiles() {
       onExport={handleExport}
       title={type}
     />
+    
+  );
+  const renderDocs = (type, extraColumns = []) => (
+    <DocsTable />
+  );
+  const renderCompanyDocs = (type, extraColumns = []) => (
+    <CompanyDocs />
   );
 
   return (
@@ -307,7 +316,7 @@ export default function AllProfiles() {
                 </TabsList>
 
                 <TabsContent value="kra">
-                  {renderDataTable('KRA Document', [
+                  {renderDocs('KRA Document', [
                     { accessorKey: "type", header: "Document Type" },
                     { accessorKey: "date", header: "Upload Date" },
                     { accessorKey: "expiryDate", header: "Expiry Date" },
@@ -316,7 +325,7 @@ export default function AllProfiles() {
                 </TabsContent>
 
                 <TabsContent value="sheria">
-                  {renderDataTable('Sheria Document', [
+                  {renderDocs('Sheria Document', [
                     { accessorKey: "type", header: "Document Type" },
                     { accessorKey: "date", header: "Upload Date" },
                     { accessorKey: "expiryDate", header: "Expiry Date" },
@@ -324,6 +333,14 @@ export default function AllProfiles() {
                   ])}
                 </TabsContent>
               </Tabs>
+            </TabsContent>
+            <TabsContent value="director-docs">
+            {renderCompanyDocs('Directors Document', [
+                    { accessorKey: "type", header: "Document Type" },
+                    { accessorKey: "date", header: "Upload Date" },
+                    { accessorKey: "expiryDate", header: "Expiry Date" },
+                    { accessorKey: "documentNumber", header: "Document Number" },
+                  ])}
             </TabsContent>
 
             {/* Supplier Documents with Trading and Monthly subtabs */}
@@ -335,7 +352,7 @@ export default function AllProfiles() {
                 </TabsList>
 
                 <TabsContent value="trading-suppliers">
-                  {renderDataTable('Trading Supplier Document', [
+                  {renderDocs('Trading Supplier Document', [
                     { accessorKey: "type", header: "Document Type" },
                     { accessorKey: "supplierName", header: "Supplier Name" },
                     { accessorKey: "date", header: "Upload Date" },
@@ -344,7 +361,7 @@ export default function AllProfiles() {
                 </TabsContent>
 
                 <TabsContent value="monthly-service-vendors">
-                  {renderDataTable('Monthly Service Document', [
+                  {renderDocs('Monthly Service Document', [
                     { accessorKey: "type", header: "Document Type" },
                     { accessorKey: "vendorName", header: "Vendor Name" },
                     { accessorKey: "date", header: "Upload Date" },
@@ -367,7 +384,7 @@ export default function AllProfiles() {
 
                 {["computer-equipment", "furniture-fitting", "land-building", "plant-equipment", "motor-vehicles"].map((assetType) => (
                   <TabsContent key={`${assetType}-docs`} value={`${assetType}-docs`}>
-                    {renderDataTable(`${assetType.split('-').map(word => 
+                    {renderDocs (`${assetType.split('-').map(word => 
                       word.charAt(0).toUpperCase() + word.slice(1)
                     ).join(' ')} Document`, [
                       { accessorKey: "type", header: "Document Type" },
@@ -381,9 +398,9 @@ export default function AllProfiles() {
             </TabsContent>
 
             {/* Standard document sections */}
-            {["director", "bank", "employee", "insurance", "deposit"].map((type) => (
+            {[ "bank", "employee", "insurance", "deposit"].map((type) => (
               <TabsContent key={`${type}-docs`} value={`${type}-docs`}>
-                {renderDataTable(`${type.charAt(0).toUpperCase() + type.slice(1)} Document`, [
+                {renderDocs(`${type.charAt(0).toUpperCase() + type.slice(1)} Document`, [
                   { accessorKey: "type", header: "Document Type" },
                   { accessorKey: "ownerName", header: `${type.charAt(0).toUpperCase() + type.slice(1)} Name` },
                   { accessorKey: "date", header: "Upload Date" },

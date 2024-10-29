@@ -1,4 +1,4 @@
-
+// @ts-nocheck
 "use client"
 import React, { Fragment, useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,7 @@ const defaultColumns = {
   daysToExpire: true
 }
 
-export default function Component() {
+export default function DocsTable() {
   // State management
   const [visibleDocs, setVisibleDocs] = useState<number[]>([])
   const [showColumns, setShowColumns] = useState(defaultColumns)
@@ -41,9 +41,13 @@ export default function Component() {
     { id: 2, name: "doc 2" },
     { id: 4, name: "doc 4" },
     { id: 5, name: "doc 5" },
+    { id: 3, name: "doc 3" },
+    { id: 6, name: "doc 6" },
+    { id: 7, name: "doc 7" },
+    { id: 8, name: "doc 8" },
   ]
 
-  const companies = Array(7).fill({ name: "company A", id: 0 }).map((company, index) => ({
+  const companies = Array(10).fill({ name: "company A", id: 0 }).map((company, index) => ({
     ...company,
     id: index + 1,
     name: `Company ${String.fromCharCode(65 + index)}`,
@@ -51,12 +55,11 @@ export default function Component() {
       ...acc,
       [doc.id]: {
         issueDate: new Date(2024, 0, index + 1).toISOString(),
-        expiryDate: new Date(2024, 6, index + 1).toISOString()
+        expiryDate: new Date(2025, 6, index + 1).toISOString()
       }
     }), {})
   }))
 
-  // Load saved settings from localStorage
   useEffect(() => {
     const savedColumns = localStorage.getItem("documentColumns")
     const savedDocs = localStorage.getItem("visibleDocs")
@@ -69,7 +72,7 @@ export default function Component() {
     }
   }, [])
 
-  // Save settings to localStorage
+
   useEffect(() => {
     localStorage.setItem("documentColumns", JSON.stringify(showColumns))
     localStorage.setItem("visibleDocs", JSON.stringify(visibleDocs))
@@ -136,7 +139,7 @@ export default function Component() {
   return (
     <div className="h-screen flex flex-col p-4">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Document Management </h1>
+        <h1 className="text-2xl font-bold">Document Management</h1>
         <div className="flex gap-2">
           <Input
             placeholder="Search companies..."
@@ -219,10 +222,12 @@ export default function Component() {
               <div className="space-y-4">
                 <div className="grid gap-4">
                   <div className="space-y-2">
-                    <Label>Upload Type</Label>
+                    <Label htmlFor="uploadType">Upload Type</Label>
                     <select 
+                      id="uploadType"
                       className="w-full p-2 border rounded"
                       onChange={(e) => setUploadType(e.target.value as "specific" | "all")}
+                      aria-label="Upload Type"
                     >
                       <option value="">Select upload type</option>
                       <option value="specific">Specific Document</option>
@@ -232,10 +237,12 @@ export default function Component() {
 
                   {uploadType === "specific" && (
                     <div className="space-y-2">
-                      <Label>Select Document</Label>
+                      <Label htmlFor="documentSelect">Select Document</Label>
                       <select 
+                        id="documentSelect"
                         className="w-full p-2 border rounded"
                         onChange={(e) => setSelectedDocForUpload(parseInt(e.target.value))}
+                        aria-label="Select Document"
                       >
                         <option value="">Select document</option>
                         {documents.map(doc => (
@@ -244,9 +251,10 @@ export default function Component() {
                       </select>
                     </div>
                   )}
-
                   <div className="space-y-2">
                     <Label>Upload File</Label>
+
+      
                     <Input type="file" />
                   </div>
                 </div>
@@ -273,8 +281,16 @@ export default function Component() {
                 >
                   Company <ArrowUpDown className="inline h-4 w-4" />
                 </TableHead>
-                {documents.map((doc, index) => !visibleDocs.includes(doc.id) && (
-                  <TableHead key={doc.id} className="text-center border-r-2 border-gray-300 py-2" colSpan={3}>
+                {documents.map((doc) => !visibleDocs.includes(doc.id) && (
+                  <TableHead 
+                    key={doc.id} 
+                    className="text-center border-r-2 border-gray-300 py-2"
+                    colSpan={
+                      (showColumns.issueDate ? 1 : 0) + 
+                      (showColumns.expiryDate ? 1 : 0) + 
+                      (showColumns.daysToExpire ? 1 : 0)
+                    }
+                  >
                     {doc.name}
                   </TableHead>
                 ))}
@@ -291,7 +307,7 @@ export default function Component() {
                       >
                         issue date <ArrowUpDown className="inline h-3 w-3" />
                       </TableHead>
-                    )}
+                    )} 
                     {showColumns.expiryDate && (
                       <TableHead 
                         className="text-center border-r-2 border-gray-300 py-2 px-1 text-xs cursor-pointer"
@@ -327,6 +343,7 @@ export default function Component() {
                     <Fragment key={doc.id}>
                       {showColumns.issueDate && (
                         <TableCell className="text-center border-r-2 border-gray-300 py-2">
+                          
                           <Dialog>
                             <DialogTrigger asChild>
                               <X className="inline text-red-500 cursor-pointer" />
@@ -338,27 +355,39 @@ export default function Component() {
                               <div className="space-y-4">
                                 <div className="space-y-2">
                                   <Label>Upload File</Label>
-                                  <Input type="file" onChange={(e) => {
-                                    const file = e.target.files?.[0]
-                                    setFormData(prev => ({ ...prev, file: file || null }))
-                                  }} />
+                                  <Input 
+                                    type="file" 
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0]
+                                      setFormData(prev => ({ ...prev, file: file || null }))
+                                    }} 
+                                  />
                                 </div>
                                 <div className="space-y-2">
                                   <Label>Issue Date</Label>
-                                  <Input type="date" onChange={(e) => {
-                                    setFormData(prev => ({ ...prev, issueDate: e.target.value }))
-                                  }} />
+                                  <Input 
+                                    type="date" 
+                                    onChange={(e) => {
+                                      setFormData(prev => ({ ...prev, issueDate: e.target.value }))
+                                    }} 
+                                  />
                                 </div>
                                 <div className="space-y-2">
                                   <Label>Expiry Date</Label>
-                                  <Input type="date" onChange={(e) => {
-                                    setFormData(prev => ({ ...prev, expiryDate: e.target.value }))
-                                  }} />
+                                  <Input 
+                                    type="date" 
+                                    onChange={(e) => {
+                                      setFormData(prev => ({ ...prev, expiryDate: e.target.value }))
+                                    }}
+                                  />
                                 </div>
-                                <Button className="w-full mt-4" onClick={() => {
-                                  // Handle form submission
-                                  console.log('Uploading document:', formData)
-                                }}>
+                                <Button 
+                                  className="w-full mt-4" 
+                                  onClick={() => {
+                                    // Handle form submission
+                                    console.log('Uploading document:', formData)
+                                  }}
+                                >
                                   Upload
                                 </Button>
                               </div>
@@ -379,9 +408,11 @@ export default function Component() {
                         </TableCell>
                       )}
                       {showColumns.daysToExpire && (
-                        <TableCell className={`text-center py-2 ${
-                          docIndex !== documents.length - 1 ? 'border-r-2 border-gray-300' : ''
-                        }`}>
+                        <TableCell 
+                          className={`text-center py-2 ${
+                            docIndex !== documents.length - 1 ? 'border-r-2 border-gray-300' : ''
+                          }`}
+                        >
                           {company.documents[doc.id]?.expiryDate && (
                             <span className={`${
                               calculateDaysToExpire(company.documents[doc.id].expiryDate) < 30 
@@ -404,4 +435,3 @@ export default function Component() {
     </div>
   )
 }
-
