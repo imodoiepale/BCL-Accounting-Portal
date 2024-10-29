@@ -12,6 +12,7 @@ const CompanySidebar = ({ onCompanySelect, showAllCompanies, onToggleView }) => 
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState(null);
+  const [allCompaniesData, setAllCompaniesData] = useState([]);
 
   useEffect(() => {
     fetchUsers();
@@ -65,12 +66,51 @@ const CompanySidebar = ({ onCompanySelect, showAllCompanies, onToggleView }) => 
     onCompanySelect(company);
   };
 
+// Add this function to fetch all companies with their details
+const fetchAllCompaniesData = async () => {
+  try {
+    // First fetch companies
+    const { data: companies, error: companiesError } = await supabase
+      .from('acc_portal_company')
+      .select('*');
+
+    if (companiesError) throw companiesError;
+
+    // Then fetch clerk users
+    const { data: clerkUsers, error: usersError } = await supabase
+      .from('acc_portal_clerk_users')
+      .select('*');
+
+    if (usersError) throw usersError;
+
+    // Combine the data
+    const combinedData = companies.map(company => ({
+      ...company,
+      clerk_user: clerkUsers.find(user => user.userid === company.userid)
+    }));
+
+    setAllCompaniesData(combinedData);
+    onCompanySelect(combinedData); // Pass the combined data up
+  } catch (error) {
+    console.error('Error fetching all companies:', error);
+  }
+};
+
+// Modify the onToggleView handler
+const handleToggleView = async () => {
+  if (!showAllCompanies) {
+    const data = await fetchAllCompaniesData();
+    onCompanySelect(data);
+  }
+  onToggleView();
+};
+
   return (
     <Card className="lg:w-1/4 bg-white shadow-md mr-6">
       <CardHeader className="space-y-4">
         <div className="flex justify-between items-center">
           <Button 
-            onClick={onToggleView} 
+            onClick={handleToggleView} 
             className="flex-1 bg-green-500 hover:bg-green-600 text-white mr-2"
           >
             {showAllCompanies ? (

@@ -126,7 +126,7 @@ export function SupplierList({ type }, { selectedUserId }: SupplierListProp) {
       console.error('Error fetching suppliers:', error);
       toast.error('Failed to fetch suppliers');
     }
-  }, [user?.id, type]);
+  }, [userIdentifier, type]);
 
   useEffect(() => {
     fetchSuppliers();
@@ -145,7 +145,7 @@ export function SupplierList({ type }, { selectedUserId }: SupplierListProp) {
       const { data: currentData, error: fetchError } = await supabase
         .from('acc_portal_suppliers')
         .select('id, data')
-        .eq('userid', user?.id)
+        .eq('userid', userIdentifier)
         .single();
 
       if (fetchError) throw fetchError;
@@ -211,7 +211,7 @@ export function SupplierList({ type }, { selectedUserId }: SupplierListProp) {
       const { data: currentData, error: fetchError } = await supabase
         .from('acc_portal_suppliers')
         .select('id, data')
-        .eq('userid', user?.id)
+        .eq('userid', userIdentifier)
         .single();
 
       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
@@ -258,7 +258,7 @@ export function SupplierList({ type }, { selectedUserId }: SupplierListProp) {
       const { error: updateError } = await supabase
         .from('acc_portal_suppliers')
         .upsert({
-          userid: user?.id,
+          userid: userIdentifier,
           data: { suppliers: updatedSuppliers }
         });
 

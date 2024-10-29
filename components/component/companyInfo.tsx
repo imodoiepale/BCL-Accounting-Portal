@@ -13,7 +13,7 @@ import { Building2, Users, Mail, Phone, Globe, MapPin, CreditCard, FileText, Cal
 import { useAuth, useUser } from '@clerk/nextjs';
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
-
+import { usePathname } from 'next/navigation';
 interface CompanyInfoProps {
   selectedUserId: string;
 }
@@ -27,7 +27,7 @@ export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({});
-
+const pathname = usePathname();
   useEffect(() => {
     fetchDirectors();
   }, []);
@@ -37,20 +37,23 @@ export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
   useEffect(() => {
     const fetchCompanyData = async () => {
       if (!userIdentifier) return;
-      
+
       setIsLoading(true);
       try {
         const { data, error } = await supabase
           .from('acc_portal_company')
           .select('*')
-          .eq('userid', userIdentifier)
-          .single();
+          .eq('userid', userIdentifier);
 
         if (error) throw error;
-        setCompanyData(data);
+        // If no data, set empty object to trigger missing fields
+        setCompanyData(data?.[0] || {});
+        checkMissingFields(data?.[0] || {});
       } catch (error) {
         console.error('Error fetching company data:', error);
-        toast.error('Failed to fetch company data');
+        // Set empty object to show missing fields card
+        setCompanyData({});
+        checkMissingFields({});
       } finally {
         setIsLoading(false);
       }
@@ -65,7 +68,7 @@ export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
       const { data, error } = await supabase
         .from('acc_portal_directors')
         .select('*')
-        .eq("userid", userId)
+        .eq("userid", userIdentifier)
 
       if (error) throw error;
 
@@ -78,7 +81,7 @@ export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
 
   const checkMissingFields = (data) => {
     const requiredFields = [
-      'company_name', 'company_type','description', 'registration_number', 'date_established', 'kra_pin_number',
+      'company_name', 'company_type', 'description', 'registration_number', 'date_established', 'kra_pin_number',
       'industry', 'employees', 'annual_revenue', 'fiscal_year', 'website',
       'email', 'phone', 'street', 'city', 'postal_code', 'country'
     ];
@@ -94,25 +97,32 @@ export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    try {
-      // Exclude the 'id' field from the upsert operation
-      const { id, ...companyDataWithoutId } = companyData;
-      const { id: formDataId, ...formDataWithoutId } = formData;
   
+    try {
+      // Filter out empty values from formData
+      const validFormData = Object.fromEntries(
+        Object.entries(formData).filter(([_, value]) => value !== '')
+      );
+  
+      // Only update fields that have changed
       const { data, error } = await supabase
         .from('acc_portal_company')
         .upsert(
-          { ...companyDataWithoutId, ...formDataWithoutId, userid: userId },
-          { onConflict: 'userid' }  // This tells Supabase to update the record with the existing userid
+          { 
+            ...validFormData,
+            userid: userIdentifier 
+          },
+          { 
+            onConflict: 'userid',
+            ignoreDuplicates: false 
+          }
         )
-        .select()
-        .single();
+        .select();
   
       if (error) throw error;
   
-      setCompanyData(data);
-      checkMissingFields(data);
+      setCompanyData(prev => ({ ...prev, ...validFormData }));
+      checkMissingFields({ ...companyData, ...validFormData });
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error updating company data:', error);
@@ -120,7 +130,6 @@ export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
       setIsLoading(false);
     }
   };
-  
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -145,7 +154,7 @@ export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
                     <div key={field} className={`space-y-2 ${field === 'description' ? 'col-span-4' : ''}`}>
                       <Label htmlFor={field}>{field.replace(/_/g, ' ')}</Label>
                       {field === 'company_type' ? (
-                        <Select 
+                        <Select
                           onValueChange={(value) => handleInputChange(field, value)}
                           value={formData[field]}
                         >
@@ -160,7 +169,7 @@ export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
                           </SelectContent>
                         </Select>
                       ) : field === 'industry' ? (
-                        <Select 
+                        <Select
                           onValueChange={(value) => handleInputChange(field, value)}
                           value={formData[field]}
                         >
@@ -176,14 +185,14 @@ export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
                           </SelectContent>
                         </Select>
                       ) : field === 'description' ? (
-                        <Textarea 
+                        <Textarea
                           id={field}
                           value={formData[field]}
                           onChange={(e) => handleInputChange(field, e.target.value)}
                           rows={4}
                         />
                       ) : (
-                        <Input 
+                        <Input
                           id={field}
                           type={field === 'date_established' ? 'date' : 'text'}
                           value={formData[field]}
@@ -263,26 +272,26 @@ export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-            <li className="flex items-center">
-              <Globe className="mr-2" />
-              {companyData?.website ? (
-                <Link href={`https://${companyData?.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                  {companyData?.website}
-                </Link>
-              ) : (
-                <span className="text-red-500">Missing Website</span>
-              )}
-            </li>
-            <li className="flex items-center">
-              <Mail className="mr-2" />
-              {companyData?.email ? (
-                <Link href={`mailto:${companyData?.email}`} className="text-blue-500 hover:underline">
-                  {companyData?.email}
-                </Link>
-              ) : (
-                <span className="text-red-500">Missing Email</span>
-              )}
-            </li>
+              <li className="flex items-center">
+                <Globe className="mr-2" />
+                {companyData?.website ? (
+                  <Link href={`https://${companyData?.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                    {companyData?.website}
+                  </Link>
+                ) : (
+                  <span className="text-red-500">Missing Website</span>
+                )}
+              </li>
+              <li className="flex items-center">
+                <Mail className="mr-2" />
+                {companyData?.email ? (
+                  <Link href={`mailto:${companyData?.email}`} className="text-blue-500 hover:underline">
+                    {companyData?.email}
+                  </Link>
+                ) : (
+                  <span className="text-red-500">Missing Email</span>
+                )}
+              </li>
               <li className="flex items-center">
                 <Phone className="mr-2" />
                 {companyData?.phone || <span className="text-red-500">Missing Phone</span>}
