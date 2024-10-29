@@ -34,7 +34,11 @@ const sanitizeSupplierData = (data) => {
   return sanitized;
 };
 
-export function SupplierList({ type }) {
+interface SupplierListProp {
+  selectedUserId: string;
+}
+
+export function SupplierList({ type }, { selectedUserId }: SupplierListProp) {
   const { user } = useUser();
   const [suppliers, setSuppliers] = useState([]);
   const [newSupplier, setNewSupplier] = useState({
@@ -79,12 +83,15 @@ export function SupplierList({ type }) {
         supplier.name_kra?.toLowerCase().includes(searchLower)
       );
     });
+
+    const userIdentifier = selectedUserId ||  user?.id;
+
   const fetchSuppliers = useCallback(async () => {
     try {
       const { data: result, error } = await supabase
         .from('acc_portal_suppliers')
         .select('id, data')
-        .eq('userid', user?.id)
+        .eq('userid',userIdentifier)
         .single();
 
       if (error) {
@@ -92,7 +99,7 @@ export function SupplierList({ type }) {
           const { data: newData, error: insertError } = await supabase
             .from('acc_portal_suppliers')
             .insert([{
-              userid: user?.id,
+              userid: userIdentifier,
               data: { suppliers: [] }
             }])
             .select()
@@ -315,7 +322,7 @@ export function SupplierList({ type }) {
       const { data: currentData, error: fetchError } = await supabase
         .from('acc_portal_suppliers')
         .select('id, data')
-        .eq('userid', user?.id)
+        .eq('userid',userIdentifier)
         .single();
 
       if (fetchError) throw fetchError;
@@ -379,7 +386,7 @@ export function SupplierList({ type }) {
       const { data: currentData, error: fetchError } = await supabase
         .from('acc_portal_suppliers')
         .select('id, data')
-        .eq('userid', user?.id)
+        .eq('userid',userIdentifier)
         .single();
 
       if (fetchError) throw fetchError;

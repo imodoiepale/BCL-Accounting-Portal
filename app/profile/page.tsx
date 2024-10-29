@@ -1,5 +1,3 @@
-
-
 /* eslint-disable react/no-unescaped-entities */
 //@ts-nocheck
 
@@ -44,14 +42,14 @@ import { SupplierList } from "@/components/component/SupplierList";
 import { KYCDocumentsList } from "@/components/component/kycDocumentsList";
 import { InsurancePolicy } from "@/components/component/InsurancePolicy";
 import { DirectorsDocumentsList } from "@/components/component/DirectorsDocumentsList";
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 
 const DataTable = ({ columns, data }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState({});
-
+  const pathname = usePathname();
   const table = useReactTable({
     data,
     columns,
