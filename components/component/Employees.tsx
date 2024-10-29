@@ -91,7 +91,7 @@ export function EmployeeList({ selectedUserId }: EmployeeList) {
   const handleSubmit = async () => {
     const { data, error } = await supabase
       .from('acc_portal_employees')
-      .insert([{ ...newEmployee, userid: user?.id, status: 'true' }])
+      .insert([{ ...newEmployee, userid: userIdentifier, status: 'true' }])
     if (error){
       console.error('Error adding employee:', error);
       toast.error('Failed to add employee.');
@@ -141,7 +141,7 @@ export function EmployeeList({ selectedUserId }: EmployeeList) {
           try {
             const { data, error } = await supabase
               .from('acc_portal_employees')
-              .insert([{ ...employee, userid: user?.id }])
+              .insert([{ ...employee, userid: userIdentifier }])
               .select();
 
             if (error) {

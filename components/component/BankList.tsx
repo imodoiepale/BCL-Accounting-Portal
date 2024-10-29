@@ -122,7 +122,7 @@ const [newBank, setNewBank] = useState<Partial<Bank>>({
         .from('acc_portal_banks')
         .insert([{
           ...newBank,
-          userid: selectedUserId || user.id
+          userid: userIdentifier
         }]);
 
       if (error) throw error;
@@ -226,7 +226,7 @@ const [newBank, setNewBank] = useState<Partial<Bank>>({
           try {
             const { error } = await supabase
               .from('acc_portal_banks')
-              .insert([{ ...bank, userid: user.id }]);
+              .insert([{ ...bank, userid: userIdentifier }]);
 
             if (error) errorCount++;
             else successCount++;

@@ -208,7 +208,7 @@ export function DirectorsList({ selectedUserId }: DirectorsProps) {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('acc_portal_directors')
-      .insert([{ ...newDirector, userid: userId }])
+      .insert([{ ...newDirector, userid: userIdentifier }])
       .select();
     setIsLoading(false);
     if (error) {
@@ -234,7 +234,7 @@ export function DirectorsList({ selectedUserId }: DirectorsProps) {
       .from('acc_portal_directors')
       .delete()
       .eq('id', directorId)
-      .eq('userid', userId);
+      .eq('userid', userIdentifier);
     setIsLoading(false);
     if (error) {
       console.error('Error deleting director:', error);
@@ -256,7 +256,7 @@ export function DirectorsList({ selectedUserId }: DirectorsProps) {
       .from('acc_portal_directors')
       .update(changedFields)
       .eq('id', selectedDirector.id)
-      .eq('userid', userId)
+      .eq('userid', userIdentifier)
       .select();
     setIsLoading(false);
   
@@ -381,7 +381,7 @@ export function DirectorsList({ selectedUserId }: DirectorsProps) {
             const { data: existingDirectors, error: fetchError } = await supabase
               .from('acc_portal_directors')
               .select('*')
-              .eq('userid', userId)
+              .eq('userid', userIdentifier)
               .or(`id_number.eq.${director.id_number},full_name.eq.${director.full_name}`);
 
             if (fetchError) {
@@ -395,7 +395,7 @@ export function DirectorsList({ selectedUserId }: DirectorsProps) {
                 .from('acc_portal_directors')
                 .update(director)
                 .eq('id', existingDirectors[0].id)
-                .eq('userid', userId);
+                .eq('userid', userIdentifier);
 
               if (error) {
                 console.error('Error updating director:', error);
@@ -406,7 +406,7 @@ export function DirectorsList({ selectedUserId }: DirectorsProps) {
             } else {
               const { error } = await supabase
                 .from('acc_portal_directors')
-                .insert([{ ...director, userid: userId }]);
+                .insert([{ ...director, userid: userIdentifier }]);
 
               if (error) {
                 console.error('Error adding director:', error);

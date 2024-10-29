@@ -5,57 +5,131 @@
 
 "use client";
 
-import React, { useState } from 'react';
-import {
-  flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
-  
-  useReactTable,
-} from "@tanstack/react-table";
+import React, { useEffect, useState } from 'react';
+import { flexRender, getCoreRowModel, getSortedRowModel, getFilteredRowModel, useReactTable,} from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, Download } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger,} from "@/components/ui/dropdown-menu";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table";
 import * as XLSX from 'xlsx';
+import { DirectorsList } from "@/components/component/DirectorsList";
+import { SupplierList } from "@/components/component/SupplierList";
+import { EmployeeList } from "@/components/component/Employees";
+import { BankList } from "@/components/component/BankList";
+import { InsurancePolicy } from "@/components/component/InsurancePolicy";
+import { KYCDocumentsList } from "@/components/component/kycDocumentsList";
+import { DirectorsDocumentsList } from "@/components/component/DirectorsDocumentsList";
+import { supabase } from '@/lib/supabaseClient';
 
-// Utility function to generate mock data
-const generateMockData = (prefix, count) => {
-  return Array.from({ length: count }, (_, i) => ({
-    id: i + 1,
-    name: `${prefix} ${i + 1}`,
-    email: `${prefix.toLowerCase()}${i + 1}@example.com`,
-    phone: `+254${Math.floor(Math.random() * 100000000)}`,
-    date: new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28)).toISOString().split('T')[0],
-    status: Math.random() > 0.5 ? 'Active' : 'Pending',
-    type: ['Type A', 'Type B', 'Type C'][Math.floor(Math.random() * 3)],
-    category: ['Category 1', 'Category 2', 'Category 3'][Math.floor(Math.random() * 3)],
-    value: `$${Math.floor(Math.random() * 10000)}`,
-    details: `Details for ${prefix} ${i + 1}`,
-    location: ['Nairobi', 'Mombasa', 'Kisumu'][Math.floor(Math.random() * 3)],
-  }));
-};
+interface AllProfilesProps {
+  companies: Array<{
+    id: number;
+    company_name: string;
+    company_type: string;
+    registration_number: string;
+    date_established: string;
+    kra_pin_number: string;
+    industry: string;
+    employees: string;
+    annual_revenue: string;
+    fiscal_year: string;
+    website: string;
+    email: string;
+    phone: string;
+    street: string;
+    city: string;
+    postal_code: string;
+    country: string;
+    userid: string;
+  }>;
+  users: Array<{
+    id: number;
+    username: string;
+    userid: string;
+    is_active: boolean;
+  }>;
+}
+
+const companyInfoColumns = [
+  { id: 'company_name', accessorKey: 'company_name', header: 'Company Name' },
+  { id: 'company_type', accessorKey: 'company_type', header: 'Company Type' },
+  { id: 'registration_number', accessorKey: 'registration_number', header: 'Registration Number' },
+  { id: 'date_established', accessorKey: 'date_established', header: 'Date Established' },
+  { id: 'kra_pin_number', accessorKey: 'kra_pin_number', header: 'KRA PIN' },
+  { id: 'industry', accessorKey: 'industry', header: 'Industry' },
+  { id: 'employees', accessorKey: 'employees', header: 'Employees' },
+  { id: 'annual_revenue', accessorKey: 'annual_revenue', header: 'Annual Revenue' },
+  { id: 'fiscal_year', accessorKey: 'fiscal_year', header: 'Fiscal Year' },
+  { id: 'email', accessorKey: 'email', header: 'Email' },
+  { id: 'phone', accessorKey: 'phone', header: 'Phone' },
+  { id: 'city', accessorKey: 'city', header: 'City' },
+  { id: 'country', accessorKey: 'country', header: 'Country' }
+];
+
+const depositsColumns = [
+  { id: 'deposit_name', accessorKey: 'deposit_name', header: 'Deposit Name' },
+  { id: 'deposit_type', accessorKey: 'deposit_type', header: 'Type' },
+  { id: 'amount', accessorKey: 'amount', header: 'Amount' },
+  { id: 'date_paid', accessorKey: 'date_paid', header: 'Date Paid' },
+  { id: 'expiry_date', accessorKey: 'expiry_date', header: 'Expiry Date' },
+  { id: 'status', accessorKey: 'status', header: 'Status' },
+  { id: 'reference_number', accessorKey: 'reference_number', header: 'Reference Number' },
+  { id: 'description', accessorKey: 'description', header: 'Description' }
+];
+
+
+export default function AllProfiles() {
+  const [activeMainTab, setActiveMainTab] = useState("company-info");
+  const [activeSubTab, setActiveSubTab] = useState("company-info-tab");
+
+  const handleExport = (data, title) => {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, title);
+    XLSX.writeFile(wb, `${title}.xlsx`);
+  };
+
+  const [companies, setCompanies] = useState([]);
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: companiesData } = await supabase
+        .from('acc_portal_company')
+        .select('*');
+
+      const { data: usersData } = await supabase
+        .from('acc_portal_clerk_users')
+        .select('*');
+
+      if (companiesData && usersData) {
+        setCompanies(companiesData);
+        setUsers(usersData);
+      }
+    };
+
+    fetchData();
+  }, []);
 
 const DataTable = ({ columns, data, onExport, title }) => {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
   const [columnVisibility, setColumnVisibility] = useState({});
 
+
+  
+  const transformedData = data.map(company => {
+    const user = users.find(u => u.userid === company.userid);
+    return {
+      ...company,
+      username: user?.username || 'N/A',
+      status: user?.is_active ? 'Active' : 'Inactive'
+    };
+  });
+
+  
   const table = useReactTable({
     data,
     columns,
@@ -72,6 +146,9 @@ const DataTable = ({ columns, data, onExport, title }) => {
     },
   });
 
+      // Get the name column for filtering
+      const nameColumn = table.getColumn("company_name");
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -79,7 +156,7 @@ const DataTable = ({ columns, data, onExport, title }) => {
           placeholder="Filter table..."
           value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
-            table.getColumn("name")?.setFilterValue(event.target.value)
+            nameColumn?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
@@ -171,33 +248,6 @@ const DataTable = ({ columns, data, onExport, title }) => {
   );
 };
 
-export default function AllProfiles() {
-  const [activeMainTab, setActiveMainTab] = useState("company-info");
-  const [activeSubTab, setActiveSubTab] = useState("company-info-tab");
-
-  const handleExport = (data, title) => {
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, title);
-    XLSX.writeFile(wb, `${title}.xlsx`);
-  };
-
-  const commonColumns = [
-    { accessorKey: "name", header: "Name" },
-    { accessorKey: "email", header: "Email" },
-    { accessorKey: "phone", header: "Phone" },
-    { accessorKey: "date", header: "Date" },
-    { accessorKey: "status", header: "Status" },
-  ];
-
-  const renderDataTable = (type, extraColumns = []) => (
-    <DataTable
-      columns={[...commonColumns, ...extraColumns]}
-      data={generateMockData(type, 10)}
-      onExport={handleExport}
-      title={type}
-    />
-  );
 
   return (
     <div className="w-full space-y-4">
@@ -221,10 +271,18 @@ export default function AllProfiles() {
             </TabsList>
 
             <TabsContent value="company-info-tab">
-              {renderDataTable('Company', [
-                { accessorKey: "industry", header: "Industry" },
-                { accessorKey: "location", header: "Location" },
-              ])}
+              <DataTable 
+                columns={companyInfoColumns}
+                data={companies}
+                onExport={handleExport}
+                title="Companies"
+              />
+            </TabsContent>
+
+            <TabsContent value="directors-info">
+              {companies.map(company => (
+                <DirectorsList key={company.id} selectedUserId={company.userid} />
+              ))}
             </TabsContent>
 
             <TabsContent value="suppliers-info">
@@ -235,19 +293,44 @@ export default function AllProfiles() {
                 </TabsList>
                 
                 <TabsContent value="trading-suppliers">
-                  {renderDataTable('Trading Supplier', [
-                    { accessorKey: "category", header: "Category" },
-                    { accessorKey: "type", header: "Type" },
-                  ])}
+                  {companies.map(company => (
+                    <SupplierList key={company.id} type="trading" selectedUserId={company.userid} />
+                  ))}
                 </TabsContent>
                 
                 <TabsContent value="monthly-service-vendors">
-                  {renderDataTable('Service Vendor', [
-                    { accessorKey: "service", header: "Service" },
-                    { accessorKey: "value", header: "Contract Value" },
-                  ])}
+                  {companies.map(company => (
+                    <SupplierList key={company.id} type="monthly" selectedUserId={company.userid} />
+                  ))}
                 </TabsContent>
               </Tabs>
+            </TabsContent>
+
+            <TabsContent value="banks-info">
+              {companies.map(company => (
+                <BankList key={company.id} selectedUserId={company.userid} />
+              ))}
+            </TabsContent>
+
+            <TabsContent value="employee-info">
+              {companies.map(company => (
+                <EmployeeList key={company.id} selectedUserId={company.userid} />
+              ))}
+            </TabsContent>
+
+            <TabsContent value="insurances-info">
+              {companies.map(company => (
+                <InsurancePolicy key={company.id} selectedUserId={company.userid} />
+              ))}
+            </TabsContent>
+
+            <TabsContent value="deposits-info">
+              <DataTable 
+                columns={depositsColumns}
+                data={companies}
+                onExport={handleExport}
+                title="Deposits"
+              />
             </TabsContent>
 
             <TabsContent value="fixed-assets-info">
@@ -260,137 +343,55 @@ export default function AllProfiles() {
                   <TabsTrigger value="motor-vehicles">Motor Vehicles</TabsTrigger>
                 </TabsList>
 
-                {["computer-equipment", "furniture-fitting", "land-building", "plant-equipment", "motor-vehicles"].map((assetType) => (
+                {/* {["computer-equipment", "furniture-fitting", "land-building", "plant-equipment", "motor-vehicles"].map((assetType) => (
                   <TabsContent key={assetType} value={assetType}>
-                    {renderDataTable(assetType.split('-').map(word => 
-                      word.charAt(0).toUpperCase() + word.slice(1)
-                    ).join(' '), [
-                      { accessorKey: "value", header: "Value" },
-                      { accessorKey: "category", header: "Category" },
-                    ])}
+                    {companies.map(company => (
+                      <DataTable
+                        key={company.id}
+                        // columns={assetsColumns}
+                        // data={getAssetsByType(company, assetType)}
+                        title={`${company.company_name} - ${assetType}`}
+                      />
+                    ))}
                   </TabsContent>
-                ))}
+                ))} */}
               </Tabs>
             </TabsContent>
-
-            {/* Other standard tabs */}
-            {["directors-info", "banks-info", "employee-info", "insurances-info", "deposits-info"].map((tab) => (
-              <TabsContent key={tab} value={tab}>
-                {renderDataTable(tab.split('-')[0].charAt(0).toUpperCase() + tab.split('-')[0].slice(1), [
-                  { accessorKey: "type", header: "Type" },
-                  { accessorKey: "value", header: "Value" },
-                ])}
-              </TabsContent>
-            ))}
           </Tabs>
         </TabsContent>
 
         <TabsContent value="kyc-docs">
           <Tabs defaultValue="company-docs">
             <TabsList>
-              <TabsTrigger value="company-docs">Company Docs</TabsTrigger>
-              <TabsTrigger value="director-docs">Director Docs</TabsTrigger>
-              <TabsTrigger value="supplier-docs">Supplier Docs</TabsTrigger>
-              <TabsTrigger value="bank-docs">Bank Docs</TabsTrigger>
-              <TabsTrigger value="employee-docs">Employee Docs</TabsTrigger>
-              <TabsTrigger value="insurance-docs">Insurance Docs</TabsTrigger>
-              <TabsTrigger value="deposit-docs">Deposit Docs</TabsTrigger>
-              <TabsTrigger value="asset-docs">Asset Docs</TabsTrigger>
+              <TabsTrigger value="company-docs">Company Documents</TabsTrigger>
+              <TabsTrigger value="director-docs">Director Documents</TabsTrigger>
+              <TabsTrigger value="supplier-docs">Supplier Documents</TabsTrigger>
+              <TabsTrigger value="bank-docs">Bank Documents</TabsTrigger>
+              <TabsTrigger value="employee-docs">Employee Documents</TabsTrigger>
+              <TabsTrigger value="insurance-docs">Insurance Documents</TabsTrigger>
             </TabsList>
 
-            {/* Company Documents with KRA and Sheria subtabs */}
-            <TabsContent value="company-docs">
-              <Tabs defaultValue="kra">
-                <TabsList>
-                  <TabsTrigger value="kra">KRA Documents</TabsTrigger>
-                  <TabsTrigger value="sheria">Sheria Documents</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="kra">
-                  {renderDataTable('KRA Document', [
-                    { accessorKey: "type", header: "Document Type" },
-                    { accessorKey: "date", header: "Upload Date" },
-                    { accessorKey: "expiryDate", header: "Expiry Date" },
-                    { accessorKey: "documentNumber", header: "Document Number" },
-                  ])}
+            {companies.map(company => (
+              <div key={company.id}>
+                <TabsContent value="company-docs">
+                  <KYCDocumentsList category="company-docs" selectedUserId={company.userid} />
                 </TabsContent>
-
-                <TabsContent value="sheria">
-                  {renderDataTable('Sheria Document', [
-                    { accessorKey: "type", header: "Document Type" },
-                    { accessorKey: "date", header: "Upload Date" },
-                    { accessorKey: "expiryDate", header: "Expiry Date" },
-                    { accessorKey: "documentNumber", header: "Document Number" },
-                  ])}
+                <TabsContent value="director-docs">
+                  <DirectorsDocumentsList selectedUserId={company.userid} />
                 </TabsContent>
-              </Tabs>
-            </TabsContent>
-
-            {/* Supplier Documents with Trading and Monthly subtabs */}
-            <TabsContent value="supplier-docs">
-              <Tabs defaultValue="trading-suppliers">
-                <TabsList>
-                  <TabsTrigger value="trading-suppliers">Trading Suppliers Documents</TabsTrigger>
-                  <TabsTrigger value="monthly-service-vendors">Monthly Service Vendors Documents</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="trading-suppliers">
-                  {renderDataTable('Trading Supplier Document', [
-                    { accessorKey: "type", header: "Document Type" },
-                    { accessorKey: "supplierName", header: "Supplier Name" },
-                    { accessorKey: "date", header: "Upload Date" },
-                    { accessorKey: "expiryDate", header: "Expiry Date" },
-                  ])}
+                <TabsContent value="supplier-docs">
+                  <KYCDocumentsList category="suppliers-docs" selectedUserId={company.userid} />
                 </TabsContent>
-
-                <TabsContent value="monthly-service-vendors">
-                  {renderDataTable('Monthly Service Document', [
-                    { accessorKey: "type", header: "Document Type" },
-                    { accessorKey: "vendorName", header: "Vendor Name" },
-                    { accessorKey: "date", header: "Upload Date" },
-                    { accessorKey: "expiryDate", header: "Expiry Date" },
-                  ])}
+                <TabsContent value="bank-docs">
+                  <KYCDocumentsList category="banks-docs" selectedUserId={company.userid} />
                 </TabsContent>
-              </Tabs>
-            </TabsContent>
-
-            {/* Fixed Assets Documents with subcategories */}
-            <TabsContent value="asset-docs">
-              <Tabs defaultValue="computer-equipment-docs">
-                <TabsList>
-                  <TabsTrigger value="computer-equipment-docs">Computer & Equipment</TabsTrigger>
-                  <TabsTrigger value="furniture-fitting-docs">Furniture & Fitting</TabsTrigger>
-                  <TabsTrigger value="land-building-docs">Land & Building</TabsTrigger>
-                  <TabsTrigger value="plant-equipment-docs">Plant & Equipment</TabsTrigger>
-                  <TabsTrigger value="motor-vehicles-docs">Motor Vehicles</TabsTrigger>
-                </TabsList>
-
-                {["computer-equipment", "furniture-fitting", "land-building", "plant-equipment", "motor-vehicles"].map((assetType) => (
-                  <TabsContent key={`${assetType}-docs`} value={`${assetType}-docs`}>
-                    {renderDataTable(`${assetType.split('-').map(word => 
-                      word.charAt(0).toUpperCase() + word.slice(1)
-                    ).join(' ')} Document`, [
-                      { accessorKey: "type", header: "Document Type" },
-                      { accessorKey: "assetName", header: "Asset Name" },
-                      { accessorKey: "date", header: "Upload Date" },
-                      { accessorKey: "expiryDate", header: "Expiry Date" },
-                    ])}
-                  </TabsContent>
-                ))}
-              </Tabs>
-            </TabsContent>
-
-            {/* Standard document sections */}
-            {["director", "bank", "employee", "insurance", "deposit"].map((type) => (
-              <TabsContent key={`${type}-docs`} value={`${type}-docs`}>
-                {renderDataTable(`${type.charAt(0).toUpperCase() + type.slice(1)} Document`, [
-                  { accessorKey: "type", header: "Document Type" },
-                  { accessorKey: "ownerName", header: `${type.charAt(0).toUpperCase() + type.slice(1)} Name` },
-                  { accessorKey: "date", header: "Upload Date" },
-                  { accessorKey: "expiryDate", header: "Expiry Date" },
-                  { accessorKey: "documentNumber", header: "Document Number" },
-                ])}
-              </TabsContent>
+                <TabsContent value="employee-docs">
+                  <KYCDocumentsList category="employees-docs" selectedUserId={company.userid} />
+                </TabsContent>
+                <TabsContent value="insurance-docs">
+                  <KYCDocumentsList category="insurance-docs" selectedUserId={company.userid} />
+                </TabsContent>
+              </div>
             ))}
           </Tabs>
         </TabsContent>
