@@ -9,14 +9,21 @@ import { useState } from "react";
 import { useSignUp } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { usePathname } from "next/navigation";
 
-export default function OnboardingPage() {
+interface OnboardingPageProps {
+  onComplete: (data: any) => void;
+}
+
+
+export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const { signUp, setActive } = useSignUp();
   const router = useRouter();
-  
+  const pathname = usePathname();
+
   // Form states
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newCompanyUsername, setNewCompanyUsername] = useState("");
@@ -90,11 +97,26 @@ export default function OnboardingPage() {
         }
 
         // Success handling
-        toast.success("Company account created successfully!");
-        resetInputs();
-        setIsOpen(false);
-        router.push("/dashboard");
-
+        if (data.id) {
+          console.log('Step 1 completed: Company created successfully');
+          console.log('Company details:', {
+            name: newCompanyName,
+            username: newCompanyUsername,
+            userId: data.id
+          });
+          
+          toast.success("Company account created successfully!");
+          resetInputs();
+          setIsOpen(false);
+          
+          console.log('Transitioning to Step 2: Upload');
+          onComplete({ 
+            name: newCompanyName, 
+            username: newCompanyUsername,
+            password: newCompanyPassword 
+          });
+        
+        }
       } catch (clerkError: any) {
         console.error("Clerk Sign Up Error:", clerkError);
         const errorMessage = clerkError.errors?.[0]?.message || "Failed to create account";
