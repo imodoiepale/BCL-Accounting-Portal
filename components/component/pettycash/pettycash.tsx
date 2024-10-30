@@ -94,7 +94,7 @@ export function PettyCashManager() {
           Settings
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[1000px] p-0">
+      <DialogContent className="sm:max-w-7xl max-h-5xl p-0">
         <DialogHeader className="px-4 py-3 border-b">
           <DialogTitle>Petty Cash Settings</DialogTitle>
           <DialogDescription>
@@ -125,6 +125,7 @@ export function PettyCashManager() {
           </CardHeader>
           <SettingsDialog />
         </Card>
+
 
         <Tabs defaultValue="transactions" onValueChange={setCurrentTab}>
           <TabsList>
