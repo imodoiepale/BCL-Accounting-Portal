@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useSignUp } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { usePathname } from "next/navigation";
+// import { usePathname } from "next/navigation";
 
 interface OnboardingPageProps {
   onComplete: (data: any) => void;
@@ -22,7 +22,7 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
   const [errorMessage, setErrorMessage] = useState("");
   const { signUp, setActive } = useSignUp();
   const router = useRouter();
-  const pathname = usePathname();
+  // const pathname = usePathname();
 
   // Form states
   const [newCompanyName, setNewCompanyName] = useState("");

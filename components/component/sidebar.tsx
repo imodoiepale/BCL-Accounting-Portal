@@ -24,6 +24,7 @@ import { useAuth } from "@clerk/clerk-react"
 const adminNavItems = [
   { href: "/admin", icon: LayoutDashboardIcon, label: "Admin Dashboard" },
   { href: "/admin/registry", icon: User2Icon, label: "Registry" },
+  { href: "/admin/overallview", icon: LayoutDashboardIcon, label: "Overall TableView" },  
   { href: "/admin/documents/kyc", icon: FileIcon, label: "Kyc Documents" },
   { href: "/admin/documents/monthly", icon: FileIcon, label: "Monthly Documents" },
   { href: "/admin/reports", icon: FileIcon, label: "Report Management" },

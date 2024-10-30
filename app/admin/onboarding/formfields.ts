@@ -59,7 +59,7 @@ export const formFields = {
     ],
   
     bankDetails: [
-      { name: 'bank_id', label: 'Bank ID', type: 'text', required: true },
+    //   { name: 'bank_id', label: 'Bank ID', type: 'text', required: true },
       { name: 'name', label: 'Name', type: 'text', required: true },
       { name: 'account_number', label: 'Account Number', type: 'text', required: true },
       { name: 'currency', label: 'Currency', type: 'text', required: true },

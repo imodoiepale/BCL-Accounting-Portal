@@ -9,6 +9,7 @@ import { Download } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { usePathname } from 'next/navigation';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 const GroupedRowTable = ({ columns, data, onExport, title }) => {
   const [sorting, setSorting] = useState([]);
@@ -45,21 +46,25 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
   }, [data]);
 
   const countMissingFields = (row) => {
-    const fields = Object.keys(row).filter(key => 
-      key !== 'companyIndex' && 
-      key !== 'company_name' && 
-      key !== 'isFirstInGroup' && 
+    const fields = Object.keys(row).filter(key =>
+      key !== 'companyIndex' &&
+      key !== 'company_name' &&
+      key !== 'isFirstInGroup' &&
       key !== 'rowspan'
     );
-    const missingCount = fields.filter(field => row[field] === null || row[field] === '').length;
+
+    const totalFields = fields.length;
+    const completedFields = fields.filter(field => row[field] !== null && row[field] !== '').length;
+    const missingFields = totalFields - completedFields;
 
     return (
-      <div className='text-red-500 font-semibold'>
-        {missingCount > 0 ? `${missingCount} Missing` : ''}
+      <div className='flex gap-2 text-sm font-medium border rounded-lg p-2 bg-gray-50'>
+        <span className='text-blue-600 border-r pr-2'>T: {totalFields}</span>
+        <span className='text-green-600 border-r pr-2'>C: {completedFields}</span>
+        <span className='text-red-600'>P: {totalMissing}</span>
       </div>
     );
   };
-
   const table = useReactTable({
     data: processedData,
     columns: [
@@ -99,7 +104,13 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
         header: 'Missing Fields',
         cell: ({ row }) => countMissingFields(row.original)
       },
-      ...columns.filter(col => col.accessorKey !== 'company_name' && col.id !== 'company_name')
+      ...columns.filter(col => col.accessorKey !== 'company_name' && col.id !== 'company_name').map(col => ({
+        ...col,
+        cell: ({ getValue }) => {
+          const value = getValue();
+          return value === null || value === '' ? <span className="text-red-500">N/A</span> : value;
+        }
+      }))
     ],
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -115,29 +126,33 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
 
   // Calculate total missing fields and per-column missing counts
   const calculateMissingCounts = () => {
-    const totalMissing = data.reduce((total, row) => {
-      const fields = Object.keys(row).filter(key => 
-        key !== 'companyIndex' && 
-        key !== 'company_name' && 
-        key !== 'isFirstInGroup' && 
-        key !== 'rowspan'
-      );
-      return total + fields.filter(field => row[field] === null || row[field] === '').length;
-    }, 0);
+    const fields = Object.keys(data[0] || {}).filter(key =>
+      key !== 'companyIndex' &&
+      key !== 'company_name' &&
+      key !== 'isFirstInGroup' &&
+      key !== 'rowspan'
+    );
+
+    const totalFields = fields.length;
+    const completedFields = fields.filter(field =>
+      data.every(row => row[field] !== null && row[field] !== '')
+    ).length;
+    const totalMissing = totalFields - completedFields;
 
     const columnMissing = {};
     columns.forEach(column => {
       if (column.accessorKey !== 'company_name') {
-        columnMissing[column.accessorKey] = data.filter(row => 
+        columnMissing[column.accessorKey] = data.filter(row =>
           row[column.accessorKey] === null || row[column.accessorKey] === ''
         ).length;
       }
     });
 
-    return { totalMissing, columnMissing };
+    return { totalFields, completedFields, totalMissing, columnMissing };
   };
 
-  const { totalMissing, columnMissing } = calculateMissingCounts();
+  const { totalFields, completedFields, totalMissing, columnMissing } = calculateMissingCounts();
+
 
   return (
     <div className="space-y-4">
@@ -151,8 +166,8 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
           className="max-w-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
         />
         {onExport && (
-          <Button 
-            onClick={() => onExport(data, title)} 
+          <Button
+            onClick={() => onExport(data, title)}
             className="bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-md shadow-sm transition-colors"
           >
             <Download className="mr-2 h-4 w-4" /> Export
@@ -160,7 +175,7 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
         )}
       </div>
 
-      <div>
+      <ScrollArea className="h-[900px] rounded-md border">
         <Table>
           <TableHeader>
             <TableRow className="bg-blue-500">
@@ -174,24 +189,26 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
             </TableRow>
             {/* Enhanced Missing Fields Summary Row */}
             <TableRow className="bg-gray-100 border-b">
-              <TableCell className="text-center font-medium">-</TableCell>
-              <TableCell className="text-center font-medium">All Companies</TableCell>
+              <TableCell className="text-center font-medium"></TableCell>
+              <TableCell className="text-center font-medium"></TableCell>
               <TableCell className="text-center">
-                <Badge variant="destructive" className="font-semibold">
-                  {totalMissing} Total Missing
-                </Badge>
+                <div className='flex justify-center gap-3 font-medium bg-white rounded-lg p-2 shadow-sm'>
+                  <span className='text-blue-600 border-r pr-3'>T: {totalFields}</span>
+                  <span className='text-green-600 border-r pr-3'>C: {completedFields}</span>
+                  <span className='text-red-600'>P: {totalMissing}</span>
+                </div>
               </TableCell>
               {columns.filter(col => col.accessorKey !== 'company_name').map((column) => (
                 <TableCell key={column.accessorKey} className="text-center">
-                  {columnMissing[column.accessorKey] > 0 ? (
-                    <Badge variant="destructive" className="font-semibold">
-                      {columnMissing[column.accessorKey]} Missing
-                    </Badge>
-                  ) : (
-                    <Badge variant="success" className="font-semibold">
-                      ✓
-                    </Badge>
-                  )}
+                  <div className='flex gap-2 justify-center text-sm bg-white rounded-lg p-2 shadow-sm'>
+                    <span className='text-blue-600 border-r pr-2'>T: 1</span>
+                    <span className='text-green-600 border-r pr-2'>
+                      C: {columnMissing[column.accessorKey] === 0 ? 1 : 0}
+                    </span>
+                    <span className='text-red-600'>
+                      P: {columnMissing[column.accessorKey]}
+                    </span>
+                  </div>
                 </TableCell>
               ))}
             </TableRow>
@@ -225,8 +242,8 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
               ))
             ) : (
               <TableRow>
-                <TableCell 
-                  colSpan={columns.length + 2} 
+                <TableCell
+                  colSpan={columns.length + 2}
                   className="h-24 text-center text-gray-500 p-4"
                 >
                   No results.
@@ -235,7 +252,8 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
             )}
           </TableBody>
         </Table>
-      </div>
+        <ScrollBar orientation='horizontal' />
+        </ScrollArea>
     </div>
   );
 };
