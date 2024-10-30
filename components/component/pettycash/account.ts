@@ -1,4 +1,4 @@
-// types/account.ts
+//@ts-nocheck
 
 export interface AccountData {
     id: string;  // Add unique ID

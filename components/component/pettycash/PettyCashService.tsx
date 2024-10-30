@@ -1356,6 +1356,80 @@ export class PettyCashService {
         }
     }
 
+
+    static async createExpenseCategory(data: {
+        expense_category: string;
+        subcategories: string;
+        description: string;
+    }) {
+        try {
+            const { data: result, error } = await supabase
+                .from('acc_portal_pettycash_expense_categories')
+                .insert([{
+                    expense_category: data.expense_category,
+                    subcategories: data.subcategories,
+                    description: data.description
+                }])
+                .select();
+
+            if (error) throw error;
+            return result[0];
+        } catch (error) {
+            console.error('Error creating expense category:', error);
+            throw error;
+        }
+    }
+
+    static async fetchExpenseCategories() {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_expense_categories')
+                .select('*')
+                .order('expense_category', { ascending: true });
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error fetching expense categories:', error);
+            throw error;
+        }
+    }
+
+    static async updateExpenseCategory(id: string, data: {
+        expense_category?: string;
+        subcategories?: string;
+        description?: string;
+    }) {
+        try {
+            const { data: result, error } = await supabase
+                .from('acc_portal_pettycash_expense_categories')
+                .update(data)
+                .eq('id', id)
+                .select();
+
+            if (error) throw error;
+            return result[0];
+        } catch (error) {
+            console.error('Error updating expense category:', error);
+            throw error;
+        }
+    }
+
+    static async deleteExpenseCategory(id: string) {
+        try {
+            const { error } = await supabase
+                .from('acc_portal_pettycash_expense_categories')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error deleting expense category:', error);
+            throw error;
+        }
+    }
+
+
 }
 
 export default PettyCashService;

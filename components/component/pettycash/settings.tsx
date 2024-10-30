@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { createClient } from '@supabase/supabase-js';
 import { Calendar as CalendarIcon } from "lucide-react";
 import { useAuth, useUser } from '@clerk/clerk-react';
+import ExpenseCategoryManager from './ExpenseCategoryManager';
 
 const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
@@ -35,7 +36,7 @@ export function PettyCashSettings({ settings, setSettings, accountsToReplenish, 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [addCategoryDialogOpen, setAddCategoryDialogOpen] = useState(false);
-  const [newCategory, setNewCategory] = useState({ expense: "", subcategory: "" });  
+  const [newCategory, setNewCategory] = useState({ expense: "", subcategories: "" });  
 
   const handleSettingChange = (section, key, value) => {
     setSettings(prevSettings => ({
@@ -87,14 +88,14 @@ export function PettyCashSettings({ settings, setSettings, accountsToReplenish, 
       .from('acc_portal_pettycash_expense_categories')
       .insert({
         expense_category: newCategory.expense,
-        subexpense_category: newCategory.subcategory,
+        subcategories: newCategory.subcategories,
         userid: userId // Assuming you have access to the user's ID
       });
 
     if (error) {
       console.error('Error adding category:', error);
     } else {
-      setNewCategory({ expense: "", subcategory: "" });     
+      setNewCategory({ expense: "", subcategories: "" });     
       fetchExpenseCategories();
     }
   };
@@ -438,139 +439,7 @@ export function PettyCashSettings({ settings, setSettings, accountsToReplenish, 
                 </TabsContent>
                 
                   <TabsContent value="expense categories" className="space-y-4">
-                    <Card className="p-4">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-sm font-medium">Expense Categories</h3>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button className="h-8 text-xs">Add Category</Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Add New Expense Category</DialogTitle>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="expense" className="text-right">
-                                  Expense
-                                </Label>
-                                <Input
-                                  id="expense"
-                                  value={newCategory.expense}
-                                  onChange={(e) => setNewCategory({ ...newCategory, expense: e.target.value })}
-                                  className="col-span-3"
-                                />
-                              </div>
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="subcategory" className="text-right">
-                                  Subcategory
-                                </Label>
-                                <Input
-                                  id="subcategory"
-                                  value={newCategory.subcategory}
-                                  onChange={(e) => setNewCategory({ ...newCategory, subcategory: e.target.value })}
-                                  className="col-span-3"
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button onClick={handleAddCategory}>Submit</Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">No.</TableHead>
-                            <TableHead className="text-xs">SubExpense Category</TableHead>
-                            <TableHead className="text-xs">Expense Category</TableHead>
-                            <TableHead className="text-xs w-24">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {settings.categories.map((category, index) => (
-                            <TableRow key={index}>
-                              <TableCell className="py-2">{index + 1}</TableCell>
-                              <TableCell className="py-2">{category.subexpense_category || 'N/A'}</TableCell>
-                              <TableCell className="py-2">{category.expense_category || 'N/A'}</TableCell>
-                              <TableCell className="py-2">
-                                <div className="flex space-x-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEditCategory(category)}
-                                    className="h-7 w-7 p-0"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => handleDeleteCategory(category)}
-                                    className="h-7 w-7 p-0"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </Card>
-
-                     {/* Edit Category Dialog */}
-                    <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Edit Category</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-type" className="text-right">
-                              Type
-                            </Label>
-                            <Input
-                              id="edit-type"
-                              value={editingCategory?.type || ''}
-                              onChange={(e) => setEditingCategory({ ...editingCategory, type: e.target.value })}
-                              className="col-span-3"
-                            />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-name" className="text-right">
-                              Name
-                            </Label>
-                            <Input
-                              id="edit-name"
-                              value={editingCategory?.name || ''}
-                              onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
-                              className="col-span-3"
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button type="submit" onClick={handleSaveEdit}>Save changes</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-
-                    {/* Delete Category Dialog */}
-                    <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Delete Category</DialogTitle>
-                        </DialogHeader>
-                        <div className="py-4">
-                          <p>Are you sure you want to delete the category "{editingCategory?.name}"?</p>
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
-                          <Button variant="destructive" onClick={handleConfirmDelete}>Delete</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                    <ExpenseCategoryManager/>
                   </TabsContent>
                 </ScrollArea>
           </div>
