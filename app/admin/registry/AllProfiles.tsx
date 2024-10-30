@@ -20,6 +20,8 @@ import { InsurancePolicy } from "@/components/component/InsurancePolicy";
 import { KYCDocumentsList } from "@/components/component/kycDocumentsList";
 import { DirectorsDocumentsList } from "@/components/component/DirectorsDocumentsList";
 import { supabase } from '@/lib/supabaseClient';
+import DirectorsDocs from '../documents/new/directors';
+
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import GroupedRowTable from './GroupedDataTable';
@@ -561,8 +563,7 @@ const TableSummary = ({ data }) => {
           <Badge variant={row.original.status ? "success" : "secondary"}>
             {row.original.status ? "Active" : "Inactive"}
           </Badge>
-        )
-      }
+        ),      }
     ]}
     data={employees}
     title="Employees"
@@ -637,7 +638,8 @@ const TableSummary = ({ data }) => {
                   <KYCDocumentsList category="company-docs" selectedUserId={company.userid} />
                 </TabsContent>
                 <TabsContent value="director-docs">
-                  <DirectorsDocumentsList selectedUserId={company.userid} />
+                  {/* <DirectorsDocumentsList selectedUserId={company.userid} /> */}
+<DirectorsDocs/>
                 </TabsContent>
                 <TabsContent value="supplier-docs">
                   <KYCDocumentsList category="suppliers-docs" selectedUserId={company.userid} />
