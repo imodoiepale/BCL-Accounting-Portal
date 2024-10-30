@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/component/sidebar";
 import { Navbar } from '@/components/component/navbar';
+import { Toaster } from 'sonner'; 
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -30,6 +31,7 @@ export default function RootLayout({
               <main className="flex-grow overflow-auto">
                 <div className="min-w-[640px] p-4">
                   {children}
+                  <Toaster />
                 </div>
               </main>
             </div>
