@@ -22,7 +22,7 @@ import { DirectorsDocumentsList } from "@/components/component/DirectorsDocument
 import { supabase } from '@/lib/supabaseClient';
 import DirectorsDocs from '../documents/new/directors';
 
-import { usePathname } from 'next/navigation';
+// import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import GroupedRowTable from './GroupedDataTable';
 interface AllProfilesProps {
@@ -195,7 +195,7 @@ export default function AllProfiles() {
   const [insurance, setInsurance] = useState([]);
   const [assets, setAssets] = useState([]);
   const [users, setUsers] = useState([]);
-const pathname = usePathname();
+// const pathname = usePathname();
 
   const handleExport = (data, title) => {
     const ws = XLSX.utils.json_to_sheet(data);
