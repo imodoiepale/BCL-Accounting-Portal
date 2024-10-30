@@ -7,44 +7,49 @@ import { toast } from 'react-hot-toast';
 
 
 const handleSaveBranch = async (branch: Branch) => {
-        try {
-            if (dialogState.mode === 'create') {
-                const newBranch = {
-                    branch_name: branch.branch_name,
-                    location: branch.location,
-                    manager_name: branch.manager_name,
-                    contact_number: branch.contact_number,
-                    email: branch.email,
-                    created_at: new Date().toISOString()
-                };
+    try {
+        if (dialogState.mode === 'create') {
+            const newBranch = {
+                branch_name: branch.branch_name,
+                location: branch.location,
+                manager_name: branch.manager_name,
+                contact_number: branch.contact_number,
+                email: branch.email,
+                created_at: new Date().toISOString()
+            };
 
-                const result = await PettyCashService.createBranchRecord(
-                    'acc_portal_pettycash_branches',
-                    newBranch,
-                    userId
-                );
+            const result = await PettyCashService.createBranchRecord(
+                'acc_portal_pettycash_branches',
+                newBranch,
+                userId
+            );
 
-                if (result) {
-                    toast.success('Branch created successfully');
-                    fetchBranches();
-                }
-            } else {
-                await PettyCashService.updateBranchRecord(
-                    branch.branch_name,
-                    branch,
-                    userId
-                );
-                toast.success('Branch updated successfully');
+            if (result) {
+                toast.success('Branch created successfully');
                 fetchBranches();
             }
-            setDialogState({ isOpen: false, mode: 'create', branch: null });
-        } catch (error) {
-            console.error('Error saving branch:', error);
-            toast.error(dialogState.mode === 'create' ? 'Failed to create branch' : 'Failed to update branch');
+        } else {
+            await PettyCashService.updateBranchRecord(
+                branch.branch_name,
+                branch,
+                userId
+            );
+            toast.success('Branch updated successfully');
+            fetchBranches();
         }
-    };
+        setDialogState({ isOpen: false, mode: 'create', branch: null });
+    } catch (error) {
+        console.error('Error saving branch:', error);
+        toast.error(dialogState.mode === 'create' ? 'Failed to create branch' : 'Failed to update branch');
+    }
+};
 
 export class PettyCashService {
+
+    static generateUUID(): string {
+        return crypto.randomUUID();
+    }
+
     // Generic CRUD operations
     static async fetchRecords(table, userId, options = {}) {
         try {
@@ -52,28 +57,23 @@ export class PettyCashService {
 
             switch (table) {
                 case 'acc_portal_pettycash_accounts':
-                    query = query.eq('admin_id', userId);
+                    query = query.eq('userid', userId);
                     break;
                 case 'acc_portal_pettycash_users':
                     query = query
-                        .eq('admin_id', userId)
-                        .select(`
-                    *,
-                    acc_portal_pettycash_branches(branch_name),
-                    account_count:acc_portal_pettycash_accounts(count)
-                `);
+                        .eq('userid', userId)
+                        .select('*');
                     break;
                 case 'acc_portal_pettycash_branches':
                     query = query.eq('userid', userId);
                     break;
-                case 'acc_portal_pettycash_users':
+                case 'acc_portal_pettycash_suppliers':
                     query = query.eq('userid', userId);
                     break;
                 case 'acc_portal_pettycash_entries':
                     query = query.eq('userid', userId).order('invoice_date', { ascending: true });
                     break;
             }
-
             if (options.orderBy) {
                 query = query.order(options.orderBy.column, { ascending: options.orderBy.ascending });
             }
@@ -83,18 +83,16 @@ export class PettyCashService {
             if (error) throw error;
 
             if (data.length === 0) {
-                toast.info(`No data found for ${table}.`);
+                toast.error(`No data found `);
                 return [];
             }
 
-            // Transform data if needed
             if (table === 'acc_portal_pettycash_users') {
                 return data.map(user => ({
                     ...user,
                     account_count: user.account_count[0]?.count || 0
                 }));
             }
-
 
             return data;
         } catch (error) {
@@ -111,10 +109,10 @@ export class PettyCashService {
             // Add specific fields based on table
             switch (table) {
                 case 'acc_portal_pettycash_accounts':
-                    recordData.admin_id = userId;
+                    recordData.userid = userId;
                     break;
                 case 'acc_portal_pettycash_users':
-                    recordData.admin_id = userId;
+                    recordData.userid = userId;
                     break;
                 case 'acc_portal_pettycash_branches':
                     recordData.userid = userId;
@@ -469,43 +467,62 @@ export class PettyCashService {
 
     static async createUserRecord(userId: string, userData: User) {
         try {
-            const { data: existingRecord } = await supabase
+            // Fetch existing user records
+            const { data: existingRecord, error: fetchError } = await supabase
                 .from('acc_portal_pettycash_users')
                 .select('*')
                 .eq('userid', userId)
                 .single();
 
+            // Get current users array or initialize empty array
+            const currentUsers = existingRecord?.data?.users || [];
+
+            // Create new user entry with numeric ID
+            const nextId = currentUsers.length > 0
+                ? Math.max(...currentUsers.map(user =>
+                    parseInt(user.id) || 0  // Handle empty string IDs
+                )) + 1
+                : 1;
+
             const userEntry = {
                 ...userData,
-                branch_id: userData.branch_id, // This is now the branch_name
+                id: nextId.toString(), // Store ID as string
+                branch_id: userData.branch_id,
                 created_date: new Date().toISOString(),
-                is_verified: false
+                is_verified: false,
+                cash_balance: userData.cash_balance || 0,
+                credit_balance: userData.credit_balance || 0,
+                mpesa_balance: userData.mpesa_balance || 0,
             };
 
-            let recordData;
+            // Prepare record data
+            const recordData = {
+                userid: userId,
+                data: {
+                    users: existingRecord
+                        ? [...currentUsers, userEntry]
+                        : [userEntry]
+                }
+            };
+
+            // If there was existing data, maintain other fields
             if (existingRecord) {
-                const currentUsers = existingRecord.data?.users || [];
-                recordData = {
+                Object.assign(recordData, {
                     ...existingRecord,
                     data: {
+                        ...existingRecord.data,
                         users: [...currentUsers, userEntry]
                     }
-                };
-            } else {
-                recordData = {
-                    userid: userId,
-                    data: {
-                        users: [userEntry]
-                    }
-                };
+                });
             }
 
-            const { data: result, error } = await supabase
+            // Upsert the record
+            const { data: result, error: upsertError } = await supabase
                 .from('acc_portal_pettycash_users')
                 .upsert([recordData])
                 .select();
 
-            if (error) throw error;
+            if (upsertError) throw upsertError;
             return result;
         } catch (error) {
             console.error('Error creating user:', error);
@@ -513,8 +530,10 @@ export class PettyCashService {
         }
     }
 
-    static async updateBranchRecord(branchName: string, branch: Branch, userId: string) {
+
+    static async updateBranchRecord(branchId: string, updatedBranch: Branch, userId: string) {
         try {
+            // First, fetch the current record
             const { data: record, error: fetchError } = await supabase
                 .from('acc_portal_pettycash_branches')
                 .select('*')
@@ -522,20 +541,39 @@ export class PettyCashService {
                 .single();
 
             if (fetchError) throw fetchError;
+            if (!record?.data?.branches) throw new Error('No branches found');
 
-            const currentBranches = record?.data?.branches || [];
-            const updatedBranches = currentBranches.map(existingBranch =>
-                existingBranch.branch_name === branchName ? {
-                    ...branch,
-                    created_at: existingBranch.created_at // Preserve original creation date
-                } : existingBranch
+            // Find and update the specific branch by ID
+            const updatedBranches = record.data.branches.map(branch =>
+                branch.id === branchId
+                    ? {
+                        ...branch,
+                        ...updatedBranch,
+                        id: branchId, // Preserve the ID
+                        created_at: branch.created_at, // Preserve original creation date
+                        updated_at: new Date().toISOString() // Add update timestamp
+                    }
+                    : branch
             );
 
+            // Check if branch was found and updated
+            if (!updatedBranches.some(branch => branch.id === branchId)) {
+                throw new Error('Branch not found');
+            }
+
+            // Prepare update data
+            const recordData = {
+                ...record,
+                data: {
+                    ...record.data,
+                    branches: updatedBranches
+                }
+            };
+
+            // Update the record
             const { data: result, error: updateError } = await supabase
                 .from('acc_portal_pettycash_branches')
-                .update({
-                    data: { branches: updatedBranches }
-                })
+                .update(recordData)
                 .eq('userid', userId)
                 .select();
 
@@ -547,7 +585,100 @@ export class PettyCashService {
         }
     }
 
-    static async deleteBranchRecord(branchName: string, userId: string) {
+    static async deleteBranchRecord(branchId: string, userId: string) {
+        try {
+            // First, fetch the current record
+            const { data: record, error: fetchError } = await supabase
+                .from('acc_portal_pettycash_branches')
+                .select('*')
+                .eq('userid', userId)
+                .single();
+
+            if (fetchError) {
+                throw fetchError;
+            }
+
+            if (!record?.data?.branches) {
+                throw new Error('No branches found');
+            }
+
+            // Find the branch to be deleted
+            const branchToDelete = record.data.branches.find(branch => branch.id === branchId);
+            if (!branchToDelete) {
+                throw new Error('Branch not found');
+            }
+
+            // Check for associated data (users, accounts, etc.)
+            const { data: associatedUsers } = await supabase
+                .from('acc_portal_pettycash_users')
+                .select('*')
+                .eq('userid', userId);
+
+            const hasAssociatedUsers = associatedUsers?.some(user =>
+                user.data?.users?.some(u => u.branch_id === branchToDelete.branch_name)
+            );
+
+            if (hasAssociatedUsers) {
+                throw new Error('Cannot delete branch with associated users. Please reassign or delete users first.');
+            }
+
+            // Remove the branch from the array
+            const updatedBranches = record.data.branches.filter(branch => branch.id !== branchId);
+
+            // Add deletion audit trail
+            const auditTrail = {
+                ...(record.data.auditTrail || {}),
+                deletions: [
+                    ...(record.data.auditTrail?.deletions || []),
+                    {
+                        branchId,
+                        branchName: branchToDelete.branch_name,
+                        deletedAt: new Date().toISOString(),
+                        deletedBy: userId
+                    }
+                ]
+            };
+
+            // Update the record
+            const { data: result, error: updateError } = await supabase
+                .from('acc_portal_pettycash_branches')
+                .update({
+                    data: {
+                        branches: updatedBranches,
+                        auditTrail
+                    },
+                    updated_at: new Date().toISOString()
+                })
+                .eq('userid', userId)
+                .select();
+
+            if (updateError) {
+                throw updateError;
+            }
+
+            // Optional: Archive the deleted branch data
+            try {
+                await supabase
+                    .from('acc_portal_pettycash_branches_archive')
+                    .insert([{
+                        userid: userId,
+                        branch_id: branchId,
+                        branch_data: branchToDelete,
+                        deleted_at: new Date().toISOString()
+                    }]);
+            } catch (archiveError) {
+                console.warn('Failed to archive branch data:', archiveError);
+                // Don't throw error here as the main deletion was successful
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Error deleting branch:', error);
+            throw error;
+        }
+    }
+
+    static async verifyBranchRecord(branchId: string, userId: string) {
         try {
             const { data: record } = await supabase
                 .from('acc_portal_pettycash_branches')
@@ -555,8 +686,10 @@ export class PettyCashService {
                 .eq('userid', userId)
                 .single();
 
-            const updatedBranches = record.data.branches.filter(
-                branch => branch.branch_name !== branchName
+            const updatedBranches = record.data.branches.map(branch =>
+                branch.id === branchId
+                    ? { ...branch, is_verified: true, verified_at: new Date().toISOString() }
+                    : branch
             );
 
             const { data: result, error } = await supabase
@@ -570,7 +703,7 @@ export class PettyCashService {
             if (error) throw error;
             return result;
         } catch (error) {
-            console.error('Error deleting branch:', error);
+            console.error('Error verifying branch:', error);
             throw error;
         }
     }
@@ -647,79 +780,53 @@ export class PettyCashService {
         }
     }
 
-    static async createUserRecord(userId: string, userData: any) {
+
+    static async updateUserRecord(userId: string, userUuid: string, updateData: Partial<User>) {
         try {
-            const { data: existingRecord } = await supabase
+            // Fetch current record
+            const { data: existingRecord, error: fetchError } = await supabase
                 .from('acc_portal_pettycash_users')
                 .select('*')
                 .eq('userid', userId)
                 .single();
 
-            const userEntry = {
-                name: userData.name,
-                email: userData.email,
-                role: userData.role,
-                branch_id: userData.branch_id,
-                default_currency: userData.default_currency || 'KES',
-                cash_balance: userData.cash_balance || 0,
-                credit_balance: userData.credit_balance || 0,
-                mpesa_balance: userData.mpesa_balance || 0,
-                created_date: new Date().toISOString(),
-                is_verified: false
-            };
+            if (fetchError) throw fetchError;
+            if (!existingRecord?.data?.users) throw new Error('No users found');
 
-            let recordData;
-            if (existingRecord) {
-                const currentUsers = existingRecord.data?.users || [];
-                recordData = {
-                    ...existingRecord,
-                    data: {
-                        users: [...currentUsers, userEntry]
+            // Find and update the specific user by UUID
+            const updatedUsers = existingRecord.data.users.map(user =>
+                user.id === userUuid
+                    ? {
+                        ...user,
+                        ...updateData,
+                        id: userUuid, // Preserve the UUID
+                        updated_date: new Date().toISOString() // Optional: track update time
                     }
-                };
-            } else {
-                recordData = {
-                    userid: userId,
-                    data: {
-                        users: [userEntry]
-                    }
-                };
-            }
-
-            const { data: result, error } = await supabase
-                .from('acc_portal_pettycash_users')
-                .upsert([recordData])
-                .select();
-
-            if (error) throw error;
-            return result;
-        } catch (error) {
-            console.error('Error creating user:', error);
-            throw error;
-        }
-    }
-
-    static async updateUserRecord(userId: string, userEmail: string, updates: any) {
-        try {
-            const { data: record } = await supabase
-                .from('acc_portal_pettycash_users')
-                .select('*')
-                .eq('userid', userId)
-                .single();
-
-            const updatedUsers = record.data.users.map(user =>
-                user.email === userEmail ? { ...user, ...updates } : user
+                    : user
             );
 
-            const { data: result, error } = await supabase
+            // Check if user was found and updated
+            if (!updatedUsers.some(user => user.id === userUuid)) {
+                throw new Error('User not found');
+            }
+
+            // Prepare update data
+            const recordData = {
+                ...existingRecord,
+                data: {
+                    ...existingRecord.data,
+                    users: updatedUsers
+                }
+            };
+
+            // Update the record
+            const { data: result, error: updateError } = await supabase
                 .from('acc_portal_pettycash_users')
-                .update({
-                    data: { users: updatedUsers }
-                })
+                .update(recordData)
                 .eq('userid', userId)
                 .select();
 
-            if (error) throw error;
+            if (updateError) throw updateError;
             return result;
         } catch (error) {
             console.error('Error updating user:', error);
@@ -755,55 +862,72 @@ export class PettyCashService {
         }
     }
 
-    static async fetchAccountRecords(userId: string) {
+    static async fetchUserRecords(userId: string) {
         try {
+            console.log('Fetching user records for userId:', userId);
+
             const { data: record, error } = await supabase
-                .from('acc_portal_pettycash_accounts')
+                .from('acc_portal_pettycash_users')
                 .select('*')
                 .eq('userid', userId)
                 .single();
 
-            if (error && error.code === 'PGRST116') {
-                // No data found
-                return { data: { accounts: [] } };
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    console.log('No users found, returning empty array');
+                    return [];
+                }
+                throw error;
             }
 
-            if (error) throw error;
+            // Ensure we have users data
+            const users = record?.data?.users || [];
+            console.log('Found users:', users);
 
-            return record;
+            return users;
         } catch (error) {
-            console.error('Error fetching accounts:', error);
-            return { data: { accounts: [] } };
+            console.error('Error in fetchUserRecords:', error);
+            return [];
         }
     }
 
     static async createAccountRecord(userId: string, accountData: AccountData) {
         try {
+            // First, fetch existing record
             const { data: existingRecord } = await supabase
                 .from('acc_portal_pettycash_accounts')
                 .select('*')
                 .eq('userid', userId)
                 .single();
 
+            // Prepare the account entry
             const accountEntry = {
                 ...accountData,
-                accountUser: accountData.accountUser, // This will now contain the user's name
-                created_at: new Date().toISOString()
+                id: accountData.id || crypto.randomUUID(),
+                created_at: new Date().toISOString(),
+                is_verified: false
             };
 
-            const recordData = existingRecord
-                ? {
+            let recordData;
+            if (existingRecord) {
+                // If record exists, append to existing accounts array
+                const currentAccounts = existingRecord.data?.accounts || [];
+                recordData = {
                     ...existingRecord,
                     data: {
-                        accounts: [...(existingRecord.data?.accounts || []), accountEntry]
+                        accounts: [...currentAccounts, accountEntry]
                     }
-                }
-                : {
+                };
+            } else {
+                // If no record exists, create new record with single account
+                recordData = {
                     userid: userId,
                     data: {
                         accounts: [accountEntry]
-                    }
+                    },
+                    created_at: new Date().toISOString()
                 };
+            }
 
             const { data: result, error } = await supabase
                 .from('acc_portal_pettycash_accounts')
@@ -818,8 +942,30 @@ export class PettyCashService {
         }
     }
 
+    static async fetchAccountRecords(userId: string) {
+        try {
+            const { data: record, error } = await supabase
+                .from('acc_portal_pettycash_accounts')
+                .select('*')
+                .eq('userid', userId)
+                .single();
 
-    static async updateAccountRecord(accountNumber: string, account: AccountData, userId: string) {
+            if (error) {
+                if (error.code === 'PGRST116') { // No data found
+                    return { data: { accounts: [] } };
+                }
+                throw error;
+            }
+
+            // Return the accounts array from inside the data object
+            return record.data?.accounts || [];
+        } catch (error) {
+            console.error('Error fetching accounts:', error);
+            throw error;
+        }
+    }
+
+    static async updateAccountRecord(accountId: string, updatedAccount: AccountData, userId: string) {
         try {
             const { data: record, error: fetchError } = await supabase
                 .from('acc_portal_pettycash_accounts')
@@ -828,20 +974,31 @@ export class PettyCashService {
                 .single();
 
             if (fetchError) throw fetchError;
+            if (!record?.data?.accounts) throw new Error('No accounts found');
 
-            const currentAccounts = record?.data?.accounts || [];
-            const updatedAccounts = currentAccounts.map(existingAccount =>
-                existingAccount.accountNumber === accountNumber ? {
-                    ...account,
-                    created_at: existingAccount.created_at,
-                    status: account.endDate && new Date(account.endDate) <= new Date() ? 'Inactive' : 'Active'
-                } : existingAccount
+            const updatedAccounts = record.data.accounts.map(account =>
+                account.id === accountId
+                    ? {
+                        ...account,
+                        ...updatedAccount,
+                        id: accountId, // Preserve the ID
+                        created_at: account.created_at, // Preserve original creation date
+                        updated_at: new Date().toISOString()
+                    }
+                    : account
             );
+
+            if (!updatedAccounts.some(account => account.id === accountId)) {
+                throw new Error('Account not found');
+            }
 
             const { data: result, error: updateError } = await supabase
                 .from('acc_portal_pettycash_accounts')
                 .update({
-                    data: { accounts: updatedAccounts }
+                    data: {
+                        accounts: updatedAccounts
+                    },
+                    updated_at: new Date().toISOString()
                 })
                 .eq('userid', userId)
                 .select();
@@ -854,27 +1011,80 @@ export class PettyCashService {
         }
     }
 
-    static async deleteAccountRecord(accountNumber: string, userId: string) {
+    static async deleteAccountRecord(accountId: string, userId: string) {
         try {
-            const { data: record } = await supabase
+            // First, fetch current record
+            const { data: record, error: fetchError } = await supabase
                 .from('acc_portal_pettycash_accounts')
                 .select('*')
                 .eq('userid', userId)
                 .single();
 
-            const updatedAccounts = record.data.accounts.filter(
-                account => account.accountNumber !== accountNumber
-            );
+            if (fetchError) throw fetchError;
+            if (!record?.data?.accounts) throw new Error('No accounts found');
 
-            const { data: result, error } = await supabase
+            // Find the account to be deleted
+            const accountToDelete = record.data.accounts.find(account => account.id === accountId);
+            if (!accountToDelete) {
+                throw new Error('Account not found');
+            }
+
+            // Check for associated transactions
+            const { data: associatedTransactions } = await supabase
+                .from('acc_portal_pettycash_entries')
+                .select('*')
+                .eq('account_id', accountId)
+                .limit(1);
+
+            if (associatedTransactions?.length > 0) {
+                throw new Error('Cannot delete account with associated transactions');
+            }
+
+            // Remove the account from the array
+            const updatedAccounts = record.data.accounts.filter(account => account.id !== accountId);
+
+            // Add to audit trail
+            const auditTrail = {
+                ...(record.data.auditTrail || {}),
+                deletions: [
+                    ...(record.data.auditTrail?.deletions || []),
+                    {
+                        accountId,
+                        accountNumber: accountToDelete.accountNumber,
+                        deletedAt: new Date().toISOString(),
+                        deletedBy: userId
+                    }
+                ]
+            };
+
+            const { data: result, error: updateError } = await supabase
                 .from('acc_portal_pettycash_accounts')
                 .update({
-                    data: { accounts: updatedAccounts }
+                    data: {
+                        accounts: updatedAccounts,
+                        auditTrail
+                    },
+                    updated_at: new Date().toISOString()
                 })
                 .eq('userid', userId)
                 .select();
 
-            if (error) throw error;
+            if (updateError) throw updateError;
+
+            // Archive the deleted account
+            try {
+                await supabase
+                    .from('acc_portal_pettycash_accounts_archive')
+                    .insert([{
+                        userid: userId,
+                        account_id: accountId,
+                        account_data: accountToDelete,
+                        deleted_at: new Date().toISOString()
+                    }]);
+            } catch (archiveError) {
+                console.warn('Failed to archive account data:', archiveError);
+            }
+
             return result;
         } catch (error) {
             console.error('Error deleting account:', error);
@@ -882,7 +1092,7 @@ export class PettyCashService {
         }
     }
 
-    static async verifyAccountRecord(accountNumber: string, userId: string) {
+    static async verifyAccountRecord(accountId: string, userId: string) {
         try {
             const { data: record } = await supabase
                 .from('acc_portal_pettycash_accounts')
@@ -890,16 +1100,24 @@ export class PettyCashService {
                 .eq('userid', userId)
                 .single();
 
+            if (!record?.data?.accounts) throw new Error('No accounts found');
+
             const updatedAccounts = record.data.accounts.map(account =>
-                account.accountNumber === accountNumber
-                    ? { ...account, is_verified: true, verified_at: new Date().toISOString() }
+                account.id === accountId
+                    ? {
+                        ...account,
+                        is_verified: true,
+                        verified_at: new Date().toISOString()
+                    }
                     : account
             );
 
             const { data: result, error } = await supabase
                 .from('acc_portal_pettycash_accounts')
                 .update({
-                    data: { accounts: updatedAccounts }
+                    data: {
+                        accounts: updatedAccounts
+                    }
                 })
                 .eq('userid', userId)
                 .select();
@@ -911,7 +1129,232 @@ export class PettyCashService {
             throw error;
         }
     }
+    // Add to PettyCashService.tsx
+    static async getNextEntryNumber(userId: string) {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_entries')
+                .select('id')
+                .eq('userid', userId);
 
+            if (error) throw error;
+            return (data?.length || 0) + 1;
+        } catch (error) {
+            console.error('Error getting next entry number:', error);
+            return 1;
+        }
+    }
+
+    // Add these methods to PettyCashService class
+
+    static async fetchReimbursementRecords(userId: string) {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_reimbursements')
+                .select('*')
+                .eq('userid', userId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error fetching reimbursements:', error);
+            throw error;
+        }
+    }
+
+    static async createReimbursementRecord(userId: string, data: any) {
+        try {
+            const { data: result, error } = await supabase
+                .from('acc_portal_pettycash_reimbursements')
+                .insert([{
+                    userid: userId,
+                    ...data,
+                    created_at: new Date().toISOString()
+                }])
+                .select();
+
+            if (error) throw error;
+            return result;
+        } catch (error) {
+            console.error('Error creating reimbursement:', error);
+            throw error;
+        }
+    }
+
+    static async updateReimbursementRecord(id: string, data: any) {
+        try {
+            const { data: result, error } = await supabase
+                .from('acc_portal_pettycash_reimbursements')
+                .update({
+                    ...data,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', id)
+                .select();
+
+            if (error) throw error;
+            return result;
+        } catch (error) {
+            console.error('Error updating reimbursement:', error);
+            throw error;
+        }
+    }
+
+    static async deleteReimbursementRecord(id: string) {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_reimbursements')
+                .delete()
+                .eq('id', id)
+                .select();
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error deleting reimbursement:', error);
+            throw error;
+        }
+    }
+
+    // Add these methods to PettyCashService class
+
+    static async fetchLoanRecords(userId: string) {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_loans')
+                .select('*')
+                .eq('userid', userId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error fetching loans:', error);
+            throw error;
+        }
+    }
+
+    static async createLoanRecord(userId: string, data: any) {
+        try {
+            const { data: result, error } = await supabase
+                .from('acc_portal_pettycash_loans')
+                .insert([{
+                    userid: userId,
+                    ...data,
+                    created_at: new Date().toISOString(),
+                    remaining_amount: data.amount - (data.paid_amount || 0)
+                }])
+                .select();
+
+            if (error) throw error;
+            return result;
+        } catch (error) {
+            console.error('Error creating loan:', error);
+            throw error;
+        }
+    }
+
+    static async updateLoanRecord(id: string, data: any) {
+        try {
+            const { data: result, error } = await supabase
+                .from('acc_portal_pettycash_loans')
+                .update({
+                    ...data,
+                    updated_at: new Date().toISOString(),
+                    remaining_amount: data.amount - (data.paid_amount || 0)
+                })
+                .eq('id', id)
+                .select();
+
+            if (error) throw error;
+            return result;
+        } catch (error) {
+            console.error('Error updating loan:', error);
+            throw error;
+        }
+    }
+
+    static async deleteLoanRecord(id: string) {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_loans')
+                .delete()
+                .eq('id', id)
+                .select();
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error deleting loan:', error);
+            throw error;
+        }
+    }
+
+    static async recordLoanPayment(loanId: string, paymentAmount: number) {
+        try {
+            // First get the current loan record
+            const { data: loan, error: fetchError } = await supabase
+                .from('acc_portal_pettycash_loans')
+                .select('*')
+                .eq('id', loanId)
+                .single();
+
+            if (fetchError) throw fetchError;
+
+            const newPaidAmount = (loan.paid_amount || 0) + paymentAmount;
+            const remainingAmount = loan.amount - newPaidAmount;
+            const payment_status =
+                remainingAmount <= 0 ? 'Paid' :
+                    newPaidAmount > 0 ? 'Partially Paid' : 'Pending';
+
+            // Update the loan record
+            const { data: result, error: updateError } = await supabase
+                .from('acc_portal_pettycash_loans')
+                .update({
+                    paid_amount: newPaidAmount,
+                    remaining_amount: remainingAmount,
+                    payment_status,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', loanId)
+                .select();
+
+            if (updateError) throw updateError;
+
+            // Record the payment in the loan_payments table
+            const { error: paymentError } = await supabase
+                .from('acc_portal_pettycash_loan_payments')
+                .insert([{
+                    loan_id: loanId,
+                    amount: paymentAmount,
+                    payment_date: new Date().toISOString(),
+                }]);
+
+            if (paymentError) throw paymentError;
+
+            return result;
+        } catch (error) {
+            console.error('Error recording loan payment:', error);
+            throw error;
+        }
+    }
+
+    static async getLoanPaymentHistory(loanId: string) {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_loan_payments')
+                .select('*')
+                .eq('loan_id', loanId)
+                .order('payment_date', { ascending: false });
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error fetching loan payment history:', error);
+            throw error;
+        }
+    }
 
 }
 
