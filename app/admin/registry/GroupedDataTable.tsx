@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
+import { usePathname } from 'next/navigation';
 
 const GroupedRowTable = ({ columns, data, onExport, title }) => {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
   const [columnVisibility, setColumnVisibility] = useState({});
+  const pathname = usePathname();
 
   // Keep existing data processing logic
   const processedData = React.useMemo(() => {
