@@ -91,11 +91,6 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
           throw new Error(data.message || "Failed to update company metadata");
         }
 
-        // Set active session
-        if (signUp.createdSessionId) {
-          await setActive({ session: signUp.createdSessionId });
-        }
-
         // Success handling
         if (data.id) {
           console.log('Step 1 completed: Company created successfully');
@@ -133,7 +128,6 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
       setLoading(false);
     }
   };
-
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-24">
       <Dialog open={isOpen} onOpenChange={(open) => {
