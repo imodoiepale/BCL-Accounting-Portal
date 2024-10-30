@@ -438,7 +438,7 @@ export function PettyCashSettings({ settings, setSettings, accountsToReplenish, 
                     </Card>
                 </TabsContent>
                 
-                  <TabsContent value="expense categories" className="space-y-4">
+                  <TabsContent value="expense categories" className="">
                     <ExpenseCategoryManager/>
                   </TabsContent>
                 </ScrollArea>
