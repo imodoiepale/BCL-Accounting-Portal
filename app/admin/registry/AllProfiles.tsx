@@ -69,9 +69,9 @@ const companyInfoColumns = [
       const missingCount = fields.length - nonEmptyFields.length;
       
       return (
-        <Badge variant={missingCount > 0 ? "destructive" : "success"}>
-          {missingCount > 0 ? `${missingCount} Missing` : 'Complete'}
-        </Badge>
+        <div className='text-red-500 font-semibold'>
+          {missingCount > 0 ? `${missingCount} Missing` : ''}
+        </div>
       );
     }
   },
@@ -321,64 +321,78 @@ const pathname = usePathname();
   
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Input
-            placeholder="Filter companies..."
-            value={(table.getColumn("company_name")?.getFilterValue() as string) ?? ""}
-            onChange={(event) =>
-              table.getColumn("company_name")?.setFilterValue(event.target.value)
-            }
-            className="max-w-sm"
-          />
+      <div className="flex items-center justify-between">
+        <Input
+          placeholder="Filter companies..."
+          value={(table.getColumn("company_name")?.getFilterValue() as string) ?? ""}
+          onChange={(event) =>
+            table.getColumn("company_name")?.setFilterValue(event.target.value)
+          }
+          className="max-w-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+        />
+        {onExport && (
           <Button 
             onClick={() => onExport(data, title)} 
-            className="bg-green-500 hover:bg-green-600 text-white"
+            className="bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-md shadow-sm transition-colors"
           >
             <Download className="mr-2 h-4 w-4" /> Export
           </Button>
-        </div>
-        <Table>
-          <TableHeader>
+        )}
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-blue-500">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
-                  </TableHead>
+              headerGroup.headers.map((header) => (
+                <TableHead 
+                  key={header.id} 
+                  className="font-bold text-white p-4 border-r last:border-r-0"
+                >
+                  {flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))
+            ))}
+          </TableRow>
+          {/* Add Missing Fields Summary Row */}
+          <TableRow className="bg-gray-100 border-b">
+            <TableCell colSpan={2} className="text-center font-medium">All Companies</TableCell>
+            {columns.map((column) => (
+              <TableCell key={column.accessorKey} className="text-center">
+                <Badge variant={getMissingCount(data, column.accessorKey) > 0 ? "destructive" : "success"}>
+                  {getMissingCount(data, column.accessorKey)} Missing
+                </Badge>
+              </TableCell>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id} className="hover:bg-gray-50">
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className="p-4">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
                 ))}
               </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    );
-  };
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center text-gray-500">
+                No results found.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+};
   
+const getMissingCount = (data, field) => {
+  return data.filter(item => !item[field]).length;
+};
 
 const CompanySeparator = ({ companyName }) => (
   <div className="py-2 px-4 bg-gray-100 border-l-4 border-blue-500 my-4">
