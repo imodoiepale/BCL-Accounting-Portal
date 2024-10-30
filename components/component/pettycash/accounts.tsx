@@ -128,16 +128,18 @@ const AccountDialog: React.FC<AccountDialogProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Validate the form data
+  
     const validationErrors = validateAccountData(formData);
     if (validationErrors.length > 0) {
       validationErrors.forEach(error => toast.error(error));
       return;
     }
-
+  
     try {
-      await onSave(formData);
+      await onSave({
+        ...formData,
+        id: formData.id || account?.id, // Ensure ID is passed
+      });
       onClose();
     } catch (error) {
       toast.error('Failed to save account');
@@ -290,9 +292,9 @@ export function AccountsTab() {
     setIsLoading(true);
     try {
       const accountsData = await PettyCashService.fetchAccountRecords(userId);
-
-      // accountsData is now the accounts array from inside data.accounts
+  
       const formattedAccounts = accountsData.map(account => ({
+        id: account.id, // Add this line
         accountUser: account.accountUser || '',
         pettyCashType: account.pettyCashType || '',
         accountNumber: account.accountNumber || '',
@@ -304,9 +306,10 @@ export function AccountsTab() {
         startDate: account.startDate || new Date().toISOString(),
         endDate: account.endDate || null,
         status: account.status || 'Active',
-        created_at: account.created_at || new Date().toISOString()
+        created_at: account.created_at || new Date().toISOString(),
+        is_verified: account.is_verified || false // Add this
       }));
-
+  
       setAccounts(formattedAccounts);
     } catch (error) {
       console.error('Error fetching accounts:', error);
@@ -344,86 +347,85 @@ export function AccountsTab() {
     setDialogState({
       isOpen: true,
       mode: 'create',
-      account: null
-    });
-  };
-  const handleEditAccount = (account: AccountData) => {
-    // Account data is now directly accessible without .data nesting
-    if (!account) {
-      toast.error('Invalid account data');
-      return;
-    }
-
-    setDialogState({
-      isOpen: true,
-      mode: 'edit',
       account: {
-        accountUser: account.accountUser || '',
-        pettyCashType: account.pettyCashType || '',
-        accountNumber: account.accountNumber || '',
-        accountType: account.accountType || 'Corporate',
-        minFloatBalance: Number(account.minFloatBalance) || 0,
-        minFloatAlert: Number(account.minFloatAlert) || 0,
-        maxOpeningFloat: Number(account.maxOpeningFloat) || 0,
-        approvedLimitAmount: Number(account.approvedLimitAmount) || 0,
-        startDate: account.startDate || new Date().toISOString(),
-        endDate: account.endDate || null,
-        status: account.status || 'Active'
+        id: crypto.randomUUID(),
+        accountUser: '', // Changed from []
+        pettyCashType: '', // Changed from []
+        accountNumber: '',
+        accountType: 'Corporate',
+        minFloatBalance: 0,
+        minFloatAlert: 0,
+        maxOpeningFloat: 0,
+        approvedLimitAmount: 0,
+        startDate: new Date().toISOString(),
+        endDate: null,
+        status: 'Active',
+        created_at: new Date().toISOString(),
+        is_verified: false
       }
     });
   };
 
-  const handleDeleteAccount = async (account: AccountData) => {
-    try {
-      // Account number is now directly accessible
-      await PettyCashService.deleteAccountRecord(account.accountNumber, userId);
-      toast.success('Account deleted successfully');
-      fetchAccountsData();
-    } catch (error) {
-      console.error('Error deleting account:', error);
-      toast.error('Failed to delete account');
+  const handleEditAccount = (account: AccountData) => {
+  setDialogState({
+    isOpen: true,
+    mode: 'edit',
+    account: {
+      ...account,
+      id: account.id // Ensure ID is preserved
     }
-  };
+  });
+};
 
-  const handleSaveAccount = async (accountData: AccountData) => {
-    try {
-      if (dialogState.mode === 'create') {
-        // Format data for creation ensuring all required fields are present
-        const formattedAccount = {
-          accountUser: accountData.accountUser,
-          pettyCashType: accountData.pettyCashType,
-          accountNumber: accountData.accountNumber,
-          accountType: accountData.accountType,
-          minFloatBalance: Number(accountData.minFloatBalance),
-          minFloatAlert: Number(accountData.minFloatAlert),
-          maxOpeningFloat: Number(accountData.maxOpeningFloat),
-          approvedLimitAmount: Number(accountData.approvedLimitAmount),
-          startDate: accountData.startDate,
-          endDate: accountData.endDate,
-          status: accountData.status
-        };
+const handleDeleteAccount = async (account: AccountData) => {
+  try {
+    await PettyCashService.deleteAccountRecord(account.id, userId);
+    toast.success('Account deleted successfully');
+    fetchAccounts();
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    toast.error('Failed to delete account');
+  }
+};
 
-        // Validate the formatted data before sending to service
-        if (!formattedAccount.accountUser || !formattedAccount.pettyCashType || !formattedAccount.accountNumber) {
-          throw new Error('Required fields are missing');
-        }
+const handleSaveAccount = async (accountData: AccountData) => {
+  try {
+    if (dialogState.mode === 'create') {
+      const formattedAccount = {
+        ...accountData,
+        id: dialogState.account?.id || crypto.randomUUID(), // Use existing ID from dialog state
+        created_at: new Date().toISOString(),
+        is_verified: false
+      };
 
-        const result = await PettyCashService.createAccountRecord(userId, formattedAccount);
-        if (result) {
-          toast.success('Account created successfully');
-          await fetchAccountsData(); // Use a different name to avoid confusion
-        }
-      } else {
-        await PettyCashService.updateAccountRecord(accountData.accountNumber, accountData, userId);
-        toast.success('Account updated successfully');
-        await fetchAccountsData();
+      const result = await PettyCashService.createAccountRecord(
+        userId,
+        formattedAccount
+      );
+
+      if (result) {
+        toast.success('Account created successfully');
+        fetchAccountsData();
       }
-      setDialogState({ isOpen: false, mode: 'create', account: null });
-    } catch (error) {
-      console.error('Error saving account:', error);
-      toast.error(error.message || (dialogState.mode === 'create' ? 'Failed to create account' : 'Failed to update account'));
+    } else {
+      await PettyCashService.updateAccountRecord(
+        accountData.id!,
+        {
+          ...accountData,
+          updated_at: new Date().toISOString()
+        },
+        userId
+      );
+      toast.success('Account updated successfully');
+      fetchAccountsData();
     }
-  };
+
+    setDialogState({ isOpen: false, mode: 'create', account: null });
+  } catch (error) {
+    console.error('Error saving account:', error);
+    toast.error(dialogState.mode === 'create' ? 'Failed to create account' : 'Failed to update account');
+  }
+};
 
 
 

@@ -23,6 +23,7 @@ const formatDate = (dateString: string): string => {
 };
 
 interface Branch {
+  id: string;
   branch_name: string;
   location: string;
   manager_name: string;
@@ -39,6 +40,7 @@ interface BranchDialogProps {
   mode: 'create' | 'edit';
 }
 
+
 const BranchDialog: React.FC<BranchDialogProps> = ({
   isOpen,
   onClose,
@@ -46,34 +48,40 @@ const BranchDialog: React.FC<BranchDialogProps> = ({
   onSave,
   mode
 }) => {
-  const [formData, setFormData] = useState<Branch | null>(branch);
+  const initialFormState: Branch = {
+    id: '',
+    branch_name: '',
+    location: '',
+    manager_name: '',
+    contact_number: '',
+    email: '',
+    created_at: new Date().toISOString(),
+    is_verified: false
+  };
+
+  const [formData, setFormData] = useState<Branch>(mode === 'create' ? initialFormState : branch || initialFormState);
 
   useEffect(() => {
-    setFormData(branch);
-  }, [branch]);
+    setFormData(mode === 'create' ? initialFormState : branch || initialFormState);
+  }, [branch, mode]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData) return;
-
     try {
       await onSave(formData);
       onClose();
     } catch (error) {
-      toast.error('Failed to save branch');
       console.error('Error saving branch:', error);
+      toast.error('Failed to save branch');
     }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        [name]: value // Direct property access, not nested under data
-      };
-    });
   };
 
   const formFields = [
@@ -88,17 +96,19 @@ const BranchDialog: React.FC<BranchDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Add New Branch' : 'Edit Branch'}</DialogTitle>
+          <DialogTitle>
+            {mode === 'create' ? 'Add New Branch' : 'Edit Branch'}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           {formFields.map(({ name, label, type, required }) => (
             <div key={name} className="space-y-1.5">
-              <Label htmlFor={name}>{label}</Label>
+              <Label htmlFor={name}>{label}{required && ' *'}</Label>
               <Input
                 id={name}
                 name={name}
                 type={type}
-                value={formData?.[name] || ''} // Direct property access
+                value={formData[name]}
                 onChange={handleInputChange}
                 className="h-8"
                 required={required}
@@ -106,9 +116,18 @@ const BranchDialog: React.FC<BranchDialogProps> = ({
             </div>
           ))}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" className="bg-blue-600 text-white">
-              {mode === 'create' ? 'Create' : 'Save Changes'}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-blue-600 text-white"
+            >
+              {mode === 'create' ? 'Create Branch' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </form>
@@ -208,12 +227,14 @@ export function BranchesTab() {
       isOpen: true,
       mode: 'create',
       branch: {
+        id: crypto.randomUUID(), // Add unique ID
         branch_name: '',
         location: '',
         manager_name: '',
         contact_number: '',
         email: '',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        is_verified: false // Add verification status like in users
       }
     });
   };
@@ -280,21 +301,23 @@ export function BranchesTab() {
 
 
   const handleEditBranch = (branch: Branch) => {
-    // Make sure we're passing a flat branch object
     setDialogState({
       isOpen: true,
       mode: 'edit',
       branch: {
+        ...branch,
+        id: branch.id, // Ensure ID is preserved
         branch_name: branch.branch_name,
         location: branch.location,
         manager_name: branch.manager_name,
         contact_number: branch.contact_number,
         email: branch.email,
         created_at: branch.created_at,
-        is_verified: branch.is_verified
+        is_verified: branch.is_verified || false
       }
     });
   };
+
   const toastConfig = {
     duration: 2000,
     dismissible: true,
@@ -319,27 +342,41 @@ export function BranchesTab() {
   };
 
 
-  const handleSaveBranch = async (branch: Branch) => {
+  const handleSaveBranch = async (branchData: Branch) => {
     try {
       if (dialogState.mode === 'create') {
+        // Format data for creation
+        const formattedBranch = {
+          ...branchData,
+          id: branchData.id || crypto.randomUUID(), // Ensure ID exists
+          created_at: new Date().toISOString(),
+          is_verified: false
+        };
+  
         const result = await PettyCashService.createBranchRecord(
           'acc_portal_pettycash_branches',
-          branch, // Pass the branch directly
+          formattedBranch,
           userId
         );
+  
         if (result) {
           toast.success('Branch created successfully');
-          fetchBranches();
+          await fetchBranches();
         }
       } else {
+        // Handle update
         await PettyCashService.updateBranchRecord(
-          branch.branch_name,
-          branch, // Pass the branch directly
+          branchData.id,
+          {
+            ...branchData,
+            updated_at: new Date().toISOString()
+          },
           userId
         );
         toast.success('Branch updated successfully');
-        fetchBranches();
+        await fetchBranches();
       }
+      
       setDialogState({ isOpen: false, mode: 'create', branch: null });
     } catch (error) {
       console.error('Error saving branch:', error);
@@ -347,12 +384,14 @@ export function BranchesTab() {
     }
   };
 
-  const handleDeleteBranch = async (branchToDelete: Branch) => {
+  const handleDeleteBranch = async (branch: Branch) => {
     try {
-      await PettyCashService.deleteBranchRecord(branchToDelete.branch_name, userId);
+      // Pass the branch ID instead of branch_name
+      await PettyCashService.deleteBranchRecord(branch.id, userId);
       toast.success('Branch deleted successfully');
-      fetchBranches();
+      fetchBranches(); // Refresh the list after deletion
     } catch (error) {
+      console.error('Error deleting branch:', error);
       toast.error('Failed to delete branch');
     }
   };
