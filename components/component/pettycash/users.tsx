@@ -61,18 +61,18 @@ const UserDialog: React.FC<UserDialogProps> = ({
   branches
 }) => {
   const initialFormData = {
-    id: '',
+    id: '', // Ensure id is included
     name: '',
     email: '',
     role: 'user',
-    branch_id: undefined, // Changed from emformFields pty string to undefined
+    branch_id: undefined,
     default_currency: 'KES',
     cash_balance: 0,
     credit_balance: 0,
     mpesa_balance: 0,
     created_date: new Date().toISOString(),
     is_verified: false
-  };
+};
 
   const [formData, setFormData] = useState(mode === 'create' ? initialFormData : user);
 
@@ -306,6 +306,7 @@ export function UsersTab() {
       isOpen: true,
       mode: 'create',
       user: {
+        id: crypto.randomUUID(),
         name: '',
         email: '',
         role: 'user',
@@ -322,42 +323,44 @@ export function UsersTab() {
 
   const handleEditUser = (user: User) => {
     setDialogState({
-      isOpen: true,
-      mode: 'edit',
-      user: {
-        ...user,
-        branch_id: user.branch_id || '' // Ensure branch_id is set properly
-      }
-    });
-  };
-
-  const handleSaveUser = async (userData: User) => {
-    try {
-      if (dialogState.mode === 'create') {
-        // Create new user record
-        const result = await PettyCashService.createUserRecord(userId, {
-          ...userData,
-          branch_id: userData.branch_id // This should be branch_name from selected branch
-        });
-        if (result) {
-          toast.success('User created successfully');
-          fetchData();
+        isOpen: true,
+        mode: 'edit',
+        user: {
+            ...user,
+            branch_id: user.branch_id || '' // Ensure branch_id is set properly
         }
+    });
+};
+
+const handleSaveUser = async (userData: User) => {
+  try {
+      if (dialogState.mode === 'create') {
+          // Create new user record
+          const result = await PettyCashService.createUserRecord(userId, {
+              ...userData,
+              branch_id: userData.branch_id // This should be branch_name from selected branch
+          });
+          if (result) {
+              toast.success('User created successfully');
+              fetchData();
+          }
       } else {
-        // Update existing user
-        await PettyCashService.updateUserRecord(userId, userData.email, {
-          ...userData,
-          branch_id: userData.branch_id // This should be branch_name from selected branch
-        });
-        toast.success('User updated successfully');
-        fetchData();
+          // Update existing user
+          await PettyCashService.updateUserRecord(userId, userData.id, {
+              ...userData,
+              branch_id: userData.branch_id // This should be branch_name from selected branch
+          });
+          toast.success('User updated successfully');
+          fetchData();
       }
+
       setDialogState({ isOpen: false, mode: 'create', user: null });
-    } catch (error) {
+  } catch (error) {
       console.error('Error saving user:', error);
       toast.error(dialogState.mode === 'create' ? 'Failed to create user' : 'Failed to update user');
-    }
-  };
+  }
+};
+
   const handleDeleteUser = async (user: User) => {
     try {
       await PettyCashService.deleteUserRecord(userId, user.email);
