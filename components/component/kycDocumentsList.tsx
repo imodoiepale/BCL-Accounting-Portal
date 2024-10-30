@@ -26,11 +26,11 @@ const formatDate = (dateString) => {
 
 const calculateRemainingDays = (issueDate, expiryDate) => {
   if (!issueDate || !expiryDate) return 'N/A';
-  
+
   const today = new Date();
   const expiry = new Date(expiryDate);
   const remainingDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-  
+
   return remainingDays > 0 ? remainingDays : 0;
 };
 
@@ -56,7 +56,7 @@ const FileViewer = ({ url, onClose }) => {
 }
 
 export function KYCDocumentsList({ category, subcategory }) {
-  const { user } = useUser()  
+  const { user } = useUser()
 
   const [documents, setDocuments] = useState([])
   const [isUploadingDocument, setIsUploadingDocument] = useState(false)
@@ -266,7 +266,7 @@ export function KYCDocumentsList({ category, subcategory }) {
 
   const filterDocuments = (docs) => {
     if (!searchTerm) return docs
-    return docs.filter(doc => 
+    return docs.filter(doc =>
       doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.department.toLowerCase().includes(searchTerm.toLowerCase())
     )
@@ -274,15 +274,15 @@ export function KYCDocumentsList({ category, subcategory }) {
 
   return (
     <div className="flex w-full bg-gray-100">
-      <Toaster position="top-right" />
+
       <main className="flex-1 p-6 w-full">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-semibold">KYC Documents - {category} {subcategory && `- ${subcategory}`}</h1>
           <div className="flex items-center space-x-2">
-            <Input 
-              type="search" 
-              placeholder="Search documents" 
-              className="w-48 bg-gray-200 border-gray-300 focus:border-blue-500 focus:ring-blue-500" 
+            <Input
+              type="search"
+              placeholder="Search documents"
+              className="w-48 bg-gray-200 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -293,64 +293,64 @@ export function KYCDocumentsList({ category, subcategory }) {
           </div>
         </div>
 
-         <Card className="h-full overflow-auto shadow-lg rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[50px] bg-gray-100 text-gray-700 font-semibold">No.</TableHead>
-            <TableHead onClick={() => handleSort('name')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
-              Document Name {sortColumn === 'name' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-            </TableHead>
-            <TableHead onClick={() => handleSort('department')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
-              Department {sortColumn === 'department' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-            </TableHead>
-            <TableHead onClick={() => handleSort('issue_date')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
-              Issue Date {sortColumn === 'issue_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-            </TableHead>
-            <TableHead onClick={() => handleSort('expiry_date')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
-              Expiry Date {sortColumn === 'expiry_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-            </TableHead>
-            <TableHead onClick={() => handleSort('reminder_days')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
-               Days To Expiry {sortColumn === 'reminder_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
-            </TableHead>
-            <TableHead className="bg-gray-100 text-gray-700 font-semibold">Status</TableHead>
-            <TableHead className="bg-gray-100 text-gray-700 font-semibold">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filterDocuments(sortDocuments(documents)).map((doc, index) => (
-            <TableRow key={doc.id} className={index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}>
-              <TableCell className="font-medium text-gray-900">{index + 1}</TableCell>
-              <TableCell className="text-gray-800">{doc.name}</TableCell>
-              <TableCell className="text-gray-800">{doc.department}</TableCell>
-              <TableCell className="text-gray-800">{doc.isUploaded ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
-              <TableCell className="text-gray-800">{doc.isUploaded ? (doc.expiry_date ? formatDate(doc.expiry_date) : 'One-off') : 'Pending'}</TableCell>
-              <TableCell className={`font-medium ${getDaysToExpiryColor(doc.reminder_days)}`}>
-                {doc.reminder_days || 'N/A'}
-              </TableCell>
-              <TableCell>
-                <Badge className={doc.isUploaded ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
-                  {doc.isUploaded ? 'Uploaded' : 'Pending'}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <Button variant="outline" onClick={() => handleViewUpload(doc)} className="mr-2 hover:bg-blue-50 text-blue-600 border-blue-200">
-                  {doc.isUploaded ? <EyeIcon className="w-4 h-4 mr-2" /> : <UploadIcon className="w-4 h-4 mr-2" />}
-                  {doc.isUploaded ? "View" : "Upload"}
-                </Button>
-                {doc.isUploaded && (
-                  <Button variant="outline" onClick={() => handleEdit(doc)} className="hover:bg-green-50 text-green-600 border-green-200">
-                    <Edit2Icon className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </Card>
-        
+        <Card className="h-full overflow-auto shadow-lg rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[50px] bg-gray-100 text-gray-700 font-semibold">No.</TableHead>
+                <TableHead onClick={() => handleSort('name')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
+                  Document Name {sortColumn === 'name' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead onClick={() => handleSort('department')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
+                  Department {sortColumn === 'department' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead onClick={() => handleSort('issue_date')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
+                  Issue Date {sortColumn === 'issue_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead onClick={() => handleSort('expiry_date')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
+                  Expiry Date {sortColumn === 'expiry_date' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead onClick={() => handleSort('reminder_days')} className="cursor-pointer bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
+                  Days To Expiry {sortColumn === 'reminder_days' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead className="bg-gray-100 text-gray-700 font-semibold">Status</TableHead>
+                <TableHead className="bg-gray-100 text-gray-700 font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filterDocuments(sortDocuments(documents)).map((doc, index) => (
+                <TableRow key={doc.id} className={index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}>
+                  <TableCell className="font-medium text-gray-900">{index + 1}</TableCell>
+                  <TableCell className="text-gray-800">{doc.name}</TableCell>
+                  <TableCell className="text-gray-800">{doc.department}</TableCell>
+                  <TableCell className="text-gray-800">{doc.isUploaded ? formatDate(doc.issue_date) : 'Pending'}</TableCell>
+                  <TableCell className="text-gray-800">{doc.isUploaded ? (doc.expiry_date ? formatDate(doc.expiry_date) : 'One-off') : 'Pending'}</TableCell>
+                  <TableCell className={`font-medium ${getDaysToExpiryColor(doc.reminder_days)}`}>
+                    {doc.reminder_days || 'N/A'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={doc.isUploaded ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                      {doc.isUploaded ? 'Uploaded' : 'Pending'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="outline" onClick={() => handleViewUpload(doc)} className="mr-2 hover:bg-blue-50 text-blue-600 border-blue-200">
+                      {doc.isUploaded ? <EyeIcon className="w-4 h-4 mr-2" /> : <UploadIcon className="w-4 h-4 mr-2" />}
+                      {doc.isUploaded ? "View" : "Upload"}
+                    </Button>
+                    {doc.isUploaded && (
+                      <Button variant="outline" onClick={() => handleEdit(doc)} className="hover:bg-green-50 text-green-600 border-green-200">
+                        <Edit2Icon className="w-4 h-4 mr-2" />
+                        Edit
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+
         {isUploadingDocument && (
           <Dialog open={isUploadingDocument} onOpenChange={(open) => {
             setIsUploadingDocument(open)
@@ -367,18 +367,18 @@ export function KYCDocumentsList({ category, subcategory }) {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="issue_date">Issue Date</Label>
-                  <Input 
-                    id="issue_date" 
-                    type="date" 
-                    value={editingDocument?.issue_date || ''} 
-                    onChange={handleInputChange} 
-                    required 
+                  <Input
+                    id="issue_date"
+                    type="date"
+                    value={editingDocument?.issue_date || ''}
+                    onChange={handleInputChange}
+                    required
                   />
                 </div>
                 <div className="flex items-center">
-                  <input 
-                    id="noExpiryDate" 
-                    type="checkbox" 
+                  <input
+                    id="noExpiryDate"
+                    type="checkbox"
                     checked={noExpiryDate}
                     onChange={handleInputChange}
                     className="mr-2"
@@ -388,12 +388,12 @@ export function KYCDocumentsList({ category, subcategory }) {
                 {!noExpiryDate && (
                   <div>
                     <Label htmlFor="expiry_date">Expiry Date</Label>
-                    <Input 
-                      id="expiry_date" 
-                      type="date" 
-                      value={editingDocument?.expiry_date || ''} 
-                      onChange={handleInputChange} 
-                      required 
+                    <Input
+                      id="expiry_date"
+                      type="date"
+                      value={editingDocument?.expiry_date || ''}
+                      onChange={handleInputChange}
+                      required
                     />
                   </div>
                 )}
@@ -427,18 +427,18 @@ export function KYCDocumentsList({ category, subcategory }) {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="issue_date">Issue Date</Label>
-                  <Input 
-                    id="issue_date" 
-                    type="date" 
-                    value={editingDocument.issue_date} 
-                    onChange={handleInputChange} 
-                    required 
+                  <Input
+                    id="issue_date"
+                    type="date"
+                    value={editingDocument.issue_date}
+                    onChange={handleInputChange}
+                    required
                   />
                 </div>
                 <div className="flex items-center">
-                  <input 
-                    id="noExpiryDate" 
-                    type="checkbox" 
+                  <input
+                    id="noExpiryDate"
+                    type="checkbox"
                     checked={noExpiryDate}
                     onChange={handleInputChange}
                     className="mr-2"
@@ -448,12 +448,12 @@ export function KYCDocumentsList({ category, subcategory }) {
                 {!noExpiryDate && (
                   <div>
                     <Label htmlFor="expiry_date">Expiry Date</Label>
-                    <Input 
-                      id="expiry_date" 
-                      type="date" 
-                      value={editingDocument.expiry_date || ''} 
-                      onChange={handleInputChange} 
-                      required 
+                    <Input
+                      id="expiry_date"
+                      type="date"
+                      value={editingDocument.expiry_date || ''}
+                      onChange={handleInputChange}
+                      required
                     />
                   </div>
                 )}
@@ -468,7 +468,7 @@ export function KYCDocumentsList({ category, subcategory }) {
             </DialogContent>
           </Dialog>
         )}
-        
+
         {viewerUrl && <FileViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />}
       </main>
     </div>
