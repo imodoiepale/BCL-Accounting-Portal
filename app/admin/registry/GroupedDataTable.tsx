@@ -1,7 +1,6 @@
 // @ts-nocheck
 // @ts-ignore
 "use client";
-
 import React, { useState } from 'react';
 import { flexRender, getCoreRowModel, getSortedRowModel, getFilteredRowModel, useReactTable } from "@tanstack/react-table";
 import { Input } from "@/components/ui/input";
@@ -15,7 +14,7 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
   const [columnFilters, setColumnFilters] = useState([]);
   const [columnVisibility, setColumnVisibility] = useState({});
 
-  // Group data by company name and calculate rowspans
+  // Keep existing data processing logic
   const processedData = React.useMemo(() => {
     const grouped = data.reduce((acc, item) => {
       const companyName = item.company_name;
@@ -26,7 +25,6 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
       return acc;
     }, {});
 
-    // Convert to flat array with rowspan information
     let result = [];
     let companyIndex = 1;
     Object.entries(grouped).forEach(([companyName, items]) => {
@@ -45,13 +43,17 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
   }, [data]);
 
   const countMissingFields = (row) => {
-    const fields = Object.keys(row);
-    const nonEmptyFields = fields.filter(field => row[field] !== null && row[field] !== '');
-    const missingCount = fields.length - nonEmptyFields.length;
+    const fields = Object.keys(row).filter(key => 
+      key !== 'companyIndex' && 
+      key !== 'company_name' && 
+      key !== 'isFirstInGroup' && 
+      key !== 'rowspan'
+    );
+    const missingCount = fields.filter(field => row[field] === null || row[field] === '').length;
 
     return (
       <div className='text-red-500 font-semibold'>
-        {missingCount > 0 ? `${missingCount} Missing` : 'Complete'}
+        {missingCount > 0 ? `${missingCount} Missing` : ''}
       </div>
     );
   };
@@ -109,6 +111,32 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
     onColumnFiltersChange: setColumnFilters,
   });
 
+  // Calculate total missing fields and per-column missing counts
+  const calculateMissingCounts = () => {
+    const totalMissing = data.reduce((total, row) => {
+      const fields = Object.keys(row).filter(key => 
+        key !== 'companyIndex' && 
+        key !== 'company_name' && 
+        key !== 'isFirstInGroup' && 
+        key !== 'rowspan'
+      );
+      return total + fields.filter(field => row[field] === null || row[field] === '').length;
+    }, 0);
+
+    const columnMissing = {};
+    columns.forEach(column => {
+      if (column.accessorKey !== 'company_name') {
+        columnMissing[column.accessorKey] = data.filter(row => 
+          row[column.accessorKey] === null || row[column.accessorKey] === ''
+        ).length;
+      }
+    });
+
+    return { totalMissing, columnMissing };
+  };
+
+  const { totalMissing, columnMissing } = calculateMissingCounts();
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -142,30 +170,29 @@ const GroupedRowTable = ({ columns, data, onExport, title }) => {
                 </TableHead>
               ))}
             </TableRow>
-            {/* Add Missing Fields Summary Row */}
-            <TableRow className="bg-gray-100">
-  <TableCell className="font-semibold text-center">#</TableCell>
-  <TableCell className="font-semibold text-center">Company</TableCell>
-  <TableCell className="font-semibold text-center">
-    <Badge variant="destructive">
-      {data.reduce((total, row) => {
-        const fields = Object.keys(row);
-        const nonEmptyFields = fields.filter(field => row[field] !== null && row[field] !== '');
-        return total + (fields.length - nonEmptyFields.length);
-      }, 0)} Total Missing
-    </Badge>
-  </TableCell>
-  {columns.slice(4).map((column) => {
-    const missingCount = data.filter(row => !row[column.accessorKey]).length;
-    return (
-      <TableCell key={column.accessorKey} className="text-center">
-        <Badge variant={missingCount > 0 ? "destructive" : "success"}>
-          {missingCount > 0 ? `${missingCount}` : '✓'}
-        </Badge>
-      </TableCell>
-    );
-  })}
-</TableRow>
+            {/* Enhanced Missing Fields Summary Row */}
+            <TableRow className="bg-gray-100 border-b">
+              <TableCell className="text-center font-medium">-</TableCell>
+              <TableCell className="text-center font-medium">All Companies</TableCell>
+              <TableCell className="text-center">
+                <Badge variant="destructive" className="font-semibold">
+                  {totalMissing} Total Missing
+                </Badge>
+              </TableCell>
+              {columns.filter(col => col.accessorKey !== 'company_name').map((column) => (
+                <TableCell key={column.accessorKey} className="text-center">
+                  {columnMissing[column.accessorKey] > 0 ? (
+                    <Badge variant="destructive" className="font-semibold">
+                      {columnMissing[column.accessorKey]} Missing
+                    </Badge>
+                  ) : (
+                    <Badge variant="success" className="font-semibold">
+                      ✓
+                    </Badge>
+                  )}
+                </TableCell>
+              ))}
+            </TableRow>
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
