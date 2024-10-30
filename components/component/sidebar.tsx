@@ -11,6 +11,7 @@ import {
   LayoutDashboardIcon,
   SettingsIcon,
   User2Icon,
+  UserPlusIcon,
   VoicemailIcon
 } from "lucide-react"
 import Link from "next/link"
@@ -27,7 +28,7 @@ const adminNavItems = [
   { href: "/admin/documents/monthly", icon: FileIcon, label: "Monthly Documents" },
   { href: "/admin/reports", icon: FileIcon, label: "Report Management" },
   { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings" },
-]
+  { href: "/admin/onboarding", icon: UserPlusIcon, label: "Onboarding" },]
 
 const userNavItems = [
   { href: "/", icon: LayoutDashboardIcon, label: "Dashboard" },
