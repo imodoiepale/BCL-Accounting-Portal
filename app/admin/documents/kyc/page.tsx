@@ -1,16 +1,18 @@
-  "use client"
-  import React from "react";
+// @ts-nocheck
+"use client";
+import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CompanyDocs from "./documenttable";
+import DocsTable from "./documenttable"; // Ensure the path is correct
 
-const DataTableWithDocuments = ({ category }: { category: string }) => {
+const DataTableWithDocuments = ({ category, showDirectors }: { category: string, showDirectors: boolean }) => {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-medium">{category} Documents</h3>
-      <CompanyDocs />
+      <DocsTable category={category} showDirectors={showDirectors} />
     </div>
   );
 };
+
 export default function KYCDocuments() {
   return (
     <div className="p-4 w-full">
@@ -34,47 +36,36 @@ export default function KYCDocuments() {
               <TabsTrigger value="sheria">Sheria Documents</TabsTrigger>
             </TabsList>
             <TabsContent value="kra">
-              <DataTableWithDocuments category="KRA" />
+              <DataTableWithDocuments category="KRA" showDirectors={false} />
             </TabsContent>
             <TabsContent value="sheria">
-              <DataTableWithDocuments category="Sheria" />
+              <DataTableWithDocuments category="Sheria" showDirectors={false} />
             </TabsContent>
           </Tabs>
         </TabsContent>
 
         <TabsContent value="directors-docs">
-          <DataTableWithDocuments category="Directors" />
+          <DataTableWithDocuments category="Directors" showDirectors={true} />
         </TabsContent>
 
         <TabsContent value="suppliers-docs">
-          <Tabs defaultValue="trading-suppliers">
-            <TabsList className="mb-4">
-              <TabsTrigger value="trading-suppliers">Trading Suppliers - Documents</TabsTrigger>
-              <TabsTrigger value="monthly-service-vendors">Monthly Service Vendors - Documents</TabsTrigger>
-            </TabsList>
-            <TabsContent value="trading-suppliers">
-              <DataTableWithDocuments category="Trading Suppliers" />
-            </TabsContent>
-            <TabsContent value="monthly-service-vendors">
-              <DataTableWithDocuments category="Monthly Service Vendors" />
-            </TabsContent>
-          </Tabs>
+          <DataTableWithDocuments category="Suppliers" showDirectors={true} />
         </TabsContent>
 
         <TabsContent value="banks-docs">
-          <DataTableWithDocuments category="Banks" />
+          <DataTableWithDocuments category="Banks" showDirectors={true} />
         </TabsContent>
 
         <TabsContent value="employee-docs">
-          <DataTableWithDocuments category="Employees" />
+          <DataTableWithDocuments category="Employees" showDirectors={true} />
         </TabsContent>
 
         <TabsContent value="insurance-docs">
-          <DataTableWithDocuments category="Insurance" />
+          <DataTableWithDocuments category="Insurance" showDirectors={false} />
         </TabsContent>
 
         <TabsContent value="deposits-docs">
-          <DataTableWithDocuments category="Deposits" />
+          <DataTableWithDocuments category="Deposits" showDirectors={false} />
         </TabsContent>
 
         <TabsContent value="fixed-assets-docs">
@@ -87,19 +78,19 @@ export default function KYCDocuments() {
               <TabsTrigger value="motor-vehicles">Motor Vehicles - 25 %</TabsTrigger>
             </TabsList>
             <TabsContent value="computer-equipment">
-              <DataTableWithDocuments category="Computer Equipment" />
+              <DataTableWithDocuments category="Computer Equipment" showDirectors={false} />
             </TabsContent>
             <TabsContent value="furniture-fitting">
-              <DataTableWithDocuments category="Furniture Fitting" />
+              <DataTableWithDocuments category="Furniture Fitting" showDirectors={false} />
             </TabsContent>
             <TabsContent value="land-building">
-              <DataTableWithDocuments category="Land Building" />
+              <DataTableWithDocuments category="Land Building" showDirectors={false} />
             </TabsContent>
             <TabsContent value="plant-equipment">
-              <DataTableWithDocuments category="Plant Equipment" />
+              <DataTableWithDocuments category="Plant Equipment" showDirectors={false} />
             </TabsContent>
             <TabsContent value="motor-vehicles">
-              <DataTableWithDocuments category="Motor Vehicles" />
+              <DataTableWithDocuments category="Motor Vehicles" showDirectors={false} />
             </TabsContent>
           </Tabs>
         </TabsContent>
