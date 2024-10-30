@@ -1,33 +1,33 @@
 // @ts-nocheck
-"use client"
-import React, { Fragment, useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { X, ArrowUpDown, Search, Settings, Upload } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "@/components/ui/use-toast"
+"use client";
+import React, { Fragment, useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { X, ArrowUpDown, Search, Settings, Upload } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "@/components/ui/use-toast";
 import * as XLSX from 'xlsx'; // Importing XLSX for Excel export
 
-export default function DocsTable() {
+const DocsTable = ({ category, showDirectors }: { category: string, showDirectors: boolean }) => {
   // State management
   const [visibleDocs, setVisibleDocs] = useState([1, 2, 3, 4]); // Initially all visible
-  const [searchTerm, setSearchTerm] = useState("")
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
-  const [selectedCell, setSelectedCell] = useState({ companyId: null, directorId: null, docId: null })
-  const [documentData, setDocumentData] = useState({})
-  const [showExpired, setShowExpired] = useState(true)
-  const [showInactive, setShowInactive] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [selectedCell, setSelectedCell] = useState({ companyId: null, directorId: null, docId: null });
+  const [documentData, setDocumentData] = useState({});
+  const [showExpired, setShowExpired] = useState(true);
+  const [showInactive, setShowInactive] = useState(true);
 
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
     file: null,
     issueDate: "",
     expiryDate: "",
-  })
+  });
 
   // Static data
   const documents = [
@@ -35,44 +35,44 @@ export default function DocsTable() {
     { id: 2, name: "doc 2" },
     { id: 3, name: "doc 3" },
     { id: 4, name: "doc 4" },
-  ]
+  ];
 
   // Generate directors
   const generateDirectors = () => {
     return Array(4).fill(null).map((_, idx) => ({
       id: idx + 1,
       name: `Director ${idx + 1}`
-    }))
-  }
+    }));
+  };
 
   // Generate companies with directors
   const companies = Array(4).fill(null).map((_, idx) => ({
     id: idx + 1,
     name: `Company ${String.fromCharCode(65 + idx)}`,
     directors: generateDirectors()
-  }))
+  }));
 
   // Load saved data on mount
   useEffect(() => {
-    const savedData = localStorage.getItem("documentData")
+    const savedData = localStorage.getItem("documentData");
     if (savedData) {
-      setDocumentData(JSON.parse(savedData))
+      setDocumentData(JSON.parse(savedData));
     }
-  }, [])
+  }, []);
 
   // Save data when it changes
   useEffect(() => {
-    localStorage.setItem("documentData", JSON.stringify(documentData))
-  }, [documentData])
+    localStorage.setItem("documentData", JSON.stringify(documentData));
+  }, [documentData]);
 
   // Utility functions
   const calculateDaysToExpire = (expiryDate) => {
-    if (!expiryDate) return null
-    const today = new Date()
-    const expiry = new Date(expiryDate)
-    const diffTime = expiry.getTime() - today.getTime()
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  }
+    if (!expiryDate) return null;
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const diffTime = expiry.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
 
   const handleUpload = () => {
     if (!uploadForm.file || !uploadForm.issueDate || !uploadForm.expiryDate) {
@@ -80,13 +80,13 @@ export default function DocsTable() {
         title: "Error",
         description: "Please fill in all fields",
         variant: "destructive"
-      })
-      return
+      });
+      return;
     }
 
-    const { companyId, directorId, docId } = selectedCell
-    const key = `${companyId}-${directorId}-${docId}`
-    const daysToExpire = calculateDaysToExpire(uploadForm.expiryDate)
+    const { companyId, directorId, docId } = selectedCell;
+    const key = `${companyId}-${directorId}-${docId}`;
+    const daysToExpire = calculateDaysToExpire(uploadForm.expiryDate);
 
     setDocumentData(prev => ({
       ...prev,
@@ -96,81 +96,81 @@ export default function DocsTable() {
         daysToExpire,
         status: daysToExpire > 0 ? 'active' : 'inactive'
       }
-    }))
+    }));
 
-    setUploadDialogOpen(false)
-    setUploadForm({ file: null, issueDate: "", expiryDate: "" })
+    setUploadDialogOpen(false);
+    setUploadForm({ file: null, issueDate: "", expiryDate: "" });
 
     toast({
       title: "Success",
       description: "Document uploaded successfully"
-    })
-  }
+    });
+  };
 
   const getTotalCounts = () => {
-    const totalDirectors = companies.reduce((sum, company) => sum + company.directors.length, 0)
-    let complete = 0
-    let pending = totalDirectors
+    const totalDirectors = companies.reduce((sum, company) => sum + company.directors.length, 0);
+    let complete = 0;
+    let pending = totalDirectors;
 
     companies.forEach(company => {
       company.directors.forEach(director => {
         const isComplete = documents.every(doc => {
-          const key = `${company.id}-${director.id}-${doc.id}`
-          const data = documentData[key]
-          return data && data.daysToExpire > 0
-        })
+          const key = `${company.id}-${director.id}-${doc.id}`;
+          const data = documentData[key];
+          return data && data.daysToExpire > 0;
+        });
         if (isComplete) {
-          complete++
-          pending--
+          complete++;
+          pending--;
         }
-      })
-    })
+      });
+    });
 
-    return { total: totalDirectors, complete, pending }
-  }
+    return { total: totalDirectors, complete, pending };
+  };
 
   const getDocumentCounts = (docId) => {
-    let uploadCount = 0
-    let activeCount = 0
-    let pendingCount = 0
-    const totalCount = companies.reduce((sum, company) => sum + company.directors.length, 0)
+    let uploadCount = 0;
+    let activeCount = 0;
+    let pendingCount = 0;
+    const totalCount = companies.reduce((sum, company) => sum + company.directors.length, 0);
 
     companies.forEach(company => {
       company.directors.forEach(director => {
-        const key = `${company.id}-${director.id}-${docId}`
-        const data = documentData[key]
+        const key = `${company.id}-${director.id}-${docId}`;
+        const data = documentData[key];
         if (data) {
-          uploadCount++
+          uploadCount++;
           if (data.daysToExpire > 0) {
-            activeCount++
+            activeCount++;
           } else {
-            pendingCount++
+            pendingCount++;
           }
         }
-      })
-    })
+      });
+    });
 
-    pendingCount = totalCount - activeCount
-    return { uploadCount, activeCount, pendingCount }
-  }
+    pendingCount = totalCount - activeCount;
+    return { uploadCount, activeCount, pendingCount };
+  };
 
   const filteredCompanies = companies.filter(company =>
     company.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  );
 
   // Function to export data to Excel
   const exportToExcel = () => {
     const exportData = [];
 
     // Prepare header
-    const header = ["Company", "Director", "Metrics", "Upload", "Issue Date", "Expiry Date", "Days Left", "Status"];
+    const header = ["Company", showDirectors ? "Director" : "Contact Person", "Metrics", "Upload", "Issue Date", "Expiry Date", "Days Left", "Status"];
     exportData.push(header);
 
     filteredCompanies.forEach(company => {
       company.directors.forEach(director => {
         const row = [];
         row.push(company.name);
-        row.push(director.name);
+        row.push(showDirectors ? director.name : "N/A"); // Show director name if applicable
         row.push(""); // Metrics placeholder
 
         documents.forEach(doc => {
@@ -209,7 +209,7 @@ export default function DocsTable() {
     <div className="h-screen flex flex-col p-4">
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Document Management</h1>
+        <h1 className="text-2xl font-bold">Document Management - {category}</h1>
         <div className="flex gap-2">
           <Input
             placeholder="Search companies..."
@@ -239,9 +239,12 @@ export default function DocsTable() {
                 <TableHead className="w-[150px] border-r border-gray-200 py-2" rowSpan={5}>
                   Company
                 </TableHead>
-                <TableHead className="w-[200px] border-r border-gray-200 py-2" rowSpan={5}>
-                  Director
-                </TableHead>
+                {/* Conditionally render the Director column */}
+                {showDirectors && (
+                  <TableHead className="w-[200px] border-r border-gray-200 py-2" rowSpan={5}>
+                    Director
+                  </TableHead>
+                )}
                 {visibleDocs.includes(0) && (
                   <TableHead className="w-[100px] border-r border-gray-200 py-2" rowSpan={2}>
                     Metrics
@@ -365,17 +368,20 @@ export default function DocsTable() {
                           </TableCell>
                         </>
                       )}
-                      <TableCell className="border-r border-gray-200 py-2">
-                        {director.name}
-                      </TableCell>
+                      {/* Conditionally render the Director cell */}
+                      {showDirectors && (
+                        <TableCell className="border-r border-gray-200 py-2">
+                          {director.name}
+                        </TableCell>
+                      )}
                       {visibleDocs.includes(0) && (
                         <TableCell className="border-r border-gray-300 py-2 text-center">
                           {/* Empty cell for metrics column */}
                         </TableCell>
                       )}
                       {documents.map((doc, docIndex) => {
-                        const key = `${company.id}-${director.id}-${doc.id}`
-                        const data = documentData[key]
+                        const key = `${company.id}-${director.id}-${doc.id}`;
+                        const data = documentData[key];
 
                         return (
                           <Fragment key={`cell-${key}`}>
@@ -388,8 +394,8 @@ export default function DocsTable() {
                                       size="sm"
                                       className="h-6 w-6"
                                       onClick={() => {
-                                        setSelectedCell({ companyId: company.id, directorId: director.id, docId: doc.id })
-                                        setUploadDialogOpen(true)
+                                        setSelectedCell({ companyId: company.id, directorId: director.id, docId: doc.id });
+                                        setUploadDialogOpen(true);
                                       }}
                                     >
                                       <Upload className="h-4 w-4" />
@@ -423,7 +429,7 @@ export default function DocsTable() {
                               </>
                             )}
                           </Fragment>
-                        )
+                        );
                       })}
                     </TableRow>
                   ))}
@@ -485,8 +491,8 @@ export default function DocsTable() {
             <Button
               variant="outline"
               onClick={() => {
-                setUploadDialogOpen(false)
-                setUploadForm({ file: null, issueDate: "", expiryDate: "" })
+                setUploadDialogOpen(false);
+                setUploadForm({ file: null, issueDate: "", expiryDate: "" });
               }}
             >
               Cancel
@@ -519,7 +525,7 @@ export default function DocsTable() {
                         checked 
                           ? [...prev, index]
                           : prev.filter(id => id !== index)
-                      )
+                      );
                     }}
                     id={`doc-${doc.id}`}
                   />
@@ -565,5 +571,7 @@ export default function DocsTable() {
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
+  );
+};
+
+export default DocsTable;
