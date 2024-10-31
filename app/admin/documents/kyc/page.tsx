@@ -29,15 +29,16 @@ export default function KYCDocuments() {
 
         const loadDirectorsDocuments = async () => {
             const { data, error } = await supabase
-                .from('acc_portal_directors_documents')
-                .select('*');
+                .from('acc_portal_kyc')
+                .select('*')
+                .eq('department', 'Directors'); // Filter by department "Directors"
 
             if (error) {
                 console.error('Error fetching directors documents:', error);
                 return;
             }
 
-            setDirectorsDocs(data);
+            setDirectorsDocs(data); // Set the filtered documents for directors
         };
 
         loadDocuments();
