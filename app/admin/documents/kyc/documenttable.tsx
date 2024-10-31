@@ -9,11 +9,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/use-toast";
-import * as XLSX from 'xlsx'; // Importing XLSX for Excel export
+import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabaseClient';
 
-const DocsTable = ({ category, showDirectors }: { category: string, showDirectors: boolean }) => {
+interface Company {
+  id: number;
+  name: string;
+  directors: Director[];
+}
+
+interface Director {
+  id: number;
+  name: string;
+  userid?: string;
+}
+
+interface Document {
+  id: string; // Assuming UUID is stored as a string
+  name: string;
+  issue_date: string;
+  expiry_date: string;
+  validity_days: string;
+  reminder_days: string;
+  listed: boolean;
+  category: string;
+  subcategory: string;
+  userid: string;
+  document_type: string;
+}
+
+const DocsTable = ({ category, showDirectors, documents }: { category: string, showDirectors: boolean, documents: Document[] }) => {
   // State management
-  const [visibleDocs, setVisibleDocs] = useState([1, 2, 3, 4]); // Initially all visible
+  const [visibleDocs, setVisibleDocs] = useState([1, 2, 3, 4]);
   const [searchTerm, setSearchTerm] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -21,6 +48,8 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
   const [documentData, setDocumentData] = useState({});
   const [showExpired, setShowExpired] = useState(true);
   const [showInactive, setShowInactive] = useState(true);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
@@ -29,30 +58,54 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
     expiryDate: "",
   });
 
-  // Static data
-  const documents = [
-    { id: 1, name: "doc 1" },
-    { id: 2, name: "doc 2" },
-    { id: 3, name: "doc 3" },
-    { id: 4, name: "doc 4" },
-  ];
+  // Fetch companies and directors
+  useEffect(() => {
+    fetchCompaniesAndDirectors();
+  }, []);
 
-  // Generate directors
-  const generateDirectors = () => {
-    return Array(4).fill(null).map((_, idx) => ({
-      id: idx + 1,
-      name: `Director ${idx + 1}`
-    }));
+  const fetchCompaniesAndDirectors = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('acc_portal_company')
+        .select(`
+          id,
+          company_name,
+          acc_portal_directors (
+            id,
+            full_name,
+            userid
+          )
+        `);
+
+      if (error) throw error;
+
+      if (data) {
+        const transformedData = data.map(company => ({
+          id: company.id,
+          name: company.company_name,
+          directors: company.acc_portal_directors.map(director => ({
+            id: director.id,
+            name: director.full_name,
+            userid: director.userid
+          })) || []
+        }));
+
+        setCompanies(transformedData);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load companies and directors",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Generate companies with directors
-  const companies = Array(4).fill(null).map((_, idx) => ({
-    id: idx + 1,
-    name: `Company ${String.fromCharCode(65 + idx)}`,
-    directors: generateDirectors()
-  }));
-
-  // Load saved data on mount
+  // Load and save document data
   useEffect(() => {
     const savedData = localStorage.getItem("documentData");
     if (savedData) {
@@ -60,12 +113,10 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
     }
   }, []);
 
-  // Save data when it changes
   useEffect(() => {
     localStorage.setItem("documentData", JSON.stringify(documentData));
   }, [documentData]);
 
-  // Utility functions
   const calculateDaysToExpire = (expiryDate) => {
     if (!expiryDate) return null;
     const today = new Date();
@@ -74,7 +125,7 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!uploadForm.file || !uploadForm.issueDate || !uploadForm.expiryDate) {
       toast({
         title: "Error",
@@ -84,27 +135,51 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
       return;
     }
 
-    const { companyId, directorId, docId } = selectedCell;
-    const key = `${companyId}-${directorId}-${docId}`;
-    const daysToExpire = calculateDaysToExpire(uploadForm.expiryDate);
+    try {
+      const { companyId, directorId, docId } = selectedCell;
 
-    setDocumentData(prev => ({
-      ...prev,
-      [key]: {
-        ...uploadForm,
-        fileName: uploadForm.file.name,
-        daysToExpire,
-        status: daysToExpire > 0 ? 'active' : 'inactive'
-      }
-    }));
+      // Save to database
+      const { error } = await supabase
+        .from('acc_portal_kyc_uploads')
+        .insert({
+          userid: directorId.toString(),
+          kyc_document_id: docId,
+          filepath: uploadForm.file.name,
+          issue_date: uploadForm.issueDate,
+          expiry_date: uploadForm.expiryDate,
+          validity_days: calculateDaysToExpire(uploadForm.expiryDate)
+        });
 
-    setUploadDialogOpen(false);
-    setUploadForm({ file: null, issueDate: "", expiryDate: "" });
+      if (error) throw error;
 
-    toast({
-      title: "Success",
-      description: "Document uploaded successfully"
-    });
+      const key = `${companyId}-${directorId}-${docId}`;
+      const daysToExpire = calculateDaysToExpire(uploadForm.expiryDate);
+
+      setDocumentData(prev => ({
+        ...prev,
+        [key]: {
+          ...uploadForm,
+          fileName: uploadForm.file.name,
+          daysToExpire,
+          status: daysToExpire > 0 ? 'active' : 'inactive'
+        }
+      }));
+
+      setUploadDialogOpen(false);
+      setUploadForm({ file: null, issueDate: "", expiryDate: "" });
+
+      toast({
+        title: "Success",
+        description: "Document uploaded successfully"
+      });
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload document",
+        variant: "destructive"
+      });
+    }
   };
 
   const getTotalCounts = () => {
@@ -158,11 +233,8 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
     company.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Function to export data to Excel
   const exportToExcel = () => {
     const exportData = [];
-
-    // Prepare header
     const header = ["Company", showDirectors ? "Director" : "Contact Person", "Metrics", "Upload", "Issue Date", "Expiry Date", "Days Left", "Status"];
     exportData.push(header);
 
@@ -170,8 +242,8 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
       company.directors.forEach(director => {
         const row = [];
         row.push(company.name);
-        row.push(showDirectors ? director.name : "N/A"); // Show director name if applicable
-        row.push(""); // Metrics placeholder
+        row.push(showDirectors ? director.name : "N/A");
+        row.push("");
 
         documents.forEach(doc => {
           const key = `${company.id}-${director.id}-${doc.id}`;
@@ -184,11 +256,11 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
             row.push(data.daysToExpire || "");
             row.push(data.status || "");
           } else {
-            row.push(""); // Upload
-            row.push(""); // Issue Date
-            row.push(""); // Expiry Date
-            row.push(""); // Days Left
-            row.push(""); // Status
+            row.push("");
+            row.push("");
+            row.push("");
+            row.push("");
+            row.push("");
           }
         });
 
@@ -196,14 +268,19 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
       });
     });
 
-    // Create a worksheet and workbook
     const ws = XLSX.utils.aoa_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Documents");
-
-    // Export the workbook
     XLSX.writeFile(wb, "Documents.xlsx");
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col p-4">
@@ -350,6 +427,7 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
                 })}
               </TableRow>
             </TableHeader>
+
             <TableBody>
               {filteredCompanies.map(company => (
                 <Fragment key={company.id}>
@@ -442,7 +520,7 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
 
       {/* Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[600px]"> {/* Adjusted for landscape layout */}
           <DialogHeader>
             <DialogTitle>Upload Document</DialogTitle>
           </DialogHeader>
@@ -523,8 +601,8 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
                     onCheckedChange={(checked) => {
                       setVisibleDocs(prev => 
                         checked 
-                          ? [...prev, index]
-                          : prev.filter(id => id !== index)
+                        ? [...prev, index]
+                        : prev.filter(id => id !== index)
                       );
                     }}
                     id={`doc-${doc.id}`}
@@ -561,10 +639,31 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
             </div>
           </div>
           <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => setSettingsOpen(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => {
+              // Reset settings to default
+              setVisibleDocs([1, 2, 3, 4]);
+              setShowExpired(true);
+              setShowInactive(true);
+              setSettingsOpen(false);
+            }}>
+              Reset
             </Button>
-            <Button onClick={() => setSettingsOpen(false)}>
+            <Button onClick={() => {
+              // Save settings to JSON file
+              const settings = {
+                visibleDocs,
+                showExpired,
+                showInactive,
+              };
+              const blob = new Blob([JSON.stringify(settings)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'settings.json';
+              a.click();
+              URL.revokeObjectURL(url);
+              setSettingsOpen(false);
+            }}>
               Save Changes
             </Button>
           </DialogFooter>
