@@ -50,6 +50,7 @@ interface PettyCashEntry {
   document_references?: string[];
 }
 
+
 interface SupplierData {
   id: string;
   pin: string | null;
@@ -128,7 +129,8 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
   const [nextPettyCashNumber, setNextPettyCashNumber] = useState<string>('');
 
   const [userAccounts, setUserAccounts] = useState<any[]>([]);
-
+  const [isReceiptUploaded, setIsReceiptUploaded] = useState(false);
+  const [accountTypeOptions, setAccountTypeOptions] = useState([]);
 
   // Fetch initial data
   useEffect(() => {
@@ -138,12 +140,12 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         const [usersData, suppliersData, accountsData, nextNumber] = await Promise.all([
           PettyCashService.fetchUserRecords(userId),
           PettyCashService.fetchRecords('acc_portal_pettycash_suppliers', userId),
-          PettyCashService.fetchAccountRecords(userId),
+          PettyCashService.fetchAccountRecords(userId), // Fetch accounts
           PettyCashService.getNextEntryNumber(userId)
         ]);
-
+  
         setUsers(usersData);
-
+  
         // Format suppliers properly
         if (Array.isArray(suppliersData)) {
           setSuppliers(suppliersData);
@@ -157,10 +159,15 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
             }));
           setSupplierOptions(formattedSuppliers);
         }
-
-        setAccounts(accountsData);
+  
+        // Extract accounts from the fetched data
+        if (accountsData && Array.isArray(accountsData)) {
+          const formattedAccounts = accountsData.flatMap(account => account.data.accounts || []);
+          setAccounts(formattedAccounts);
+        }
+  
         setNextPettyCashNumber(`PC${nextNumber.toString().padStart(6, '0')}`);
-
+  
       } catch (error) {
         console.error('Error fetching initial data:', error);
         toast.error('Failed to load form data');
@@ -168,7 +175,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         setIsLoading(false);
       }
     };
-
+  
     fetchInitialData();
   }, [userId]);
 
@@ -185,27 +192,59 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
 
       const matchingSupplier = suppliers.find(s => s.data.supplierName === initialData.supplier_name);
       if (matchingSupplier) {
-        setSelectedSupplier(matchingSupplier);
         setIsNewSupplier(false);
+        setFormData(prev => ({
+          ...prev,
+          supplier_name: matchingSupplier.data.supplierName,
+          supplier_pin: matchingSupplier.data.pin || matchingSupplier.data.idNumber || ''
+        }));
       }
     }
   }, [initialData, suppliers]);
 
+
   useEffect(() => {
     if (formData.user_name) {
-      const selectedUser = users.find(u => u.id === formData.user_name);
-      const userAccountsList = accounts.filter(acc => acc.user_id === formData.user_name);
-
+      const selectedUser = users.find(u => u.name === formData.user_name); // Match by name
+      const userAccountsList = accounts.filter(acc => acc.accountUser === selectedUser?.name); // Filter by accountUser
+  
       if (userAccountsList.length > 0) {
+        setUserAccounts(userAccountsList);
+  
+        // Extract unique account types from the user's accounts
+        const uniqueAccountTypes = Array.from(new Set(userAccountsList.map(acc => acc.pettyCashType)));
+  
+        // Set the account type options based on the unique account types
+        setAccountTypeOptions(uniqueAccountTypes.map(type => ({
+          value: type,
+          label: type
+        })));
+  
+        // If there's only one account, automatically set it
+        if (userAccountsList.length === 1) {
+          setFormData(prev => ({
+            ...prev,
+            account_type: userAccountsList[0].pettyCashType, // Automatically set account type
+            petty_cash_account: userAccountsList[0].accountNumber // Automatically set account number
+          }));
+        } else {
+          // Clear account fields if multiple accounts exist
+          setFormData(prev => ({
+            ...prev,
+            account_type: '', // Clear account type
+            petty_cash_account: '' // Clear account number
+          }));
+        }
+      } else {
+        // Clear account fields if no accounts found
         setFormData(prev => ({
           ...prev,
-          account_type: userAccountsList[0].account_type,
-          petty_cash_account: userAccountsList[0].account_number
+          account_type: '',
+          petty_cash_account: ''
         }));
-        setUserAccounts(userAccountsList);
       }
     }
-  }, [formData.user_name]);
+  }, [formData.user_name, users, accounts]);
 
   useEffect(() => {
     if (selectedSupplier) {
@@ -243,48 +282,35 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     return errors;
   };
 
+
   // Handle input changes
   const handleInputChange = (fieldId: string, value: any) => {
     setFormData(prev => {
       const newData = { ...prev, [fieldId]: value };
-
-      // Handle category changes
-      if (fieldId === 'category_code') {
-        const category = EXPENSE_CATEGORIES[value];
-        newData.category = category?.name || '';
-        newData.subcategory_code = '';
-        newData.subcategory = '';
+  
+      // Handle file previews
+      if (fieldId === 'receipt_url' && value instanceof File) {
+        const url = URL.createObjectURL(value);
+        setReceiptPreview(url);
+        setIsReceiptUploaded(true); // Set receipt uploaded state
       }
-
-      // Handle subcategory changes
-      if (fieldId === 'subcategory_code' && prev.category_code) {
-        const subcategory = EXPENSE_CATEGORIES[prev.category_code]?.subcategories
-          .find(sub => sub.code === value);
-        newData.subcategory = subcategory?.name || '';
+      if (fieldId === 'payment_proof_url' && value instanceof File) {
+        const url = URL.createObjectURL(value);
+        setPaymentProofPreview(url);
       }
-
+  
       return newData;
     });
-
-    // Handle file previews
-    if (fieldId === 'receipt_url' && value instanceof File) {
-      const url = URL.createObjectURL(value);
-      setReceiptPreview(url);
-    }
-    if (fieldId === 'payment_proof_url' && value instanceof File) {
-      const url = URL.createObjectURL(value);
-      setPaymentProofPreview(url);
-    }
   };
 
   // Handle supplier selection
   const handleSupplierSelect = (supplierId: string) => {
-    const selectedSupplier = supplierOptions.find(s => s.value === supplierId);
+    const selectedSupplier = supplierOptions.find(s => s.id.toString() === supplierId);
     if (selectedSupplier) {
       setFormData(prev => ({
         ...prev,
-        supplier_name: selectedSupplier.data.supplierName,
-        supplier_pin: selectedSupplier.data.pin || selectedSupplier.data.idNumber || ''
+        supplier_name: selectedSupplier.data.supplierName, // Set the supplier name
+        supplier_pin: selectedSupplier.data.pin || selectedSupplier.data.idNumber || '' // Autofill supplier ID/PIN
       }));
       setSelectedSupplier(selectedSupplier);
       setOpenSupplier(false);
@@ -378,7 +404,6 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     }
   };
 
-
   // File preview renderer
   const renderFilePreview = (fieldId: string) => {
     const fileUrl = formData[fieldId];
@@ -406,6 +431,100 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
       </div>
     );
   };
+
+  const renderSupplierSection = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4">
+        <div className="space-y-2">
+          <Select
+            value={isNewSupplier ? 'new' : 'existing'}
+            onValueChange={(value) => {
+              setIsNewSupplier(value === 'new');
+              if (value === 'new') {
+                setFormData(prev => ({
+                  ...prev,
+                  supplier_name: '',
+                  supplier_pin: ''
+                }));
+              }
+            }}
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder="Choose supplier type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="existing">Existing Supplier</SelectItem>
+              <SelectItem value="new">New Supplier</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {!isNewSupplier ? (
+          <div className="space-y-2">
+            <Select
+              value={formData.supplier_name || ''}
+              onValueChange={handleSupplierSelect} // Use the updated function
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Select supplier..." />
+              </SelectTrigger>
+              <SelectContent>
+                {supplierOptions.map((supplier) => (
+                  <SelectItem
+                    key={supplier.id}
+                    value={supplier.id.toString()} // Use supplier ID as value
+                    className="cursor-pointer"
+                  >
+                    <div className="flex flex-col py-1">
+                      <span className="font-medium text-sm">
+                        {supplier.data.supplierName}
+                      </span>
+                      <div className="flex flex-col gap-0.5 text-xs text-gray-500">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-blue-50 px-1.5 py-0.5 rounded">
+                            {supplier.data.supplierType}
+                          </span>
+                          {supplier.data.idNumber && (
+                            <span>ID: {supplier.data.idNumber}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span>{supplier.data.tradingType}</span>
+                          <span>•</span>
+                          <span>{supplier.data.email}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Supplier Name<span className="text-red-500">*</span></Label>
+              <Input
+                value={formData.supplier_name}
+                onChange={(e) => handleInputChange('supplier_name', e.target.value)}
+                className="h-8"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>ID Number<span className="text-red-500">*</span></Label>
+              <Input
+                value={formData.supplier_pin}
+                onChange={(e) => handleInputChange('supplier_pin', e.target.value)}
+                className="h-8"
+                required
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   const formSections = {
     basicInfo: {
@@ -448,10 +567,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
           type: "select",
           required: true,
           value: formData.account_type,
-          options: [
-            { value: "Corporate", label: "Corporate" },
-            { value: "Personal", label: "Personal" }
-          ]
+          options: accountTypeOptions, // Use the state that holds the unique account types
         },
         {
           id: "petty_cash_account",
@@ -461,14 +577,26 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
           colSpan: 2,
           value: formData.petty_cash_account,
           disabled: !formData.user_name || !formData.account_type,
-          options: accounts
-            .filter(acc => acc.user_id === formData.user_name &&
-              acc.account_type === formData.account_type)
+          options: userAccounts // Use the state that holds the filtered accounts
+            .filter(acc => acc.pettyCashType === formData.account_type) // Filter by selected account type
             .map(acc => ({
-              value: acc.account_number,
-              label: acc.account_number
+              value: acc.accountNumber, // Use accountNumber from the account data
+              label: acc.accountNumber // Display accountNumber as the label
             }))
         }
+      ]
+    },
+    supplierDetails: {
+      title: "Supplier Details",
+      fields: [
+        {
+          id: "supplier_type",
+          label: "Supplier Type",
+          type: "custom", // Custom type to render the supplier selection
+          required: true,
+          render: renderSupplierSection,
+          colSpan: 2
+        },
       ]
     },
     transactionDetails: {
@@ -595,6 +723,10 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
   };
 
   const renderField = (field: any) => {
+    if (field.type === 'custom' && field.render) {
+      return field.render(); // Render the custom supplier section
+    }
+
     switch (field.type) {
       case 'select':
         return (
@@ -645,31 +777,29 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     }
   };
 
-
   const renderFormSection = (section: any) => (
-    <div key={section.title} className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h3 className="text-sm font-medium">{section.title}</h3>
-        <Separator className="flex-1" />
+    <div key={section.title} className="space-y-2 border-l-4 border border-l-blue-500 border-black p-2 rounded-md">
+      <div className="flex items-center gap-1">
+        <h3 className="text-black font-bold text-sm">{section.title}</h3>
+        {/* <Separator className="flex-1 text-black" /> */}
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-4 gap-2">
         {section.fields.map((field: any) => (
           <div
             key={field.id}
             className={cn(
-              "space-y-2",
+              "space-y-1",
               field.colSpan === 2 ? "col-span-2" : "",
               field.className
             )}
           >
-            <Label>{field.label} {field.required && '*'}</Label>
+            <Label className="text-sm">{field.label} {field.required && '*'}</Label>
             {renderField(field)}
           </div>
         ))}
       </div>
     </div>
   );
-
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 px-2">
