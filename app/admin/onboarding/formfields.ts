@@ -59,26 +59,32 @@ export const formFields = {
     ],
   
     bankDetails: [
-    //   { name: 'bank_id', label: 'Bank ID', type: 'text', required: true },
-      { name: 'name', label: 'Name', type: 'text', required: true },
-      { name: 'account_number', label: 'Account Number', type: 'text', required: true },
-      { name: 'currency', label: 'Currency', type: 'text', required: true },
-      { name: 'branch', label: 'Branch', type: 'text', required: true },
-      { name: 'rm_name', label: 'RM Name', type: 'text' },
-      { name: 'start_date', label: 'Start Date', type: 'date', required: true }
+    
+      { name: 'bank_name', label: 'Bank Name', type: 'text' , required: true},
+            { name: 'account_number', label: 'Account Number', type: 'text' , required: true},
+            { name: 'currency', label: 'Currency', type: 'text' , required: true},
+            { name: 'branch', label: 'Branch', type: 'text' , required: true},
+            { name: 'relationship_manager_name', label: 'RM Name', type: 'text' , required: true},
+            { name: 'relationship_manager_mobile', label: 'RM Mobile', type: 'tel' , required: true},
+            { name: 'relationship_manager_email', label: 'RM Email', type: 'email' , required: true},
+            { name: 'bank_startdate', label: 'Start Date', type: 'date' , required: true},
+            { name: 'bank_status', label: 'Status', type: 'boolean' , required: true},
+            { name: 'bank_verified', label: 'Verified', type: 'boolean' , required: true}
     ],
   
     employeeDetails: [
-      { name: 'emp_id', label: 'EMP ID', type: 'text', required: true },
-      { name: 'name', label: 'Name', type: 'text', required: true },
+      { name: 'end_date', label: 'End Date', type: 'date', required: true },
+      { name: 'employee_name', label: 'Name', type: 'text', required: true },
       { name: 'id_number', label: 'ID Number', type: 'text', required: true },
-      { name: 'kra_pin', label: 'KRA PIN', type: 'text', required: true },
-      { name: 'email', label: 'Email', type: 'email', required: true },
-      { name: 'mobile', label: 'Mobile', type: 'tel', required: true },
-      { name: 'nhif', label: 'NHIF', type: 'text', required: true },
-      { name: 'nssf', label: 'NSSF', type: 'text', required: true },
-      { name: 'start_date', label: 'Start Date', type: 'date', required: true },
-      { name: 'end_date', label: 'End Date', type: 'date' }
+      { name: 'employee_kra_pin', label: 'KRA PIN', type: 'text', required: true },
+      { name: 'employee_email', label: 'Email', type: 'email', required: true },
+      { name: 'employee_mobile', label: 'Mobile', type: 'tel', required: true },
+      { name: 'employee_nhif', label: 'NHIF', type: 'text', required: true },
+      { name: 'employee_nssf', label: 'NSSF', type: 'text', required: true },
+      { name: 'employee_startdate', label: 'Start Date', type: 'date', required: true },
+      { name: 'employee_enddate', label: 'End Date', type: 'date', required: true },
+      { name: 'employee_status', label: 'Status', type: 'boolean', required: true },
+      { name: 'employee_verified', label: 'Verified', type: 'boolean', required: true }
     ]
   };
   
