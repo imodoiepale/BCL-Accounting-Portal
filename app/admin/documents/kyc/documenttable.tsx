@@ -25,11 +25,20 @@ interface Director {
 }
 
 interface Document {
-  id: number;
+  id: string; // Assuming UUID is stored as a string
   name: string;
+  issue_date: string;
+  expiry_date: string;
+  validity_days: string;
+  reminder_days: string;
+  listed: boolean;
+  category: string;
+  subcategory: string;
+  userid: string;
+  document_type: string;
 }
 
-const DocsTable = ({ category, showDirectors }: { category: string, showDirectors: boolean }) => {
+const DocsTable = ({ category, showDirectors, documents }: { category: string, showDirectors: boolean, documents: Document[] }) => {
   // State management
   const [visibleDocs, setVisibleDocs] = useState([1, 2, 3, 4]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -49,13 +58,6 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
     expiryDate: "",
   });
 
-  // Static documents data
-  const documents = [
-    { id: 1, name: "doc 1" },
-    { id: 2, name: "doc 2" },
-    { id: 3, name: "doc 3" },
-    { id: 4, name: "doc 4" },
-  ];
   // Fetch companies and directors
   useEffect(() => {
     fetchCompaniesAndDirectors();
@@ -135,7 +137,7 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
 
     try {
       const { companyId, directorId, docId } = selectedCell;
-      
+
       // Save to database
       const { error } = await supabase
         .from('acc_portal_kyc_uploads')
@@ -279,6 +281,7 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
       </div>
     );
   }
+
   return (
     <div className="h-screen flex flex-col p-4">
       {/* Header */}
@@ -432,220 +435,242 @@ const DocsTable = ({ category, showDirectors }: { category: string, showDirector
                     <TableRow 
                       key={`${company.id}-${director.id}`}
                       className={`border-b border-gray-200 ${idx === 0 ? 'border-t-2 border-t-gray-300' : ''} ${idx === company.directors.length - 1 ? 'border-b-2 border-b-gray-300' : ''}`}
-                    >{idx === 0 && (
-                      <>
-                        <TableCell className="border-r border-gray-200 py-2 text-center" rowSpan={company.directors.length}>
-                          {company.id}
+                    >
+                      {idx === 0 && (
+                        <>
+                          <TableCell className="border-r border-gray-200 py-2 text-center" rowSpan={company.directors.length}>
+                            {company.id}
+                          </TableCell>
+                          <TableCell className="border-r border-gray-200 py-2 font-medium" rowSpan={company.directors.length}>
+                            {company.name}
+                          </TableCell>
+                        </>
+                      )}
+                      {/* Conditionally render the Director cell */}
+                      {showDirectors && (
+                        <TableCell className="border-r border-gray-200 py-2">
+                          {director.name}
                         </TableCell>
-                        <TableCell className="border-r border-gray-200 py-2 font-medium" rowSpan={company.directors.length}>
-                          {company.name}
+                      )}
+                      {visibleDocs.includes(0) && (
+                        <TableCell className="border-r border-gray-300 py-2 text-center">
+                          {/* Empty cell for metrics column */}
                         </TableCell>
-                      </>
-                    )}
-                    {/* Conditionally render the Director cell */}
-                    {showDirectors && (
-                      <TableCell className="border-r border-gray-200 py-2">
-                        {director.name}
-                      </TableCell>
-                    )}
-                    {visibleDocs.includes(0) && (
-                      <TableCell className="border-r border-gray-300 py-2 text-center">
-                        {/* Empty cell for metrics column */}
-                      </TableCell>
-                    )}
-                    {documents.map((doc, docIndex) => {
-                      const key = `${company.id}-${director.id}-${doc.id}`;
-                      const data = documentData[key];
+                      )}
+                      {documents.map((doc, docIndex) => {
+                        const key = `${company.id}-${director.id}-${doc.id}`;
+                        const data = documentData[key];
 
-                      return (
-                        <Fragment key={`cell-${key}`}>
-                          {visibleDocs.includes(docIndex) && (
-                            <>
-                              <TableCell className={`text-center border-r py-2 px-2 ${docIndex === 0 ? 'border-l-2 border-l-gray-400' : ''}`}>
-                                {!data ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6"
-                                    onClick={() => {
-                                      setSelectedCell({ companyId: company.id, directorId: director.id, docId: doc.id });
-                                      setUploadDialogOpen(true);
-                                    }}
-                                  >
-                                    <Upload className="h-4 w-4" />
-                                    +
-                                  </Button>
-                                ) : (
-                                  <div className="flex items-center justify-center text-xs text-blue-600 truncate max-w-[100px] hover:text-blue-800">
-                                    <Upload className="h-3 w-3 mr-1" />
-                                    {data.fileName}
-                                  </div>
-                                )}
-                              </TableCell>
-                              <TableCell className={`text-center border-r py-2 px-2 text-xs`}>
-                                {data?.issueDate && new Date(data.issueDate).toLocaleDateString()}
-                              </TableCell>
-                              <TableCell className={`text-center border-r py-2 px-2 text-xs`}>
-                                {data?.expiryDate && new Date(data.expiryDate).toLocaleDateString()}
-                              </TableCell>
-                              <TableCell className={`text-center border-r py-2 px-2 text-xs`}>
-                                {data?.daysToExpire}
-                              </TableCell>
-                              <TableCell className={`text-center border-r py-2 px-2 text-xs`}>
-                                {data ? (
-                                  <span className={`font-medium ${data.daysToExpire > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {data.daysToExpire > 0 ? 'Active' : 'Inactive'}
-                                  </span>
-                                ) : (
-                                  <span className="text-red-600">x</span>
-                                )}
-                              </TableCell>
-                            </>
-                          )}
-                        </Fragment>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </Fragment>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
-
-    {/* Upload Dialog */}
-    <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Upload Document</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="space-y-2">
-            <Label>Upload File</Label>
-            <Input
-              type="file"
-              onChange={(e) => setUploadForm(prev => ({ 
-                ...prev, 
-                file: e.target.files?.[0] || null 
-              }))}
-              accept=".pdf,.doc,.docx"
-              className="cursor-pointer"
-            />
-            {uploadForm.file && (
-              <div className="text-sm text-gray-500">
-                Selected: {uploadForm.file.name}
-              </div>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label>Issue Date</Label>
-            <Input
-              type="date"
-              value={uploadForm.issueDate}
-              onChange={(e) => setUploadForm(prev => ({ 
-                ...prev, 
-                issueDate: e.target.value 
-              }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Expiry Date</Label>
-            <Input
-              type="date"
-              value={uploadForm.expiryDate}
-              onChange={(e) => setUploadForm(prev => ({ 
-                ...prev, 
-                expiryDate: e.target.value 
-              }))}
-            />
-          </div>
+                        return (
+                          <Fragment key={`cell-${key}`}>
+                            {visibleDocs.includes(docIndex) && (
+                              <>
+                                <TableCell className={`text-center border-r py-2 px-2 ${docIndex === 0 ? 'border-l-2 border-l-gray-400' : ''}`}>
+                                  {!data ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6"
+                                      onClick={() => {
+                                        setSelectedCell({ companyId: company.id, directorId: director.id, docId: doc.id });
+                                        setUploadDialogOpen(true);
+                                      }}
+                                    >
+                                      <Upload className="h-4 w-4" />
+                                      +
+                                    </Button>
+                                  ) : (
+                                    <div className="flex items-center justify-center text-xs text-blue-600 truncate max-w-[100px] hover:text-blue-800">
+                                      <Upload className="h-3 w-3 mr-1" />
+                                      {data.fileName}
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell className={`text-center border-r py-2 px-2 text-xs`}>
+                                  {data?.issueDate && new Date(data.issueDate).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className={`text-center border-r py-2 px-2 text-xs`}>
+                                  {data?.expiryDate && new Date(data.expiryDate).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className={`text-center border-r py-2 px-2 text-xs`}>
+                                  {data?.daysToExpire}
+                                </TableCell>
+                                <TableCell className={`text-center border-r py-2 px-2 text-xs`}>
+                                  {data ? (
+                                    <span className={`font-medium ${data.daysToExpire > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {data.daysToExpire > 0 ? 'Active' : 'Inactive'}
+                                    </span>
+                                  ) : (
+                                    <span className="text-red-600">x</span>
+                                  )}
+                                </TableCell>
+                              </>
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-        <DialogFooter className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setUploadDialogOpen(false);
-              setUploadForm({ file: null, issueDate: "", expiryDate: "" });
-            }}
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleUpload}
-            disabled={!uploadForm.file || !uploadForm.issueDate || !uploadForm.expiryDate}
-          >
-            Upload
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
 
-    {/* Settings Dialog */}
-    <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Display Settings</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="space-y-4">
-            <Label className="text-lg font-semibold">Visible Documents</Label>
-            {documents.map((doc, index) => (
-              <div key={doc.id} className="flex items-center space-x-2">
-                <Checkbox
-                  checked={visibleDocs.includes(index)}
-                  onCheckedChange={(checked) => {
-                    setVisibleDocs(prev => 
-                      checked 
+      {/* Upload Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]"> {/* Adjusted for landscape layout */}
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Upload File</Label>
+              <Input
+                type="file"
+                onChange={(e) => setUploadForm(prev => ({ 
+                  ...prev, 
+                  file: e.target.files?.[0] || null 
+                }))}
+                accept=".pdf,.doc,.docx"
+                className="cursor-pointer"
+              />
+              {uploadForm.file && (
+                <div className="text-sm text-gray-500">
+                  Selected: {uploadForm.file.name}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Issue Date</Label>
+              <Input
+                type="date"
+                value={uploadForm.issueDate}
+                onChange={(e) => setUploadForm(prev => ({ 
+                  ...prev, 
+                  issueDate: e.target.value 
+                }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Expiry Date</Label>
+              <Input
+                type="date"
+                value={uploadForm.expiryDate}
+                onChange={(e) => setUploadForm(prev => ({ 
+                  ...prev, 
+                  expiryDate: e.target.value 
+                }))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setUploadDialogOpen(false);
+                setUploadForm({ file: null, issueDate: "", expiryDate: "" });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpload}
+              disabled={!uploadForm.file || !uploadForm.issueDate || !uploadForm.expiryDate}
+            >
+              Upload
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Settings Dialog */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Display Settings</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-4">
+              <Label className="text-lg font-semibold">Visible Documents</Label>
+              {documents.map((doc, index) => (
+                <div key={doc.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    checked={visibleDocs.includes(index)}
+                    onCheckedChange={(checked) => {
+                      setVisibleDocs(prev => 
+                        checked 
                         ? [...prev, index]
                         : prev.filter(id => id !== index)
-                    );
-                  }}
-                  id={`doc-${doc.id}`}
+                      );
+                    }}
+                    id={`doc-${doc.id}`}
+                  />
+                  <Label htmlFor={`doc-${doc.id}`} className="cursor-pointer">
+                    {doc.name}
+                  </Label>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-4">
+              <Label className="text-lg font-semibold">Additional Options</Label>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="show-expired" 
+                  checked={showExpired}
+                  onCheckedChange={setShowExpired}
                 />
-                <Label htmlFor={`doc-${doc.id}`} className="cursor-pointer">
-                  {doc.name}
+                <Label htmlFor="show-expired" className="cursor-pointer">
+                  Show expired documents
                 </Label>
               </div>
-            ))}
-          </div>
-
-          <div className="space-y-4">
-            <Label className="text-lg font-semibold">Additional Options</Label>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="show-expired" 
-                checked={showExpired}
-                onCheckedChange={setShowExpired}
-              />
-              <Label htmlFor="show-expired" className="cursor-pointer">
-                Show expired documents
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="show-inactive" 
-                checked={showInactive}
-                onCheckedChange={setShowInactive}
-              />
-              <Label htmlFor="show-inactive" className="cursor-pointer">
-                Show inactive documents
-              </Label>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="show-inactive" 
+                  checked={showInactive}
+                  onCheckedChange={setShowInactive}
+                />
+                <Label htmlFor="show-inactive" className="cursor-pointer">
+                  Show inactive documents
+                </Label>
+              </div>
             </div>
           </div>
-        </div>
-        <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={() => setSettingsOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={() => setSettingsOpen(false)}>
-            Save Changes
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  </div>
-);
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => {
+              // Reset settings to default
+              setVisibleDocs([1, 2, 3, 4]);
+              setShowExpired(true);
+              setShowInactive(true);
+              setSettingsOpen(false);
+            }}>
+              Reset
+            </Button>
+            <Button onClick={() => {
+              // Save settings to JSON file
+              const settings = {
+                visibleDocs,
+                showExpired,
+                showInactive,
+              };
+              const blob = new Blob([JSON.stringify(settings)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'settings.json';
+              a.click();
+              URL.revokeObjectURL(url);
+              setSettingsOpen(false);
+            }}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 };
 
 export default DocsTable;
