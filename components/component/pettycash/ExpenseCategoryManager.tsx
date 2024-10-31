@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { PlusCircle, Search, Edit2, Trash2, Grid, List, Plus, X } from 'lucide-react';
+import { PlusCircle, Search, Edit2, Trash2, Grid, List, Plus, X, RefreshCwIcon } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { PettyCashService } from './PettyCashService';
 
@@ -264,138 +264,16 @@ export function ExpenseCategoryManager() {
     );
 
     return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                    <div className="relative">
-                        <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <Input
-                            placeholder="Search categories..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-8 w-64"
-                        />
-                    </div>
-                    <Tabs value={view} onValueChange={(v) => setView(v as 'table' | 'grid')}>
-                        <TabsList>
-                            <TabsTrigger value="table">
-                                <List className="h-4 w-4 mr-1" />
-                                Table View
-                            </TabsTrigger>
-                            <TabsTrigger value="grid">
-                                <Grid className="h-4 w-4 mr-1" />
-                                Card View
-                            </TabsTrigger>
-                        </TabsList>
-
-                        <TabsContent value="table" className="m-0">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Expense Categories</CardTitle>
-                                    <CardDescription>
-                                        Manage your expense categories and their subcategories
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ScrollArea className="h-[600px]">
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead className="w-[200px]">Main Category</TableHead>
-                                                    <TableHead>Subcategories</TableHead>
-                                                    <TableHead className="w-[100px]">Actions</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {filteredCategories.map((category) => (
-                                                    <TableRow key={category.id}>
-                                                        <TableCell className="font-medium">
-                                                            {category.expense_category}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="space-y-2">
-                                                                {category.subcategories.map((sub, index) => (
-                                                                    <div key={index} className="flex justify-between items-start border-b last:border-0 pb-2">
-                                                                        <div>
-                                                                            <div className="font-medium">{sub.name}</div>
-                                                                            {sub.description && (
-                                                                                <div className="text-sm text-gray-500">{sub.description}</div>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="flex gap-2">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => setDialogState({ isOpen: true, category })}
-                                                                >
-                                                                    <Edit2 className="h-4 w-4" />
-                                                                </Button>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => handleDeleteCategory(category)}
-                                                                    className="text-red-600"
-                                                                >
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </ScrollArea>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        <TabsContent value="grid" className="m-0">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {filteredCategories.map((category) => (
-                                    <Card key={category.id} className="relative">
-                                        <CardHeader>
-                                            <CardTitle className="text-lg">{category.expense_category}</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-2">
-                                                {category.subcategories.map((sub, index) => (
-                                                    <div key={index} className="border-b last:border-0 pb-2">
-                                                        <div className="font-medium">{sub.name}</div>
-                                                        {sub.description && (
-                                                            <div className="text-sm text-gray-500">{sub.description}</div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="absolute top-2 right-2 flex gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => setDialogState({ isOpen: true, category })}
-                                                >
-                                                    <Edit2 className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleDeleteCategory(category)}
-                                                    className="text-red-600"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        </TabsContent>
-
-                    </Tabs>
+        <div className="flex flex-col justify-center w-full">
+            <div className="flex justify-between items-center mb-4">
+                <div className="relative w-1/2">
+                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                        placeholder="Search categories..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8 w-full"
+                    />
                 </div>
                 <Button onClick={() => setDialogState({ isOpen: true })} className="bg-blue-600">
                     <PlusCircle className="h-4 w-4 mr-1" />
@@ -403,7 +281,178 @@ export function ExpenseCategoryManager() {
                 </Button>
             </div>
 
+            <Tabs value={view} onValueChange={(v) => setView(v as 'table' | 'grid')}>
+                <TabsList className="mb-4">
+                    <TabsTrigger value="table" className="flex items-center gap-2">
+                        <List className="h-4 w-4" />
+                        Table View
+                    </TabsTrigger>
+                    <TabsTrigger value="grid" className="flex items-center gap-2">
+                        <Grid className="h-4 w-4" />
+                        Card View
+                    </TabsTrigger>
+                </TabsList>
 
+                {/* Table View */}
+                <TabsContent value="table" className="m-0">
+                    <ScrollArea className="h-[calc(100vh-200px)]">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-blue-600 hover:bg-blue-600">
+                                    <TableHead className="text-white h-8 text-xs font-medium border-r border-blue-500 last:border-r-0">
+                                        #
+                                    </TableHead>
+                                    <TableHead className="text-white h-8 text-xs font-medium border-r border-blue-500 last:border-r-0">
+                                        Main Category
+                                    </TableHead>
+                                    <TableHead className="text-white h-8 text-xs font-medium border-r border-blue-500 last:border-r-0">
+                                        Subcategory
+                                    </TableHead>
+                                    <TableHead className="text-white h-8 text-xs font-medium border-r border-blue-500 last:border-r-0">
+                                        Description
+                                    </TableHead>
+                                    <TableHead className="text-white h-8 text-xs font-medium border-r border-blue-500 last:border-r-0">
+                                        Actions
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={5}
+                                            className="h-32 text-center"
+                                        >
+                                            <div className="flex flex-col items-center justify-center">
+                                                <RefreshCwIcon className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+                                                <span className="text-sm text-gray-500">Loading categories...</span>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : filteredCategories.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={5}
+                                            className="h-32 text-center"
+                                        >
+                                            <div className="flex flex-col items-center justify-center">
+                                                <div className="rounded-full bg-gray-100 p-3 mb-2">
+                                                    <Search className="h-6 w-6 text-gray-400" />
+                                                </div>
+                                                <span className="text-sm font-medium text-gray-900">No Categories Found</span>
+                                                <p className="text-sm text-gray-500 mt-1">
+                                                    {searchQuery
+                                                        ? 'No categories match your search criteria'
+                                                        : 'Get started by adding your first category'}
+                                                </p>
+                                                {!searchQuery && (
+                                                    <Button
+                                                        onClick={() => setDialogState({ isOpen: true })}
+                                                        className="mt-3 bg-blue-600 text-white"
+                                                    >
+                                                        Add New Category
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredCategories.map((category, categoryIndex) => (
+                                        <TableRow
+                                            key={category.id}
+                                            className="hover:bg-blue-50 border-b border-gray-100 transition-colors [&>td]:h-8"
+                                        >
+                                            <TableCell className="py-1 px-2 text-xs border-r border-gray-100 last:border-r-0">
+                                                {categoryIndex + 1}
+                                            </TableCell>
+                                            <TableCell className="py-1 px-2 text-xs border-r border-gray-100 last:border-r-0">
+                                                {category.expense_category}
+                                            </TableCell>
+                                            <TableCell className="py-1 px-2 text-xs border-r border-gray-100 last:border-r-0">
+                                                <div className="space-y-1">
+                                                    {category.subcategories.map((sub, subIndex) => (
+                                                        <div key={subIndex} className="border-b last:border-0 pb-1">
+                                                            <div className="font-medium">{sub.name}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-1 px-2 text-xs border-r border-gray-100 last:border-r-0">
+                                                <div className="space-y-1">
+                                                    {category.subcategories.map((sub, subIndex) => (
+                                                        <div key={subIndex} className="border-b last:border-0 pb-1">
+                                                            {sub.description && (
+                                                                <div className="text-sm text-gray-500">{sub.description}</div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-1 px-2 text-xs border-r border-gray-100 last:border-r-0">
+                                                <div className="flex gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => setDialogState({ isOpen: true, category })}
+                                                    >
+                                                        <Edit2 className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleDeleteCategory(category)}
+                                                        className="text-red-600"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </ScrollArea>
+                </TabsContent>
+
+                {/* Grid View */}
+                <TabsContent value="grid" className="m-0">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredCategories.map((category) => (
+                            <div key={category.id} className="relative p-4 border rounded shadow-md">
+                                <div className="text-lg font-medium">{category.expense_category}</div>
+                                <div className="space-y-2 mt-2">
+                                    {category.subcategories.map((sub, index) => (
+                                        <div key={index} className="border-b last:border-0 pb-2">
+                                            <div className="font-medium">{sub.name}</div>
+                                            {sub.description && (
+                                                <div className="text-sm text-gray-500">{sub.description}</div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="absolute top-2 right-2 flex gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setDialogState({ isOpen: true, category })}
+                                    >
+                                        <Edit2 className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteCategory(category)}
+                                        className="text-red-600"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </TabsContent>
+            </Tabs>
 
             <CategoryDialog
                 isOpen={dialogState.isOpen}
@@ -413,6 +462,7 @@ export function ExpenseCategoryManager() {
             />
         </div>
     );
-}
 
+
+}
 export default ExpenseCategoryManager;
