@@ -15,7 +15,7 @@ interface MailListProps {
 function getSenderLabel(email: string) {
   // Extract domain to determine email provider
   const domain = email.split('@')[1]
-  if (domain === 'example.com') return 'Vercel'
+  if (domain === 'example.com') return 'BOOKSMART CONSULTANCY LIMITED'
   if (domain === 'gmail.com') return 'Gmail'
   if (domain === 'me.com') return 'iCloud'
   return domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1)
@@ -45,21 +45,21 @@ export function MailList({ items }: MailListProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="font-semibold">{item.name}</div>
-                  <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">
+                  {/* <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">
                     {getSenderLabel(item.email)}
-                  </Badge>
+                  </Badge> */}
                   {!item.read && (
                     <span className="flex h-2 w-2 rounded-full bg-blue-600" />
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="font-semibold">{item.name}</div>
+                  {/* <div className="font-semibold">{item.name}</div> */}
                   <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">
                     {getSenderLabel(item.email)}
                   </Badge>
-                  {!item.read && (
+                  {/* {!item.read && (
                     <span className="flex h-2 w-2 rounded-full bg-blue-600" />
-                  )}
+                  )} */}
                 </div>
                 
                 <div

@@ -12,10 +12,13 @@ import {
   Filter,
   Inbox,
   MessagesSquare,
+  Pencil,
   Plus,
   Search,
   Send,
   Settings,
+  Settings2,
+  SettingsIcon,
   ShoppingCart,
   Star,
   Tags,
@@ -230,156 +233,156 @@ export function Mail({
   }
 
   const handleEditFilter = (filter: CustomFilter) => {
-  setEditingFilter(filter)
-  setNewFilter({
-    ...filter,
-    conditions: [...filter.conditions]
-  })
-  setIsCreateFilterOpen(true)
-}
-
-const handleDeleteFilter = (filterId: string) => {
-  setCustomFilters(filters => filters.filter(f => f.id !== filterId))
-}
-
-const updateFilter = () => {
-  if (editingFilter && newFilter.name.trim() !== "") {
-    setCustomFilters(filters => 
-      filters.map(f => f.id === editingFilter.id ? {
-        ...newFilter,
-        id: editingFilter.id
-      } : f)
-    )
-    setIsCreateFilterOpen(false)
-    setEditingFilter(null)
+    setEditingFilter(filter)
     setNewFilter({
-      id: "",
-      name: "",
-      conditions: [{ field: "subject", operator: "contains", value: "" }],
+      ...filter,
+      conditions: [...filter.conditions]
     })
+    setIsCreateFilterOpen(true)
   }
-}
 
-  
-const FilterManagement = ({ filters, onEdit, onDelete }: FilterManagementProps) => {
-  return (
-    <Tabs defaultValue="table" className="w-full">
-      <TabsList className="w-full">
-        <TabsTrigger value="table" className="flex-1">Table View</TabsTrigger>
-        <TabsTrigger value="cards" className="flex-1">Card View</TabsTrigger>
-      </TabsList>
-      <TabsContent value="table" className="mt-4">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Filter Name</TableHead>
-              <TableHead>Conditions</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+  const handleDeleteFilter = (filterId: string) => {
+    setCustomFilters(filters => filters.filter(f => f.id !== filterId))
+  }
+
+  const updateFilter = () => {
+    if (editingFilter && newFilter.name.trim() !== "") {
+      setCustomFilters(filters =>
+        filters.map(f => f.id === editingFilter.id ? {
+          ...newFilter,
+          id: editingFilter.id
+        } : f)
+      )
+      setIsCreateFilterOpen(false)
+      setEditingFilter(null)
+      setNewFilter({
+        id: "",
+        name: "",
+        conditions: [{ field: "subject", operator: "contains", value: "" }],
+      })
+    }
+  }
+
+
+  const FilterManagement = ({ filters, onEdit, onDelete }: FilterManagementProps) => {
+    return (
+      <Tabs defaultValue="table" className="w-full">
+        <TabsList className="w-full">
+          <TabsTrigger value="table" className="flex-1">Table View</TabsTrigger>
+          <TabsTrigger value="cards" className="flex-1">Card View</TabsTrigger>
+        </TabsList>
+        <TabsContent value="table" className="mt-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Filter Name</TableHead>
+                <TableHead>Conditions</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="w-[100px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filters.map((filter) => (
+                <TableRow key={filter.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <Tags className="h-4 w-4" />
+                      {filter.name}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      {filter.conditions.map((condition, idx) => (
+                        <Badge key={idx} variant="outline" className="w-fit">
+                          {condition.field} {condition.operator} "{condition.value}"
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>{new Date().toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onEdit(filter)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onDelete(filter.id)}
+                          className="text-red-600"
+                        >
+                          <Trash className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TabsContent>
+        <TabsContent value="cards" className="mt-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filters.map((filter) => (
-              <TableRow key={filter.id}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
+              <Card key={filter.id}>
+                <CardHeader className="space-y-1">
+                  <CardTitle className="flex items-center gap-2">
                     <Tags className="h-4 w-4" />
                     {filter.name}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col gap-1">
+                  </CardTitle>
+                  <CardDescription>
+                    {filter.conditions.length} condition(s)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col gap-2">
                     {filter.conditions.map((condition, idx) => (
-                      <Badge key={idx} variant="outline" className="w-fit">
-                        {condition.field} {condition.operator} "{condition.value}"
-                      </Badge>
+                      <div
+                        key={idx}
+                        className="rounded-md border border-border p-2 text-sm"
+                      >
+                        <div className="font-medium">{condition.field}</div>
+                        <div className="text-muted-foreground">
+                          {condition.operator} "{condition.value}"
+                        </div>
+                      </div>
                     ))}
-                  </div>
-                </TableCell>
-                <TableCell>{new Date().toLocaleDateString()}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => onEdit(filter)}>
+                    <div className="mt-4 flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onEdit(filter)}
+                      >
                         <Edit className="mr-2 h-4 w-4" />
                         Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => onDelete(filter.id)}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         className="text-red-600"
+                        onClick={() => onDelete(filter.id)}
                       >
                         <Trash className="mr-2 h-4 w-4" />
                         Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TabsContent>
-      <TabsContent value="cards" className="mt-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filters.map((filter) => (
-            <Card key={filter.id}>
-              <CardHeader className="space-y-1">
-                <CardTitle className="flex items-center gap-2">
-                  <Tags className="h-4 w-4" />
-                  {filter.name}
-                </CardTitle>
-                <CardDescription>
-                  {filter.conditions.length} condition(s)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-2">
-                  {filter.conditions.map((condition, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-md border border-border p-2 text-sm"
-                    >
-                      <div className="font-medium">{condition.field}</div>
-                      <div className="text-muted-foreground">
-                        {condition.operator} "{condition.value}"
-                      </div>
+                      </Button>
                     </div>
-                  ))}
-                  <div className="mt-4 flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onEdit(filter)}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600"
-                      onClick={() => onDelete(filter.id)}
-                    >
-                      <Trash className="mr-2 h-4 w-4" />
-                      Delete
-                    </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </TabsContent>
-    </Tabs>
-  )
-}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+    )
+  }
 
 
   const getFilteredMails = (filterId: string, mailList: Mail[]) => {
@@ -455,6 +458,18 @@ const FilterManagement = ({ filters, onEdit, onDelete }: FilterManagementProps) 
           <Nav
             isCollapsed={isCollapsed}
             links={[
+              {
+                title: "Compose",
+                label: "Write a new Email",
+                icon: Pencil,
+                variant: "outline",
+              },
+              {
+                title: "Automations",
+                label: "Automate & Schedule",
+                icon: SettingsIcon,
+                variant: "outline",
+              },
               {
                 title: "Inbox",
                 label: "128",
