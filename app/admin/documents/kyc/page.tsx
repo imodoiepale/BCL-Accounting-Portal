@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabaseClient';
 export default function KYCDocuments() {
     const [documents, setDocuments] = useState([]);
     const [filteredDocs, setFilteredDocs] = useState({ kraDocs: [], sheriaDocs: [] });
-    const [companies, setCompanies] = useState([]);
+    const [directorsDocs, setDirectorsDocs] = useState([]);
 
     useEffect(() => {
         const loadDocuments = async () => {
@@ -27,21 +27,21 @@ export default function KYCDocuments() {
             setFilteredDocs({ kraDocs, sheriaDocs });
         };
 
-        const loadCompanies = async () => {
+        const loadDirectorsDocuments = async () => {
             const { data, error } = await supabase
-                .from('acc_portal_company')
+                .from('acc_portal_directors_documents')
                 .select('*');
 
             if (error) {
-                console.error('Error fetching companies:', error);
+                console.error('Error fetching directors documents:', error);
                 return;
             }
 
-            setCompanies(data);
+            setDirectorsDocs(data);
         };
 
         loadDocuments();
-        loadCompanies();
+        loadDirectorsDocuments();
     }, []);
 
     return (
@@ -75,7 +75,7 @@ export default function KYCDocuments() {
                 </TabsContent>
 
                 <TabsContent value="directors-docs">
-                    <DataTableWithDocuments category="Directors" showDirectors={true} documents={[]} />
+                    <DataTableWithDocuments category="Directors" showDirectors={true} documents={directorsDocs} />
                 </TabsContent>
 
                 <TabsContent value="suppliers-docs">
