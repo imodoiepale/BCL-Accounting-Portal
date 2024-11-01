@@ -69,6 +69,14 @@
     payment_proof_url: string;
   }
 
+  interface ExpenseCategory {
+    category_code: string;
+    expense_category: string;
+    subcategories: {
+      subcategory_code: string;
+      expense_subcategory: string;
+    }[];
+  }
 
   interface EntryDialogProps {
     isOpen: boolean;
@@ -89,7 +97,7 @@
     { name: 'supplier_name', label: 'Supplier Name', type: 'text', required: true },
     { name: 'supplier_pin', label: 'Supplier PIN/ID', type: 'text', required: true },
     {
-      name: 'purchase_type', label: 'Purchase Type', type: 'select', required: true,
+      name: 'purchase_type', label: 'Trading Type', type: 'select', required: true,
       options: [
         { value: 'goods', label: 'Goods' },
         { value: 'services', label: 'Services' },
@@ -182,6 +190,8 @@
     const [openSupplier, setOpenSupplier] = useState(false);
     const [selectedSupplier, setSelectedSupplier] = useState(null);
     const [isNewSupplier, setIsNewSupplier] = useState(false);
+    const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
+
 
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -318,6 +328,20 @@
       }
     };
 
+    useEffect(() => {
+      const fetchCategories = async () => {
+        try {
+          const categories = await PettyCashService.fetchExpenseCategories();
+          setExpenseCategories(categories);
+        } catch (error) {
+          console.error('Error fetching expense categories:', error);
+          toast.error('Failed to load expense categories');
+        }
+      };
+    
+      fetchCategories();
+    }, []);
+
     const handleSubmit = async () => {
       try {
         // If it's a new supplier, create supplier record first
@@ -396,7 +420,7 @@
       // },
       {
         header: <div className="">User</div>,
-        width: '350px',
+        width: '150px',
         cell: (entry: PettyCashEntry) => <div className="text-nowrap ">{entry.user_name || '-'}</div>
       },
       {
@@ -426,18 +450,21 @@
       {
         header: 'Purchase Type',
         width: '120px',
-        cell: (entry: PettyCashEntry) => entry.purchase_type || '-'
+        cell: (entry: PettyCashEntry) => (
+          <div className="capitalize">
+            {entry.purchase_type ? entry.purchase_type.charAt(0).toUpperCase() + entry.purchase_type.slice(1) : '-'}
+          </div>
+        )
       },
-
       {
         header: 'Category',
         width: '150px',
-        cell: (entry: PettyCashEntry) => getCategoryName(entry.category_code)
+      cell: (entry) => entry.expense_category || '-'
       },
       {
         header: 'Subcategory',
         width: '150px',
-        cell: (entry: PettyCashEntry) => getSubcategoryName(entry.category_code, entry.subcategory_code)
+        cell: (entry) => entry.subcategory || '-'
       },
       {
         header: 'Amount',

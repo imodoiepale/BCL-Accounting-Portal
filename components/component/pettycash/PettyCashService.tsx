@@ -1136,12 +1136,18 @@ export class PettyCashService {
                 .from('acc_portal_pettycash_entries')
                 .select('id')
                 .eq('userid', userId);
-
+    
             if (error) throw error;
-            return (data?.length || 0) + 1;
+            
+            // Get the count and add 1
+            const nextNumber = (data?.length || 0) + 1;
+            
+            return `PCV${nextNumber.toString().padStart(6, '0')}`;
+            
         } catch (error) {
             console.error('Error getting next entry number:', error);
-            return 1;
+            // Return PCV000001 as the first number if there's an error
+            return 'PCV000001';
         }
     }
 

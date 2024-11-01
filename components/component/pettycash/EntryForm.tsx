@@ -20,6 +20,8 @@ import { cn } from "@/lib/utils";
 import { toast } from 'react-hot-toast';
 import Image from 'next/image';
 
+type EntryStatus = 'pending' | 'checked' | 'approved';
+
 interface PettyCashEntry {
   id?: string;
   petty_cash_number?: string;
@@ -46,7 +48,7 @@ interface PettyCashEntry {
   created_at: string;
   is_verified: boolean;
   branch_name?: string;
-  status: 'Pending' | 'Checked' | 'Approved';
+  status: EntryStatus;
   document_references?: string[];
 }
 
@@ -62,6 +64,18 @@ interface SupplierData {
   supplierType: "Individual" | "Corporate";
   data?: any;
 }
+
+interface ExpenseCategory {
+  category_code: string;
+  expense_category: string;
+  subcategories: ExpenseSubcategory[];
+}
+
+interface ExpenseSubcategory {
+  subcategory_code: string;
+  expense_subcategory: string;
+}
+
 
 interface PettyCashEntryFormProps {
   mode: 'create' | 'edit';
@@ -92,9 +106,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     supplier_name: '',
     supplier_pin: '',
     purchase_type: '',
-    category_code: '',
-    category: '',
-    subcategory_code: '',
+    expense_category: '',
     subcategory: '',
     amount: '',
     description: '',
@@ -105,7 +117,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     payment_proof_url: null,
     created_at: new Date().toISOString(),
     is_verified: false,
-    status: 'Pending',
+    status: 'pending',
     document_references: []
   };
 
@@ -128,54 +140,84 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
   const [supplierOptions, setSupplierOptions] = useState<any[]>([]);
   const [nextPettyCashNumber, setNextPettyCashNumber] = useState<string>('');
 
+  const [supplierFormData, setSupplierFormData] = useState({
+    supplierName: '',
+    pin: '',
+    tradingType: ''
+  });
+
   const [userAccounts, setUserAccounts] = useState<any[]>([]);
   const [isReceiptUploaded, setIsReceiptUploaded] = useState(false);
   const [accountTypeOptions, setAccountTypeOptions] = useState([]);
+  const [uniqueUsers, setUniqueUsers] = useState<string[]>([]);
+
+  const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
+
+
+  const mapPurchaseTypeToTradingType = (purchaseType: string): string => {
+    switch (purchaseType) {
+      case 'purchase': return 'Purchase Only';
+      case 'expense': return 'Expense Only';
+      case 'both': return 'Both Purchase + Expense';
+      default: return '';
+    }
+  };
+
+  const mapTradingTypeToPurchaseType = (tradingType: string): string => {
+    switch (tradingType) {
+      case 'Purchase Only': return 'purchase';
+      case 'Expense Only': return 'expense';
+      case 'Both Purchase + Expense': return 'both';
+      default: return '';
+    }
+  };
 
   // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoading(true);
       try {
-        const [usersData, suppliersData, accountsData, nextNumber] = await Promise.all([
-          PettyCashService.fetchUserRecords(userId),
+        const [accountsData, suppliersData, nextNumber] = await Promise.all([
+          PettyCashService.fetchAccountRecords(userId),
           PettyCashService.fetchRecords('acc_portal_pettycash_suppliers', userId),
-          PettyCashService.fetchAccountRecords(userId), // Fetch accounts
           PettyCashService.getNextEntryNumber(userId)
         ]);
-  
-        setUsers(usersData);
-  
-        // Format suppliers properly
-        if (Array.isArray(suppliersData)) {
-          setSuppliers(suppliersData);
-          const formattedSuppliers = suppliersData
-            .filter(supplier => supplier && supplier.data) // Ensure supplier and data exist
-            .map(supplier => ({
-              id: supplier.id,
-              data: supplier.data,
-              value: supplier.id,
-              label: supplier.data.supplierName
-            }));
-          setSupplierOptions(formattedSuppliers);
-        }
-  
-        // Extract accounts from the fetched data
+
+        setNextPettyCashNumber(nextNumber);
+        // Update the form data with the next number
+        setFormData(prev => ({
+          ...prev,
+          petty_cash_number: nextNumber
+        }));
+
+
         if (accountsData && Array.isArray(accountsData)) {
-          const formattedAccounts = accountsData.flatMap(account => account.data.accounts || []);
-          setAccounts(formattedAccounts);
+          // Set accounts directly since they're already in the correct format
+          setAccounts(accountsData);
+
+          // Extract unique users
+          const users = Array.from(new Set(accountsData.map(acc => acc.accountUser)))
+            .filter(user => user);
+          setUniqueUsers(users);
         }
-  
-        setNextPettyCashNumber(`PC${nextNumber.toString().padStart(6, '0')}`);
-  
+
+        if (suppliersData && Array.isArray(suppliersData)) {
+          console.log('Setting suppliers state with:', suppliersData);
+          setSuppliers(suppliersData);
+        } else {
+          console.error('Suppliers data is not in expected format:', suppliersData);
+        }
+
+
+        // Rest of your existing code...
+
       } catch (error) {
-        console.error('Error fetching initial data:', error);
+        console.error('Error in fetchInitialData:', error);
         toast.error('Failed to load form data');
       } finally {
         setIsLoading(false);
       }
     };
-  
     fetchInitialData();
   }, [userId]);
 
@@ -184,10 +226,8 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     if (initialData) {
       setFormData({
         ...initialData,
-        category: EXPENSE_CATEGORIES[initialData.category_code]?.name || '',
-        subcategory: EXPENSE_CATEGORIES[initialData.category_code]?.subcategories.find(
-          sub => sub.code === initialData.subcategory_code
-        )?.name || ''
+        category_code: initialData.category_code || '',
+        subcategory_code: initialData.subcategory_code || ''
       });
 
       const matchingSupplier = suppliers.find(s => s.data.supplierName === initialData.supplier_name);
@@ -204,72 +244,105 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
 
 
   useEffect(() => {
+
     if (formData.user_name) {
-      const selectedUser = users.find(u => u.name === formData.user_name); // Match by name
-      const userAccountsList = accounts.filter(acc => acc.accountUser === selectedUser?.name); // Filter by accountUser
-  
+      // Filter accounts for selected user
+      const userAccountsList = accounts.filter(acc => acc.accountUser === formData.user_name);
+
       if (userAccountsList.length > 0) {
         setUserAccounts(userAccountsList);
-  
-        // Extract unique account types from the user's accounts
+
+        // Extract unique petty cash types for this user
         const uniqueAccountTypes = Array.from(new Set(userAccountsList.map(acc => acc.pettyCashType)));
-  
-        // Set the account type options based on the unique account types
+
         setAccountTypeOptions(uniqueAccountTypes.map(type => ({
           value: type,
           label: type
         })));
-  
-        // If there's only one account, automatically set it
-        if (userAccountsList.length === 1) {
-          setFormData(prev => ({
-            ...prev,
-            account_type: userAccountsList[0].pettyCashType, // Automatically set account type
-            petty_cash_account: userAccountsList[0].accountNumber // Automatically set account number
-          }));
-        } else {
-          // Clear account fields if multiple accounts exist
-          setFormData(prev => ({
-            ...prev,
-            account_type: '', // Clear account type
-            petty_cash_account: '' // Clear account number
-          }));
+
+        // If user has only one petty cash type, auto-select it
+        if (uniqueAccountTypes.length === 1) {
+          const accountType = uniqueAccountTypes[0];
+          const accountsOfType = userAccountsList.filter(acc => acc.pettyCashType === accountType);
+
+          setFormData(prev => {
+            const newData = {
+              ...prev,
+              account_type: accountType,
+              // If there's only one account of this type, auto-select it
+              petty_cash_account: accountsOfType.length === 1 ? accountsOfType[0].accountNumber : ''
+            };
+            return newData;
+          });
         }
-      } else {
-        // Clear account fields if no accounts found
-        setFormData(prev => ({
-          ...prev,
-          account_type: '',
-          petty_cash_account: ''
-        }));
       }
     }
-  }, [formData.user_name, users, accounts]);
+  }, [formData.user_name, accounts]);
 
   useEffect(() => {
     if (selectedSupplier) {
+      const purchaseType = mapTradingTypeToPurchaseType(selectedSupplier.data.tradingType);
+
       setFormData(prev => ({
         ...prev,
-        purchase_type: selectedSupplier.data.tradingType === 'Purchase Only' ? 'goods' :
-          selectedSupplier.data.tradingType === 'Both Purchase + Expense' ? 'goods' : 'services'
+        supplier_name: selectedSupplier.data.supplierName,
+        supplier_pin: selectedSupplier.data.pin || selectedSupplier.data.idNumber || '',
+        purchase_type: purchaseType
       }));
     }
   }, [selectedSupplier]);
 
+  useEffect(() => {
+
+    if (formData.account_type && formData.user_name) {
+      const accountsOfType = userAccounts.filter(acc =>
+        acc.pettyCashType === formData.account_type
+      );
+
+      // If there's only one account of this type, auto-select it
+      if (accountsOfType.length === 1) {
+        setFormData(prev => ({
+          ...prev,
+          petty_cash_account: accountsOfType[0].accountNumber
+        }));
+      } else if (accountsOfType.length === 0) {
+        setFormData(prev => ({
+          ...prev,
+          petty_cash_account: ''
+        }));
+      }
+    }
+  }, [formData.account_type, formData.user_name, userAccounts]);
+
+
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const categories = await PettyCashService.fetchExpenseCategories();
+        console.log('Fetched categories:', categories); // Check the fetched categories
+        setExpenseCategories(categories);
+      } catch (error) {
+        console.error('Error fetching expense categories:', error);
+        toast.error('Failed to load expense categories');
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   // Form validation
   const validateForm = (): string[] => {
     const errors: string[] = [];
 
     if (!formData.invoice_date) errors.push('Invoice date is required');
-    if (!formData.invoice_number) errors.push('Invoice number is required');
     if (!formData.cuin_number) errors.push('CUIN number is required');
     if (!formData.user_name) errors.push('User is required');
     if (!formData.account_type) errors.push('Account type is required');
     if (!formData.petty_cash_account) errors.push('Account number is required');
     if (!formData.supplier_name) errors.push('Supplier name is required');
-    if (!formData.category_code) errors.push('Category is required');
-    if (!formData.subcategory_code) errors.push('Subcategory is required');
+    if (!formData.expense_category) errors.push('Category is required');
+    if (!formData.subcategory) errors.push('Subcategory is required');
     if (!formData.amount || Number(formData.amount) <= 0) errors.push('Valid amount is required');
     if (!formData.description) errors.push('Description is required');
 
@@ -287,7 +360,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
   const handleInputChange = (fieldId: string, value: any) => {
     setFormData(prev => {
       const newData = { ...prev, [fieldId]: value };
-  
+
       // Handle file previews
       if (fieldId === 'receipt_url' && value instanceof File) {
         const url = URL.createObjectURL(value);
@@ -298,7 +371,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         const url = URL.createObjectURL(value);
         setPaymentProofPreview(url);
       }
-  
+
       return newData;
     });
   };
@@ -315,6 +388,28 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
       setSelectedSupplier(selectedSupplier);
       setOpenSupplier(false);
     }
+  };
+
+  const handleCategoryChange = (selectedExpenseCategory: string) => {
+    const selectedCategoryData = expenseCategories.find(cat => cat.expense_category === selectedExpenseCategory);
+
+    // Update formData with the selected expense category and reset subcategory
+    setFormData(prev => ({
+      ...prev,
+      expense_category: selectedCategoryData?.expense_category || '',
+      subcategory: '' // Reset subcategory when category changes
+    }));
+  };
+
+  const formatStatus = (status: string): string => {
+    return status.toLowerCase();
+  };
+
+  const determineStatus = (checkedBy: string | null, verifiedBy: string | null): 'pending' | 'checked' | 'verified' => {
+    if (!checkedBy && !verifiedBy) return 'pending';
+    if (checkedBy && !verifiedBy) return 'checked';
+    if (checkedBy && verifiedBy) return 'verified';
+    return 'pending'; // Default fallback
   };
 
   // Handle form submission
@@ -353,35 +448,30 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         );
       }
 
-      // Handle new supplier creation if needed
-      if (isNewSupplier) {
-        const supplierData = {
-          supplierName: formData.supplier_name,
-          supplierType: 'Individual',
-          pin: formData.supplier_pin,
-          idNumber: formData.supplier_pin,
-          mobile: '',
-          email: ''
-        };
-
-        uploadPromises.push(
-          PettyCashService.createRecord('acc_portal_pettycash_suppliers', {
-            data: supplierData,
-            userid: userId
-          }, userId)
-        );
-      }
-
       // Wait for all uploads to complete
       await Promise.all(uploadPromises);
 
-      // Update final data with uploaded URLs
+      // Log checkedBy and verifiedBy values
+      console.log('Checked By:', formData.checked_by);
+      console.log('Verified By:', formData.approved_by);
+
+      // Determine status based on checked_by and approved_by
+      const status = determineStatus(formData.checked_by, formData.approved_by);
+      console.log('Determined Status:', status); // Log the determined status
+
+      // Remove petty_cash_number from finalData as it shouldn't be submitted
+      const { petty_cash_number, ...dataWithoutPCVNumber } = finalData;
+
+      // Update final data with uploaded URLs and other required fields
       finalData = {
-        ...finalData,
+        ...dataWithoutPCVNumber,
         receipt_url: receiptUrl || finalData.receipt_url,
         payment_proof_url: paymentProofUrl || finalData.payment_proof_url,
-        userid: userId
+        status: status, // Ensure this is a valid status
+        userid: userId,
       };
+
+      console.log('Final Data before submission:', finalData); // Log final data
 
       await onSubmit(finalData);
 
@@ -432,99 +522,156 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     );
   };
 
-  const renderSupplierSection = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4">
-        <div className="space-y-2">
-          <Select
-            value={isNewSupplier ? 'new' : 'existing'}
-            onValueChange={(value) => {
-              setIsNewSupplier(value === 'new');
-              if (value === 'new') {
-                setFormData(prev => ({
-                  ...prev,
-                  supplier_name: '',
-                  supplier_pin: ''
-                }));
-              }
-            }}
-          >
-            <SelectTrigger className="h-8">
-              <SelectValue placeholder="Choose supplier type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="existing">Existing Supplier</SelectItem>
-              <SelectItem value="new">New Supplier</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+  useEffect(() => {
+    console.log('Suppliers loaded:', suppliers.map(s => s.data.supplierName));
+  }, [suppliers]);
 
-        {!isNewSupplier ? (
+  const renderSupplierSection = () => {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
+          {/* Supplier Type Selection */}
           <div className="space-y-2">
             <Select
-              value={formData.supplier_name || ''}
-              onValueChange={handleSupplierSelect} // Use the updated function
+              value={isNewSupplier ? 'new' : 'existing'}
+              onValueChange={(value) => {
+                setIsNewSupplier(value === 'new');
+                if (value === 'new') {
+                  setFormData(prev => ({
+                    ...prev,
+                    supplier_name: '',
+                    supplier_pin: '',
+                    purchase_type: ''
+                  }));
+                  setSelectedSupplier(null);
+                }
+              }}
             >
               <SelectTrigger className="h-8">
-                <SelectValue placeholder="Select supplier..." />
+                <SelectValue placeholder="Choose supplier type" />
               </SelectTrigger>
               <SelectContent>
-                {supplierOptions.map((supplier) => (
-                  <SelectItem
-                    key={supplier.id}
-                    value={supplier.id.toString()} // Use supplier ID as value
-                    className="cursor-pointer"
-                  >
-                    <div className="flex flex-col py-1">
-                      <span className="font-medium text-sm">
-                        {supplier.data.supplierName}
-                      </span>
-                      <div className="flex flex-col gap-0.5 text-xs text-gray-500">
-                        <div className="flex items-center gap-2">
-                          <span className="bg-blue-50 px-1.5 py-0.5 rounded">
-                            {supplier.data.supplierType}
-                          </span>
-                          {supplier.data.idNumber && (
-                            <span>ID: {supplier.data.idNumber}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span>{supplier.data.tradingType}</span>
-                          <span>•</span>
-                          <span>{supplier.data.email}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </SelectItem>
-                ))}
+                <SelectItem value="existing">Existing Supplier</SelectItem>
+                <SelectItem value="new">New Supplier</SelectItem>
               </SelectContent>
             </Select>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
+
+          {/* Existing Supplier Selection */}
+          {!isNewSupplier && (
             <div className="space-y-2">
-              <Label>Supplier Name<span className="text-red-500">*</span></Label>
-              <Input
-                value={formData.supplier_name}
-                onChange={(e) => handleInputChange('supplier_name', e.target.value)}
-                className="h-8"
-                required
-              />
+              <Label>Select Supplier</Label>
+              <Select
+                value={selectedSupplier?.id?.toString()}
+                onValueChange={(value) => {
+                  const supplier = suppliers.find(s => s.id.toString() === value);
+                  if (supplier) {
+                    setSelectedSupplier(supplier);
+                  }
+                }}
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="Select a supplier">
+                    {selectedSupplier?.data?.supplierName || "Select supplier..."}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((supplier) => (
+                    <SelectItem
+                      key={supplier.id}
+                      value={supplier.id.toString()}
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {supplier.data.supplierName}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {supplier.data.pin || supplier.data.idNumber || 'No ID'} •
+                          {supplier.data.tradingType} •
+                          {supplier.data.supplierType}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Selected Supplier Details */}
+              {selectedSupplier && (
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div className="space-y-2">
+                    <Label>Supplier Name</Label>
+                    <Input
+                      value={formData.supplier_name}
+                      disabled
+                      className="h-8 bg-gray-50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Supplier PIN/ID</Label>
+                    <Input
+                      value={formData.supplier_pin}
+                      disabled
+                      className="h-8 bg-gray-50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Trading Type</Label>
+                    <Input
+                      value={mapPurchaseTypeToTradingType(formData.purchase_type)}
+                      disabled
+                      className="h-8 bg-gray-50"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>ID Number<span className="text-red-500">*</span></Label>
-              <Input
-                value={formData.supplier_pin}
-                onChange={(e) => handleInputChange('supplier_pin', e.target.value)}
-                className="h-8"
-                required
-              />
+          )}
+
+          {/* New Supplier Form */}
+          {isNewSupplier && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Supplier Name<span className="text-red-500">*</span></Label>
+                <Input
+                  value={formData.supplier_name}
+                  onChange={(e) => handleInputChange('supplier_name', e.target.value)}
+                  className="h-8"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>ID Number/PIN<span className="text-red-500">*</span></Label>
+                <Input
+                  value={formData.supplier_pin}
+                  onChange={(e) => handleInputChange('supplier_pin', e.target.value)}
+                  className="h-8"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Trading Type<span className="text-red-500">*</span></Label>
+                <Select
+                  value={formData.purchase_type}
+                  onValueChange={(value) => handleInputChange('purchase_type', value)}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="Select trading type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="purchase">Purchase Only</SelectItem>
+                    <SelectItem value="expense">Expense Only</SelectItem>
+                    <SelectItem value="both">Both Purchase + Expense</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
 
   const formSections = {
     basicInfo: {
@@ -535,7 +682,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
           label: "Petty Cash Number",
           type: "text",
           disabled: true,
-          value: nextPettyCashNumber,
+          value: formData.petty_cash_number,
           className: "bg-gray-50"
         },
         {
@@ -556,9 +703,9 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
           type: "select",
           required: true,
           value: formData.user_name,
-          options: users.map(user => ({
-            value: user.name,
-            label: user.name
+          options: uniqueUsers.map(user => ({
+            value: user,
+            label: user
           }))
         },
         {
@@ -567,7 +714,8 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
           type: "select",
           required: true,
           value: formData.account_type,
-          options: accountTypeOptions, // Use the state that holds the unique account types
+          disabled: !formData.user_name,
+          options: accountTypeOptions
         },
         {
           id: "petty_cash_account",
@@ -577,12 +725,18 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
           colSpan: 2,
           value: formData.petty_cash_account,
           disabled: !formData.user_name || !formData.account_type,
-          options: userAccounts // Use the state that holds the filtered accounts
-            .filter(acc => acc.pettyCashType === formData.account_type) // Filter by selected account type
-            .map(acc => ({
-              value: acc.accountNumber, // Use accountNumber from the account data
-              label: acc.accountNumber // Display accountNumber as the label
-            }))
+          options: (() => {
+            const filteredAccounts = accounts
+              .filter(acc =>
+                acc.accountUser === formData.user_name &&
+                acc.pettyCashType === formData.account_type
+              )
+              .map(acc => ({
+                value: acc.accountNumber,
+                label: acc.accountNumber
+              }));
+            return filteredAccounts;
+          })()
         }
       ]
     },
@@ -616,35 +770,40 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
           type: "select",
           required: true,
           value: formData.purchase_type,
+          disabled: false,
           options: [
-            { value: "purchase", label: "Purchase" },
-            { value: "expense", label: "Expense" },
-            { value: "both", label: "Purchase + Expense" }
+            { value: "purchase", label: "Purchase Only" },
+            { value: "expense", label: "Expense Only" },
+            { value: "both", label: "Both Purchase + Expense" }
           ]
         },
         {
-          id: "category_code",
+          id: "expense_category", // Change to expense_category
           label: "Category",
           type: "select",
           required: true,
-          value: formData.category_code,
-          options: Object.entries(EXPENSE_CATEGORIES).map(([code, category]) => ({
-            value: code,
-            label: category.name
+          value: formData.expense_category, // Use expense_category
+          options: expenseCategories.map(category => ({
+            value: category.expense_category,
+            label: category.expense_category
           }))
         },
         {
-          id: "subcategory_code",
+          id: "subcategory", // Change to subcategory
           label: "Subcategory",
           type: "select",
           required: true,
-          value: formData.subcategory_code,
-          disabled: !formData.category_code,
-          options: formData.category_code ?
-            EXPENSE_CATEGORIES[formData.category_code]?.subcategories.map(sub => ({
-              value: sub.code,
-              label: sub.name
-            })) : []
+          value: formData.subcategory, // Use the subcategory name directly
+          disabled: !formData.expense_category, // Disable if no category is selected
+          options: (() => {
+            const selectedCategory = expenseCategories.find(
+              cat => cat.expense_category === formData.expense_category // Match by expense category
+            );
+            return selectedCategory?.subcategories?.map(sub => ({
+              value: sub.name, // Use the subcategory name directly
+              label: sub.name // Display the subcategory name
+            })) || [];
+          })()
         },
         {
           id: "description",
@@ -656,8 +815,68 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         }
       ]
     },
-    paymentVerification: {
-      title: "Payment & Verification",
+    // paymentVerification: {
+    //   title: "Payment & Verification",
+    //   fields: [
+    //     {
+    //       id: "paid_via",
+    //       label: "Paid Via/By",
+    //       type: "text",
+    //       required: true,
+    //       value: formData.paid_via
+    //     },
+    //     {
+    //       id: "checked_by",
+    //       label: "Checked By",
+    //       type: "select",
+    //       value: formData.checked_by,
+    //       options: uniqueUsers.map(user => ({
+    //         value: user,
+    //         label: user
+    //       }))
+    //     },
+    //     {
+    //       id: "approved_by",
+    //       label: "Approved By",
+    //       type: "select",
+    //       value: formData.approved_by,
+    //       options: uniqueUsers.map(user => ({
+    //         value: user,
+    //         label: user
+    //       }))
+    //     },
+    //     {
+    //       id: "receipt_url",
+    //       label: "Bill/PCV Upload",
+    //       type: "file",
+    //       required: true,
+    //       accept: "image/*,.pdf"
+    //     },
+    //     {
+    //       id: "bill_number",
+    //       label: "Bill Number",
+    //       type: "text",
+    //       required: true,
+    //       value: formData.bill_number
+    //     },
+    //     {
+    //       id: "cuin_number",
+    //       label: "Bill CUIN Number",
+    //       type: "text",
+    //       required: true,
+    //       value: formData.cuin_number
+    //     },
+    //     {
+    //       id: "payment_proof_url",
+    //       label: "Payment Proof",
+    //       type: "file",
+    //       required: true,
+    //       accept: "image/*,.pdf"
+    //     }
+    //   ]
+    // },
+    payment: {
+      title: "Payment Verification",
       fields: [
         {
           id: "paid_via",
@@ -671,25 +890,33 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
           label: "Checked By",
           type: "select",
           value: formData.checked_by,
-          options: users
-            .filter(user => user.role === 'manager' || user.role === 'admin')
-            .map(user => ({
-              value: user.name,
-              label: user.name
-            }))
+          options: uniqueUsers.map(user => ({
+            value: user,
+            label: user
+          }))
         },
         {
           id: "approved_by",
           label: "Approved By",
           type: "select",
           value: formData.approved_by,
-          options: users
-            .filter(user => user.role === 'manager' || user.role === 'admin')
-            .map(user => ({
-              value: user.name,
-              label: user.name
-            }))
+          options: uniqueUsers.map(user => ({
+            value: user,
+            label: user
+          }))
         },
+        {
+          id: "payment_proof_url",
+          label: "Payment Proof",
+          type: "file",
+          required: true,
+          accept: "image/*,.pdf"
+        }
+      ]
+    },
+    billPaymentVerification: {
+      title: "Bill Verification",
+      fields: [
         {
           id: "receipt_url",
           label: "Bill/PCV Upload",
@@ -706,17 +933,10 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         },
         {
           id: "cuin_number",
-          label: "CUIN Number",
+          label: "Bill CUIN Number",
           type: "text",
           required: true,
           value: formData.cuin_number
-        },
-        {
-          id: "payment_proof_url",
-          label: "Payment Proof",
-          type: "file",
-          required: true,
-          accept: "image/*,.pdf"
         }
       ]
     }
@@ -727,12 +947,69 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
       return field.render(); // Render the custom supplier section
     }
 
+    if (field.id === 'category_code') {
+      return (
+        <Select
+          value={formData.category} // This should reflect the selected category
+          onValueChange={handleCategoryChange} // Call the updated handler
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue placeholder="Select category" />
+          </SelectTrigger>
+          <SelectContent>
+            {expenseCategories.map(category => (
+              <SelectItem
+                key={category.expense_category}
+                value={category.expense_category}
+              >
+                {category.expense_category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    if (field.id === 'subcategory') { // Change to use subcategory directly
+      const selectedCategory = expenseCategories.find(
+        cat => cat.expense_category === formData.expense_category // Match by expense category
+      );
+      const subcategories = selectedCategory?.subcategories || [];
+
+      return (
+        <Select
+          value={formData.subcategory} // Use the subcategory name directly
+          onValueChange={(value) => {
+            handleInputChange('subcategory', value); // Update the subcategory name directly
+          }}
+          disabled={!formData.expense_category || subcategories.length === 0} // Disable if no category is selected or no subcategories
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue placeholder="Select subcategory" />
+          </SelectTrigger>
+          <SelectContent>
+            {subcategories.map(sub => (
+              <SelectItem
+                key={sub.name} // Use the subcategory name as the key
+                value={sub.name} // Use the subcategory name as the value
+              >
+                {sub.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
     switch (field.type) {
       case 'select':
         return (
           <Select
             value={field.value?.toString()}
-            onValueChange={(value) => handleInputChange(field.id, value)}
+            onValueChange={(value) => {
+              console.log(`Select Change - ${field.id}:`, value);
+              handleInputChange(field.id, value);
+            }}
             disabled={field.disabled}
           >
             <SelectTrigger className="h-8">
@@ -758,7 +1035,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
               className="h-8"
               required={field.required}
             />
-            {renderFilePreview(field.id)}
+            {/* {renderFilePreview(field.id)} */}
           </div>
         );
 
