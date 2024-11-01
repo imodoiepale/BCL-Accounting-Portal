@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { RefreshCwIcon, EyeIcon, UploadIcon, ArrowUpDown, Edit2Icon } from 'lucide-react'
-import { toast, Toaster } from 'react-hot-toast'
+import { toast } from 'react-hot-toast'
 import dynamic from 'next/dynamic'
 import { useAuth } from '@clerk/clerk-react'
 

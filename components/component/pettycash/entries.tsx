@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RefreshCwIcon, Search, FilterIcon, Download, RotateCcw, Loader2, Eye, Check } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { PettyCashService } from './PettyCashService';
@@ -818,7 +818,6 @@ export function TransactionsTab() {
 
   return (
     <div className="flex w-full bg-gray-100">
-      {/* <Toaster position="top-right" /> */}
       <main className="flex-1 p-4 w-full">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-4">

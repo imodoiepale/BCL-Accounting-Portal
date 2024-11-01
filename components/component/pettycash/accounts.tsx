@@ -14,7 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
 import { RefreshCwIcon, Search, Plus } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { PettyCashService } from './PettyCashService';
 import { TableActions } from './TableActions';
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,7 @@ const CASH_TYPES = [
   { value: 'Card', label: 'Card' },
   { value: 'Credit', label: 'Credit' }
 ];
-
+ 
 // Types
 interface AccountData {
   id?: string;
@@ -219,7 +219,8 @@ const AccountDialog: React.FC<AccountDialogProps> = ({
           { value: 'Active', label: 'Active' },
           { value: 'Inactive', label: 'Inactive' }
         ],
-        required: true
+        required: true,
+        disabled: formData.endDate ? true : false
       }
     ];
 
@@ -243,6 +244,7 @@ const AccountDialog: React.FC<AccountDialogProps> = ({
                           handleInputChange({ target: { name: 'accountNumber', value: 'Cash' } } as React.ChangeEvent<HTMLInputElement>);
                         }
                       }}
+                      disabled={disabled}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
@@ -261,7 +263,12 @@ const AccountDialog: React.FC<AccountDialogProps> = ({
                       name={name}
                       type={type}
                       value={formData[name]?.toString() || ''}
-                      onChange={handleInputChange}
+                      onChange={(e) => {
+                        handleInputChange(e);
+                        if (name === 'endDate' && e.target.value) {
+                          handleInputChange({ target: { name: 'status', value: 'Inactive' } } as React.ChangeEvent<HTMLInputElement>);
+                        }
+                      }}
                       required={required}
                       disabled={disabled || (name === 'accountNumber' && formData.pettyCashType === 'Cash')}
                       className="h-9 w-full"
