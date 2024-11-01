@@ -459,27 +459,12 @@
       {
         header: 'Category',
         width: '150px',
-        cell: (entry: PettyCashEntry) => {
-          const category = expenseCategories.find(cat => cat.expense_category === entry.expense_category);
-          return (
-            <div>
-              {category?.expense_category || '-'}
-            </div>
-          );
-        }
+      cell: (entry) => entry.expense_category || '-'
       },
       {
         header: 'Subcategory',
         width: '150px',
-        cell: (entry: PettyCashEntry) => {
-          const category = expenseCategories.find(cat => cat.expense_category === entry.expense_category);
-          const subcategory = category?.subcategories?.find(sub => sub.subcategory === entry.subcategory);
-          return (
-            <div>
-              {subcategory?.subcategory || '-'}
-            </div>
-          );
-        }
+        cell: (entry) => entry.subcategory || '-'
       },
       {
         header: 'Amount',
