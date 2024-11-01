@@ -63,13 +63,12 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
     return { fields, defaultValues };
   };
 
-// Initialize form with empty values or saved data
-const { fields, defaultValues } = getFormFields();
+  const { fields, defaultValues } = getFormFields();
 const methods = useForm({
   defaultValues: {
     ...defaultValues,
-    company_name: companyData.name,
-    ...formData // Include saved form data
+    company_name: companyData.company_name || companyData.name, // Try both properties
+    ...formData
   }
 });
 
@@ -119,25 +118,40 @@ const methods = useForm({
     }
   };
 
-
   const handleManualEntry = async (formData: any) => {
     try {
-      const cleanedData = {
-        ...Object.keys(formData).reduce((acc, key) => {
-          if (formData[key] !== undefined && formData[key] !== '') {
-            acc[key] = formData[key];
+      let cleanedData;
+      if (currentStage === 3) { // Supplier stage
+        cleanedData = {
+          userid: companyData.userId,
+          data: {
+            supplierName: formData['data.supplierName'] || '',
+            supplierType: formData['data.supplierType'] || '',
+            tradingType: formData['data.tradingType'] || '',
+            pin: formData['data.pin'] || '',
+            idNumber: formData['data.idNumber'] || '',
+            mobile: formData['data.mobile'] || '',
+            email: formData['data.email'] || ''
           }
-          return acc;
-        }, {}),
-        userid: companyData.userId
-      };
+        };
+      } else {
+        cleanedData = {
+          ...Object.keys(formData).reduce((acc, key) => {
+            if (formData[key] !== undefined && formData[key] !== '') {
+              acc[key] = formData[key];
+            }
+            return acc;
+          }, {}),
+          userid: companyData.userId
+        };
+      }
   
       // Update local state
       setData(prev => ({
         ...prev,
         [currentStage]: [cleanedData] // Replace instead of append
       }));
-      setFormData(cleanedData); // Save form data
+      setFormData(cleanedData);
       
       setIsDialogOpen(false);
       toast.success('Data added successfully');
@@ -158,124 +172,168 @@ const methods = useForm({
 
       // Company Data
       if (data[1]?.length) {
-        const companyData = data[1][0];
+        const companyData = {
+          company_name: name,
+          company_type: data[1][0].company_type,
+          description: data[1][0].description,
+          registration_number: data[1][0].registration_number,
+          date_established: data[1][0].date_established,
+          kra_pin_number: data[1][0].kra_pin,
+          industry: data[1][0].industry,
+          employees: data[1][0].employees,
+          annual_revenue: data[1][0].annual_revenue,
+          fiscal_year: data[1][0].fiscal_year,
+          website: data[1][0].website,
+          email: data[1][0].email,
+          phone: data[1][0].phone,
+          street: data[1][0].street,
+          city: data[1][0].city,
+          postal_code: data[1][0].postal_code,
+          country: data[1][0].country,
+          userid: userId
+        };
+
         const { error: companyError } = await supabase
           .from('acc_portal_company')
-          .insert({
-            ...companyData,
-            company_name: name,
-            userid: userId
-          });
+          .insert(companyData);
         if (companyError) throw companyError;
 
-        // Password Checker
-        if (companyData.kra_pin && companyData.kra_password) {
-          const { error: passwordError } = await supabase
+        // Submit statutory data
+        await Promise.all([
+          // Password Checker
+          companyData.kra_pin && supabase
             .from('PasswordChecker')
             .insert({
               company_name: name,
-              kra_pin: companyData.kra_pin,
-              kra_password: companyData.kra_password,
+              kra_pin: data[1][0].kra_pin,
+              kra_password: data[1][0].kra_password,
               status: 'pending',
-              last_checked: new Date().toISOString()
-            });
-          if (passwordError) throw passwordError;
-        }
+            }),
 
-        // NSSF
-        if (companyData.nssf_code) {
-          const { error: nssfError } = await supabase
+          // NSSF
+          data[1][0].nssf_code && supabase
             .from('nssf_companies')
             .insert({
               name: name,
-              identifier: companyData.nssf_user,
-              nssf_password: companyData.nssf_password,
-              nssf_code: companyData.nssf_code,
-              userid: userId
-            });
-          if (nssfError) throw nssfError;
-        }
+              identifier: data[1][0].nssf_user,
+              nssf_password: data[1][0].nssf_password,
+              nssf_code: data[1][0].nssf_code,
+            }),
 
-        // NHIF
-        if (companyData.nhif_code) {
-          const { error: nhifError } = await supabase
+          // NHIF
+          data[1][0].nhif_code && supabase
             .from('nhif_companies')
             .insert({
               name: name,
-              identifier: companyData.nhif_code,
-              nhif_password: companyData.nhif_password,
-              nhif_code: companyData.nhif_code,
-              nhif_mobile: companyData.nhif_mobile,
-              nhif_email: companyData.nhif_email,
-              userid: userId
-            });
-          if (nhifError) throw nhifError;
-        }
+              identifier: data[1][0].nhif_code,
+              nhif_password: data[1][0].nhif_password,
+              nhif_code: data[1][0].nhif_code,
+              nhif_mobile: data[1][0].nhif_mobile,
+              nhif_email: data[1][0].nhif_email,
+            }),
 
-        // Ecitizen
-        if (companyData.ecitizen_identifier) {
-          const { error: ecitizenError } = await supabase
+          // Ecitizen
+          data[1][0].ecitizen_identifier && supabase
             .from('ecitizen_companies')
             .insert({
               name: name,
-              ecitizen_identifier: companyData.ecitizen_identifier,
-              ecitizen_password: companyData.ecitizen_password,
+              ecitizen_identifier: data[1][0].ecitizen_identifier,
+              ecitizen_password: data[1][0].ecitizen_password,
               ecitizen_status: 'Pending',
-              userid: userId
-            });
-          if (ecitizenError) throw ecitizenError;
-        }
+            })
+        ].filter(Boolean));
       }
 
       // Directors
       if (data[2]?.length) {
+        const directorData = data[2].map(director => ({
+          first_name: director.first_name,
+          middle_name: director.middle_name,
+          last_name: director.last_name,
+          full_name: director.full_name,
+          gender: director.gender,
+          place_of_birth: director.place_of_birth,
+          country_of_birth: director.country_of_birth,
+          nationality: director.nationality,
+          date_of_birth: director.date_of_birth,
+          id_number: director.id_number,
+          tax_pin: director.tax_pin,
+          mobile_number: director.mobile_number,
+          email_address: director.email_address,
+          job_position: director.job_position,
+          shares_held: director.shares_held,
+          userid: userId
+        }));
+
         const { error: directorError } = await supabase
           .from('acc_portal_directors')
-          .insert(data[2].map(director => ({
-            ...director,
-            userid: userId
-          })));
+          .insert(directorData);
         if (directorError) throw directorError;
       }
 
       // Suppliers
       if (data[3]?.length) {
+        const supplierData = data[3].map(supplier => ({
+          userid: userId,
+          data: {
+            supplierName: supplier['data.supplierName'],
+            supplierType: supplier['data.supplierType'],
+            tradingType: supplier['data.tradingType'],
+            pin: supplier['data.pin'],
+            idNumber: supplier['data.idNumber'],
+            mobile: supplier['data.mobile'],
+            email: supplier['data.email']
+          }
+        }));
+
         const { error: supplierError } = await supabase
           .from('acc_portal_pettycash_suppliers')
-          .insert(data[3].map(supplier => ({
-            userid: userId,
-            data: {
-              supplierName: supplier['data.supplierName'],
-              supplierType: supplier['data.supplierType'],
-              tradingType: supplier['data.tradingType'],
-              pin: supplier['data.pin'],
-              idNumber: supplier['data.idNumber'],
-              mobile: supplier['data.mobile'],
-              email: supplier['data.email']
-            }
-          })));
+          .insert(supplierData);
         if (supplierError) throw supplierError;
       }
 
       // Banks
       if (data[4]?.length) {
+        const bankData = data[4].map(bank => ({
+          bank_name: bank.bank_name,
+          account_number: bank.account_number,
+          currency: bank.currency || null,
+          branch: bank.branch,
+          relationship_manager_name: bank.relationship_manager_name,
+          relationship_manager_mobile: bank.relationship_manager_mobile,
+          relationship_manager_email: bank.relationship_manager_email,
+          bank_startdate: bank.bank_startdate,
+          userid: userId,
+          bank_status: false,
+          bank_verified: false
+        }));
+
         const { error: bankError } = await supabase
           .from('acc_portal_banks')
-          .insert(data[4].map(bank => ({
-            ...bank,
-            userid: userId
-          })));
+          .insert(bankData);
         if (bankError) throw bankError;
       }
 
       // Employees
       if (data[5]?.length) {
+        const employeeData = data[5].map(employee => ({
+          employee_name: employee.employee_name,
+          id_number: employee.id_number,
+          employee_kra_pin: employee.employee_kra_pin,
+          employee_email: employee.employee_email,
+          employee_mobile: employee.employee_mobile,
+          employee_nhif: employee.employee_nhif,
+          employee_nssf: employee.employee_nssf,
+          employee_startdate: employee.employee_startdate,
+          employee_enddate: employee.employee_enddate,
+          userid: userId,
+          employee_status: false,
+          employee_verified: false
+        }));
+
         const { error: employeeError } = await supabase
           .from('acc_portal_employees')
-          .insert(data[5].map(employee => ({
-            ...employee,
-            userid: userId
-          })));
+          .insert(employeeData);
         if (employeeError) throw employeeError;
       }
 
@@ -317,13 +375,18 @@ const methods = useForm({
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6">
         <div className="mb-12">
-     {/* Company Header */}
-     <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <span className="text-gray-600">Company:</span>
-          <span>{companyData.name}</span>
-        </h1>
-      </div>
+          {/* Company Header */}
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+  <div className="flex justify-between items-center">
+    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+      <span className="text-gray-600">Company:</span>
+      <span>{companyData.company_name || companyData.name}</span>
+    </h1>
+    <div className="text-sm text-gray-500">
+      ID: {companyData.userId}
+    </div>
+  </div>
+</div>
           <div className="flex justify-between items-center">
             {stages.map((stage) => (
               <div
@@ -380,29 +443,29 @@ const methods = useForm({
                     <FormProvider {...methods}>
                       <form onSubmit={methods.handleSubmit(handleManualEntry)} className="space-y-6">
                         <div className="grid grid-cols-2 gap-6">
-                           {/* Add the Company Name field first when in Stage 1 */}
-    {currentStage === 1 && (
-      <FormField
-        control={methods.control}
-        name="company_name"
-        render={({ field }) => (
-          <FormItem className="col-span-2">
-            <FormLabel className="text-sm font-semibold text-gray-700">
-              Company Name
-            </FormLabel>
-            <FormControl>
-              <Input
-                {...field}
-                value={companyData.name}
-                disabled
-                className="w-full bg-gray-50"
-              />
-            </FormControl>
-          </FormItem>
-        )}
-      />
-    )}
-     {Object.entries(
+                          {/* Add the Company Name field first when in Stage 1 */}
+                          {currentStage === 1 && (
+                            <FormField
+                              control={methods.control}
+                              name="company_name"
+                              render={({ field }) => (
+                                <FormItem className="col-span-2">
+                                  <FormLabel className="text-sm font-semibold text-gray-700">
+                                    Company Name
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      value={companyData.name}
+                                      disabled
+                                      className="w-full bg-gray-50"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          )}
+                          {Object.entries(
                             fields.reduce((groups, field) => {
                               const category = field.category || 'General Information';
                               if (!groups[category]) {
@@ -485,21 +548,51 @@ const methods = useForm({
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50">
-            {Object.keys(data[currentStage][0]).map((header) => (
-              <TableHead key={header} className="font-semibold text-gray-700">
-                {header}
-              </TableHead>
-            ))}
+            {currentStage === 3 ? (
+              // Special handling for suppliers
+              <>
+                <TableHead>Supplier Name</TableHead>
+                <TableHead>Supplier Type</TableHead>
+                <TableHead>Trading Type</TableHead>
+                <TableHead>PIN</TableHead>
+                <TableHead>ID Number</TableHead>
+                <TableHead>Mobile</TableHead>
+                <TableHead>Email</TableHead>
+              </>
+            ) : (
+              // Other stages
+              Object.keys(data[currentStage][0])
+                .filter(key => key !== 'userid')
+                .map((header) => (
+                  <TableHead key={header} className="font-semibold text-gray-700">
+                    {header}
+                  </TableHead>
+                ))
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
           {data[currentStage].map((row, index) => (
             <TableRow key={index} className="hover:bg-gray-50 transition-colors">
-              {Object.entries(row).map(([key, value], i) => (
-                <TableCell key={i} className="py-3">
-                  {typeof value === 'object' ? JSON.stringify(value) : value}
-                </TableCell>
-              ))}
+              {currentStage === 3 ? (
+                <>
+                  <TableCell>{row.data.supplierName || ''}</TableCell>
+                  <TableCell>{row.data.supplierType || ''}</TableCell>
+                  <TableCell>{row.data.tradingType || ''}</TableCell>
+                  <TableCell>{row.data.pin || ''}</TableCell>
+                  <TableCell>{row.data.idNumber || ''}</TableCell>
+                  <TableCell>{row.data.mobile || ''}</TableCell>
+                  <TableCell>{row.data.email || ''}</TableCell>
+                </>
+              ) : (
+                Object.entries(row)
+                  .filter(([key]) => key !== 'userid')
+                  .map(([key, value], i) => (
+                    <TableCell key={i} className="py-3">
+                      {typeof value === 'object' ? JSON.stringify(value) : value}
+                    </TableCell>
+                  ))
+              )}
             </TableRow>
           ))}
         </TableBody>
