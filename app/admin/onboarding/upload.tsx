@@ -16,6 +16,9 @@ import { PlusIcon } from "lucide-react";
 import { formFields } from "../overallview/formfields";
 import { supabase } from "@/lib/supabaseClient";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
+
 interface UploadProps {
   onComplete: (data: any) => void;
   companyData: {
@@ -64,54 +67,93 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
   };
 
   const { fields, defaultValues } = getFormFields();
-const methods = useForm({
-  defaultValues: {
-    ...defaultValues,
-    company_name: companyData.company_name || companyData.name, // Try both properties
-    ...formData
-  }
-});
+  const methods = useForm({
+    defaultValues: {
+      ...defaultValues,
+      company_name: companyData.company_name || companyData.name, // Try both properties
+      ...formData
+    }
+  });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
+    const file = e.target.files[0];
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+
+    if (!['csv', 'xlsx'].includes(fileExtension || '')) {
+      toast.error('Please upload a .csv or .xlsx file');
+      return;
+    }
 
     try {
-      setFile(e.target.files[0]);
-      const reader = new FileReader();
+      setFile(file);
 
-      reader.onload = async (event) => {
-        const text = event.target?.result as string;
-        const rows = text.split('\n');
-        const headers = rows[0].split(',');
+      if (fileExtension === 'csv') {
+        const reader = new FileReader();
 
-        const parsedData = rows.slice(1)
-          .map(row => {
-            const values = row.split(',');
-            const rowData = headers.reduce((acc, header, index) => {
-              const value = values[index]?.trim();
-              if (value) acc[header.trim()] = value;
-              return acc;
-            }, {} as Record<string, string>);
+        reader.onload = async (event) => {
+          const text = event.target?.result as string;
+          const rows = text.split('\n');
+          const headers = rows[0].split(',');
 
-            // Add userid to each row
-            return { ...rowData, userid: companyData.userId };
-          })
-          .filter(row => Object.keys(row).length > 1); // Filter out empty rows
+          const parsedData = rows.slice(1)
+            .map(row => {
+              const values = row.split(',');
+              const rowData = headers.reduce((acc, header, index) => {
+                const value = values[index]?.trim();
+                if (value) acc[header.trim()] = value;
+                return acc;
+              }, {} as Record<string, string>);
 
-        if (parsedData.length === 0) {
-          toast.error('No valid data found in CSV');
-          return;
-        }
+              // Add userid to each row
+              return { ...rowData, userid: companyData.userId };
+            })
+            .filter(row => Object.keys(row).length > 1); // Filter out empty rows
 
-        setData({ ...data, [currentStage]: parsedData });
-        toast.success('CSV data loaded successfully');
-      };
+          if (parsedData.length === 0) {
+            toast.error('No valid data found in CSV');
+            return;
+          }
 
-      reader.onerror = () => {
-        toast.error('Error reading file');
-      };
+          setData({ ...data, [currentStage]: parsedData });
+          toast.success('CSV data loaded successfully');
+        };
 
-      reader.readAsText(e.target.files[0]);
+        reader.onerror = () => {
+          toast.error('Error reading file');
+        };
+
+        reader.readAsText(file);
+      } else {
+        // Handle XLSX file
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const data = event.target?.result;
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+          const parsedData = jsonData.map(row => ({
+            ...row,
+            userid: companyData.userId
+          }));
+
+          if (parsedData.length === 0) {
+            toast.error('No valid data found in XLSX');
+            return;
+          }
+
+          setData({ ...data, [currentStage]: parsedData });
+          toast.success('XLSX data loaded successfully');
+        };
+
+        reader.onerror = () => {
+          toast.error('Error reading file');
+        };
+
+        reader.readAsBinaryString(file);
+      }
     } catch (error) {
       console.error('Error processing file:', error);
       toast.error('Error processing file');
@@ -121,38 +163,140 @@ const methods = useForm({
   const handleManualEntry = async (formData: any) => {
     try {
       let cleanedData;
-      if (currentStage === 3) { // Supplier stage
-        cleanedData = {
-          userid: companyData.userId,
-          data: {
-            supplierName: formData['data.supplierName'] || '',
-            supplierType: formData['data.supplierType'] || '',
-            tradingType: formData['data.tradingType'] || '',
-            pin: formData['data.pin'] || '',
-            idNumber: formData['data.idNumber'] || '',
-            mobile: formData['data.mobile'] || '',
-            email: formData['data.email'] || ''
-          }
-        };
-      } else {
-        cleanedData = {
-          ...Object.keys(formData).reduce((acc, key) => {
-            if (formData[key] !== undefined && formData[key] !== '') {
-              acc[key] = formData[key];
+      console.log('Current stage:', currentStage);
+      console.log('Raw form data:', formData);
+  
+      switch (currentStage) {
+        case 1: // Company Information
+          cleanedData = {
+            company_type: formData.company_type || '',
+            description: formData.description || '',
+            registration_number: formData.registration_number || '',
+            date_established: formData.date_established || '',
+            kra_pin: formData.kra_pin || '',
+            industry: formData.industry || '',
+            employees: formData.employees || '',
+            annual_revenue: formData.annual_revenue || '',
+            fiscal_year: formData.fiscal_year || '',
+            website: formData.website || '',
+            email: formData.email || '',
+            phone: formData.phone || '',
+            street: formData.street || '',
+            city: formData.city || '',
+            postal_code: formData.postal_code || '',
+            country: formData.country || '',
+            kra_password: formData.kra_password || '',
+            nssf_code: formData.nssf_code || '',
+            nssf_user: formData.nssf_user || '',
+            nssf_password: formData.nssf_password || '',
+            nhif_code: formData.nhif_code || '',
+            nhif_password: formData.nhif_password || '',
+            nhif_mobile: formData.nhif_mobile || '',
+            nhif_email: formData.nhif_email || '',
+            ecitizen_identifier: formData.ecitizen_identifier || '',
+            ecitizen_password: formData.ecitizen_password || '',
+            userid: companyData.userId
+          };
+          break;
+  
+        case 2: // Director's Information
+          cleanedData = {
+            first_name: formData.first_name || '',
+            middle_name: formData.middle_name || '',
+            last_name: formData.last_name || '',
+            full_name: formData.full_name || '',
+            gender: formData.gender || '',
+            place_of_birth: formData.place_of_birth || '',
+            country_of_birth: formData.country_of_birth || '',
+            nationality: formData.nationality || '',
+            date_of_birth: formData.date_of_birth || '',
+            id_number: formData.id_number || '',
+            tax_pin: formData.tax_pin || '',
+            mobile_number: formData.mobile_number || '',
+            email_address: formData.email_address || '',
+            job_position: formData.job_position || '',
+            shares_held: formData.shares_held || '',
+            userid: companyData.userId
+          };
+          break;
+  
+        case 3: // Suppliers
+          cleanedData = {
+            userid: companyData.userId,
+            data: {
+              supplierName: formData['data.supplierName'] || '',
+              supplierType: formData['data.supplierType'] || '',
+              tradingType: formData['data.tradingType'] || '',
+              pin: formData['data.pin'] || '',
+              idNumber: formData['data.idNumber'] || '',
+              mobile: formData['data.mobile'] || '',
+              email: formData['data.email'] || ''
             }
-            return acc;
-          }, {}),
-          userid: companyData.userId
-        };
+          };
+          break;
+  
+        case 4: // Banks
+          cleanedData = {
+            bank_name: formData.bank_name || '',
+            account_number: formData.account_number || '',
+            currency: formData.currency || '',
+            branch: formData.branch || '',
+            relationship_manager_name: formData.relationship_manager_name || '',
+            relationship_manager_mobile: formData.relationship_manager_mobile || '',
+            relationship_manager_email: formData.relationship_manager_email || '',
+            bank_startdate: formData.bank_startdate || '',
+            userid: companyData.userId,
+            bank_status: false,
+            bank_verified: false
+          };
+          break;
+  
+        case 5: // Employee Details
+          cleanedData = {
+            employee_name: formData.employee_name || '',
+            id_number: formData.id_number || '',
+            employee_kra_pin: formData.employee_kra_pin || '',
+            employee_email: formData.employee_email || '',
+            employee_mobile: formData.employee_mobile || '',
+            employee_nhif: formData.employee_nhif || '',
+            employee_nssf: formData.employee_nssf || '',
+            employee_startdate: formData.employee_startdate || '',
+            employee_enddate: formData.employee_enddate || '',
+            userid: companyData.userId,
+            employee_status: false,
+            employee_verified: false
+          };
+          break;
+  
+        default:
+          cleanedData = {};
       }
   
-      // Update local state
-      setData(prev => ({
-        ...prev,
-        [currentStage]: [cleanedData] // Replace instead of append
-      }));
+      // Validate that at least some data is present
+      const hasData = Object.values(cleanedData).some(value => 
+        value !== '' && value !== null && value !== undefined && 
+        (typeof value === 'object' ? Object.values(value).some(v => v !== '') : true)
+      );
+  
+      if (!hasData) {
+        toast.error('Please fill in at least one field');
+        return false;
+      }
+  
+      console.log('Cleaned data before setting:', cleanedData);
+  
+      setData(prev => {
+        const newData = {
+          ...prev,
+          [currentStage]: Array.isArray(prev[currentStage]) 
+            ? [...prev[currentStage], cleanedData]
+            : [cleanedData]
+        };
+        console.log('Updated data state:', newData);
+        return newData;
+      });
+  
       setFormData(cleanedData);
-      
       setIsDialogOpen(false);
       toast.success('Data added successfully');
       return true;
@@ -166,208 +310,285 @@ const methods = useForm({
 
   const submitAllData = async () => {
     const { userId, name } = companyData;
-
+  
     try {
       setLoading(true);
-
+      let companyId; // Store company ID if needed for relations
+  
       // Company Data
-      if (data[1]?.length) {
+      if (data[1] && Array.isArray(data[1]) && data[1].length > 0) {
+        console.log('Submitting company data:', data[1][0]);
+        
         const companyData = {
           company_name: name,
-          company_type: data[1][0].company_type,
-          description: data[1][0].description,
-          registration_number: data[1][0].registration_number,
-          date_established: data[1][0].date_established,
-          kra_pin_number: data[1][0].kra_pin,
-          industry: data[1][0].industry,
-          employees: data[1][0].employees,
-          annual_revenue: data[1][0].annual_revenue,
-          fiscal_year: data[1][0].fiscal_year,
-          website: data[1][0].website,
-          email: data[1][0].email,
-          phone: data[1][0].phone,
-          street: data[1][0].street,
-          city: data[1][0].city,
-          postal_code: data[1][0].postal_code,
-          country: data[1][0].country,
+          company_type: data[1][0]?.company_type || '',
+          description: data[1][0]?.description || '',
+          registration_number: data[1][0]?.registration_number || '',
+          date_established: data[1][0]?.date_established || '',
+          kra_pin_number: data[1][0]?.kra_pin || '',
+          industry: data[1][0]?.industry || '',
+          employees: data[1][0]?.employees || '',
+          annual_revenue: data[1][0]?.annual_revenue || '',
+          fiscal_year: data[1][0]?.fiscal_year || '',
+          website: data[1][0]?.website || '',
+          email: data[1][0]?.email || '',
+          phone: data[1][0]?.phone || '',
+          street: data[1][0]?.street || '',
+          city: data[1][0]?.city || '',
+          postal_code: data[1][0]?.postal_code || '',
+          country: data[1][0]?.country || '',
           userid: userId
         };
-
-        const { error: companyError } = await supabase
+  
+        const { data: insertedCompany, error: companyError } = await supabase
           .from('acc_portal_company')
-          .insert(companyData);
-        if (companyError) throw companyError;
-
-        // Submit statutory data
-        await Promise.all([
-          // Password Checker
-          companyData.kra_pin && supabase
-            .from('PasswordChecker')
-            .insert({
+          .insert(companyData)
+          .select('id')
+          .single();
+  
+        if (companyError) {
+          console.error('Error inserting company:', companyError);
+          throw new Error(`Failed to insert company: ${companyError.message}`);
+        }
+  
+        companyId = insertedCompany?.id;
+  
+        // Submit statutory data only if company insertion was successful
+        const statutoryPromises = [];
+  
+        if (data[1][0].kra_pin) {
+          statutoryPromises.push(
+            supabase.from('PasswordChecker').insert({
               company_name: name,
               kra_pin: data[1][0].kra_pin,
               kra_password: data[1][0].kra_password,
               status: 'pending',
-            }),
-
-          // NSSF
-          data[1][0].nssf_code && supabase
-            .from('nssf_companies')
-            .insert({
+            })
+          );
+        }
+  
+        if (data[1][0].nssf_code) {
+          statutoryPromises.push(
+            supabase.from('nssf_companies').insert({
               name: name,
               identifier: data[1][0].nssf_user,
               nssf_password: data[1][0].nssf_password,
               nssf_code: data[1][0].nssf_code,
-            }),
-
-          // NHIF
-          data[1][0].nhif_code && supabase
-            .from('nhif_companies')
-            .insert({
+            })
+          );
+        }
+  
+        if (data[1][0].nhif_code) {
+          statutoryPromises.push(
+            supabase.from('nhif_companies').insert({
               name: name,
               identifier: data[1][0].nhif_code,
               nhif_password: data[1][0].nhif_password,
               nhif_code: data[1][0].nhif_code,
               nhif_mobile: data[1][0].nhif_mobile,
               nhif_email: data[1][0].nhif_email,
-            }),
-
-          // Ecitizen
-          data[1][0].ecitizen_identifier && supabase
-            .from('ecitizen_companies')
-            .insert({
+            })
+          );
+        }
+  
+        if (data[1][0].ecitizen_identifier) {
+          statutoryPromises.push(
+            supabase.from('ecitizen_companies').insert({
               name: name,
               ecitizen_identifier: data[1][0].ecitizen_identifier,
               ecitizen_password: data[1][0].ecitizen_password,
               ecitizen_status: 'Pending',
             })
-        ].filter(Boolean));
+          );
+        }
+  
+        if (statutoryPromises.length > 0) {
+          const statutoryResults = await Promise.allSettled(statutoryPromises);
+          const failedStatutory = statutoryResults.filter(result => result.status === 'rejected');
+          if (failedStatutory.length > 0) {
+            console.error('Some statutory submissions failed:', failedStatutory);
+            throw new Error('Failed to submit some statutory data');
+          }
+        }
       }
-
+  
       // Directors
-      if (data[2]?.length) {
+      if (data[2] && Array.isArray(data[2]) && data[2].length > 0) {
+        console.log('Submitting director data:', data[2]);
+  
         const directorData = data[2].map(director => ({
-          first_name: director.first_name,
-          middle_name: director.middle_name,
-          last_name: director.last_name,
-          full_name: director.full_name,
-          gender: director.gender,
-          place_of_birth: director.place_of_birth,
-          country_of_birth: director.country_of_birth,
-          nationality: director.nationality,
-          date_of_birth: director.date_of_birth,
-          id_number: director.id_number,
-          tax_pin: director.tax_pin,
-          mobile_number: director.mobile_number,
-          email_address: director.email_address,
-          job_position: director.job_position,
-          shares_held: director.shares_held,
+          first_name: director.first_name || '',
+          middle_name: director.middle_name || '',
+          last_name: director.last_name || '',
+          full_name: director.full_name || '',
+          gender: director.gender || '',
+          place_of_birth: director.place_of_birth || '',
+          country_of_birth: director.country_of_birth || '',
+          nationality: director.nationality || '',
+          date_of_birth: director.date_of_birth || '',
+          id_number: director.id_number || '',
+          tax_pin: director.tax_pin || '',
+          mobile_number: director.mobile_number || '',
+          email_address: director.email_address || '',
+          job_position: director.job_position || '',
+          shares_held: director.shares_held || '',
           userid: userId
         }));
-
+  
         const { error: directorError } = await supabase
           .from('acc_portal_directors')
           .insert(directorData);
-        if (directorError) throw directorError;
+  
+        if (directorError) {
+          console.error('Error inserting directors:', directorError);
+          throw new Error(`Failed to insert directors: ${directorError.message}`);
+        }
       }
-
+  
+      // If we get here, company and director data were successful
+      // Now proceed with the rest of the data
+  
       // Suppliers
-      if (data[3]?.length) {
-        const supplierData = data[3].map(supplier => ({
-          userid: userId,
-          data: {
-            supplierName: supplier['data.supplierName'],
-            supplierType: supplier['data.supplierType'],
-            tradingType: supplier['data.tradingType'],
-            pin: supplier['data.pin'],
-            idNumber: supplier['data.idNumber'],
-            mobile: supplier['data.mobile'],
-            email: supplier['data.email']
-          }
-        }));
-
+      if (data[3] && Array.isArray(data[3]) && data[3].length > 0) {
         const { error: supplierError } = await supabase
-          .from('acc_portal_pettycash_suppliers')
-          .insert(supplierData);
+          .from('acc_portal_suppliers')
+          .insert(data[3].map(supplier => ({
+            userid: userId,
+            data: {
+              supplierName: supplier.data?.supplierName || '',
+              supplierType: supplier.data?.supplierType || '',
+              tradingType: supplier.data?.tradingType || '',
+              pin: supplier.data?.pin || '',
+              idNumber: supplier.data?.idNumber || '',
+              mobile: supplier.data?.mobile || '',
+              email: supplier.data?.email || ''
+            }
+          })));
+  
         if (supplierError) throw supplierError;
       }
-
+  
       // Banks
-      if (data[4]?.length) {
-        const bankData = data[4].map(bank => ({
-          bank_name: bank.bank_name,
-          account_number: bank.account_number,
-          currency: bank.currency || null,
-          branch: bank.branch,
-          relationship_manager_name: bank.relationship_manager_name,
-          relationship_manager_mobile: bank.relationship_manager_mobile,
-          relationship_manager_email: bank.relationship_manager_email,
-          bank_startdate: bank.bank_startdate,
-          userid: userId,
-          bank_status: false,
-          bank_verified: false
-        }));
-
+      if (data[4] && Array.isArray(data[4]) && data[4].length > 0) {
         const { error: bankError } = await supabase
           .from('acc_portal_banks')
-          .insert(bankData);
+          .insert(data[4].map(bank => ({
+            bank_name: bank.bank_name || '',
+            account_number: bank.account_number || '',
+            currency: bank.currency || null,
+            branch: bank.branch || '',
+            relationship_manager_name: bank.relationship_manager_name || '',
+            relationship_manager_mobile: bank.relationship_manager_mobile || '',
+            relationship_manager_email: bank.relationship_manager_email || '',
+            bank_startdate: bank.bank_startdate || '',
+            userid: userId,
+            bank_status: false,
+            bank_verified: false
+          })));
+  
         if (bankError) throw bankError;
       }
-
+  
       // Employees
-      if (data[5]?.length) {
+      if (data[5] && Array.isArray(data[5]) && data[5].length > 0) {
         const employeeData = data[5].map(employee => ({
-          employee_name: employee.employee_name,
-          id_number: employee.id_number,
-          employee_kra_pin: employee.employee_kra_pin,
-          employee_email: employee.employee_email,
-          employee_mobile: employee.employee_mobile,
-          employee_nhif: employee.employee_nhif,
-          employee_nssf: employee.employee_nssf,
-          employee_startdate: employee.employee_startdate,
-          employee_enddate: employee.employee_enddate,
+          employee_name: employee.employee_name || '',
+          id_number: employee.id_number || '',
+          employee_kra_pin: employee.employee_kra_pin || '',
+          employee_email: employee.employee_email || `no-email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          employee_mobile: employee.employee_mobile || '',
+          employee_nhif: employee.employee_nhif || '',
+          employee_nssf: employee.employee_nssf || '',
+          employee_startdate: employee.employee_startdate || '',
+          employee_enddate: employee.employee_enddate || '',
           userid: userId,
           employee_status: false,
           employee_verified: false
         }));
-
+  
+        const uniqueEmployees = employeeData.filter((employee, index, self) =>
+          index === self.findIndex((e) => e.employee_email === employee.employee_email)
+        );
+  
         const { error: employeeError } = await supabase
           .from('acc_portal_employees')
-          .insert(employeeData);
+          .insert(uniqueEmployees);
+  
         if (employeeError) throw employeeError;
       }
-
+  
       toast.success('All data submitted successfully!');
       onComplete(data);
       return true;
-
+  
     } catch (error) {
       console.error('Error submitting data:', error);
-      toast.error('Failed to submit data. Please try again.');
+      toast.error(`Failed to submit data: ${error.message}`);
       return false;
     } finally {
       setLoading(false);
     }
   };
-
   // Update handleVerification
   const handleVerification = async () => {
     if (currentStage === 5) {
       // Submit all data when completing the final stage
       await submitAllData();
     } else {
-      // Just move to next stage
+      // Just move to next stage but log the current data state
+      console.log('Current data state:', data);
       setCurrentStage(currentStage + 1);
     }
   };
 
-
+  // Update the handleSkip function:
   const handleSkip = () => {
+    console.log('Current data state before skip:', data);
     if (currentStage === 5) {
       onComplete(data);
     } else {
       setCurrentStage(currentStage + 1);
     }
+  };
+
+  // Add logging to stage navigation:
+  const handleStageChange = (newStage: number) => {
+    console.log('Changing stage from', currentStage, 'to', newStage);
+    console.log('Current data state:', data);
+    setCurrentStage(newStage);
+  };
+
+  // Add this function to your component
+  const handleTemplateDownload = () => {
+    const currentFields = getFormFields().fields;
+
+    // Create template data
+    const templateData = [
+      // Header row
+      currentFields.map(field => field.label),
+      // Example row
+      // currentFields.map(field => {
+      //   switch (field.type) {
+      //     case 'email': return 'example@email.com';
+      //     case 'tel': return '+254700000000';
+      //     case 'date': return '2024-01-01';
+      //     case 'number': return '0';
+      //     case 'boolean': return 'true/false';
+      //     default: return 'Sample ' + field.label;
+      //   }
+      // }),
+      // // Empty row for filling
+      // currentFields.map(() => '')
+    ];
+
+    // Create workbook
+    const ws = XLSX.utils.aoa_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+
+    // Save the file
+    const fileName = `${stages[currentStage - 1].name.replace(/\s+/g, '_')}_Template.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
 
@@ -377,16 +598,16 @@ const methods = useForm({
         <div className="mb-12">
           {/* Company Header */}
           <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-  <div className="flex justify-between items-center">
-    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-      <span className="text-gray-600">Company:</span>
-      <span>{companyData.company_name || companyData.name}</span>
-    </h1>
-    <div className="text-sm text-gray-500">
-      ID: {companyData.userId}
-    </div>
-  </div>
-</div>
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <span className="text-gray-600">Company:</span>
+                <span>{companyData.company_name || companyData.name}</span>
+              </h1>
+              <div className="text-sm text-gray-500">
+                ID: {companyData.userId}
+              </div>
+            </div>
+          </div>
           <div className="flex justify-between items-center">
             {stages.map((stage) => (
               <div
@@ -428,6 +649,21 @@ const methods = useForm({
               Stage {currentStage}: {stages[currentStage - 1].name}
             </h2>
             <div className="flex items-center space-x-4">
+            <Button
+  onClick={() => console.log('Current data state:', data)}
+  variant="outline"
+  className="hover:bg-blue-50 transition-colors"
+>
+  Debug Data
+</Button>
+              <Button
+                variant="outline"
+                onClick={handleTemplateDownload}
+                className="hover:bg-blue-50 transition-colors"
+              >
+                Download Template
+              </Button>
+
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="hover:bg-blue-50 transition-colors">
@@ -542,70 +778,75 @@ const methods = useForm({
             </div>
           </div>
 
-          {data[currentStage]?.length > 0 && (
-  <div className="bg-white rounded-lg shadow overflow-hidden">
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-gray-50">
-            {currentStage === 3 ? (
-              // Special handling for suppliers
-              <>
-                <TableHead>Supplier Name</TableHead>
-                <TableHead>Supplier Type</TableHead>
-                <TableHead>Trading Type</TableHead>
-                <TableHead>PIN</TableHead>
-                <TableHead>ID Number</TableHead>
-                <TableHead>Mobile</TableHead>
-                <TableHead>Email</TableHead>
-              </>
-            ) : (
-              // Other stages
-              Object.keys(data[currentStage][0])
-                .filter(key => key !== 'userid')
-                .map((header) => (
-                  <TableHead key={header} className="font-semibold text-gray-700">
-                    {header}
-                  </TableHead>
-                ))
-            )}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data[currentStage].map((row, index) => (
-            <TableRow key={index} className="hover:bg-gray-50 transition-colors">
-              {currentStage === 3 ? (
-                <>
-                  <TableCell>{row.data.supplierName || ''}</TableCell>
-                  <TableCell>{row.data.supplierType || ''}</TableCell>
-                  <TableCell>{row.data.tradingType || ''}</TableCell>
-                  <TableCell>{row.data.pin || ''}</TableCell>
-                  <TableCell>{row.data.idNumber || ''}</TableCell>
-                  <TableCell>{row.data.mobile || ''}</TableCell>
-                  <TableCell>{row.data.email || ''}</TableCell>
-                </>
-              ) : (
-                Object.entries(row)
-                  .filter(([key]) => key !== 'userid')
-                  .map(([key, value], i) => (
-                    <TableCell key={i} className="py-3">
-                      {typeof value === 'object' ? JSON.stringify(value) : value}
-                    </TableCell>
-                  ))
-              )}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  </div>
-)}
+          {/* Replace the existing data mapping section with this */}
+          {data[currentStage] && Array.isArray(data[currentStage]) && data[currentStage].length > 0 ? (
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      {currentStage === 3 ? (
+                        // Special handling for suppliers
+                        <>
+                          <TableHead>Supplier Name</TableHead>
+                          <TableHead>Supplier Type</TableHead>
+                          <TableHead>Trading Type</TableHead>
+                          <TableHead>PIN</TableHead>
+                          <TableHead>ID Number</TableHead>
+                          <TableHead>Mobile</TableHead>
+                          <TableHead>Email</TableHead>
+                        </>
+                      ) : (
+                        // Other stages - only show headers for existing data
+                        Object.keys(data[currentStage][0] || {})
+                          .filter(key => key !== 'userid')
+                          .map((header) => (
+                            <TableHead key={header} className="font-semibold text-gray-700">
+                              {header}
+                            </TableHead>
+                          ))
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data[currentStage].map((row, index) => (
+                      <TableRow key={index} className="hover:bg-gray-50 transition-colors">
+                        {currentStage === 3 ? (
+                          <>
+                            <TableCell>{row.data?.supplierName || '-'}</TableCell>
+                            <TableCell>{row.data?.supplierType || '-'}</TableCell>
+                            <TableCell>{row.data?.tradingType || '-'}</TableCell>
+                            <TableCell>{row.data?.pin || '-'}</TableCell>
+                            <TableCell>{row.data?.idNumber || '-'}</TableCell>
+                            <TableCell>{row.data?.mobile || '-'}</TableCell>
+                            <TableCell>{row.data?.email || '-'}</TableCell>
+                          </>
+                        ) : (
+                          Object.entries(row || {})
+                            .filter(([key]) => key !== 'userid')
+                            .map(([key, value], i) => (
+                              <TableCell key={i} className="py-3">
+                                {value ? (typeof value === 'object' ? JSON.stringify(value) : value) : '-'}
+                              </TableCell>
+                            ))
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              No data available for this stage
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end space-x-4">
           {currentStage > 1 && (
             <Button
-              onClick={() => setCurrentStage(currentStage - 1)}
+              onClick={() => handleStageChange(currentStage - 1)}
               variant="outline"
               className="hover:bg-gray-50 transition-colors"
             >

@@ -5,6 +5,135 @@ import { formFields } from './formfields';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+
+const CompanyGeneralTable = ({ data }) => {
+    const generalFields = formFields.companyDetails.fields.filter(
+        field => !field.category || field.category === 'General Information'
+    );
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-slate-100">
+                    {generalFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((company, index) => (
+                    <TableRow key={index} className="hover:bg-slate-50">
+                        {generalFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
+const CompanyTaxTable = ({ data }) => {
+    const taxFields = formFields.companyDetails.fields.filter(
+        field => field.category === 'KRA Details'
+    );
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-sky-100">
+                    {taxFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((company, index) => (
+                    <TableRow key={index} className="hover:bg-sky-50">
+                        {taxFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
+const DirectorsTable = ({ data }) => {
+    const directorFields = formFields.directorDetails.fields;
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-emerald-100">
+                    {directorFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((director, index) => (
+                    <TableRow key={index} className="hover:bg-emerald-50">
+                        {directorFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {director[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
+const ComplianceTable = ({ data }) => {
+    const complianceFields = [
+        ...formFields.companyDetails.fields.filter(field => 
+            field.category === 'NSSF Details' ||
+            field.category === 'NHIF Details' ||
+            field.category === 'Housing Levy Details' ||
+            field.category === 'Standard Levy Details'
+        )
+    ];
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-violet-100">
+                    {complianceFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((company, index) => (
+                    <TableRow key={index} className="hover:bg-violet-50">
+                        {complianceFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
 
 const OverallView = () => {
     const [data, setData] = useState([]);
@@ -287,9 +416,21 @@ const OverallView = () => {
         };
     });
 
-
     return (
-        <ScrollArea className="h-[900px] rounded-md border">
+        <Tabs defaultValue="overview" className="w-full space-y-4">
+            <TabsList className="grid w-full grid-cols-6">
+                <TabsTrigger value="overview" className="py-3">Overview</TabsTrigger>
+                <TabsTrigger value="company" className="py-3">Company</TabsTrigger>
+                <TabsTrigger value="directors" className="py-3">Directors</TabsTrigger>
+                <TabsTrigger value="compliance" className="py-3">Compliance</TabsTrigger>
+                <TabsTrigger value="payroll" className="py-3">Payroll</TabsTrigger>
+                <TabsTrigger value="banking" className="py-3">Banking</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="mt-6">
+                <Card>
+                    <CardContent className="p-0">
+                    <ScrollArea className="h-[900px] rounded-md border">
             <Table>
                 <TableHeader>
                     {/* Section Headers */}
@@ -496,6 +637,276 @@ const OverallView = () => {
             </Table>
             <ScrollBar orientation="horizontal" />
         </ScrollArea>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            <TabsContent value="company">
+                <Tabs defaultValue="general" className="space-y-4">
+                    <TabsList>
+                        <TabsTrigger value="general">General</TabsTrigger>
+                        <TabsTrigger value="tax">Tax Details</TabsTrigger>
+                        <TabsTrigger value="ecitizen">E-Citizen</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="general">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <CompanyGeneralTable data={data} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="tax">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <CompanyTaxTable data={data} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+            </TabsContent>
+
+            <TabsContent value="directors">
+                <Card>
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-[700px]">
+                            <DirectorsTable data={data.flatMap(company => company.directors)} />
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="compliance">
+                <Tabs defaultValue="statutory" className="space-y-4">
+                    <TabsList>
+                        <TabsTrigger value="statutory">Statutory</TabsTrigger>
+                        <TabsTrigger value="nssf">NSSF</TabsTrigger>
+                        <TabsTrigger value="nhif">NHIF</TabsTrigger>
+                        <TabsTrigger value="housing">Housing Levy</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="statutory">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <ComplianceTable data={data} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="nssf">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <NSSFTable data={data.map(company => ({
+                                        ...company,
+                                        ...company.nssf
+                                    }))} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="nhif">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <NHIFTable data={data.map(company => ({
+                                        ...company,
+                                        ...company.nhif
+                                    }))} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="housing">
+                        <Card>
+                            <CardContent className="p-0">
+                                {/* <ScrollArea className="h-[700px]">
+                                    <HousingLevyTable data={data} />
+                                </ScrollArea> */}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+            </TabsContent>
+
+            <TabsContent value="payroll">
+                <Tabs defaultValue="employees" className="space-y-4">
+                    <TabsList>
+                        <TabsTrigger value="employees">Employees</TabsTrigger>
+                        <TabsTrigger value="payroll">Payroll</TabsTrigger>
+                        <TabsTrigger value="deductions">Deductions</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="employees">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <EmployeesTable data={data.flatMap(company => company.employees)} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="payroll">
+                        <Card>
+                            <CardContent className="p-0">
+                                {/* <ScrollArea className="h-[700px]">
+                                    <PayrollTable data={data.flatMap(company => company.employees)} />
+                                </ScrollArea> */}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+            </TabsContent>
+
+            <TabsContent value="banking">
+                <Tabs defaultValue="accounts" className="space-y-4">
+                    <TabsList>
+                        <TabsTrigger value="accounts">Accounts</TabsTrigger>
+                        <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="accounts">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <BankingTable data={data.flatMap(company => company.banks)} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+            </TabsContent>
+        </Tabs>
+    );
+};
+
+// Additional table components
+const NSSFTable = ({ data }) => {
+    const nssfFields = formFields.companyDetails.fields.filter(
+        field => field.category === 'NSSF Details'
+    );
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-emerald-100">
+                    {nssfFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((item, index) => (
+                    <TableRow key={index} className="hover:bg-emerald-50">
+                        {nssfFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {item[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
+const NHIFTable = ({ data }) => {
+    const nhifFields = formFields.companyDetails.fields.filter(
+        field => field.category === 'NHIF Details'
+    );
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-teal-100">
+                    {nhifFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((item, index) => (
+                    <TableRow key={index} className="hover:bg-teal-50">
+                        {nhifFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {item[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
+const EmployeesTable = ({ data }) => {
+    const employeeFields = formFields.employeeDetails.fields;
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-rose-100">
+                    {employeeFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((employee, index) => (
+                    <TableRow key={index} className="hover:bg-rose-50">
+                        {employeeFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {employee[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
+const BankingTable = ({ data }) => {
+    const bankFields = formFields.bankDetails.fields;
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-amber-100">
+                    {bankFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((bank, index) => (
+                    <TableRow key={index} className="hover:bg-amber-50">
+                        {bankFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {bank[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
     );
 };
 
