@@ -69,6 +69,14 @@
     payment_proof_url: string;
   }
 
+  interface ExpenseCategory {
+    category_code: string;
+    expense_category: string;
+    subcategories: {
+      subcategory_code: string;
+      expense_subcategory: string;
+    }[];
+  }
 
   interface EntryDialogProps {
     isOpen: boolean;
@@ -182,6 +190,8 @@
     const [openSupplier, setOpenSupplier] = useState(false);
     const [selectedSupplier, setSelectedSupplier] = useState(null);
     const [isNewSupplier, setIsNewSupplier] = useState(false);
+    const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
+
 
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -318,6 +328,20 @@
       }
     };
 
+    useEffect(() => {
+      const fetchCategories = async () => {
+        try {
+          const categories = await PettyCashService.fetchExpenseCategories();
+          setExpenseCategories(categories);
+        } catch (error) {
+          console.error('Error fetching expense categories:', error);
+          toast.error('Failed to load expense categories');
+        }
+      };
+    
+      fetchCategories();
+    }, []);
+
     const handleSubmit = async () => {
       try {
         // If it's a new supplier, create supplier record first
@@ -435,22 +459,27 @@
       {
         header: 'Category',
         width: '150px',
-        cell: (entry: PettyCashEntry) => (
-          <div>
-            {EXPENSE_CATEGORIES[entry.category_code]?.name || '-'}
-          </div>
-        )
+        cell: (entry: PettyCashEntry) => {
+          const category = expenseCategories.find(cat => cat.expense_category === entry.expense_category);
+          return (
+            <div>
+              {category?.expense_category || '-'}
+            </div>
+          );
+        }
       },
       {
         header: 'Subcategory',
         width: '150px',
-        cell: (entry: PettyCashEntry) => (
-          <div>
-            {EXPENSE_CATEGORIES[entry.category_code]?.subcategories.find(
-              sub => sub.code === entry.subcategory_code
-            )?.name || '-'}
-          </div>
-        )
+        cell: (entry: PettyCashEntry) => {
+          const category = expenseCategories.find(cat => cat.expense_category === entry.expense_category);
+          const subcategory = category?.subcategories?.find(sub => sub.subcategory === entry.subcategory);
+          return (
+            <div>
+              {subcategory?.subcategory || '-'}
+            </div>
+          );
+        }
       },
       {
         header: 'Amount',

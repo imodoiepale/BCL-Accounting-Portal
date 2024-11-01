@@ -65,6 +65,18 @@ interface SupplierData {
   data?: any;
 }
 
+interface ExpenseCategory {
+  category_code: string;
+  expense_category: string;
+  subcategories: ExpenseSubcategory[];
+}
+
+interface ExpenseSubcategory {
+  subcategory_code: string;
+  expense_subcategory: string;
+}
+
+
 interface PettyCashEntryFormProps {
   mode: 'create' | 'edit';
   initialData: PettyCashEntry | null;
@@ -94,9 +106,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     supplier_name: '',
     supplier_pin: '',
     purchase_type: '',
-    category_code: '',
-    category: '',
-    subcategory_code: '',
+    expense_category: '',
     subcategory: '',
     amount: '',
     description: '',
@@ -141,18 +151,20 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
   const [accountTypeOptions, setAccountTypeOptions] = useState([]);
   const [uniqueUsers, setUniqueUsers] = useState<string[]>([]);
 
+  const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
+
 
   const mapPurchaseTypeToTradingType = (purchaseType: string): string => {
-    switch(purchaseType) {
+    switch (purchaseType) {
       case 'purchase': return 'Purchase Only';
       case 'expense': return 'Expense Only';
       case 'both': return 'Both Purchase + Expense';
       default: return '';
     }
   };
-  
+
   const mapTradingTypeToPurchaseType = (tradingType: string): string => {
-    switch(tradingType) {
+    switch (tradingType) {
       case 'Purchase Only': return 'purchase';
       case 'Expense Only': return 'expense';
       case 'Both Purchase + Expense': return 'both';
@@ -214,10 +226,8 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     if (initialData) {
       setFormData({
         ...initialData,
-        category: EXPENSE_CATEGORIES[initialData.category_code]?.name || '',
-        subcategory: EXPENSE_CATEGORIES[initialData.category_code]?.subcategories.find(
-          sub => sub.code === initialData.subcategory_code
-        )?.name || ''
+        category_code: initialData.category_code || '',
+        subcategory_code: initialData.subcategory_code || ''
       });
 
       const matchingSupplier = suppliers.find(s => s.data.supplierName === initialData.supplier_name);
@@ -272,7 +282,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
   useEffect(() => {
     if (selectedSupplier) {
       const purchaseType = mapTradingTypeToPurchaseType(selectedSupplier.data.tradingType);
-      
+
       setFormData(prev => ({
         ...prev,
         supplier_name: selectedSupplier.data.supplierName,
@@ -305,6 +315,22 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
   }, [formData.account_type, formData.user_name, userAccounts]);
 
 
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const categories = await PettyCashService.fetchExpenseCategories();
+        console.log('Fetched categories:', categories); // Check the fetched categories
+        setExpenseCategories(categories);
+      } catch (error) {
+        console.error('Error fetching expense categories:', error);
+        toast.error('Failed to load expense categories');
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
   // Form validation
   const validateForm = (): string[] => {
     const errors: string[] = [];
@@ -315,8 +341,8 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     if (!formData.account_type) errors.push('Account type is required');
     if (!formData.petty_cash_account) errors.push('Account number is required');
     if (!formData.supplier_name) errors.push('Supplier name is required');
-    if (!formData.category_code) errors.push('Category is required');
-    if (!formData.subcategory_code) errors.push('Subcategory is required');
+    if (!formData.expense_category) errors.push('Category is required');
+    if (!formData.subcategory) errors.push('Subcategory is required');
     if (!formData.amount || Number(formData.amount) <= 0) errors.push('Valid amount is required');
     if (!formData.description) errors.push('Description is required');
 
@@ -364,22 +390,33 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     }
   };
 
+  const handleCategoryChange = (selectedExpenseCategory: string) => {
+    const selectedCategoryData = expenseCategories.find(cat => cat.expense_category === selectedExpenseCategory);
+
+    // Update formData with the selected expense category and reset subcategory
+    setFormData(prev => ({
+      ...prev,
+      expense_category: selectedCategoryData?.expense_category || '',
+      subcategory: '' // Reset subcategory when category changes
+    }));
+  };
+
   const formatStatus = (status: string): string => {
     return status.toLowerCase();
   };
-  
+
   const determineStatus = (checkedBy: string | null, verifiedBy: string | null): 'pending' | 'checked' | 'verified' => {
     if (!checkedBy && !verifiedBy) return 'pending';
     if (checkedBy && !verifiedBy) return 'checked';
     if (checkedBy && verifiedBy) return 'verified';
     return 'pending'; // Default fallback
   };
-  
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-  
+
     const errors = validateForm();
     if (errors.length > 0) {
       setValidationErrors(errors);
@@ -387,13 +424,13 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
       errors.forEach(error => toast.error(error));
       return;
     }
-  
+
     try {
       let finalData = { ...formData };
       const uploadPromises = [];
       let receiptUrl = null;
       let paymentProofUrl = null;
-  
+
       // Handle file uploads
       if (formData.receipt_url instanceof File) {
         const uploadPath = `receipts/${Date.now()}_${formData.receipt_url.name}`;
@@ -402,7 +439,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
             .then(url => { receiptUrl = url; })
         );
       }
-  
+
       if (formData.payment_proof_url instanceof File) {
         const uploadPath = `payment_proofs/${Date.now()}_${formData.payment_proof_url.name}`;
         uploadPromises.push(
@@ -410,62 +447,44 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
             .then(url => { paymentProofUrl = url; })
         );
       }
-  
-      // Handle new supplier creation if needed
-      if (isNewSupplier) {
-        const supplierData = {
-          data: {
-            supplierName: formData.supplier_name,
-            supplierType: 'Individual',
-            pin: formData.supplier_pin,
-            idNumber: formData.supplier_pin,
-            tradingType: mapPurchaseTypeToTradingType(formData.purchase_type),
-            mobile: '',
-            email: ''
-          },
-          userid: userId
-        };
-    
-        try {
-          await PettyCashService.createRecord('acc_portal_pettycash_suppliers', supplierData, userId);
-          console.log('New supplier created successfully');
-        } catch (error) {
-          console.error('Error creating supplier:', error);
-          toast.error('Failed to create supplier');
-          return;
-        }
-      }
-  
+
       // Wait for all uploads to complete
       await Promise.all(uploadPromises);
-  
+
+      // Log checkedBy and verifiedBy values
+      console.log('Checked By:', formData.checked_by);
+      console.log('Verified By:', formData.approved_by);
+
       // Determine status based on checked_by and approved_by
       const status = determineStatus(formData.checked_by, formData.approved_by);
-  
+      console.log('Determined Status:', status); // Log the determined status
+
       // Remove petty_cash_number from finalData as it shouldn't be submitted
       const { petty_cash_number, ...dataWithoutPCVNumber } = finalData;
-  
+
       // Update final data with uploaded URLs and other required fields
       finalData = {
         ...dataWithoutPCVNumber,
         receipt_url: receiptUrl || finalData.receipt_url,
         payment_proof_url: paymentProofUrl || finalData.payment_proof_url,
-        status: formatStatus(status),
+        status: status, // Ensure this is a valid status
         userid: userId,
       };
-  
+
+      console.log('Final Data before submission:', finalData); // Log final data
+
       await onSubmit(finalData);
-  
+
       // Clean up preview URLs
       if (receiptPreview) URL.revokeObjectURL(receiptPreview);
       if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
-  
+
       toast.success(`Entry ${mode === 'create' ? 'created' : 'updated'} successfully`);
-  
+
       if (onSuccess) {
         await onSuccess();
       }
-  
+
       onClose();
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -537,7 +556,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
               </SelectContent>
             </Select>
           </div>
-  
+
           {/* Existing Supplier Selection */}
           {!isNewSupplier && (
             <div className="space-y-2">
@@ -576,7 +595,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
                   ))}
                 </SelectContent>
               </Select>
-  
+
               {/* Selected Supplier Details */}
               {selectedSupplier && (
                 <div className="grid grid-cols-2 gap-4 mt-2">
@@ -608,7 +627,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
               )}
             </div>
           )}
-  
+
           {/* New Supplier Form */}
           {isNewSupplier && (
             <div className="grid grid-cols-2 gap-4">
@@ -735,52 +754,56 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
       ]
     },
     transactionDetails: {
-    title: "Transaction Details",
-    fields: [
-      {
-        id: "amount",
-        label: "Amount (KES)",
-        type: "number",
-        required: true,
-        value: formData.amount,
-        step: "0.01"
-      },
-      {
-        id: "purchase_type",
-        label: "Purchase Type",
-        type: "select",
-        required: true,
-        value: formData.purchase_type,
-        disabled: false, 
-        options: [
-          { value: "purchase", label: "Purchase Only" },
-          { value: "expense", label: "Expense Only" },
-          { value: "both", label: "Both Purchase + Expense" }
-        ]
-      },
+      title: "Transaction Details",
+      fields: [
         {
-          id: "category_code",
+          id: "amount",
+          label: "Amount (KES)",
+          type: "number",
+          required: true,
+          value: formData.amount,
+          step: "0.01"
+        },
+        {
+          id: "purchase_type",
+          label: "Purchase Type",
+          type: "select",
+          required: true,
+          value: formData.purchase_type,
+          disabled: false,
+          options: [
+            { value: "purchase", label: "Purchase Only" },
+            { value: "expense", label: "Expense Only" },
+            { value: "both", label: "Both Purchase + Expense" }
+          ]
+        },
+        {
+          id: "expense_category", // Change to expense_category
           label: "Category",
           type: "select",
           required: true,
-          value: formData.category_code,
-          options: Object.entries(EXPENSE_CATEGORIES).map(([code, category]) => ({
-            value: code,
-            label: category.name
+          value: formData.expense_category, // Use expense_category
+          options: expenseCategories.map(category => ({
+            value: category.expense_category,
+            label: category.expense_category
           }))
         },
         {
-          id: "subcategory_code",
+          id: "subcategory", // Change to subcategory
           label: "Subcategory",
           type: "select",
           required: true,
-          value: formData.subcategory_code,
-          disabled: !formData.category_code,
-          options: formData.category_code ?
-            EXPENSE_CATEGORIES[formData.category_code]?.subcategories.map(sub => ({
-              value: sub.code,
-              label: sub.name
-            })) : []
+          value: formData.subcategory, // Use the subcategory name directly
+          disabled: !formData.expense_category, // Disable if no category is selected
+          options: (() => {
+            const selectedCategory = expenseCategories.find(
+              cat => cat.expense_category === formData.expense_category // Match by expense category
+            );
+            return selectedCategory?.subcategories?.map(sub => ({
+              value: sub.name, // Use the subcategory name directly
+              label: sub.name // Display the subcategory name
+            })) || [];
+          })()
         },
         {
           id: "description",
@@ -922,6 +945,60 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
   const renderField = (field: any) => {
     if (field.type === 'custom' && field.render) {
       return field.render(); // Render the custom supplier section
+    }
+
+    if (field.id === 'category_code') {
+      return (
+        <Select
+          value={formData.category} // This should reflect the selected category
+          onValueChange={handleCategoryChange} // Call the updated handler
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue placeholder="Select category" />
+          </SelectTrigger>
+          <SelectContent>
+            {expenseCategories.map(category => (
+              <SelectItem
+                key={category.expense_category}
+                value={category.expense_category}
+              >
+                {category.expense_category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    if (field.id === 'subcategory') { // Change to use subcategory directly
+      const selectedCategory = expenseCategories.find(
+        cat => cat.expense_category === formData.expense_category // Match by expense category
+      );
+      const subcategories = selectedCategory?.subcategories || [];
+
+      return (
+        <Select
+          value={formData.subcategory} // Use the subcategory name directly
+          onValueChange={(value) => {
+            handleInputChange('subcategory', value); // Update the subcategory name directly
+          }}
+          disabled={!formData.expense_category || subcategories.length === 0} // Disable if no category is selected or no subcategories
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue placeholder="Select subcategory" />
+          </SelectTrigger>
+          <SelectContent>
+            {subcategories.map(sub => (
+              <SelectItem
+                key={sub.name} // Use the subcategory name as the key
+                value={sub.name} // Use the subcategory name as the value
+              >
+                {sub.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
     }
 
     switch (field.type) {
