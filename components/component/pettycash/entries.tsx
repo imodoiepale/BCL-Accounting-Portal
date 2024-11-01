@@ -89,7 +89,7 @@
     { name: 'supplier_name', label: 'Supplier Name', type: 'text', required: true },
     { name: 'supplier_pin', label: 'Supplier PIN/ID', type: 'text', required: true },
     {
-      name: 'purchase_type', label: 'Purchase Type', type: 'select', required: true,
+      name: 'purchase_type', label: 'Trading Type', type: 'select', required: true,
       options: [
         { value: 'goods', label: 'Goods' },
         { value: 'services', label: 'Services' },
@@ -396,7 +396,7 @@
       // },
       {
         header: <div className="">User</div>,
-        width: '350px',
+        width: '150px',
         cell: (entry: PettyCashEntry) => <div className="text-nowrap ">{entry.user_name || '-'}</div>
       },
       {
@@ -426,18 +426,31 @@
       {
         header: 'Purchase Type',
         width: '120px',
-        cell: (entry: PettyCashEntry) => entry.purchase_type || '-'
+        cell: (entry: PettyCashEntry) => (
+          <div className="capitalize">
+            {entry.purchase_type ? entry.purchase_type.charAt(0).toUpperCase() + entry.purchase_type.slice(1) : '-'}
+          </div>
+        )
       },
-
       {
         header: 'Category',
         width: '150px',
-        cell: (entry: PettyCashEntry) => getCategoryName(entry.category_code)
+        cell: (entry: PettyCashEntry) => (
+          <div>
+            {EXPENSE_CATEGORIES[entry.category_code]?.name || '-'}
+          </div>
+        )
       },
       {
         header: 'Subcategory',
         width: '150px',
-        cell: (entry: PettyCashEntry) => getSubcategoryName(entry.category_code, entry.subcategory_code)
+        cell: (entry: PettyCashEntry) => (
+          <div>
+            {EXPENSE_CATEGORIES[entry.category_code]?.subcategories.find(
+              sub => sub.code === entry.subcategory_code
+            )?.name || '-'}
+          </div>
+        )
       },
       {
         header: 'Amount',
