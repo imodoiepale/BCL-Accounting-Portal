@@ -1,8 +1,8 @@
 export const formFields = {
     companyDetails: {
         fields: [
-            { name: 'company_name', label: 'Company Name', type: 'text' },
-            { name: 'company_type', label: 'Company Type', type: 'text' },
+            { name: 'company_name', label: 'Company Name', type: 'text' ,required: true},
+            { name: 'company_type', label: 'Company Type', type: 'text' ,required: true},
             { name: 'description', label: 'Description', type: 'text' },
             { name: 'registration_number', label: 'Registration Number', type: 'text' },
             { name: 'date_established', label: 'Date Established', type: 'date' },
@@ -68,16 +68,16 @@ export const formFields = {
 
             // VAT Details
             { name: 'vat_identifier', label: 'VAT Identifier', type: 'text', category: 'VAT Details' },
-            { name: 'vat_password', label: 'VAT Password', type: 'text', category: 'VAT Details' },
+            { name: 'vat_password', label: 'VAT Password', type: 'text', category: 'VAT Details' },            
+            { name: 'vat_status', label: 'VAT Status', type: 'text', category: 'VAT Details' },
+            { name: 'vat_from', label: 'VAT From', type: 'date', category: 'VAT Details' },
+            { name: 'vat_to', label: 'VAT To', type: 'date', category: 'VAT Details' },
 
              // Tax Status Details
              { name: 'income_tax_resident_status', label: 'Income Tax - Resident Individual Status', type: 'text', category: 'Income Tax Status' },
              { name: 'income_tax_resident_from', label: 'Income Tax - Resident Individual From', type: 'date', category: 'Income Tax Status' },
              { name: 'income_tax_resident_to', label: 'Income Tax - Resident Individual To', type: 'date', category: 'Income Tax Status' },
- 
-             { name: 'vat_status', label: 'VAT Status', type: 'text', category: 'VAT Status' },
-             { name: 'vat_from', label: 'VAT From', type: 'date', category: 'VAT Status' },
-             { name: 'vat_to', label: 'VAT To', type: 'date', category: 'VAT Status' },
+
              // NEA Details
              { name: 'nea_username', label: 'NEA Username', type: 'text', category: 'NEA Details' },
              { name: 'nea_password', label: 'NEA Password', type: 'text', category: 'NEA Details' },

@@ -24,7 +24,7 @@ import { supabase } from '@/lib/supabaseClient'
 // Utility function to format date
 const formatDate = (dateString) => {
   let date;
-  
+
   // Check if the date is in DD/MM/YYYY format
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
     const [day, month, year] = dateString.split('/');
@@ -53,22 +53,22 @@ export function EmployeeList({ selectedUserId }: EmployeeList) {
   const { user } = useUser();
   const [employees, setEmployees] = useState([])
   const [newEmployee, setNewEmployee] = useState({
-    name: '',
-    id_number: '',
-    kra_pin: '',
-    email: '',
-    mobile: '',
-    nhif: '',
-    nssf: '',
-    startdate: '',
-    enddate: '',
+    employee_name: '',
+    employee_id_number: '',
+    employee_kra_pin: '',
+    employee_email: '',
+    employee_mobile: '',
+    employee_nhif: '',
+    employee_nssf: '',
+    employee_startdate: '',
+    employee_enddate: '',
   })
   const [isUploading, setIsUploading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
-  const userIdentifier = selectedUserId ||  user?.id;
+  const userIdentifier = selectedUserId || user?.id;
 
   const fetchEmployees = useCallback(async () => {
     const { data, error } = await supabase
@@ -92,21 +92,21 @@ export function EmployeeList({ selectedUserId }: EmployeeList) {
     const { data, error } = await supabase
       .from('acc_portal_employees')
       .insert([{ ...newEmployee, userid: userIdentifier, status: 'true' }])
-    if (error){
+    if (error) {
       console.error('Error adding employee:', error);
       toast.error('Failed to add employee.');
     } else {
       fetchEmployees()
       setNewEmployee({
-        name: '',
-        id_number: '',
-        kra_pin: '',
-        email: '',
-        mobile: '',
-        nhif: '',
-        nssf: '',
-        startdate: '',
-        enddate: '', 
+employee_name: '',
+employee_id_number: '',
+employee_kra_pin: '',
+employee_email: '',
+employee_mobile: '',
+employee_nhif: '',
+employee_nssf: '',
+employee_startdate: '',
+employee_enddate: '',
       })
       toast.success('Employee added successfully!');
       setIsDialogOpen(false);
@@ -171,7 +171,7 @@ export function EmployeeList({ selectedUserId }: EmployeeList) {
   };
 
   const downloadCSVTemplate = () => {
-    const headers = ['name', 'id_number', 'kra_pin', 'email', 'mobile', 'nhif', 'nssf', 'startdate', 'enddate'];
+    const headers = ['employee_name', 'id_number', 'employee_kra_pin', 'employee_email', 'employee_mobile', 'employee_nhif', 'employee_nssf', 'employee_startdate', 'employee_enddate'];
     const csvContent = headers.join(',') + '\n';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -287,7 +287,7 @@ export function EmployeeList({ selectedUserId }: EmployeeList) {
                 <div className="flex flex-col pt-4 gap-4">
                   <div className="space-y-1">
                     <Label htmlFor="name">Name</Label>
-                    <Input id="name" placeholder="John Doe" value={newEmployee.name} onChange={handleInputChange} required />
+                    <Input id="name" placeholder="John Doe" value={newEmployee.employee_name} onChange={handleInputChange} required />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="id_number">ID Number</Label>
@@ -295,40 +295,40 @@ export function EmployeeList({ selectedUserId }: EmployeeList) {
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="kra_pin">KRA PIN</Label>
-                    <Input id="kra_pin" placeholder="K1234567890" value={newEmployee.kra_pin} onChange={handleInputChange} />
+                    <Input id="kra_pin" placeholder="K1234567890" value={newEmployee.employee_kra_pin} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" placeholder="john@example.com" value={newEmployee.email} onChange={handleInputChange} />
+                    <Input id="email" placeholder="john@example.com" value={newEmployee.employee_email} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="mobile">Mobile</Label>
-                    <Input id="mobile" placeholder="+25471234567" value={newEmployee.mobile} onChange={handleInputChange} />
+                    <Input id="mobile" placeholder="+25471234567" value={newEmployee.employee_mobile} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="nhif">NHIF Number</Label>
-                    <Input id="nhif" placeholder="123456789" value={newEmployee.nhif} onChange={handleInputChange} />
+                    <Input id="nhif" placeholder="123456789" value={newEmployee.employee_nhif} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="nssf">NSSF Number</Label>
-                    <Input id="nssf" placeholder="987654321" value={newEmployee.nssf} onChange={handleInputChange} />
+                    <Input id="nssf" placeholder="987654321" value={newEmployee.employee_nssf} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="startdate">Start Date</Label>
-                    <Input id="startdate" type="date" value={newEmployee.startdate} onChange={handleInputChange} />
+                    <Input id="startdate" type="date" value={newEmployee.employee_startdate} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="enddate">End Date</Label>
-                    <Input id="enddate" type="date" value={newEmployee.enddate} onChange={handleInputChange} />
+                    <Input id="enddate" type="date" value={newEmployee.employee_enddate} onChange={handleInputChange} />
                   </div>
                 </div>
                 <div className="pt-4"><Button className="bg-blue-600 text-white" onClick={handleSubmit}>Submit</Button></div>
-               </SheetContent>
+              </SheetContent>
             </Sheet>
           </div>
         </div>
         <Card>
-        <Table>
+          <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>EMP ID</TableHead>
@@ -347,26 +347,26 @@ export function EmployeeList({ selectedUserId }: EmployeeList) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((employee,index) => (
+              {employees.map((employee, index) => (
                 <TableRow key={employee.id}>
                   <TableCell>EMP-{index + 1}</TableCell>
-                  <TableCell>{employee.name}</TableCell>
+                  <TableCell>{employee.employee_name}</TableCell>
                   <TableCell>{employee.id_number}</TableCell>
-                  <TableCell>{employee.kra_pin}</TableCell>
-                  <TableCell>{employee.email}</TableCell>
-                  <TableCell>{employee.mobile}</TableCell>
-                  <TableCell>{employee.nhif}</TableCell>
-                  <TableCell>{employee.nssf}</TableCell>
+                  <TableCell>{employee.employee_kra_pin}</TableCell>
+                  <TableCell>{employee.employee_email}</TableCell>
+                  <TableCell>{employee.employee_mobile}</TableCell>
+                  <TableCell>{employee.employee_nhif}</TableCell>
+                  <TableCell>{employee.employee_nssf}</TableCell>
                   <TableCell>{formatDate(employee.startdate)}</TableCell>
-                  <TableCell>{employee.enddate ? formatDate(employee.enddate) : ''}</TableCell>
+                  <TableCell>{employee.employee_enddate ? formatDate(employee.employee_enddate) : ''}</TableCell>
                   <TableCell>
-                    <span className={`font-bold capitalize ${employee.status ? 'text-green-600' : 'text-red-600'}`}>
-                      {employee.status ? 'Active' : 'Inactive'}
+                    <span className={`font-bold capitalize ${employee.employee_status ? 'text-green-600' : 'text-red-600'}`}>
+                      {employee.employee_status ? 'Active' : 'Inactive'}
                     </span>
                   </TableCell>
                   <TableCell className='text-center'>
-                    <Badge variant={employee.verified ? "success" : "destructive"}>
-                      {employee.verified ? "✔️" : "❌"}
+                    <Badge variant={employee.employee_verified ? "success" : "destructive"}>
+                      {employee.employee_verified ? "✔️" : "❌"}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -384,7 +384,7 @@ export function EmployeeList({ selectedUserId }: EmployeeList) {
                           <div className="flex flex-col gap-4">
                             <div className="space-y-1">
                               <Label htmlFor="name">Name</Label>
-                              <Input id="name" value={editingEmployee?.name || ''} onChange={handleEditInputChange} />
+                              <Input id="name" value={editingEmployee?.employee_name || ''} onChange={handleEditInputChange} />
                             </div>
                             <div className="space-y-1">
                               <Label htmlFor="id_number">ID Number</Label>
@@ -392,31 +392,31 @@ export function EmployeeList({ selectedUserId }: EmployeeList) {
                             </div>
                             <div className="space-y-1">
                               <Label htmlFor="kra_pin">KRA PIN</Label>
-                              <Input id="kra_pin" value={editingEmployee?.kra_pin || ''} onChange={handleEditInputChange} />
+                              <Input id="kra_pin" value={editingEmployee?.employee_kra_pin || ''} onChange={handleEditInputChange} />
                             </div>
                             <div className="space-y-1">
                               <Label htmlFor="email">Email</Label>
-                              <Input id="email" value={editingEmployee?.email || ''} onChange={handleEditInputChange} />
+                              <Input id="email" value={editingEmployee?.employee_email || ''} onChange={handleEditInputChange} />
                             </div>
                             <div className="space-y-1">
                               <Label htmlFor="mobile">Mobile</Label>
-                              <Input id="mobile" value={editingEmployee?.mobile || ''} onChange={handleEditInputChange} />
+                              <Input id="mobile" value={editingEmployee?.employee_mobile || ''} onChange={handleEditInputChange} />
                             </div>
                             <div className="space-y-1">
                               <Label htmlFor="nhif">NHIF Number</Label>
-                              <Input id="nhif" value={editingEmployee?.nhif || ''} onChange={handleEditInputChange} />
+                              <Input id="nhif" value={editingEmployee?.employee_nhif || ''} onChange={handleEditInputChange} />
                             </div>
                             <div className="space-y-1">
                               <Label htmlFor="nssf">MNSSF Number</Label>
-                              <Input id="nssf" value={editingEmployee?.nssf || ''} onChange={handleEditInputChange} />
+                              <Input id="nssf" value={editingEmployee?.employee_nssf || ''} onChange={handleEditInputChange} />
                             </div>
                             <div className="space-y-1">
                               <Label htmlFor="startdate">Start Date</Label>
-                              <Input id="startdate" type="date" value={editingEmployee?.startdate || ''} onChange={handleEditInputChange} />
+                              <Input id="startdate" type="date" value={editingEmployee?.employee_startdate || ''} onChange={handleEditInputChange} />
                             </div>
                             <div className="space-y-1">
                               <Label htmlFor="enddate">End Date</Label>
-                              <Input id="enddate" type="date" value={editingEmployee?.enddate || ''} onChange={handleEditInputChange} />
+                              <Input id="enddate" type="date" value={editingEmployee?.employee_enddate || ''} onChange={handleEditInputChange} />
                             </div>
                             <Button onClick={handleEditSubmit}>Save Changes</Button>
                           </div>

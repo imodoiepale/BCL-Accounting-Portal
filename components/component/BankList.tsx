@@ -30,7 +30,7 @@ interface BankProps {
 }
 interface Bank {
   id: number;
-  name: string;
+  bank_name: string;
   account_number: string;
   currency: string;
   branch?: string;
@@ -54,7 +54,7 @@ export function BankList({ selectedUserId }: BankProps) {
   
 // Update the initial state for newBank to match all fields
 const [newBank, setNewBank] = useState<Partial<Bank>>({
-  name: '',
+  bank_name: '',
   account_number: '',
   currency: '',
   branch: '',
@@ -89,7 +89,7 @@ const [newBank, setNewBank] = useState<Partial<Bank>>({
         .order('id', { ascending: true });
 
       if (searchTerm) {
-        query = query.or(`name.ilike.%${searchTerm}%,account_number.ilike.%${searchTerm}%`);
+        query = query.or(`bank_name.ilike.%${searchTerm}%,account_number.ilike.%${searchTerm}%`);
       }
 
       // Add pagination
@@ -113,7 +113,7 @@ const [newBank, setNewBank] = useState<Partial<Bank>>({
 
   const handleSubmit = async () => {
     try {
-      if (!newBank.name || !newBank.account_number || !newBank.currency) {
+      if (!newBank.bank_name || !newBank.account_number || !newBank.currency) {
         toast.error('Please fill in all required fields');
         return;
       }
@@ -130,7 +130,7 @@ const [newBank, setNewBank] = useState<Partial<Bank>>({
       toast.success('Bank added successfully');
       setIsAddSheetOpen(false);
       setNewBank({
-        name: '',
+        bank_name: '',
         account_number: '',
         currency: '',
         branch: '',
@@ -154,7 +154,7 @@ const [newBank, setNewBank] = useState<Partial<Bank>>({
       const { error } = await supabase
         .from('acc_portal_banks')
         .update({
-          name: editingBank.name,
+          bank_name: editingBank.bank_name,
           account_number: editingBank.account_number,
           currency: editingBank.currency,
           branch: editingBank.branch,
@@ -253,7 +253,7 @@ const [newBank, setNewBank] = useState<Partial<Bank>>({
   // Download CSV template
   const downloadCSVTemplate = () => {
     const headers = [
-      'name',
+      'bank_name',
       'account_number',
       'currency',
       'branch',
@@ -332,8 +332,8 @@ const [newBank, setNewBank] = useState<Partial<Bank>>({
       <Label htmlFor="name">Bank Name</Label>
       <Input
         id="name"
-        value={newBank.name}
-        onChange={(e) => setNewBank({ ...newBank, name: e.target.value })}
+        value={newBank.bank_name}
+        onChange={(e) => setNewBank({ ...newBank, bank_name: e.target.value })}
         required
       />
     </div>
@@ -440,7 +440,7 @@ const [newBank, setNewBank] = useState<Partial<Bank>>({
               banks.map((bank, index) => (
                 <TableRow key={bank.id}>
                   <TableCell>B-{bank.id}</TableCell>
-                  <TableCell>{bank.name}</TableCell>
+                  <TableCell>{bank.bank_name}</TableCell>
                   <TableCell>{bank.account_number}</TableCell>
                   <TableCell>{bank.currency}</TableCell>
                   <TableCell>{bank.branch}</TableCell>
@@ -526,8 +526,8 @@ const [newBank, setNewBank] = useState<Partial<Bank>>({
                   <Label htmlFor="edit-name">Bank Name</Label>
                   <Input
                     id="edit-name"
-                    value={editingBank.name}
-                    onChange={(e) => setEditingBank({ ...editingBank, name: e.target.value })}
+                    value={editingBank.bank_name}
+                    onChange={(e) => setEditingBank({ ...editingBank, bank_name: e.target.value })}
                   />
                 </div>
                 <div>

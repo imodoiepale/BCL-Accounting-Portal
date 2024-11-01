@@ -54,9 +54,16 @@ interface AllProfilesProps {
   }>;
 }
 
+const displayValue = (value: any) => {
+  if (value === null || value === undefined || value === '') {
+    return <span className="text-red-500">N/A</span>;
+  }
+  return value;
+};
+
 const companyInfoColumns = [
   { accessorKey: "index",  header: "#", cell: ({ row }) => row.index + 1 },
-  { id: 'company_name', accessorKey: 'company_name', header: 'Company Name' },
+  { id: 'company_name', accessorKey: 'company_name', header: 'Company Name' , cell: ({ row }) => displayValue(row.getValue("company_name"))},
   {
     id: 'completeness',
     header: 'Missing Fields',
@@ -78,21 +85,19 @@ const companyInfoColumns = [
         </div>
       );
     }},
-  { id: 'company_type', accessorKey: 'company_type', header: 'Company Type' },
-  { id: 'registration_number', accessorKey: 'registration_number', header: 'Registration Number' },
-  { id: 'date_established', accessorKey: 'date_established', header: 'Date Established' },
-  { id: 'kra_pin_number', accessorKey: 'kra_pin_number', header: 'KRA PIN' },
-  { id: 'industry', accessorKey: 'industry', header: 'Industry' },
-  { id: 'employees', accessorKey: 'employees', header: 'Employees' },
-  { id: 'annual_revenue', accessorKey: 'annual_revenue', header: 'Annual Revenue' },
-  { id: 'fiscal_year', accessorKey: 'fiscal_year', header: 'Fiscal Year' },
-  { id: 'email', accessorKey: 'email', header: 'Email' },
-  { id: 'phone', accessorKey: 'phone', header: 'Phone' },
-  { id: 'city', accessorKey: 'city', header: 'City' },
-  { id: 'country', accessorKey: 'country', header: 'Country' }
-];
-
-const depositsColumns = [
+  { id: 'company_type', accessorKey: 'company_type', header: 'Company Type' , cell: ({ row }) => displayValue(row.getValue("company_type")) },
+  { id: 'registration_number', accessorKey: 'registration_number', header: 'Registration Number', cell: ({ row }) => displayValue(row.getValue("registration_number"))},
+  { id: 'date_established', accessorKey: 'date_established', header: 'Date Established' , cell: ({ row }) => displayValue(row.getValue("date_established")) },
+  { id: 'kra_pin_number', accessorKey: 'kra_pin_number', header: 'KRA PIN' , cell: ({ row }) => displayValue(row.getValue("kra_pin_number")) },
+  { id: 'industry', accessorKey: 'industry', header: 'Industry' , cell: ({ row }) => displayValue(row.getValue("industry")) },
+  { id: 'employees', accessorKey: 'employees', header: 'Employees' , cell: ({ row }) => displayValue(row.getValue("employees")) },
+  { id: 'annual_revenue', accessorKey: 'annual_revenue', header: 'Annual Revenue' , cell: ({ row }) => displayValue(row.getValue("annual_revenue")) },
+  { id: 'fiscal_year', accessorKey: 'fiscal_year', header: 'Fiscal Year' , cell: ({ row }) => displayValue(row.getValue("fiscal_year")) },
+  { id: 'email', accessorKey: 'email', header: 'Email' , cell: ({ row }) => displayValue(row.getValue("email")) },
+  { id: 'phone', accessorKey: 'phone', header: 'Phone' , cell: ({ row }) => displayValue(row.getValue("phone")) },
+  { id: 'city', accessorKey: 'city', header: 'City' , cell: ({ row }) => displayValue(row.getValue("city")) },
+  { id: 'country', accessorKey: 'country', header: 'Country' , cell: ({ row }) => displayValue(row.getValue("country")) }
+];const depositsColumns = [
   { id: 'deposit_name', accessorKey: 'deposit_name', header: 'Deposit Name' },
   { id: 'deposit_type', accessorKey: 'deposit_type', header: 'Type' },
   { id: 'amount', accessorKey: 'amount', header: 'Amount' },

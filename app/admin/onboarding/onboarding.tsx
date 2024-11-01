@@ -36,45 +36,136 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
     setErrorMessage("");
   };
 
+  // const handleAddCompany = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setLoading(true);
+  //   setErrorMessage("");
+
+  //   try {
+  //     if (!signUp) {
+  //       throw new Error("Sign up is not initialized");
+  //     }
+
+  //     // Validation
+  //     if (!newCompanyName || !newCompanyUsername || !newCompanyPassword) {
+  //       setErrorMessage("All fields are required");
+  //       setLoading(false);
+  //       return;
+  //     }
+
+  //     if (!/^[a-zA-Z0-9_]+$/.test(newCompanyUsername)) {
+  //       setErrorMessage("Username can only contain letters, numbers, and underscores");
+  //       setLoading(false);
+  //       return;
+  //     }
+
+  //     if (newCompanyPassword.length < 8) {
+  //       setErrorMessage("Password must be at least 8 characters long");
+  //       setLoading(false);
+  //       return;
+  //     }
+
+  //     try {
+  //       // First create the basic sign up
+  //       await signUp.create({
+  //         username: newCompanyUsername.trim(),
+  //         password: newCompanyPassword,
+  //         firstName: newCompanyName.trim(),
+  //       });
+
+  //       // Update metadata through API
+  //       const response = await fetch("/api/create-users", {
+  //         method: "POST",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //         },
+  //         body: JSON.stringify({
+  //           name: newCompanyName.trim(),
+  //           username: newCompanyUsername.trim(),
+  //         }),
+  //       });
+
+  //       const data = await response.json();
+
+  //       if (!response.ok) {
+  //         throw new Error(data.message || "Failed to update company metadata");
+  //       }
+
+  //       // Success handling
+  //       if (data.id) {
+  //         console.log('Step 1 completed: Company created successfully');
+  //         console.log('Company details:', {
+  //           name: newCompanyName,
+  //           username: newCompanyUsername,
+  //           userId: data.id
+  //         });
+          
+  //         toast.success("Company account created successfully!");
+  //         resetInputs();
+  //         setIsOpen(false);
+          
+  //         console.log('Transitioning to Step 2: Upload');
+  //         onComplete({ 
+  //           name: newCompanyName, 
+  //           username: newCompanyUsername,
+  //           password: newCompanyPassword 
+  //         });
+  //       }
+  //     } catch (clerkError: any) {
+  //       console.error("Clerk Sign Up Error:", clerkError);
+  //       const errorMessage = clerkError.errors?.[0]?.message || "Failed to create account";
+  //       setErrorMessage(errorMessage);
+  //       toast.error(errorMessage);
+  //     }
+
+  //   } catch (error: any) {
+  //     console.error("Creation Error:", error);
+  //     const errorMessage = error.message || "An unexpected error occurred";
+  //     setErrorMessage(errorMessage);
+  //     toast.error(errorMessage);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }; 
+  
   const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMessage("");
-
+  
     try {
       if (!signUp) {
         throw new Error("Sign up is not initialized");
       }
-
-      // Validation
+  
+      // Basic validation
       if (!newCompanyName || !newCompanyUsername || !newCompanyPassword) {
-        setErrorMessage("All fields are required");
-        setLoading(false);
-        return;
+        throw new Error("All fields are required");
       }
-
+  
       if (!/^[a-zA-Z0-9_]+$/.test(newCompanyUsername)) {
-        setErrorMessage("Username can only contain letters, numbers, and underscores");
-        setLoading(false);
-        return;
+        throw new Error("Username can only contain letters, numbers, and underscores");
       }
-
+  
       if (newCompanyPassword.length < 8) {
-        setErrorMessage("Password must be at least 8 characters long");
-        setLoading(false);
-        return;
+        throw new Error("Password must be at least 8 characters long");
       }
-
+  
+      // Create the user account
       try {
-        // First create the basic sign up
         await signUp.create({
           username: newCompanyUsername.trim(),
           password: newCompanyPassword,
           firstName: newCompanyName.trim(),
         });
-
-        // Update metadata through API
-        const response = await fetch("/api/create-users", {
+      } catch (signUpError: any) {
+        throw new Error(signUpError.errors?.[0]?.message || "Failed to create account");
+      }
+  
+      // Update metadata through API
+      let response;
+      try {
+        response = await fetch("/api/create-users", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -84,50 +175,43 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
             username: newCompanyUsername.trim(),
           }),
         });
-
-        const data = await response.json();
-
+  
         if (!response.ok) {
-          throw new Error(data.message || "Failed to update company metadata");
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to update company metadata");
         }
-
+  
+        const data = await response.json();
+  
+        if (!data.id) {
+          throw new Error("Failed to get company ID");
+        }
+  
         // Success handling
-        if (data.id) {
-          console.log('Step 1 completed: Company created successfully');
-          console.log('Company details:', {
-            name: newCompanyName,
-            username: newCompanyUsername,
-            userId: data.id
-          });
-          
-          toast.success("Company account created successfully!");
-          resetInputs();
-          setIsOpen(false);
-          
-          console.log('Transitioning to Step 2: Upload');
-          onComplete({ 
-            name: newCompanyName, 
-            username: newCompanyUsername,
-            password: newCompanyPassword 
-          });
+        toast.success("Company account created successfully!");
+        resetInputs();
+        setIsOpen(false);
         
-        }
-      } catch (clerkError: any) {
-        console.error("Clerk Sign Up Error:", clerkError);
-        const errorMessage = clerkError.errors?.[0]?.message || "Failed to create account";
-        setErrorMessage(errorMessage);
-        toast.error(errorMessage);
+        onComplete({ 
+          name: newCompanyName.trim(), 
+          username: newCompanyUsername.trim(),
+          userId: data.id 
+        });
+  
+      } catch (apiError: any) {
+        throw new Error(apiError.message || "API request failed");
       }
-
+  
     } catch (error: any) {
-      console.error("Creation Error:", error);
-      const errorMessage = error.message || "An unexpected error occurred";
-      setErrorMessage(errorMessage);
-      toast.error(errorMessage);
+      const errorMsg = error instanceof Error ? error.message : "An unexpected error occurred";
+      console.error("Creation Error:", errorMsg);
+      setErrorMessage(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
+  
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-24">
       <Dialog open={isOpen} onOpenChange={(open) => {

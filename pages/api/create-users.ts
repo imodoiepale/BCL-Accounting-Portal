@@ -1,6 +1,11 @@
-// pages/api/create-users.ts
 import { clerkClient } from '@clerk/clerk-sdk-node';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default async function handler(
   req: NextApiRequest,
@@ -13,7 +18,7 @@ export default async function handler(
     });
   }
 
-  const { name, username, password } = req.body;
+  const { name, username } = req.body;
 
   try {
     // Get the user from Clerk using the username
@@ -30,16 +35,30 @@ export default async function handler(
       });
     }
 
-    // Update user metadata
+    // Update user metadata in Clerk
     await clerkClient.users.updateUser(user.id, {
       publicMetadata: {
         companyName: name,
       }
     });
 
+    // Insert user into database
+    const { error } = await supabase
+      .from('acc_portal_clerk_users')
+      .upsert({
+        username: username,
+        userid: user.id,
+        metadata: { companyName: name },
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'userid'
+      });
+
+    if (error) throw error;
+
     return res.status(200).json({
-      success : true,
-      id      : user.id,
+      success: true,
+      id: user.id,
       username: user.username
     });
 
