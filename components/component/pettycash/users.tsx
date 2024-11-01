@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RefreshCwIcon, Search } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import { PettyCashService } from './PettyCashService';
 import { TableActions } from './TableActions';

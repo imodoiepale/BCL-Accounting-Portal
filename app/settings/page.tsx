@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { Switch } from "@/components/ui/switch";
 
 // Initialize Supabase client
@@ -433,7 +433,6 @@ const SettingsPage = () => {
         </TabsContent>
       </Tabs>
       {renderEditDocumentDialog()}
-      <Toaster />
     </div>
   );
 };
