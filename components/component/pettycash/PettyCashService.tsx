@@ -1436,6 +1436,25 @@ export class PettyCashService {
         }
     }
 
+    // In PettyCashService.tsx
+
+static async fetchFilteredEntries(table: string, userId: string, category: 'reimbursement' | 'loan') {
+    try {
+      const { data, error } = await supabase
+        .from('acc_portal_pettycash_entries')
+        .select('*')
+        .eq('userid', userId)
+        .eq('category', category)
+        .order('created_at', { ascending: false });
+  
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error(`Error fetching ${category} entries:`, error);
+      throw error;
+    }
+  }
+
 
 }
 
