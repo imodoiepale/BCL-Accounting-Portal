@@ -352,13 +352,13 @@ export function BranchesTab() {
           created_at: new Date().toISOString(),
           is_verified: false
         };
-  
+
         const result = await PettyCashService.createBranchRecord(
           'acc_portal_pettycash_branches',
           formattedBranch,
           userId
         );
-  
+
         if (result) {
           toast.success('Branch created successfully');
           await fetchBranches();
@@ -376,7 +376,7 @@ export function BranchesTab() {
         toast.success('Branch updated successfully');
         await fetchBranches();
       }
-      
+
       setDialogState({ isOpen: false, mode: 'create', branch: null });
     } catch (error) {
       console.error('Error saving branch:', error);
@@ -531,8 +531,10 @@ export function BranchesTab() {
                       colSpan={columnDefinitions.length}
                       className="h-32 text-center"
                     >
-                      <RefreshCwIcon className="h-4 w-4 animate-spin mx-auto" />
-                      <span className="mt-2">Loading branches...</span>
+                      <div className="flex flex-col items-center justify-center">
+                        <RefreshCwIcon className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+                        <span className="text-sm text-gray-500">Loading branches...</span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : filteredBranches.length === 0 ? (
@@ -541,7 +543,25 @@ export function BranchesTab() {
                       colSpan={columnDefinitions.length}
                       className="h-32 text-center"
                     >
-                      No branches found
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="rounded-full bg-gray-100 p-3 mb-2">
+                          <Search className="h-6 w-6 text-gray-400" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">No Branches Found</span>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {searchQuery
+                            ? 'No branches match your search criteria'
+                            : 'Get started by adding your first branch'}
+                        </p>
+                        {!searchQuery && (
+                          <Button
+                            onClick={handleCreateBranch}
+                            className="mt-3 bg-blue-600 text-white"
+                          >
+                            Add New Branch
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
