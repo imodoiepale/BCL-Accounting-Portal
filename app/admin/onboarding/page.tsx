@@ -18,17 +18,19 @@ export default function Page() {
   useEffect(() => {
     console.log('Current step:', step);
   }, [step]);
-  const handleOnboardingComplete = (data: any) => {
-    console.log('Onboarding complete, data:', data);
-    setCompanyData({ 
-      ...companyData, 
-      company_name: data.name,
-      username: data.username,
-      password: data.password
-    });
-    console.log('Moving to step 2');
-    setStep(2);
-  };
+
+const handleOnboardingComplete = (data: any) => {
+  console.log('Onboarding complete, data:', data);
+  setCompanyData({ 
+    ...companyData, 
+    name: data.name,
+    username: data.username,
+    userId: data.userId, // Make sure this matches what onboarding sends
+    company_name: data.name // Add this explicitly
+  });
+  console.log('Moving to step 2');
+  setStep(2);
+};
 
   const handleUploadComplete = (data: any) => {
     setCompanyData({ 
