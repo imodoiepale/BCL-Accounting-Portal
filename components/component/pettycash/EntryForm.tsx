@@ -417,6 +417,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     e.preventDefault();
     setIsLoading(true);
 
+    // Validate form and handle errors
     const errors = validateForm();
     if (errors.length > 0) {
       setValidationErrors(errors);
@@ -426,12 +427,13 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
     }
 
     try {
+      // Prepare final data and file upload promises
       let finalData = { ...formData };
       const uploadPromises = [];
       let receiptUrl = null;
       let paymentProofUrl = null;
 
-      // Handle file uploads
+      // Handle receipt file upload
       if (formData.receipt_url instanceof File) {
         const uploadPath = `receipts/${Date.now()}_${formData.receipt_url.name}`;
         uploadPromises.push(
@@ -440,6 +442,7 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
         );
       }
 
+      // Handle payment proof file upload
       if (formData.payment_proof_url instanceof File) {
         const uploadPath = `payment_proofs/${Date.now()}_${formData.payment_proof_url.name}`;
         uploadPromises.push(
@@ -451,45 +454,54 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
       // Wait for all uploads to complete
       await Promise.all(uploadPromises);
 
-      // Log checkedBy and verifiedBy values
+      // Log checkedBy and approvedBy values for debugging
       console.log('Checked By:', formData.checked_by);
-      console.log('Verified By:', formData.approved_by);
+      console.log('Approved By:', formData.approved_by);
 
       // Determine status based on checked_by and approved_by
-      const status = determineStatus(formData.checked_by, formData.approved_by);
+      let status = determineStatus(formData.checked_by, formData.approved_by);
+      if (!['pending', 'checked', 'approved'].includes(status)) {
+        status = 'pending'; // Default to 'pending' if invalid
+      }
+
       console.log('Determined Status:', status); // Log the determined status
 
-      // Remove petty_cash_number from finalData as it shouldn't be submitted
+      // Prepare final data for submission, excluding petty_cash_number
       const { petty_cash_number, ...dataWithoutPCVNumber } = finalData;
-
-      // Update final data with uploaded URLs and other required fields
       finalData = {
         ...dataWithoutPCVNumber,
         receipt_url: receiptUrl || finalData.receipt_url,
         payment_proof_url: paymentProofUrl || finalData.payment_proof_url,
-        status: status, // Ensure this is a valid status
+        status, 
         userid: userId,
       };
 
-      console.log('Final Data before submission:', finalData); // Log final data
+      // Log final data before submission
+      console.log('Final Data before submission:', finalData);
 
+      // Submit the final data
       await onSubmit(finalData);
 
-      // Clean up preview URLs
+      // Clean up preview URLs to free memory
       if (receiptPreview) URL.revokeObjectURL(receiptPreview);
       if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
 
+      // Show success message
       toast.success(`Entry ${mode === 'create' ? 'created' : 'updated'} successfully`);
 
+      // Call onSuccess callback if provided
       if (onSuccess) {
         await onSuccess();
       }
 
+      // Close the form dialog
       onClose();
     } catch (error) {
+      // Handle submission errors
       console.error('Error submitting form:', error);
       toast.error('Failed to submit entry');
     } finally {
+      // Reset loading state
       setIsLoading(false);
     }
   };
