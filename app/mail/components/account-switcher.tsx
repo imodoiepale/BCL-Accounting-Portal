@@ -68,7 +68,7 @@ export function AccountSwitcher({
   const [isAddAccountOpen, setIsAddAccountOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
-  const [localAccounts, setLocalAccounts] = React.useState<Account[]>(() => 
+  const [localAccounts, setLocalAccounts] = React.useState<Account[]>(() =>
     accounts.map((account, index) => ({
       ...account,
       id: account.id || generateUniqueId(`init-account-${index}`),
@@ -364,7 +364,6 @@ export function AccountSwitcher({
             <Plus className="h-4 w-4" />
             Add Gmail Account
           </Button>
-
           <Separator className="my-2" />
 
           <ScrollArea className="h-[300px]">
@@ -443,6 +442,20 @@ export function AccountSwitcher({
                       className="focus-visible:ring-2"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">App Password</Label>
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      required
+                      placeholder="Enter your Gmail app password"
+                      className="focus-visible:ring-2"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      Use an App Password from your Google Account settings
+                    </span>
+                  </div>
                   <Button
                     type="submit"
                     className="w-full"
@@ -463,8 +476,8 @@ export function AccountSwitcher({
             <TabsContent value="multiple">
               <form onSubmit={handleAddMultipleAccounts} className="grid grid-cols-3 gap-4 py-4">
                 {[1, 2, 3].map((index) => (
-                  <div 
-                    key={`account-form-${index}`} 
+                  <div
+                    key={`account-form-${index}`}
                     className="space-y-4 rounded-lg border p-4"
                   >
                     <div className="flex items-center justify-between">
@@ -489,6 +502,19 @@ export function AccountSwitcher({
                         placeholder="Enter Gmail address"
                         className="focus-visible:ring-2"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`password-${index}`}>App Password</Label>
+                      <Input
+                        id={`password-${index}`}
+                        name={`password-${index}`}
+                        type="password"
+                        placeholder="Enter app password"
+                        className="focus-visible:ring-2"
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        Use an App Password from your Google Account settings
+                      </span>
                     </div>
                   </div>
                 ))}
