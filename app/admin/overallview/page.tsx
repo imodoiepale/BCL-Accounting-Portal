@@ -10,6 +10,34 @@ const OverallView = () => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const sectionColors = {
+        companyDetails: { main: 'bg-blue-600', sub: 'bg-blue-500', cell: 'bg-blue-50' },
+        directorDetails: { main: 'bg-emerald-600', sub: 'bg-emerald-500', cell: 'bg-emerald-50' },
+        supplierDetails: { main: 'bg-purple-600', sub: 'bg-purple-500', cell: 'bg-purple-50' },
+        bankDetails: { main: 'bg-amber-600', sub: 'bg-amber-500', cell: 'bg-amber-50' },
+        employeeDetails: { main: 'bg-rose-600', sub: 'bg-rose-500', cell: 'bg-rose-50' }
+    };
+    const categoryColors = {
+        'General Information': { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
+        'KRA Details': { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' },
+        'NSSF Details': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+        'NHIF Details': { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200' },
+        'Ecitizen Details': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
+        'NITA Details': { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' },
+        'Housing Levy Details': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+        'Standard Levy Details': { bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', border: 'border-fuchsia-200' },
+        'Tourism Levy Details': { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
+        'Tourism Fund Details': { bg: 'bg-pink-50', text: 'text-pink-700', border: 'border-pink-200' },
+        'VAT Details': { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+        'Income Tax Status': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+        'PAYE Details': { bg: 'bg-lime-50', text: 'text-lime-700', border: 'border-lime-200' },
+        'MRI': { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+        'TOT': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+        'TIMS Details': { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
+        'Sheria Details': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+        'Other Details': { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' }
+    };
+    
     const sectionsWithSeparators = [
         { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
         { isSeparator: true },
@@ -208,6 +236,7 @@ const OverallView = () => {
     const columnStats = calculateColumnStatistics();
 
     const groupFieldsByCategory = (fields) => {
+        // First group fields by their categories
         const categorizedFields = fields.reduce((acc, field) => {
             const category = field.category || 'General';
             if (!acc[category]) {
@@ -216,117 +245,181 @@ const OverallView = () => {
             acc[category].push(field);
             return acc;
         }, {});
-    
+
         // Convert to array format with separators
-        return Object.entries(categorizedFields).flatMap(([category, fields], index, array) => {
+        const result = Object.entries(categorizedFields).flatMap(([category, fields], index, array) => {
             // Add category with its fields
             const categoryGroup = {
                 category,
                 fields,
-                isCategoryHeader: true
+                colSpan: fields.length
             };
-            
+
             // Add separator if not the last category
             if (index < array.length - 1) {
                 return [categoryGroup, { isSeparator: true }];
             }
             return [categoryGroup];
         });
+
+        return result;
     };
-    
+
+    const processedSections = sectionsWithSeparators.map(section => {
+        if (section.isSeparator) return section;
+
+        // Group fields by category for company details
+        if (section.name === 'companyDetails') {
+            return {
+                ...section,
+                categorizedFields: groupFieldsByCategory(section.fields)
+            };
+        }
+
+        // For other sections, treat all fields as 'General' category
+        return {
+            ...section,
+            categorizedFields: [{
+                category: 'General',
+                fields: section.fields,
+                colSpan: section.fields.length
+            }]
+        };
+    });
+
+
     return (
         <ScrollArea className="h-[900px] rounded-md border">
             <Table>
                 <TableHeader>
                     {/* Section Headers */}
                     <TableRow>
-                        {sectionsWithSeparators.map((section, index) => {
+                        {processedSections.map((section, index) => {
                             if (section.isSeparator) {
                                 return renderSeparatorCell(`separator-header-1-${index}`, true);
                             }
+
+                            const totalColSpan = section.categorizedFields.reduce((total, cat) =>
+                                total + (cat.isSeparator ? 1 : cat.fields.length), 0);
+
+                            const sectionColor = sectionColors[section.name]?.main || 'bg-gray-600';
+
                             return (
                                 <TableHead
                                     key={section.name}
-                                    colSpan={section.fields.length}
-                                    className="text-center bg-blue-600 text-white font-bold"
+                                    colSpan={totalColSpan}
+                                    className={`text-center ${sectionColor} text-white font-bold transition-colors`}
                                 >
                                     {section.label}
                                 </TableHead>
                             );
                         })}
                     </TableRow>
+
                     {/* Category Headers */}
                     <TableRow>
-                        {allFieldsWithSeparators.map((field, index) => {
-                            if (field.isSeparator) {
-                                return renderSeparatorCell(`category-separator-${index}`, true);
+                        {processedSections.map((section, sectionIndex) => {
+                            if (section.isSeparator) {
+                                return renderSeparatorCell(`category-separator-${sectionIndex}`, true);
                             }
 
-                            const category = field.category || 'General';
-                            return (
-                                <TableHead
-                                    key={`category-${index}`}
-                                    className="text-center bg-blue-500 text-white font-medium text-sm"
+                            const sectionColor = sectionColors[section.name]?.sub || 'bg-gray-500';
+
+                            return section.categorizedFields.map((category, categoryIndex) => {
+                                if (category.isSeparator) {
+                                    return renderSeparatorCell(`cat-sep-${sectionIndex}-${categoryIndex}`, true);
+                                }
+
+                                return (
+                                    <TableHead
+                                    key={`${section.name}-${category.category}-${categoryIndex}`}
+                                    colSpan={category.fields.length}
+                                    className={`text-center ${categoryColors[category.category]?.bg || 'bg-gray-50'} 
+                                                ${categoryColors[category.category]?.text || 'text-gray-700'} 
+                                                ${categoryColors[category.category]?.border || 'border-gray-200'} 
+                                                font-medium text-sm transition-colors`}
                                 >
-                                    {category}
+                                    {category.category}
                                 </TableHead>
-                            );
+                                
+                                );
+                            });
                         })}
                     </TableRow>
+
                     {/* Statistics Row */}
                     <TableRow className="bg-gray-50">
-                        {allFieldsWithSeparators.map((field, index) => {
-                            if (field.isSeparator) {
-                                return renderSeparatorCell(`stats-separator-${index}`, true);
+                        {processedSections.map((section, sectionIndex) => {
+                            if (section.isSeparator) {
+                                return renderSeparatorCell(`stats-separator-${sectionIndex}`, true);
                             }
 
-                            const stats = columnStats[field.name] || { total: 0, completed: 0, pending: 0 };
+                            const sectionColor = sectionColors[section.name]?.cell || 'bg-gray-50';
 
-                            return (
-                                <TableHead
-                                    key={`stats-${field.name}`}
-                                    className="p-2"
-                                >
-                                    <div className="flex flex-col gap-1 text-xs bg-white rounded-lg p-2 shadow-sm">
-                                        <div className="flex justify-center gap-2">
-                                            <span className="text-blue-600 border-r pr-2">
-                                                T: {stats.total}
-                                            </span>
-                                            <span className="text-green-600 border-r pr-2">
-                                                C: {stats.completed}
-                                            </span>
-                                            <span className="text-red-600">
-                                                P: {stats.pending}
-                                            </span>
-                                        </div>
-                                        <div className="w-full bg-gray-200 rounded-full h-1">
-                                            <div
-                                                className="bg-green-600 h-1 rounded-full"
-                                                style={{
-                                                    width: `${stats.total ? (stats.completed / stats.total) * 100 : 0}%`
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                </TableHead>
-                            );
+                            return section.categorizedFields.map((category, categoryIndex) => {
+                                if (category.isSeparator) {
+                                    return renderSeparatorCell(`stats-cat-sep-${sectionIndex}-${categoryIndex}`, true);
+                                }
+
+                                return category.fields.map(field => {
+                                    const stats = columnStats[field.name] || { total: 0, completed: 0, pending: 0 };
+
+                                    return (
+                                        <TableHead
+                                            key={`stats-${field.name}`}
+                                            className={`p-2 ${sectionColor} transition-colors`}
+                                        >
+                                            <div className="flex flex-col gap-1 text-xs bg-white rounded-lg p-2 shadow-sm">
+                                                <div className="flex justify-center gap-2">
+                                                    <span className="text-blue-600 border-r pr-2">
+                                                        T: {stats.total}
+                                                    </span>
+                                                    <span className="text-green-600 border-r pr-2">
+                                                        C: {stats.completed}
+                                                    </span>
+                                                    <span className="text-red-600">
+                                                        P: {stats.pending}
+                                                    </span>
+                                                </div>
+                                                <div className="w-full bg-gray-200 rounded-full h-1">
+                                                    <div
+                                                        className="bg-green-600 h-1 rounded-full transition-all"
+                                                        style={{
+                                                            width: `${stats.total ? (stats.completed / stats.total) * 100 : 0}%`
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </TableHead>
+                                    );
+                                });
+                            });
                         })}
                     </TableRow>
 
                     {/* Column Headers */}
                     <TableRow>
-                        {allFieldsWithSeparators.map((field, index) => {
-                            if (field.isSeparator) {
-                                return renderSeparatorCell(`separator-header-2-${index}`, true);
+                        {processedSections.map((section, sectionIndex) => {
+                            if (section.isSeparator) {
+                                return renderSeparatorCell(`header-separator-${sectionIndex}`, true);
                             }
-                            return (
-                                <TableHead
-                                    key={`${field.name}-${index}`}
-                                    className="whitespace-nowrap bg-blue-500 text-white"
-                                >
-                                    {field.label}
-                                </TableHead>
-                            );
+
+                            const sectionColor = sectionColors[section.name]?.sub || 'bg-gray-500';
+
+                            return section.categorizedFields.map((category, categoryIndex) => {
+                                if (category.isSeparator) {
+                                    return renderSeparatorCell(`header-cat-sep-${sectionIndex}-${categoryIndex}`, true);
+                                }
+
+                                return category.fields.map(field => (
+                                    <TableHead
+                                        key={`${section.name}-${field.name}`}
+                                        className={`whitespace-nowrap ${sectionColor} text-white transition-colors`}
+                                    >
+                                        {field.label}
+                                    </TableHead>
+                                ));
+                            });
                         })}
                     </TableRow>
                 </TableHeader>
@@ -334,48 +427,67 @@ const OverallView = () => {
                 <TableBody>
                     {data.map((companyGroup, groupIndex) => (
                         companyGroup.rows.map((row, rowIndex) => (
-                            <TableRow key={`${groupIndex}-${rowIndex}`}>
+                            <TableRow 
+                                key={`${groupIndex}-${rowIndex}`}
+                                className="hover:bg-gray-50 transition-colors"
+                            >
                                 {rowIndex === 0 && (
                                     <TableCell
-                                        className="whitespace-nowrap"
+                                        className="whitespace-nowrap font-medium"
                                         rowSpan={companyGroup.rowSpan}
                                     >
                                         {groupIndex + 1}
                                     </TableCell>
                                 )}
-                                {rowIndex === 0 && renderSeparatorCell(`sep-${groupIndex}`, false, companyGroup.rowSpan)}
-                                {allFieldsWithSeparators.slice(2).map((field, colIndex) => {
-                                    if (field.isSeparator) {
-                                        return rowIndex === 0
-                                            ? renderSeparatorCell(`separator-body-${groupIndex}-${colIndex}`, false, companyGroup.rowSpan)
-                                            : null;
+                                {/* Skip the first section (index) and start from the first separator */}
+                                {processedSections.slice(1).map((section, sectionIndex) => {
+                                    if (section.isSeparator) {
+                                        return rowIndex === 0 && renderSeparatorCell(
+                                            `body-sep-${groupIndex}-${sectionIndex}`,
+                                            false,
+                                            companyGroup.rowSpan
+                                        );
                                     }
 
-                                    if (field.name.startsWith('company_') && rowIndex > 0) {
-                                        return null;
-                                    }
+                                    const sectionColor = sectionColors[section.name]?.cell || 'bg-gray-50';
 
-                                    let value = row[field.name];
-
-                                    if (field.type === 'boolean') {
-                                        value = value ? 'Yes' : 'No';
-                                    } else if (field.type === 'date' && value) {
-                                        try {
-                                            value = new Date(value).toLocaleDateString();
-                                        } catch (e) {
-                                            value = value;
+                                    return section.categorizedFields.map((category, categoryIndex) => {
+                                        if (category.isSeparator) {
+                                            return rowIndex === 0 && renderSeparatorCell(
+                                                `body-cat-sep-${groupIndex}-${sectionIndex}-${categoryIndex}`,
+                                                false,
+                                                companyGroup.rowSpan
+                                            );
                                         }
-                                    }
 
-                                    return (
-                                        <TableCell
-                                            key={`${groupIndex}-${rowIndex}-${colIndex}`}
-                                            className="whitespace-nowrap"
-                                            rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
-                                        >
-                                            {value || <span className="text-red-500 font-semibold">N/A</span>}
-                                        </TableCell>
-                                    );
+                                        return category.fields.map(field => {
+                                            if (field.name.startsWith('company_') && rowIndex > 0) {
+                                                return null;
+                                            }
+
+                                            let value = row[field.name];
+
+                                            if (field.type === 'boolean') {
+                                                value = value ? 'Yes' : 'No';
+                                            } else if (field.type === 'date' && value) {
+                                                try {
+                                                    value = new Date(value).toLocaleDateString();
+                                                } catch (e) {
+                                                    value = value;
+                                                }
+                                            }
+
+                                            return (
+                                                <TableCell
+                                                    key={`${groupIndex}-${rowIndex}-${field.name}`}
+                                                    className={`whitespace-nowrap ${sectionColor} transition-colors`}
+                                                    rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
+                                                >
+                                                    {value || <span className="text-red-500 font-semibold">N/A</span>}
+                                                </TableCell>
+                                            );
+                                        });
+                                    });
                                 })}
                             </TableRow>
                         ))
@@ -386,4 +498,5 @@ const OverallView = () => {
         </ScrollArea>
     );
 };
+
 export default OverallView;

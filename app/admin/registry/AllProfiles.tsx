@@ -21,6 +21,7 @@ import { KYCDocumentsList } from "@/components/component/kycDocumentsList";
 import { DirectorsDocumentsList } from "@/components/component/DirectorsDocumentsList";
 import { supabase } from '@/lib/supabaseClient';
 import DirectorsDocs from '../documents/new/directors';
+import { formFields } from './onboarding/formFields'; 
 
 // import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
@@ -183,6 +184,7 @@ const bankColumns = [
   { id: 'branch', header: 'Branch' },
   { id: 'currency', header: 'Currency' }
 ];
+
 
 export default function AllProfiles() {
   const [activeMainTab, setActiveMainTab] = useState("company-info");

@@ -70,7 +70,7 @@ export default function Page() {
             <OnboardingPage onComplete={handleOnboardingComplete} />
           )}
           {step === 2 && (
-            <Upload onComplete={handleUploadComplete} />
+            <Upload onComplete={handleUploadComplete} companyData={companyData} />
           )}
           {step === 3 && (
             <div className="text-center space-y-6">
