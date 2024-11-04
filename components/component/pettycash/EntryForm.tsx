@@ -335,22 +335,22 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
   const validateForm = (): string[] => {
     const errors: string[] = [];
 
-    if (!formData.invoice_date) errors.push('Invoice date is required');
-    if (!formData.cuin_number) errors.push('CUIN number is required');
-    if (!formData.user_name) errors.push('User is required');
-    if (!formData.account_type) errors.push('Account type is required');
-    if (!formData.petty_cash_account) errors.push('Account number is required');
-    if (!formData.supplier_name) errors.push('Supplier name is required');
-    if (!formData.expense_category) errors.push('Category is required');
-    if (!formData.subcategory) errors.push('Subcategory is required');
-    if (!formData.amount || Number(formData.amount) <= 0) errors.push('Valid amount is required');
-    if (!formData.description) errors.push('Description is required');
+    // if (!formData.invoice_date) errors.push('Invoice date is required');
+    // if (!formData.cuin_number) errors.push('CUIN number is required');
+    // if (!formData.user_name) errors.push('User is required');
+    // if (!formData.account_type) errors.push('Account type is required');
+    // if (!formData.petty_cash_account) errors.push('Account number is required');
+    // if (!formData.supplier_name) errors.push('Supplier name is required');
+    // if (!formData.expense_category) errors.push('Category is required');
+    // if (!formData.subcategory) errors.push('Subcategory is required');
+    // if (!formData.amount || Number(formData.amount) <= 0) errors.push('Valid amount is required');
+    // if (!formData.description) errors.push('Description is required');
 
     // File validation for new entries
-    if (mode === 'create') {
-      if (!formData.receipt_url) errors.push('Bill/PCV upload is required');
-      if (!formData.payment_proof_url) errors.push('Payment proof is required');
-    }
+    // if (mode === 'create') {
+    //   if (!formData.receipt_url) errors.push('Bill/PCV upload is required');
+    //   if (!formData.payment_proof_url) errors.push('Payment proof is required');
+    // }
 
     return errors;
   };

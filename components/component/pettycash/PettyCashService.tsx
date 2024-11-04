@@ -1019,30 +1019,30 @@ export class PettyCashService {
                 .select('*')
                 .eq('userid', userId)
                 .single();
-    
+
             if (fetchError) throw fetchError;
             if (!record?.data?.accounts) throw new Error('No accounts found');
-    
+
             // Find the account to be deleted
             const accountToDelete = record.data.accounts.find(account => account.id === accountId);
             if (!accountToDelete) {
                 throw new Error('Account not found');
             }
-    
+
             // Check for associated transactions
             const { data: associatedTransactions } = await supabase
                 .from('acc_portal_pettycash_entries')
                 .select('*')
                 .eq('account_id', accountId)
                 .limit(1);
-    
+
             if (associatedTransactions?.length > 0) {
                 throw new Error('Cannot delete account with associated transactions');
             }
-    
+
             // Remove the account from the array
             const updatedAccounts = record.data.accounts.filter(account => account.id !== accountId);
-    
+
             // Add to audit trail
             const auditTrail = {
                 ...(record.data.auditTrail || {}),
@@ -1056,7 +1056,7 @@ export class PettyCashService {
                     }
                 ]
             };
-    
+
             // Update the record
             const { data: result, error: updateError } = await supabase
                 .from('acc_portal_pettycash_accounts')
@@ -1069,9 +1069,9 @@ export class PettyCashService {
                 })
                 .eq('userid', userId)
                 .select();
-    
+
             if (updateError) throw updateError;
-    
+
             // Archive the deleted account
             try {
                 await supabase
@@ -1085,7 +1085,7 @@ export class PettyCashService {
             } catch (archiveError) {
                 console.warn('Failed to archive account data:', archiveError);
             }
-    
+
             return result;
         } catch (error) {
             console.error('Error deleting account:', error);
@@ -1137,14 +1137,14 @@ export class PettyCashService {
                 .from('acc_portal_pettycash_entries')
                 .select('id')
                 .eq('userid', userId);
-    
+
             if (error) throw error;
-            
+
             // Get the count and add 1
             const nextNumber = (data?.length || 0) + 1;
-            
+
             return `PCV${nextNumber.toString().padStart(6, '0')}`;
-            
+
         } catch (error) {
             console.error('Error getting next entry number:', error);
             // Return PCV000001 as the first number if there's an error
@@ -1438,22 +1438,195 @@ export class PettyCashService {
 
     // In PettyCashService.tsx
 
-static async fetchFilteredEntries(table: string, userId: string, category: 'reimbursement' | 'loan') {
-    try {
-      const { data, error } = await supabase
-        .from('acc_portal_pettycash_entries')
-        .select('*')
-        .eq('userid', userId)
-        .eq('category', category)
-        .order('created_at', { ascending: false });
-  
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error(`Error fetching ${category} entries:`, error);
-      throw error;
+    static async fetchFilteredEntries(table: string, userId: string, category: 'reimbursement' | 'loan') {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_entries')
+                .select('*')
+                .eq('userid', userId)
+                .eq('category', category)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error(`Error fetching ${category} entries:`, error);
+            throw error;
+        }
     }
-  }
+
+
+    static async getPaymentHistory(entryId: string) {
+        try {
+            const { data, error } = await supabase
+                .from('acc_portal_pettycash_payments')
+                .select('*')
+                .eq('entry_id', entryId)
+                .order('payment_date', { ascending: false });
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error fetching payment history:', error);
+            throw error;
+        }
+    }
+
+    static async recordPayment(entryId: string, paymentData: PaymentTracking) {
+        try {
+            // Begin transaction
+            const { data: entry, error: entryError } = await supabase
+                .from('acc_portal_pettycash_entries')
+                .select('amount, paid_amount')
+                .eq('id', entryId)
+                .single();
+
+            if (entryError) throw entryError;
+
+            const newPaidAmount = (entry.paid_amount || 0) + paymentData.payment_amount;
+            const status = newPaidAmount >= entry.amount ? 'Paid' :
+                newPaidAmount > 0 ? 'Partially Paid' : 'Pending';
+
+            // Record the payment
+            const { data: payment, error: paymentError } = await supabase
+                .from('acc_portal_pettycash_payments')
+                .insert([{
+                    entry_id: entryId,
+                    ...paymentData,
+                    created_at: new Date().toISOString()
+                }])
+                .select()
+                .single();
+
+            if (paymentError) throw paymentError;
+
+            // Update the entry's paid amount and status
+            const { error: updateError } = await supabase
+                .from('acc_portal_pettycash_entries')
+                .update({
+                    paid_amount: newPaidAmount,
+                    last_payment_date: paymentData.payment_date,
+                    status,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', entryId);
+
+            if (updateError) throw updateError;
+
+            return payment;
+        } catch (error) {
+            console.error('Error recording payment:', error);
+            throw error;
+        }
+    }
+
+    static async updatePaymentSchedule(entryId: string, nextPaymentDate: string) {
+        try {
+            const { error } = await supabase
+                .from('acc_portal_pettycash_entries')
+                .update({
+                    next_payment_date: nextPaymentDate,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', entryId);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating payment schedule:', error);
+            throw error;
+        }
+    }
+
+    static async deletePayment(paymentId: string, entryId: string) {
+        try {
+            // Get the payment amount first
+            const { data: payment, error: paymentError } = await supabase
+                .from('acc_portal_pettycash_payments')
+                .select('payment_amount')
+                .eq('id', paymentId)
+                .single();
+
+            if (paymentError) throw paymentError;
+
+            // Get current entry data
+            const { data: entry, error: entryError } = await supabase
+                .from('acc_portal_pettycash_entries')
+                .select('amount, paid_amount')
+                .eq('id', entryId)
+                .single();
+
+            if (entryError) throw entryError;
+
+            // Calculate new paid amount
+            const newPaidAmount = (entry.paid_amount || 0) - (payment.payment_amount || 0);
+            const status = newPaidAmount >= entry.amount ? 'Paid' :
+                newPaidAmount > 0 ? 'Partially Paid' : 'Pending';
+
+            // Delete the payment
+            const { error: deleteError } = await supabase
+                .from('acc_portal_pettycash_payments')
+                .delete()
+                .eq('id', paymentId);
+
+            if (deleteError) throw deleteError;
+
+            // Update the entry's paid amount and status
+            const { error: updateError } = await supabase
+                .from('acc_portal_pettycash_entries')
+                .update({
+                    paid_amount: newPaidAmount,
+                    status,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', entryId);
+
+            if (updateError) throw updateError;
+        } catch (error) {
+            console.error('Error deleting payment:', error);
+            throw error;
+        }
+    }
+
+    static async getPaymentStats(entryId: string) {
+        try {
+            const { data: entry, error: entryError } = await supabase
+                .from('acc_portal_pettycash_entries')
+                .select('amount, paid_amount, created_at')
+                .eq('id', entryId)
+                .single();
+
+            if (entryError) throw entryError;
+
+            const { data: payments, error: paymentsError } = await supabase
+                .from('acc_portal_pettycash_payments')
+                .select('payment_amount, payment_date')
+                .eq('entry_id', entryId)
+                .order('payment_date', { ascending: true });
+
+            if (paymentsError) throw paymentsError;
+
+            const totalAmount = entry.amount || 0;
+            const paidAmount = entry.paid_amount || 0;
+            const remainingBalance = totalAmount - paidAmount;
+            const paymentCount = payments.length;
+            const lastPaymentDate = payments[payments.length - 1]?.payment_date || null;
+            const averagePaymentAmount = paymentCount > 0 ?
+                payments.reduce((sum, p) => sum + (p.payment_amount || 0), 0) / paymentCount : 0;
+
+            return {
+                totalAmount,
+                paidAmount,
+                remainingBalance,
+                paymentCount,
+                lastPaymentDate,
+                averagePaymentAmount,
+                createdAt: entry.created_at
+            };
+        } catch (error) {
+            console.error('Error getting payment stats:', error);
+            throw error;
+        }
+    }
 
 
 }
