@@ -400,7 +400,7 @@ const handleDeleteAccount = async (account: AccountData) => {
   try {
     await PettyCashService.deleteAccountRecord(account.id, userId);
     toast.success('Account deleted successfully');
-    fetchAccounts();
+    fetchAccountsData();
   } catch (error) {
     console.error('Error deleting account:', error);
     toast.error('Failed to delete account');
