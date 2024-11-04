@@ -1,8 +1,8 @@
 export const formFields = {
     companyDetails: {
         fields: [
-            { name: 'company_name', label: 'Company Name', type: 'text' ,required: true},
-            { name: 'company_type', label: 'Company Type', type: 'text' ,required: true},
+            { name: 'company_name', label: 'Company Name', type: 'text', required: true },
+            { name: 'company_type', label: 'Company Type', type: 'text', required: true },
             { name: 'description', label: 'Description', type: 'text' },
             { name: 'registration_number', label: 'Registration Number', type: 'text' },
             { name: 'date_established', label: 'Date Established', type: 'date' },
@@ -39,9 +39,13 @@ export const formFields = {
             { name: 'nhif_compliance_date', label: 'NHIF Compliance Certificate Date', type: 'date', category: 'NHIF Details' },
 
             // Ecitizen Details
-            { name: 'ecitizen_identifier', label: 'Ecitizen Identifier', type: 'text', category: 'Ecitizen Details' },
-            { name: 'ecitizen_password', label: 'Ecitizen Password', type: 'text', category: 'Ecitizen Details' },
-            { name: 'ecitizen_status', label: 'Ecitizen Status', type: 'text', category: 'Ecitizen Details' },
+            { name: 'ecitizen_identifier', label: 'E-Citizen Identifier', type: 'text', category: 'E-Citizen Details' },
+            { name: 'ecitizen_password', label: 'E-Citizen Password', type: 'text', category: 'E-Citizen Details' },
+            { name: 'ecitizen_status', label: 'E-Citizen Status', type: 'text', category: 'E-Citizen Details' },
+            { name: 'ecitizen_id', label: 'E-Citizen ID', type: 'text', category: 'E-Citizen Details' },
+            { name: 'ecitizen_email', label: 'E-Citizen Email', type: 'email', category: 'E-Citizen Details' },
+            { name: 'ecitizen_mobile', label: 'E-Citizen Mobile', type: 'tel', category: 'E-Citizen Details' },
+            
 
             // NITA Details
             { name: 'nita_identifier', label: 'NITA Identifier', type: 'text', category: 'NITA Details' },
@@ -68,30 +72,30 @@ export const formFields = {
 
             // VAT Details
             { name: 'vat_identifier', label: 'VAT Identifier', type: 'text', category: 'VAT Details' },
-            { name: 'vat_password', label: 'VAT Password', type: 'text', category: 'VAT Details' },            
+            { name: 'vat_password', label: 'VAT Password', type: 'text', category: 'VAT Details' },
             { name: 'vat_status', label: 'VAT Status', type: 'text', category: 'VAT Details' },
             { name: 'vat_from', label: 'VAT From', type: 'date', category: 'VAT Details' },
             { name: 'vat_to', label: 'VAT To', type: 'date', category: 'VAT Details' },
 
-             // Tax Status Details
-             { name: 'income_tax_resident_status', label: 'Income Tax - Resident Individual Status', type: 'text', category: 'Income Tax Status' },
-             { name: 'income_tax_resident_from', label: 'Income Tax - Resident Individual From', type: 'date', category: 'Income Tax Status' },
-             { name: 'income_tax_resident_to', label: 'Income Tax - Resident Individual To', type: 'date', category: 'Income Tax Status' },
+            // Tax Status Details
+            { name: 'income_tax_resident_status', label: 'Income Tax - Resident Individual Status', type: 'text', category: 'Income Tax Status' },
+            { name: 'income_tax_resident_from', label: 'Income Tax - Resident Individual From', type: 'date', category: 'Income Tax Status' },
+            { name: 'income_tax_resident_to', label: 'Income Tax - Resident Individual To', type: 'date', category: 'Income Tax Status' },
 
-             // NEA Details
-             { name: 'nea_username', label: 'NEA Username', type: 'text', category: 'NEA Details' },
-             { name: 'nea_password', label: 'NEA Password', type: 'text', category: 'NEA Details' },
-             { name: 'paye_status', label: 'PAYE Status', type: 'text', category: 'PAYE Details' },
-             { name: 'paye_from', label: 'PAYE From', type: 'date', category: 'PAYE Details' },
-             { name: 'paye_to', label: 'PAYE To', type: 'date', category: 'PAYE Details' },
- 
-             { name: 'rent_income_status', label: 'Rent Income Status', type: 'text', category: 'MRI' },
-             { name: 'rent_income_from', label: 'Rent Income From', type: 'date', category: 'MRI' },
-             { name: 'rent_income_to', label: 'Rent Income To', type: 'date', category: 'MRI' },
- 
-             { name: 'turnover_tax_status', label: 'Turnover Tax Status', type: 'text', category: 'TOT' },
-             { name: 'turnover_tax_from', label: 'Turnover Tax From', type: 'date', category: 'TOT' },
-             { name: 'turnover_tax_to', label: 'Turnover Tax To', type: 'date', category: 'TOT' },
+            // NEA Details
+            { name: 'nea_username', label: 'NEA Username', type: 'text', category: 'NEA Details' },
+            { name: 'nea_password', label: 'NEA Password', type: 'text', category: 'NEA Details' },
+            { name: 'paye_status', label: 'PAYE Status', type: 'text', category: 'PAYE Details' },
+            { name: 'paye_from', label: 'PAYE From', type: 'date', category: 'PAYE Details' },
+            { name: 'paye_to', label: 'PAYE To', type: 'date', category: 'PAYE Details' },
+
+            { name: 'rent_income_status', label: 'Rent Income Status', type: 'text', category: 'MRI' },
+            { name: 'rent_income_from', label: 'Rent Income From', type: 'date', category: 'MRI' },
+            { name: 'rent_income_to', label: 'Rent Income To', type: 'date', category: 'MRI' },
+
+            { name: 'turnover_tax_status', label: 'Turnover Tax Status', type: 'text', category: 'TOT' },
+            { name: 'turnover_tax_from', label: 'Turnover Tax From', type: 'date', category: 'TOT' },
+            { name: 'turnover_tax_to', label: 'Turnover Tax To', type: 'date', category: 'TOT' },
 
             // TIMS Details
             { name: 'tims_username', label: 'TIMS Username', type: 'text', category: 'TIMS Details' },
@@ -111,12 +115,34 @@ export const formFields = {
             { name: 'sheria_email', label: 'Sheria Email', type: 'text', category: 'Sheria Details' },
             { name: 'sheria_postal_address', label: 'Sheria Postal Address', type: 'text', category: 'Sheria Details' },
 
+            // Client Category
+            { name: 'account_manager', label: 'Account Manager', type: 'text', category: 'Client Category' },
+            { name: 'client_accountant', label: 'Client Company Accountant', type: 'text', category: 'Client Category' },
+            { name: 'company_status', label: 'Company Status', type: 'select', options: ['Active', 'Dormant', 'To Start'], category: 'Client Category' },
+            { name: 'company_type', label: 'Company Type', type: 'select', options: ['Limited', 'Sole Proprietorship', 'Partnership'], category: 'Client Category' },
+
+            // Tax Status Details
+            { name: 'pin_status', label: 'PIN Status', type: 'text', category: 'Tax Status' },
+            { name: 'itax_status', label: 'iTax Status', type: 'text', category: 'Tax Status' },
+            { name: 'tax_year_end', label: 'Tax Year End', type: 'date', category: 'Tax Status' },
+
+            // Compliance Details
+            { name: 'fire_prevention_license', label: 'Fire Prevention License', type: 'text', category: 'Compliance' },
+            { name: 'business_permit', label: 'Single Business Permit', type: 'text', category: 'Compliance' },
+            { name: 'tourism_fund_levy', label: 'Tourism Fund Levy', type: 'text', category: 'Compliance' },
+
+            // Statutory Details
+            { name: 'nea_status', label: 'NEA Status', type: 'text', category: 'Statutory Details' },
+            { name: 'nhif_status', label: 'NHIF Status', type: 'text', category: 'Statutory Details' },
+            { name: 'nssf_status', label: 'NSSF Status', type: 'text', category: 'Statutory Details' },
+
+
             // Other Company Details
-            { name: 'nature_of_business', label: 'Nature of Business', type: 'text', category: 'Other Details'},
-            { name: 'audit_period', label: 'Audit Period', type: 'text', category: 'Other Details'},
-            { name: 'sale_terms', label: 'Sale Terms', type: 'text', category: 'Other Details'},
+            { name: 'nature_of_business', label: 'Nature of Business', type: 'text', category: 'Other Details' },
+            { name: 'audit_period', label: 'Audit Period', type: 'text', category: 'Other Details' },
+            { name: 'sale_terms', label: 'Sale Terms', type: 'text', category: 'Other Details' },
         ]
-    }, 
+    },
     directorDetails: {
         fields: [
             { name: 'first_name', label: 'First Name', type: 'text' },
