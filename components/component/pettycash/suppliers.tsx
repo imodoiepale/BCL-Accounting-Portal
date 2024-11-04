@@ -11,7 +11,7 @@
   import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
   import { ScrollArea } from "@/components/ui/scroll-area";
   import { RefreshCwIcon, Search, Plus, Upload } from 'lucide-react';
-  import { toast, Toaster } from 'react-hot-toast';
+  import { toast } from 'react-hot-toast';
 
   import { PettyCashService } from './PettyCashService';
   import TableActions from './TableActions';

@@ -25,7 +25,7 @@ interface Director {
 }
 
 interface Document {
-  id: string; // Assuming UUID is stored as a string
+  id: number;
   name: string;
   issue_date: string;
   expiry_date: string;
@@ -322,11 +322,9 @@ const DocsTable = ({ category, showDirectors, documents }: { category: string, s
                     Director
                   </TableHead>
                 )}
-                {visibleDocs.includes(0) && (
-                  <TableHead className="w-[100px] border-r border-gray-200 py-2" rowSpan={2}>
-                    Metrics
-                  </TableHead>
-                )}
+                <TableHead className="w-[100px] border-r border-gray-200 py-2" rowSpan={2}>
+                  Metrics
+                </TableHead>
                 {documents.map(doc => (
                   <TableHead 
                     key={doc.id} 
@@ -639,31 +637,10 @@ const DocsTable = ({ category, showDirectors, documents }: { category: string, s
             </div>
           </div>
           <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => {
-              // Reset settings to default
-              setVisibleDocs([1, 2, 3, 4]);
-              setShowExpired(true);
-              setShowInactive(true);
-              setSettingsOpen(false);
-            }}>
-              Reset
+            <Button variant="outline" onClick={() => setSettingsOpen(false)}>
+              Cancel
             </Button>
-            <Button onClick={() => {
-              // Save settings to JSON file
-              const settings = {
-                visibleDocs,
-                showExpired,
-                showInactive,
-              };
-              const blob = new Blob([JSON.stringify(settings)], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'settings.json';
-              a.click();
-              URL.revokeObjectURL(url);
-              setSettingsOpen(false);
-            }}>
+            <Button onClick={() => setSettingsOpen(false)}>
               Save Changes
             </Button>
           </DialogFooter>

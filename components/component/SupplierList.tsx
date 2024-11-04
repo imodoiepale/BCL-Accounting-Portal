@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, UploadIcon, Edit3Icon, Trash2Icon } from 'lucide-react'
 import { ScrollArea } from '../ui/scroll-area'
 import { useUser } from '@clerk/clerk-react'
-import { toast, Toaster } from 'react-hot-toast'
+import { toast } from 'react-hot-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from '@/lib/supabaseClient'
 import { Switch } from '../ui/switch'

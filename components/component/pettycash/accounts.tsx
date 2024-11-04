@@ -14,7 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
 import { RefreshCwIcon, Search, Plus } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { PettyCashService } from './PettyCashService';
 import { TableActions } from './TableActions';
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,7 @@ const CASH_TYPES = [
   { value: 'Card', label: 'Card' },
   { value: 'Credit', label: 'Credit' }
 ];
-
+ 
 // Types
 interface AccountData {
   id?: string;
@@ -146,135 +146,149 @@ const AccountDialog: React.FC<AccountDialogProps> = ({
       console.error('Error saving account:', error);
     }
   };
+    const formFields = [
+      {
+        name: 'accountUser',
+        label: 'Account User',
+        type: 'select',
+        options: users,
+        required: true
+      },
+      {
+        name: 'pettyCashType',
+        label: 'Petty Cash Type',
+        type: 'select',
+        options: CASH_TYPES,
+        required: true
+      },
+      {
+        name: 'accountNumber',
+        label: 'Account Number',
+        type: 'text',
+        required: true,
+        disabled: formData.pettyCashType === 'Cash'
+      },
+      {
+        name: 'accountType',
+        label: 'Account Type',
+        type: 'select',
+        options: ACCOUNT_TYPES,
+        required: true
+      },
+      {
+        name: 'minFloatBalance',
+        label: 'Minimum Float Balance',
+        type: 'number',
+        required: true
+      },
+      {
+        name: 'minFloatAlert',
+        label: 'Minimum Float Alert',
+        type: 'number',
+        required: true
+      },
+      {
+        name: 'maxOpeningFloat',
+        label: 'Maximum Opening Float',
+        type: 'number',
+        required: true
+      },
+      {
+        name: 'approvedLimitAmount',
+        label: 'Approved Limit Amount',
+        type: 'number',
+        required: true
+      },
+      {
+        name: 'startDate',
+        label: 'Start Date',
+        type: 'date',
+        required: true
+      },
+      {
+        name: 'endDate',
+        label: 'End Date',
+        type: 'date',
+        required: false
+      },
+      {
+        name: 'status',
+        label: 'Status',
+        type: 'select',
+        options: [
+          { value: 'Active', label: 'Active' },
+          { value: 'Inactive', label: 'Inactive' }
+        ],
+        required: true,
+        disabled: formData.endDate ? true : false
+      }
+    ];
 
-  const formFields = [
-    {
-      name: 'accountUser',
-      label: 'Account User',
-      type: 'select',
-      options: users,
-      required: true
-    },
-    {
-      name: 'pettyCashType',
-      label: 'Petty Cash Type',
-      type: 'select',
-      options: CASH_TYPES,
-      required: true
-    },
-    {
-      name: 'accountNumber',
-      label: 'Account Number',
-      type: 'text',
-      required: true
-    },
-    {
-      name: 'accountType',
-      label: 'Account Type',
-      type: 'select',
-      options: ACCOUNT_TYPES,
-      required: true
-    },
-    {
-      name: 'minFloatBalance',
-      label: 'Minimum Float Balance',
-      type: 'number',
-      required: true
-    },
-    {
-      name: 'minFloatAlert',
-      label: 'Minimum Float Alert',
-      type: 'number',
-      required: true
-    },
-    {
-      name: 'maxOpeningFloat',
-      label: 'Maximum Opening Float',
-      type: 'number',
-      required: true
-    },
-    {
-      name: 'approvedLimitAmount',
-      label: 'Approved Limit Amount',
-      type: 'number',
-      required: true
-    },
-    {
-      name: 'startDate',
-      label: 'Start Date',
-      type: 'date',
-      required: true
-    },
-    {
-      name: 'endDate',
-      label: 'End Date',
-      type: 'date',
-      required: false
-    },
-    {
-      name: 'status',
-      label: 'Status',
-      type: 'select',
-      options: [
-        { value: 'Active', label: 'Active' },
-        { value: 'Inactive', label: 'Inactive' }
-      ],
-      required: true
-    }
-  ];
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Add New Account' : 'Edit Account'}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {formFields.map(({ name, label, type, options, required }) => (
-            <div key={name} className="space-y-1.5">
-              <Label htmlFor={name}>{label}{required && ' *'}</Label>
-              {type === 'select' ? (
-                <Select
-                  value={formData[name]?.toString()}
-                  onValueChange={(value) => handleSelectChange(name, value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {options?.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  id={name}
-                  name={name}
-                  type={type}
-                  value={formData[name]?.toString() || ''}
-                  onChange={handleInputChange}
-                  required={required}
-                  className="h-8"
-                />
-              )}
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{mode === 'create' ? 'Add New Account' : 'Edit Account'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              {formFields.map(({ name, label, type, options, required, disabled }) => (
+                <div key={name} className="space-y-2 px-2 rounded-lg">
+                  <Label htmlFor={name} className="font-medium">{label}{required && ' *'}</Label>
+                  {type === 'select' ? (
+                    <Select
+                      value={formData[name]?.toString()}
+                      onValueChange={(value) => {
+                        handleSelectChange(name, value);
+                        if (name === 'pettyCashType' && value === 'Cash') {
+                          handleInputChange({ target: { name: 'accountNumber', value: 'Cash' } } as React.ChangeEvent<HTMLInputElement>);
+                        }
+                      }}
+                      disabled={disabled}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {options?.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id={name}
+                      name={name}
+                      type={type}
+                      value={formData[name]?.toString() || ''}
+                      onChange={(e) => {
+                        handleInputChange(e);
+                        if (name === 'endDate' && e.target.value) {
+                          handleInputChange({ target: { name: 'status', value: 'Inactive' } } as React.ChangeEvent<HTMLInputElement>);
+                        }
+                      }}
+                      required={required}
+                      disabled={disabled || (name === 'accountNumber' && formData.pettyCashType === 'Cash')}
+                      className="h-9 w-full"
+                    />
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" className="bg-blue-600 text-white">
-              {mode === 'create' ? 'Create Account' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-};
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">
+                {mode === 'create' ? 'Create Account' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );};
 
 export function AccountsTab() {
   const { userId } = useAuth();
@@ -292,6 +306,12 @@ export function AccountsTab() {
     setIsLoading(true);
     try {
       const accountsData = await PettyCashService.fetchAccountRecords(userId);
+      
+      if (!accountsData || accountsData.length === 0) {
+        toast.error('No data found');
+        setAccounts([]);
+        return;
+      }
   
       const formattedAccounts = accountsData.map(account => ({
         id: account.id, // Add this line
@@ -312,8 +332,7 @@ export function AccountsTab() {
   
       setAccounts(formattedAccounts);
     } catch (error) {
-      console.error('Error fetching accounts:', error);
-      toast.error('Failed to fetch accounts');
+      // toast.error('Failed to fetch accounts');
       setAccounts([]);
     } finally {
       setIsLoading(false);
@@ -381,7 +400,7 @@ const handleDeleteAccount = async (account: AccountData) => {
   try {
     await PettyCashService.deleteAccountRecord(account.id, userId);
     toast.success('Account deleted successfully');
-    fetchAccounts();
+    fetchAccountsData();
   } catch (error) {
     console.error('Error deleting account:', error);
     toast.error('Failed to delete account');
