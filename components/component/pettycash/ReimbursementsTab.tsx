@@ -1,8 +1,7 @@
-// components/ReimbursementsTab.tsx
-// ReimbursementsTab.tsx
 // @ts-nocheck
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,239 +11,35 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
-import { RefreshCwIcon, Search, Plus, Eye } from 'lucide-react';
+import { RefreshCwIcon, Search, FilterIcon, Download, RotateCcw, Loader2, Eye, Plus } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import { PettyCashService } from './PettyCashService';
 import { TableActions } from './TableActions';
-import { formatCurrency } from './currency';
 import Image from 'next/image';
+import PettyCashEntryForm from './EntryForm';
 
-interface BaseEntry {
+interface ReimbursementEntry {
     id: string;
-    customer_name: string;
-    reminder_date: string;
-    payment_date: string | null;
     amount: number;
-    paid_amount: number;
+    description: string;
     user_name: string;
-    account_number: string;
-    
-    // Hidden fields
     account_type: string;
+    account_number: string;
     supplier_name: string;
     supplier_pin: string;
     purchase_type: string;
     category: string;
     subcategory: string;
-    description: string;
     paid_via: string;
     payment_proof_url: string | null;
     receipt_url: string | null;
     status: 'Pending' | 'Partially Paid' | 'Paid';
-    
     created_at: string;
-    updated_at: string;
     notes: string;
-  }
-  
-  interface ReimbursementEntry extends BaseEntry {
-    // Add reimbursement-specific fields here
-    reimbursement_type: string;
-  }
-
-interface ReimbursementDialogProps {
-    isOpen: boolean;
-    onClose: () => void;
-    entry: ReimbursementEntry | null;
-    onSave: (entry: ReimbursementEntry) => Promise<void>;
-    mode: 'create' | 'edit';
+    paid_amount: number;
 }
-
-const ReimbursementDialog: React.FC<ReimbursementDialogProps> = ({
-    isOpen,
-    onClose,
-    entry,
-    onSave,
-    mode
-}) => {
-    const initialFormState: ReimbursementEntry = {
-        id: '',
-        amount: 0,
-        customer_name: '',
-        payment_status: 'Pending',
-        paid_amount: 0,
-        description: '',
-        created_at: new Date().toISOString(),
-        due_date: new Date().toISOString(),
-        contact_number: '',
-        email: '',
-        notes: '',
-        receipt_url: null
-    };
-
-    const [formData, setFormData] = useState<ReimbursementEntry>(entry || initialFormState);
-    const [receiptFile, setReceiptFile] = useState<File | null>(null);
-
-    useEffect(() => {
-        setFormData(entry || initialFormState);
-    }, [entry]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value, type } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'number' ? parseFloat(value) : value
-        }));
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            let receipt_url = formData.receipt_url;
-
-            if (receiptFile) {
-                const uploadPath = `reimbursements/${Date.now()}_${receiptFile.name}`;
-                receipt_url = await PettyCashService.uploadReceipt(receiptFile, uploadPath);
-            }
-
-            await onSave({ ...formData, receipt_url });
-            onClose();
-        } catch (error) {
-            console.error('Error saving reimbursement:', error);
-            toast.error('Failed to save reimbursement');
-        }
-    };
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>{mode === 'create' ? 'New Reimbursement' : 'Edit Reimbursement'}</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label>Customer Name *</Label>
-                        <Input
-                            name="customer_name"
-                            value={formData.customer_name}
-                            onChange={handleInputChange}
-                            required
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Amount *</Label>
-                            <Input
-                                name="amount"
-                                type="number"
-                                step="0.01"
-                                value={formData.amount}
-                                onChange={handleInputChange}
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Paid Amount</Label>
-                            <Input
-                                name="paid_amount"
-                                type="number"
-                                step="0.01"
-                                value={formData.paid_amount}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Due Date</Label>
-                        <Input
-                            name="due_date"
-                            type="date"
-                            value={formData.due_date.split('T')[0]}
-                            onChange={handleInputChange}
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Payment Status</Label>
-                        <Select
-                            value={formData.payment_status}
-                            onValueChange={(value) => setFormData(prev => ({ ...prev, payment_status: value as any }))}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Pending">Pending</SelectItem>
-                                <SelectItem value="Partially Paid">Partially Paid</SelectItem>
-                                <SelectItem value="Paid">Paid</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Contact Number</Label>
-                            <Input
-                                name="contact_number"
-                                value={formData.contact_number}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Email</Label>
-                            <Input
-                                name="email"
-                                type="email"
-                                value={formData.email}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Input
-                            name="description"
-                            value={formData.description}
-                            onChange={handleInputChange}
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Receipt Upload</Label>
-                        <Input
-                            type="file"
-                            accept="image/*,.pdf"
-                            onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Notes</Label>
-                        <Input
-                            name="notes"
-                            value={formData.notes}
-                            onChange={handleInputChange}
-                        />
-                    </div>
-
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" className="bg-blue-600 text-white">
-                            {mode === 'create' ? 'Create' : 'Save Changes'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-};
 
 export function ReimbursementsTab() {
     const { userId } = useAuth();
@@ -252,16 +47,43 @@ export function ReimbursementsTab() {
     const [isLoading, setIsLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [showAllColumns, setShowAllColumns] = useState(false);
+    const [users, setUsers] = useState([]);
+    const [accounts, setAccounts] = useState([]);
+
     const [dialogState, setDialogState] = useState({
         isOpen: false,
         mode: 'create' as const,
         entry: null as ReimbursementEntry | null
     });
 
+    const [receiptPreview, setReceiptPreview] = useState<{
+        isOpen: boolean;
+        url: string | null;
+        rotation: number;
+    }>({
+        isOpen: false,
+        url: null,
+        rotation: 0
+    });
+
+    const [paymentProofPreview, setPaymentProofPreview] = useState<{
+        isOpen: boolean;
+        url: string | null;
+        rotation: number;
+    }>({
+        isOpen: false,
+        url: null,
+        rotation: 0
+    });
+
     const fetchEntries = async () => {
         setIsLoading(true);
         try {
-            const data = await PettyCashService.fetchRecords('acc_portal_pettycash_reimbursements', userId);
+            const data = await PettyCashService.fetchFilteredEntries(
+                'acc_portal_pettycash_entries',
+                userId,
+                'reimbursement'
+            );
             setEntries(data || []);
         } catch (error) {
             console.error('Error fetching reimbursements:', error);
@@ -273,21 +95,45 @@ export function ReimbursementsTab() {
 
     useEffect(() => {
         fetchEntries();
+        fetchUsers();
+        fetchAccounts();
     }, [userId]);
+
+    const fetchUsers = async () => {
+        try {
+            const userData = await PettyCashService.fetchUserRecords(userId);
+            setUsers(userData);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        }
+    };
+
+    const fetchAccounts = async () => {
+        try {
+            const accountData = await PettyCashService.fetchAccountRecords(userId);
+            setAccounts(accountData);
+        } catch (error) {
+            console.error('Error fetching accounts:', error);
+        }
+    };
 
     const handleSave = async (entryData: ReimbursementEntry) => {
         try {
+            const dataWithCategory = {
+                ...entryData,
+                category: 'reimbursement',
+                userid: userId
+            };
+
             if (dialogState.mode === 'create') {
-                await PettyCashService.createRecord('acc_portal_pettycash_reimbursements', {
-                    ...entryData,
-                    userid: userId
-                }, userId);
+                await PettyCashService.createRecord('acc_portal_pettycash_entries', dataWithCategory);
                 toast.success('Reimbursement created successfully');
             } else {
-                await PettyCashService.updateRecord('acc_portal_pettycash_reimbursements', entryData.id, entryData);
+                await PettyCashService.updateRecord('acc_portal_pettycash_entries', entryData.id, dataWithCategory);
                 toast.success('Reimbursement updated successfully');
             }
             fetchEntries();
+            setDialogState({ isOpen: false, mode: 'create', entry: null });
         } catch (error) {
             console.error('Error saving reimbursement:', error);
             toast.error('Failed to save reimbursement');
@@ -296,7 +142,7 @@ export function ReimbursementsTab() {
 
     const handleDelete = async (entry: ReimbursementEntry) => {
         try {
-            await PettyCashService.deleteRecord('acc_portal_pettycash_reimbursements', entry.id);
+            await PettyCashService.deleteRecord('acc_portal_pettycash_entries', entry.id);
             toast.success('Reimbursement deleted successfully');
             fetchEntries();
         } catch (error) {
@@ -305,9 +151,27 @@ export function ReimbursementsTab() {
         }
     };
 
-    // Common column definitions for both tabs
+    const handleViewReceipt = (entry: ReimbursementEntry) => {
+        if (entry.receipt_url) {
+            setReceiptPreview({
+                isOpen: true,
+                url: entry.receipt_url,
+                rotation: 0
+            });
+        }
+    };
+
+    const handleViewPaymentProof = (entry: ReimbursementEntry) => {
+        if (entry.payment_proof_url) {
+            setPaymentProofPreview({
+                isOpen: true,
+                url: entry.payment_proof_url,
+                rotation: 0
+            });
+        }
+    };
+
     const columnDefinitions = [
-        // Always visible columns
         {
             header: '#',
             width: '40px',
@@ -315,120 +179,59 @@ export function ReimbursementsTab() {
             alwaysVisible: true
         },
         {
-            header: 'Customer Name',
-            width: '200px',
-            cell: (entry: any) => entry.customer_name,
+            header: 'Date',
+            width: '100px',
+            cell: (entry: ReimbursementEntry) => format(new Date(entry.created_at), 'dd/MM/yyyy'),
             alwaysVisible: true
         },
         {
-            header: 'Payment Reminder Date',
-            width: '150px',
-            cell: (entry: any) => format(new Date(entry.reminder_date), 'dd/MM/yyyy'),
-            alwaysVisible: true
-        },
-        {
-            header: 'Payment Date',
-            width: '150px',
-            cell: (entry: any) => entry.payment_date ? format(new Date(entry.payment_date), 'dd/MM/yyyy') : '-',
-            alwaysVisible: true
-        },
-        {
-            header: 'Balance',
+            header: 'Amount',
             width: '120px',
-            cell: (entry: any) => formatCurrency(entry.amount - (entry.paid_amount || 0)),
+            cell: (entry: ReimbursementEntry) => (
+                <div className="font-medium">
+                    {new Intl.NumberFormat('en-KE', {
+                        style: 'currency',
+                        currency: 'KES',
+                    }).format(entry.amount)}
+                </div>
+            ),
+            alwaysVisible: true
+        },
+        {
+            header: 'Status',
+            width: '100px',
+            cell: (entry: ReimbursementEntry) => (
+                <span className={`px-2 py-1 rounded-full text-xs ${entry.status === 'Paid' ? 'bg-green-100 text-green-800' :
+                        entry.status === 'Partially Paid' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
+                    }`}>
+                    {entry.status}
+                </span>
+            ),
             alwaysVisible: true
         },
         {
             header: 'User',
             width: '150px',
-            cell: (entry: any) => entry.user_name,
-            alwaysVisible: true
+            cell: (entry: ReimbursementEntry) => entry.user_name,
+            toggleable: true
         },
         {
             header: 'Account',
             width: '150px',
-            cell: (entry: any) => entry.account_number,
-            alwaysVisible: true
-        },
-
-        // Hidden columns (toggleable)
-        {
-            header: 'Account Type',
-            width: '120px',
-            cell: (entry: any) => entry.account_type,
-            toggleable: true
-        },
-        {
-            header: 'Account No.',
-            width: '120px',
-            cell: (entry: any) => entry.account_number,
-            toggleable: true
-        },
-        {
-            header: 'Supplier Name',
-            width: '200px',
-            cell: (entry: any) => entry.supplier_name,
-            toggleable: true
-        },
-        {
-            header: 'Supplier PIN/ID',
-            width: '120px',
-            cell: (entry: any) => entry.supplier_pin,
-            toggleable: true
-        },
-        {
-            header: 'Purchase Type',
-            width: '120px',
-            cell: (entry: any) => entry.purchase_type,
-            toggleable: true
-        },
-        {
-            header: 'Category',
-            width: '150px',
-            cell: (entry: any) => entry.category,
-            toggleable: true
-        },
-        {
-            header: 'Subcategory',
-            width: '150px',
-            cell: (entry: any) => entry.subcategory,
-            toggleable: true
-        },
-        {
-            header: 'Amount',
-            width: '120px',
-            cell: (entry: any) => formatCurrency(entry.amount),
+            cell: (entry: ReimbursementEntry) => entry.account_number,
             toggleable: true
         },
         {
             header: 'Description',
             width: '200px',
-            cell: (entry: any) => entry.description,
+            cell: (entry: ReimbursementEntry) => entry.description,
             toggleable: true
         },
         {
-            header: 'Paid Via/By',
-            width: '120px',
-            cell: (entry: any) => entry.paid_via,
-            toggleable: true
-        },
-        {
-            header: 'Payment Proof',
+            header: 'Receipt',
             width: '100px',
-            cell: (entry: any) => entry.payment_proof_url ? (
-                <Button
-                    className="h-6 px-1.5 text-[11px] bg-blue-500 flex text-white items-center gap-0.5"
-                    onClick={() => handleViewPaymentProof(entry)}
-                >
-                    <Eye size={12} /> View
-                </Button>
-            ) : '-',
-            toggleable: true
-        },
-        {
-            header: 'Bill/PCV Upload',
-            width: '100px',
-            cell: (entry: any) => entry.receipt_url ? (
+            cell: (entry: ReimbursementEntry) => entry.receipt_url ? (
                 <Button
                     className="h-6 px-1.5 text-[11px] bg-blue-500 flex text-white items-center gap-0.5"
                     onClick={() => handleViewReceipt(entry)}
@@ -439,25 +242,29 @@ export function ReimbursementsTab() {
             toggleable: true
         },
         {
-            header: 'Status',
+            header: 'Payment Proof',
             width: '100px',
-            cell: (entry: any) => (
-                <span className={`px-2 py-1 rounded-full text-xs ${entry.status === 'Paid' ? 'bg-green-100 text-green-800' :
-                        entry.status === 'Partially Paid' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                    }`}>
-                    {entry.status}
-                </span>
-            ),
+            cell: (entry: ReimbursementEntry) => entry.payment_proof_url ? (
+                <Button
+                    className="h-6 px-1.5 text-[11px] bg-blue-500 flex text-white items-center gap-0.5"
+                    onClick={() => handleViewPaymentProof(entry)}
+                >
+                    <Eye size={12} /> View
+                </Button>
+            ) : '-',
             toggleable: true
         },
         {
             header: 'Actions',
             width: '100px',
-            cell: (entry: any) => (
+            cell: (entry: ReimbursementEntry) => (
                 <TableActions
                     row={entry}
-                    onEdit={() => handleEdit(entry)}
+                    onEdit={() => setDialogState({
+                        isOpen: true,
+                        mode: 'edit',
+                        entry
+                    })}
                     onDelete={() => handleDelete(entry)}
                 />
             ),
@@ -470,8 +277,9 @@ export function ReimbursementsTab() {
     );
 
     const filteredEntries = entries.filter(entry =>
-        entry.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        entry.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        entry.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        entry.user_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        entry.account_number?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (
@@ -540,14 +348,33 @@ export function ReimbursementsTab() {
                             <TableBody>
                                 {isLoading ? (
                                     <TableRow>
-                                        <TableCell colSpan={visibleColumns.length} className="h-32 text-center">
-                                            <RefreshCwIcon className="h-8 w-8 animate-spin mx-auto" />
+                                        <TableCell
+                                            colSpan={visibleColumns.length}
+                                            className="h-32 text-center"
+                                        >
+                                            <div className="flex flex-col items-center justify-center">
+                                                <RefreshCwIcon className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+                                                <span className="text-sm text-gray-500">Loading reimbursements...</span>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ) : filteredEntries.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={visibleColumns.length} className="h-32 text-center">
-                                            No reimbursements found
+                                        <TableCell
+                                            colSpan={visibleColumns.length}
+                                            className="h-32 text-center"
+                                        >
+                                            <div className="flex flex-col items-center justify-center">
+                                                <div className="rounded-full bg-gray-100 p-3 mb-2">
+                                                    <Search className="h-6 w-6 text-gray-400" />
+                                                </div>
+                                                <span className="text-sm font-medium text-gray-900">No Reimbursements Found</span>
+                                                <p className="text-sm text-gray-500 mt-1">
+                                                    {searchQuery
+                                                        ? 'No reimbursements match your search criteria'
+                                                        : 'Get started by adding your first reimbursement'}
+                                                </p>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ) : (
@@ -573,10 +400,11 @@ export function ReimbursementsTab() {
                     </ScrollArea>
                 </Card>
 
-                {/* Receipt Preview Dialog */}
+                {/* Document Preview Dialogs */}
                 <Dialog
-                    open={Boolean(dialogState.entry?.receipt_url)}
-                    onOpenChange={() => setDialogState(prev => ({ ...prev, entry: null }))}>
+                    open={receiptPreview.isOpen}
+                    onOpenChange={(open) => setReceiptPreview(prev => ({ ...prev, isOpen: open }))}
+                >
                     <DialogContent className="max-w-4xl max-h-[90vh] p-0">
                         <DialogHeader className="p-4 border-b">
                             <DialogTitle>Receipt Preview</DialogTitle>
@@ -584,44 +412,164 @@ export function ReimbursementsTab() {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => {
-                                        if (dialogState.entry?.receipt_url) {
-                                            window.open(
-                                                `https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${dialogState.entry.receipt_url}`,
-                                                '_blank'
+                                    onClick={() => setReceiptPreview(prev => ({
+                                        ...prev,
+                                        rotation: ((prev.rotation || 0) + 90) % 360
+                                    }))}
+                                >
+                                    <RotateCcw className="h-4 w-4 mr-1" />
+                                    Rotate
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                        try {
+                                            const response = await fetch(
+                                                `https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${receiptPreview.url}`
                                             );
+                                            const blob = await response.blob();
+                                            const url = window.URL.createObjectURL(blob);
+                                            const link = document.createElement('a');
+                                            link.href = url;
+                                            link.download = `receipt-${receiptPreview.url}`;
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                            window.URL.revokeObjectURL(url);
+                                        } catch (error) {
+                                            console.error('Download failed:', error);
                                         }
                                     }}
                                 >
+                                    <Download className="h-4 w-4 mr-1" />
                                     Download
                                 </Button>
                             </div>
                         </DialogHeader>
-                        {dialogState.entry?.receipt_url && (
-                            <div className="relative w-full h-[calc(90vh-100px)] bg-gray-50">
+                        {receiptPreview.url && (
+                            <div className="relative w-full h-[calc(90vh-100px)] bg-gray-50 group">
+                                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 animate-pulse">
+                                    <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                                </div>
                                 <Image
-                                    src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${dialogState.entry.receipt_url}`}
+                                    src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${receiptPreview.url}`}
                                     alt="Receipt"
-                                    className="w-full h-full object-contain"
+                                    fill
+                                    className="transition-transform duration-300 ease-in-out hover:scale-150 cursor-zoom-in"
+                                    style={{
+                                        objectFit: 'contain',
+                                        transform: `rotate(${receiptPreview.rotation || 0}deg)`,
+                                        transition: 'transform 0.3s ease-in-out'
+                                    }}
+                                    priority
+                                    onLoadingComplete={(image) => {
+                                        image.classList.remove('opacity-0');
+                                        image.classList.add('opacity-100');
+                                    }}
                                 />
                             </div>
                         )}
                     </DialogContent>
                 </Dialog>
 
-                {/* Add/Edit Reimbursement Dialog */}
-                <ReimbursementDialog
-                    isOpen={dialogState.isOpen}
-                    onClose={() => setDialogState({ isOpen: false, mode: 'create', entry: null })}
-                    entry={dialogState.entry}
-                    onSave={handleSave}
-                    mode={dialogState.mode}
-                />
+                {/* Payment Proof Preview Dialog */}
+                <Dialog
+                    open={paymentProofPreview.isOpen}
+                    onOpenChange={(open) => setPaymentProofPreview(prev => ({ ...prev, isOpen: open }))}
+                >
+                    <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+                        <DialogHeader className="p-4 border-b">
+                            <DialogTitle>Payment Proof Preview</DialogTitle>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPaymentProofPreview(prev => ({
+                                        ...prev,
+                                        rotation: ((prev.rotation || 0) + 90) % 360
+                                    }))}
+                                >
+                                    <RotateCcw className="h-4 w-4 mr-1" />
+                                    Rotate
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                        try {
+                                            const response = await fetch(
+                                                `https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${paymentProofPreview.url}`
+                                            );
+                                            const blob = await response.blob();
+                                            const url = window.URL.createObjectURL(blob);
+                                            const link = document.createElement('a');
+                                            link.href = url;
+                                            link.download = `payment-proof-${paymentProofPreview.url}`;
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                            window.URL.revokeObjectURL(url);
+                                        } catch (error) {
+                                            console.error('Download failed:', error);
+                                        }
+                                    }}
+                                >
+                                    <Download className="h-4 w-4 mr-1" />
+                                    Download
+                                </Button>
+                            </div>
+                        </DialogHeader>
+                        {paymentProofPreview.url && (
+                            <div className="relative w-full h-[calc(90vh-100px)] bg-gray-50 group">
+                                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 animate-pulse">
+                                    <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                                </div>
+                                <Image
+                                    src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${paymentProofPreview.url}`}
+                                    alt="Payment Proof"
+                                    fill
+                                    className="transition-transform duration-300 ease-in-out hover:scale-150 cursor-zoom-in"
+                                    style={{
+                                        objectFit: 'contain',
+                                        transform: `rotate(${paymentProofPreview.rotation || 0}deg)`,
+                                        transition: 'transform 0.3s ease-in-out'
+                                    }}
+                                    priority
+                                    onLoadingComplete={(image) => {
+                                        image.classList.remove('opacity-0');
+                                        image.classList.add('opacity-100');
+                                    }}
+                                />
+                            </div>
+                        )}
+                    </DialogContent>
+                </Dialog>
+
+                {/* Edit/Create Form Dialog - Import and use your EntryForm component here */}
+                <Dialog
+                    open={dialogState.isOpen}
+                    onOpenChange={(open) => !open && setDialogState(prev => ({ ...prev, isOpen: false }))}
+                >
+                    <DialogContent className="max-w-4xl">
+                        <DialogHeader>
+                            <DialogTitle>
+                                {dialogState.mode === 'create' ? 'New Reimbursement' : 'Edit Reimbursement'}
+                            </DialogTitle>
+                        </DialogHeader>
+                        <PettyCashEntryForm
+                            mode={dialogState.mode}
+                            initialData={dialogState.entry}
+                            onSubmit={handleSave}
+                            onClose={() => setDialogState(prev => ({ ...prev, isOpen: false }))}
+                            userId={userId}
+                            onSuccess={fetchEntries}
+                        />
+                    </DialogContent>
+                </Dialog>
             </main>
         </div>
     );
 }
 
-// Export types for use in other components
-export type { ReimbursementEntry };
 export default ReimbursementsTab;
