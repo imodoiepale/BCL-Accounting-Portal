@@ -1013,36 +1013,36 @@ export class PettyCashService {
 
     static async deleteAccountRecord(accountId: string, userId: string) {
         try {
-            // First, fetch current record
+            // First, fetch the current record
             const { data: record, error: fetchError } = await supabase
                 .from('acc_portal_pettycash_accounts')
                 .select('*')
                 .eq('userid', userId)
                 .single();
-
+    
             if (fetchError) throw fetchError;
             if (!record?.data?.accounts) throw new Error('No accounts found');
-
+    
             // Find the account to be deleted
             const accountToDelete = record.data.accounts.find(account => account.id === accountId);
             if (!accountToDelete) {
                 throw new Error('Account not found');
             }
-
+    
             // Check for associated transactions
             const { data: associatedTransactions } = await supabase
                 .from('acc_portal_pettycash_entries')
                 .select('*')
                 .eq('account_id', accountId)
                 .limit(1);
-
+    
             if (associatedTransactions?.length > 0) {
                 throw new Error('Cannot delete account with associated transactions');
             }
-
+    
             // Remove the account from the array
             const updatedAccounts = record.data.accounts.filter(account => account.id !== accountId);
-
+    
             // Add to audit trail
             const auditTrail = {
                 ...(record.data.auditTrail || {}),
@@ -1056,7 +1056,8 @@ export class PettyCashService {
                     }
                 ]
             };
-
+    
+            // Update the record
             const { data: result, error: updateError } = await supabase
                 .from('acc_portal_pettycash_accounts')
                 .update({
@@ -1068,9 +1069,9 @@ export class PettyCashService {
                 })
                 .eq('userid', userId)
                 .select();
-
+    
             if (updateError) throw updateError;
-
+    
             // Archive the deleted account
             try {
                 await supabase
@@ -1084,7 +1085,7 @@ export class PettyCashService {
             } catch (archiveError) {
                 console.warn('Failed to archive account data:', archiveError);
             }
-
+    
             return result;
         } catch (error) {
             console.error('Error deleting account:', error);
@@ -1136,12 +1137,18 @@ export class PettyCashService {
                 .from('acc_portal_pettycash_entries')
                 .select('id')
                 .eq('userid', userId);
-
+    
             if (error) throw error;
-            return (data?.length || 0) + 1;
+            
+            // Get the count and add 1
+            const nextNumber = (data?.length || 0) + 1;
+            
+            return `PCV${nextNumber.toString().padStart(6, '0')}`;
+            
         } catch (error) {
             console.error('Error getting next entry number:', error);
-            return 1;
+            // Return PCV000001 as the first number if there's an error
+            return 'PCV000001';
         }
     }
 
@@ -1428,6 +1435,25 @@ export class PettyCashService {
             throw error;
         }
     }
+
+    // In PettyCashService.tsx
+
+static async fetchFilteredEntries(table: string, userId: string, category: 'reimbursement' | 'loan') {
+    try {
+      const { data, error } = await supabase
+        .from('acc_portal_pettycash_entries')
+        .select('*')
+        .eq('userid', userId)
+        .eq('category', category)
+        .order('created_at', { ascending: false });
+  
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error(`Error fetching ${category} entries:`, error);
+      throw error;
+    }
+  }
 
 
 }

@@ -9,6 +9,7 @@ import {
   CoinsIcon,
   FileIcon,
   LayoutDashboardIcon,
+  Mail,
   SettingsIcon,
   User2Icon,
   VoicemailIcon
@@ -22,6 +23,7 @@ import { useAuth } from "@clerk/clerk-react"
 
 const adminNavItems = [
   { href: "/admin", icon: LayoutDashboardIcon, label: "Admin Dashboard" },
+  { href: "/mail", icon: Mail, label: "Mail" },
   { href: "/admin/registry", icon: User2Icon, label: "Registry" },
   { href: "/admin/documents", icon: FileIcon, label: "Document Management" },
   { href: "/admin/reports", icon: FileIcon, label: "Report Management" },
@@ -31,6 +33,7 @@ const adminNavItems = [
 const userNavItems = [
   { href: "/", icon: LayoutDashboardIcon, label: "Dashboard" },
   { href: "/profile", icon: User2Icon, label: "Profile" },
+  { href: "/mail", icon: Mail, label: "Mail" },
   { href: "/documents", icon: FileIcon, label: "Monthly Documents" },
   { href: "/reports", icon: FileIcon, label: "Reports" },
   { href: "/checklist", icon: CheckIcon, label: "Checklist" },
