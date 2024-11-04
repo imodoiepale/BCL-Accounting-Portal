@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import * as React from "react";
 import { Plus, Search, X, Mail, Check, Loader2 } from "lucide-react";
@@ -228,7 +228,6 @@ export function AccountSwitcher({
         if (!email || !password) return null;
 
         try {
-          // Using the same OAuth flow as single account
           const state = generateUniqueId(`state-${index}`);
           sessionStorage.setItem(`oauth_state_${index}`, state);
           sessionStorage.setItem(`oauth_email_${index}`, email);
@@ -248,8 +247,6 @@ export function AccountSwitcher({
 
           const { authUrl } = await response.json();
 
-          // You might want to handle multiple OAuth windows differently
-          // This is just an example
           const width = 600;
           const height = 600;
           const left = window.screenX + (window.outerWidth - width) / 2;
@@ -279,7 +276,6 @@ export function AccountSwitcher({
         return;
       }
 
-      // Handle the authentication results
       const handleMultipleCallbacks = async (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
         if (!event.data?.code || !event.data?.state) return;
@@ -291,15 +287,60 @@ export function AccountSwitcher({
         if (!savedEmail) return;
 
         try {
-          // Rest of your token exchange and account creation logic
-          // Similar to handleAddSingleAccount
-          // ...
+          const tokenResponse = await fetch('/api/gmail/auth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: savedEmail,
+              code: event.data.code
+            }),
+          });
 
-          // Clean up storage
-          sessionStorage.removeItem(`oauth_state_${matchingAuth.index}`);
-          sessionStorage.removeItem(`oauth_email_${matchingAuth.index}`);
+          if (!tokenResponse.ok) {
+            throw new Error('Failed to get tokens');
+          }
+
+          const { accessToken, refreshToken, expiryDate } = await tokenResponse.json();
+
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+          if (userError) throw userError;
+
+          const { data, error } = await supabase
+            .from('acc_portal_email_accounts')
+            .insert([{
+              user_id: userData.user.id,
+              email: savedEmail,
+              access_token: accessToken,
+              refresh_token: refreshToken,
+              expiry_date: expiryDate,
+              label: savedEmail.split('@')[0],
+              auth_type: 'gmail'
+            }])
+            .select();
+
+          if (error) throw error;
+
+          const newAccount: Account = {
+            id: data?.[0]?.id || generateUniqueId('account'),
+            label: savedEmail.split('@')[0],
+            email: savedEmail,
+            icon: <Mail className="h-4 w-4" />,
+            status: 'active',
+            lastSync: new Date().toISOString(),
+            accessToken,
+            refreshToken
+          };
+
+          setLocalAccounts(prev => [...prev, newAccount]);
+          toast.success(`Gmail account ${savedEmail} connected successfully!`);
         } catch (error) {
           console.error('Error:', error);
+          toast.error('Failed to connect Gmail account');
+        } finally {
+          sessionStorage.removeItem(`oauth_state_${matchingAuth.index}`);
+          sessionStorage.removeItem(`oauth_email_${matchingAuth.index}`);
         }
       };
 
@@ -309,8 +350,7 @@ export function AccountSwitcher({
       setTimeout(() => {
         window.removeEventListener('message', handleMultipleCallbacks);
         setIsLoading(false);
-      }, 300000); // 5 minute timeout
-
+      }, 30000);
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to connect Gmail accounts');
