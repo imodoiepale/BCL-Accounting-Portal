@@ -101,7 +101,7 @@ const DirectorsTable = ({ data }) => {
 
 const ComplianceTable = ({ data }) => {
     const complianceFields = [
-        ...formFields.companyDetails.fields.filter(field => 
+        ...formFields.companyDetails.fields.filter(field =>
             field.category === 'NSSF Details' ||
             field.category === 'NHIF Details' ||
             field.category === 'Housing Levy Details' ||
@@ -166,7 +166,7 @@ const OverallView = () => {
         'Sheria Details': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
         'Other Details': { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' }
     };
-    
+
     const sectionsWithSeparators = [
         { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
         { isSeparator: true },
@@ -416,227 +416,389 @@ const OverallView = () => {
         };
     });
 
+    // Add new table components for each category
+    const ClientCategoryTable = ({ data }) => {
+        const fields = formFields.companyDetails.fields.filter(
+            field => field.category === 'Client Category'
+        );
+
+        return (
+            <Table>
+                <TableHeader>
+                    <TableRow className="bg-blue-100">
+                        <TableHead className="whitespace-nowrap font-semibold">#</TableHead>
+                        <TableHead>Company Name</TableHead>
+                        {fields.map(field => (
+                            <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                                {field.label}
+                            </TableHead>
+                        ))}
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {data.map((companyGroup, index) => (
+                        <TableRow key={index} className="hover:bg-blue-50">
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell>{companyGroup.company.company_name}</TableCell>
+                            {fields.map(field => (
+                                <TableCell key={field.name} className="whitespace-nowrap">
+                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        );
+    };
+
+    // Add new table components for each category
+    const SheriaDetailsTable = ({ data }) => {
+        const fields = formFields.companyDetails.fields.filter(
+            field => field.category === 'Sheria Details'
+        );
+
+        return (
+            <Table>
+                <TableHeader>
+                    <TableRow className="bg-blue-100">
+                        <TableHead className="whitespace-nowrap font-semibold">#</TableHead>
+                        <TableHead>Company Name</TableHead>
+                        {fields.map(field => (
+                            <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                                {field.label}
+                            </TableHead>
+                        ))}
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {data.map((companyGroup, index) => (
+                        <TableRow key={index} className="hover:bg-blue-50">
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell>{companyGroup.company.company_name}</TableCell>
+                            {fields.map(field => (
+                                <TableCell key={field.name} className="whitespace-nowrap">
+                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        );
+    };
+
+    const TaxStatusTable = ({ data }) => {
+        const fields = formFields.companyDetails.fields.filter(
+            field => field.category === 'Tax Status'
+        );
+
+        return (
+            <Table>
+                <TableHeader>
+                    <TableRow className="bg-orange-100">
+                        <TableHead className="whitespace-nowrap font-semibold">#</TableHead>
+                        <TableHead>Company Name</TableHead>
+                        {fields.map(field => (
+                            <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                                {field.label}
+                            </TableHead>
+                        ))}
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {data.map((companyGroup, index) => (
+                        <TableRow key={index} className="hover:bg-orange-50">
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell>{companyGroup.company.company_name}</TableCell>
+                            {fields.map(field => (
+                                <TableCell key={field.name} className="whitespace-nowrap">
+                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        );
+    };
+
+    const ECitizenTable = ({ data }) => {
+        const fields = formFields.companyDetails.fields.filter(
+            field => field.category === 'E-Citizen Details'
+        );
+
+        return (
+            <Table>
+                <TableHeader>
+                    <TableRow className="bg-indigo-100">
+                        <TableHead className="whitespace-nowrap font-semibold">#</TableHead>
+                        <TableHead>Company Name</TableHead>
+                        {fields.map(field => (
+                            <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                                {field.label}
+                            </TableHead>
+                        ))}
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {data.map((companyGroup, index) => (
+                        <TableRow key={index} className="hover:bg-indigo-50">
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell>{companyGroup.company.company_name}</TableCell>
+                            {fields.map(field => (
+                                <TableCell key={field.name} className="whitespace-nowrap">
+                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        );
+    };
+
     return (
+
         <Tabs defaultValue="overview" className="w-full space-y-4">
-            <TabsList className="grid w-full grid-cols-6">
-                <TabsTrigger value="overview" className="py-3">Overview</TabsTrigger>
-                <TabsTrigger value="company" className="py-3">Company</TabsTrigger>
-                <TabsTrigger value="directors" className="py-3">Directors</TabsTrigger>
-                <TabsTrigger value="compliance" className="py-3">Compliance</TabsTrigger>
-                <TabsTrigger value="payroll" className="py-3">Payroll</TabsTrigger>
-                <TabsTrigger value="banking" className="py-3">Banking</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-8">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="client">Client Category</TabsTrigger>
+                <TabsTrigger value="sheria">Sheria Details</TabsTrigger>
+                <TabsTrigger value="ecitizen">E-Citizen</TabsTrigger>
+                <TabsTrigger value="tax">Tax Status</TabsTrigger>
+                <TabsTrigger value="compliance">Compliance</TabsTrigger>
+                <TabsTrigger value="statutory">Statutory</TabsTrigger>
+                <TabsTrigger value="other">Other Details</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="mt-6">
                 <Card>
                     <CardContent className="p-0">
-                    <ScrollArea className="h-[900px] rounded-md border">
-            <Table>
-                <TableHeader>
-                    {/* Section Headers */}
-                    <TableRow>
-                        {processedSections.map((section, index) => {
-                            if (section.isSeparator) {
-                                return renderSeparatorCell(`separator-header-1-${index}`, true);
-                            }
+                        <ScrollArea className="h-[900px] rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    {/* Section Headers */}
+                                    <TableRow>
+    {processedSections.map((section, sectionIndex) => {
+        if (section.isSeparator) {
+            return renderSeparatorCell(`separator-header-1-${sectionIndex}`, true);
+        }
 
-                            const totalColSpan = section.categorizedFields.reduce((total, cat) =>
-                                total + (cat.isSeparator ? 1 : cat.fields.length), 0);
+        const totalColSpan = section.categorizedFields.reduce((total, cat) =>
+            total + (cat.isSeparator ? 1 : cat.fields.length), 0);
 
-                            const sectionColor = sectionColors[section.name]?.main || 'bg-gray-600';
+        const sectionColor = sectionColors[section.name]?.main || 'bg-gray-600';
+        const sectionNumber = sectionIndex + 1;
 
-                            return (
-                                <TableHead
-                                    key={section.name}
-                                    colSpan={totalColSpan}
-                                    className={`text-center ${sectionColor} text-white font-bold transition-colors`}
-                                >
-                                    {section.label}
-                                </TableHead>
-                            );
-                        })}
-                    </TableRow>
+        return (
+            <TableHead
+                key={section.name}
+                colSpan={totalColSpan}
+                className={`text-center ${sectionColor} text-white font-bold transition-colors`}
+            >
+                <div className="flex flex-col gap-1">
+                    <span className="text-xs opacity-75">{sectionNumber}.0</span>
+                    <span>{section.label}</span>
+                </div>
+            </TableHead>
+        );
+    })}
+</TableRow>
 
-                    {/* Category Headers */}
-                    <TableRow>
-                        {processedSections.map((section, sectionIndex) => {
-                            if (section.isSeparator) {
-                                return renderSeparatorCell(`category-separator-${sectionIndex}`, true);
-                            }
-
-                            const sectionColor = sectionColors[section.name]?.sub || 'bg-gray-500';
-
-                            return section.categorizedFields.map((category, categoryIndex) => {
-                                if (category.isSeparator) {
-                                    return renderSeparatorCell(`cat-sep-${sectionIndex}-${categoryIndex}`, true);
-                                }
-
-                                return (
-                                    <TableHead
-                                    key={`${section.name}-${category.category}-${categoryIndex}`}
-                                    colSpan={category.fields.length}
-                                    className={`text-center ${categoryColors[category.category]?.bg || 'bg-gray-50'} 
-                                                ${categoryColors[category.category]?.text || 'text-gray-700'} 
-                                                ${categoryColors[category.category]?.border || 'border-gray-200'} 
-                                                font-medium text-sm transition-colors`}
-                                >
-                                    {category.category}
-                                </TableHead>
-                                
-                                );
-                            });
-                        })}
-                    </TableRow>
-
-                    {/* Statistics Row */}
-                    <TableRow className="bg-gray-50">
-                        {processedSections.map((section, sectionIndex) => {
-                            if (section.isSeparator) {
-                                return renderSeparatorCell(`stats-separator-${sectionIndex}`, true);
-                            }
-
-                            const sectionColor = sectionColors[section.name]?.cell || 'bg-gray-50';
-
-                            return section.categorizedFields.map((category, categoryIndex) => {
-                                if (category.isSeparator) {
-                                    return renderSeparatorCell(`stats-cat-sep-${sectionIndex}-${categoryIndex}`, true);
-                                }
-
-                                return category.fields.map(field => {
-                                    const stats = columnStats[field.name] || { total: 0, completed: 0, pending: 0 };
-
-                                    return (
-                                        <TableHead
-                                            key={`stats-${field.name}`}
-                                            className={`p-2 ${sectionColor} transition-colors`}
-                                        >
-                                            <div className="flex flex-col gap-1 text-xs bg-white rounded-lg p-2 shadow-sm">
-                                                <div className="flex justify-center gap-2">
-                                                    <span className="text-blue-600 border-r pr-2">
-                                                        T: {stats.total}
-                                                    </span>
-                                                    <span className="text-green-600 border-r pr-2">
-                                                        C: {stats.completed}
-                                                    </span>
-                                                    <span className="text-red-600">
-                                                        P: {stats.pending}
-                                                    </span>
-                                                </div>
-                                                <div className="w-full bg-gray-200 rounded-full h-1">
-                                                    <div
-                                                        className="bg-green-600 h-1 rounded-full transition-all"
-                                                        style={{
-                                                            width: `${stats.total ? (stats.completed / stats.total) * 100 : 0}%`
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </TableHead>
-                                    );
-                                });
-                            });
-                        })}
-                    </TableRow>
-
-                    {/* Column Headers */}
-                    <TableRow>
-                        {processedSections.map((section, sectionIndex) => {
-                            if (section.isSeparator) {
-                                return renderSeparatorCell(`header-separator-${sectionIndex}`, true);
-                            }
-
-                            const sectionColor = sectionColors[section.name]?.sub || 'bg-gray-500';
-
-                            return section.categorizedFields.map((category, categoryIndex) => {
-                                if (category.isSeparator) {
-                                    return renderSeparatorCell(`header-cat-sep-${sectionIndex}-${categoryIndex}`, true);
-                                }
-
-                                return category.fields.map(field => (
-                                    <TableHead
-                                        key={`${section.name}-${field.name}`}
-                                        className={`whitespace-nowrap ${sectionColor} text-white transition-colors`}
-                                    >
-                                        {field.label}
-                                    </TableHead>
-                                ));
-                            });
-                        })}
-                    </TableRow>
-                </TableHeader>
-
-                <TableBody>
-                    {data.map((companyGroup, groupIndex) => (
-                        companyGroup.rows.map((row, rowIndex) => (
-                            <TableRow 
-                                key={`${groupIndex}-${rowIndex}`}
-                                className="hover:bg-gray-50 transition-colors"
-                            >
-                                {rowIndex === 0 && (
-                                    <TableCell
-                                        className="whitespace-nowrap font-medium"
-                                        rowSpan={companyGroup.rowSpan}
-                                    >
-                                        {groupIndex + 1}
-                                    </TableCell>
-                                )}
-                                {/* Skip the first section (index) and start from the first separator */}
-                                {processedSections.slice(1).map((section, sectionIndex) => {
-                                    if (section.isSeparator) {
-                                        return rowIndex === 0 && renderSeparatorCell(
-                                            `body-sep-${groupIndex}-${sectionIndex}`,
-                                            false,
-                                            companyGroup.rowSpan
-                                        );
-                                    }
-
-                                    const sectionColor = sectionColors[section.name]?.cell || 'bg-gray-50';
-
-                                    return section.categorizedFields.map((category, categoryIndex) => {
-                                        if (category.isSeparator) {
-                                            return rowIndex === 0 && renderSeparatorCell(
-                                                `body-cat-sep-${groupIndex}-${sectionIndex}-${categoryIndex}`,
-                                                false,
-                                                companyGroup.rowSpan
-                                            );
-                                        }
-
-                                        return category.fields.map(field => {
-                                            if (field.name.startsWith('company_') && rowIndex > 0) {
-                                                return null;
+                                    {/* Category Headers */}
+                                    <TableRow>
+                                        {processedSections.map((section, sectionIndex) => {
+                                            if (section.isSeparator) {
+                                                return renderSeparatorCell(`category-separator-${sectionIndex}`, true);
                                             }
 
-                                            let value = row[field.name];
-
-                                            if (field.type === 'boolean') {
-                                                value = value ? 'Yes' : 'No';
-                                            } else if (field.type === 'date' && value) {
-                                                try {
-                                                    value = new Date(value).toLocaleDateString();
-                                                } catch (e) {
-                                                    value = value;
+                                            return section.categorizedFields.map((category, categoryIndex) => {
+                                                if (category.isSeparator) {
+                                                    return renderSeparatorCell(`cat-sep-${sectionIndex}-${categoryIndex}`, true);
                                                 }
+
+                                                const sectionNumber = sectionIndex + 1;
+                                                const categoryNumber = categoryIndex + 1;
+
+                                                return (
+                                                    <TableHead
+                                                        key={`${section.name}-${category.category}-${categoryIndex}`}
+                                                        colSpan={category.fields.length}
+                                                        className={`text-center ${categoryColors[category.category]?.bg || 'bg-gray-50'} 
+                              ${categoryColors[category.category]?.text || 'text-gray-700'} 
+                              ${categoryColors[category.category]?.border || 'border-gray-200'} 
+                              font-medium text-sm transition-colors`}
+                                                    >
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="text-xs opacity-75">{sectionNumber}.{categoryNumber}</span>
+                                                            <span>{category.category}</span>
+                                                        </div>
+                                                    </TableHead>
+                                                );
+                                            });
+                                        })}
+                                    </TableRow>
+
+                                    {/* Statistics Row */}
+                                    <TableRow className="bg-gray-50">
+                                        {processedSections.map((section, sectionIndex) => {
+                                            if (section.isSeparator) {
+                                                return renderSeparatorCell(`stats-separator-${sectionIndex}`, true);
                                             }
 
-                                            return (
-                                                <TableCell
-                                                    key={`${groupIndex}-${rowIndex}-${field.name}`}
-                                                    className={`whitespace-nowrap ${sectionColor} transition-colors`}
-                                                    rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
-                                                >
-                                                    {value || <span className="text-red-500 font-semibold">N/A</span>}
-                                                </TableCell>
-                                            );
-                                        });
-                                    });
-                                })}
-                            </TableRow>
-                        ))
-                    ))}
-                </TableBody>
-            </Table>
-            <ScrollBar orientation="horizontal" />
-        </ScrollArea>
+                                            const sectionColor = sectionColors[section.name]?.cell || 'bg-gray-50';
+
+                                            return section.categorizedFields.map((category, categoryIndex) => {
+                                                if (category.isSeparator) {
+                                                    return renderSeparatorCell(`stats-cat-sep-${sectionIndex}-${categoryIndex}`, true);
+                                                }
+
+                                                return category.fields.map(field => {
+                                                    const stats = columnStats[field.name] || { total: 0, completed: 0, pending: 0 };
+
+                                                    return (
+                                                        <TableHead
+                                                            key={`stats-${field.name}`}
+                                                            className={`p-2 ${sectionColor} transition-colors`}
+                                                        >
+                                                            <div className="flex flex-col gap-1 text-xs bg-white rounded-lg p-2 shadow-sm">
+                                                                <div className="flex justify-center gap-2">
+                                                                    <span className="text-blue-600 border-r pr-2">
+                                                                        T: {stats.total}
+                                                                    </span>
+                                                                    <span className="text-green-600 border-r pr-2">
+                                                                        C: {stats.completed}
+                                                                    </span>
+                                                                    <span className="text-red-600">
+                                                                        P: {stats.pending}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="w-full bg-gray-200 rounded-full h-1">
+                                                                    <div
+                                                                        className="bg-green-600 h-1 rounded-full transition-all"
+                                                                        style={{
+                                                                            width: `${stats.total ? (stats.completed / stats.total) * 100 : 0}%`
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </TableHead>
+                                                    );
+                                                });
+                                            });
+                                        })}
+                                    </TableRow>
+
+                                    {/* Column Headers */}
+                                    <TableRow>
+                                        {processedSections.map((section, sectionIndex) => {
+                                            if (section.isSeparator) {
+                                                return renderSeparatorCell(`header-separator-${sectionIndex}`, true);
+                                            }
+
+                                            const sectionColor = sectionColors[section.name]?.sub || 'bg-gray-500';
+
+                                            return section.categorizedFields.map((category, categoryIndex) => {
+                                                if (category.isSeparator) {
+                                                    return renderSeparatorCell(`header-cat-sep-${sectionIndex}-${categoryIndex}`, true);
+                                                }
+
+                                                return category.fields.map((field, fieldIndex) => {
+                                                    // Calculate the column number
+                                                    const sectionNumber = sectionIndex + 1;
+                                                    const fieldNumber = fieldIndex + 1;
+                                                    const columnNumber = `${sectionNumber}.${fieldNumber}`;
+
+                                                    return (
+                                                        <TableHead
+                                                            key={`${section.name}-${field.name}`}
+                                                            className={`whitespace-nowrap ${sectionColor} text-white transition-colors`}
+                                                        >
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-xs opacity-75">{columnNumber}</span>
+                                                                <span>{field.label}</span>
+                                                            </div>
+                                                        </TableHead>
+                                                    );
+                                                });
+                                            });
+                                        })}
+                                    </TableRow>
+                                </TableHeader>
+
+                                <TableBody>
+                                    {data.map((companyGroup, groupIndex) => (
+                                        companyGroup.rows.map((row, rowIndex) => (
+                                            <TableRow
+                                                key={`${groupIndex}-${rowIndex}`}
+                                                className="hover:bg-gray-50 transition-colors"
+                                            >
+                                                {rowIndex === 0 && (
+                                                    <TableCell
+                                                        className="whitespace-nowrap font-medium"
+                                                        rowSpan={companyGroup.rowSpan}
+                                                    >
+                                                        {groupIndex + 1}
+                                                    </TableCell>
+                                                )}
+                                                {/* Skip the first section (index) and start from the first separator */}
+                                                {processedSections.slice(1).map((section, sectionIndex) => {
+                                                    if (section.isSeparator) {
+                                                        return rowIndex === 0 && renderSeparatorCell(
+                                                            `body-sep-${groupIndex}-${sectionIndex}`,
+                                                            false,
+                                                            companyGroup.rowSpan
+                                                        );
+                                                    }
+
+                                                    const sectionColor = sectionColors[section.name]?.cell || 'bg-gray-50';
+
+                                                    return section.categorizedFields.map((category, categoryIndex) => {
+                                                        if (category.isSeparator) {
+                                                            return rowIndex === 0 && renderSeparatorCell(
+                                                                `body-cat-sep-${groupIndex}-${sectionIndex}-${categoryIndex}`,
+                                                                false,
+                                                                companyGroup.rowSpan
+                                                            );
+                                                        }
+
+                                                        return category.fields.map(field => {
+                                                            if (field.name.startsWith('company_') && rowIndex > 0) {
+                                                                return null;
+                                                            }
+
+                                                            let value = row[field.name];
+
+                                                            if (field.type === 'boolean') {
+                                                                value = value ? 'Yes' : 'No';
+                                                            } else if (field.type === 'date' && value) {
+                                                                try {
+                                                                    value = new Date(value).toLocaleDateString();
+                                                                } catch (e) {
+                                                                    value = value;
+                                                                }
+                                                            }
+
+                                                            return (
+                                                                <TableCell
+                                                                    key={`${groupIndex}-${rowIndex}-${field.name}`}
+                                                                    className={`whitespace-nowrap ${sectionColor} transition-colors`}
+                                                                    rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
+                                                                >
+                                                                    {value || <span className="text-red-500 font-semibold">N/A</span>}
+                                                                </TableCell>
+                                                            );
+                                                        });
+                                                    });
+                                                })}
+                                            </TableRow>
+                                        ))
+                                    ))}
+                                </TableBody>
+                            </Table>
+                            <ScrollBar orientation="horizontal" />
+                        </ScrollArea>
                     </CardContent>
                 </Card>
             </TabsContent>
@@ -737,6 +899,26 @@ const OverallView = () => {
                 </Tabs>
             </TabsContent>
 
+            <TabsContent value="ecitizen">
+                <Card>
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-[700px]">
+                            <ECitizenTable data={data} />
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+
+            <TabsContent value="tax">
+                <Card>
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-[700px]">
+                            <TaxStatusTable data={data} />
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </TabsContent>
             <TabsContent value="payroll">
                 <Tabs defaultValue="employees" className="space-y-4">
                     <TabsList>
@@ -785,6 +967,27 @@ const OverallView = () => {
                     </TabsContent>
                 </Tabs>
             </TabsContent>
+
+            <TabsContent value="client">
+                <Card>
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-[700px]">
+                            <ClientCategoryTable data={data} />
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            <TabsContent value="sheria">
+                <Card>
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-[700px]">
+                            <SheriaDetailsTable data={data} />
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
         </Tabs>
     );
 };
