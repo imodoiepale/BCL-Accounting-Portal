@@ -565,8 +565,8 @@ export function TransactionsTab() {
   ];
   const EditForm = ({ entry, onClose, onSubmit }) => {
     const [editedEntry, setEditedEntry] = useState(entry);
-    const [selectedCategory, setSelectedCategory] = useState(entry?.category_code || 'ALL');
-    const [selectedSubcategory, setSelectedSubcategory] = useState(entry?.subcategory_code || 'ALL');
+    const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+    const [selectedSubcategory, setSelectedSubcategory] = useState<string>("ALL");
 
     const handleSubmit = async (e) => {
       e.preventDefault();
@@ -857,7 +857,7 @@ export function TransactionsTab() {
         </div>
 
         <Card className="overflow-hidden">
-          <ScrollArea className="h-[calc(100vh-200px)]">
+          <ScrollArea className="h-[calc(100vh-370px)]">
             <Table>
               <TableHeader className="sticky top-0 bg-blue-800 z-10">
                 <TableRow className="bg-blue-600 hover:bg-blue-600">
