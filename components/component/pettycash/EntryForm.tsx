@@ -610,30 +610,32 @@ const PettyCashEntryForm: React.FC<PettyCashEntryFormProps> = ({
 
               {/* Selected Supplier Details */}
               {selectedSupplier && (
-                <div className="grid grid-cols-2 gap-4 mt-2">
-                  <div className="space-y-2">
-                    <Label>Supplier Name</Label>
-                    <Input
-                      value={formData.supplier_name}
-                      disabled
-                      className="h-8 bg-gray-50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Supplier PIN/ID</Label>
-                    <Input
-                      value={formData.supplier_pin}
-                      disabled
-                      className="h-8 bg-gray-50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Trading Type</Label>
-                    <Input
-                      value={mapPurchaseTypeToTradingType(formData.purchase_type)}
-                      disabled
-                      className="h-8 bg-gray-50"
-                    />
+                <div className="hidden">
+                  <div className="grid grid-cols-2 gap-4 mt-2 ">
+                    <div className="space-y-2">
+                      <Label>Supplier Name</Label>
+                      <Input
+                        value={formData.supplier_name}
+                        disabled
+                        className="h-8 bg-gray-50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Supplier PIN/ID</Label>
+                      <Input
+                        value={formData.supplier_pin}
+                        disabled
+                        className="h-8 bg-gray-50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Trading Type</Label>
+                      <Input
+                        value={mapPurchaseTypeToTradingType(formData.purchase_type)}
+                        disabled
+                        className="h-8 bg-gray-50"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
