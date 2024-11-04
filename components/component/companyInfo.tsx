@@ -9,13 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Building2, Users, Mail, Phone, Globe, MapPin, CreditCard, FileText, Calendar } from 'lucide-react';
+import { Building2, Users, Mail, Phone, Globe, MapPin, CreditCard, FileText, Calendar, Edit } from 'lucide-react';
 import { useAuth, useUser } from '@clerk/nextjs';
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
-
-
-
 
 export function CompanyInfoTab() {
   const { userId } = useAuth();
@@ -25,6 +22,7 @@ export function CompanyInfoTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({});
+  const [dialogMode, setDialogMode] = useState<'edit' | 'missing'>('missing');
 
   useEffect(() => {
     fetchCompanyData();
@@ -42,7 +40,6 @@ export function CompanyInfoTab() {
 
       if (error) {
         if (error.code === 'PGRST116') {
-          // No data found for the user, likely a new company
           setCompanyData({});
           checkMissingFields({});
         } else {
@@ -69,7 +66,6 @@ export function CompanyInfoTab() {
         .eq("userid", userId)
 
       if (error) throw error;
-
       setDirectors(data || []);
     } catch (error) {
       console.error('Error fetching directors:', error);
@@ -79,13 +75,23 @@ export function CompanyInfoTab() {
 
   const checkMissingFields = (data) => {
     const requiredFields = [
-      'company_name', 'company_type','description', 'registration_number', 'date_established', 'kra_pin_number',
+      'company_name', 'company_type', 'description', 'registration_number', 'date_established', 'kra_pin_number',
       'industry', 'employees', 'annual_revenue', 'fiscal_year', 'website',
       'email', 'phone', 'street', 'city', 'postal_code', 'country'
     ];
     const missing = requiredFields.filter(field => !data[field]);
     setMissingFields(missing);
-    setFormData(Object.fromEntries(missing.map(field => [field, ''])));
+    if (missing.length === 0) {
+      setFormData(data);
+    } else {
+      setFormData(Object.fromEntries(missing.map(field => [field, ''])));
+    }
+  };
+
+  const handleOpenDialog = (mode: 'edit' | 'missing') => {
+    setDialogMode(mode);
+    setFormData(mode === 'edit' ? companyData : {});
+    setIsDialogOpen(true);
   };
 
   const handleInputChange = (field, value) => {
@@ -95,23 +101,22 @@ export function CompanyInfoTab() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
-      // Exclude the 'id' field from the upsert operation
       const { id, ...companyDataWithoutId } = companyData;
       const { id: formDataId, ...formDataWithoutId } = formData;
-  
+
       const { data, error } = await supabase
         .from('acc_portal_company')
         .upsert(
           { ...companyDataWithoutId, ...formDataWithoutId, userid: userId },
-          { onConflict: 'userid' }  // This tells Supabase to update the record with the existing userid
+          { onConflict: 'userid' }
         )
         .select()
         .single();
-  
+
       if (error) throw error;
-  
+
       setCompanyData(data);
       checkMissingFields(data);
       setIsDialogOpen(false);
@@ -121,86 +126,118 @@ export function CompanyInfoTab() {
       setIsLoading(false);
     }
   };
-  
 
   if (isLoading) {
     return <div>Loading...</div>;
   }
 
+  const renderFormFields = () => {
+    const fieldsToShow = dialogMode === 'edit' ? [
+      'company_name', 'company_type', 'description', 'registration_number', 'date_established',
+      'kra_pin_number', 'industry', 'employees', 'annual_revenue', 'fiscal_year', 'website',
+      'email', 'phone', 'street', 'city', 'postal_code', 'country'
+    ] : missingFields;
+
+    return fieldsToShow.map((field) => (
+      <div key={field} className={`space-y-2 ${field === 'description' ? 'col-span-4' : ''}`}>
+        <Label htmlFor={field}>{field.replace(/_/g, ' ')}</Label>
+        {field === 'company_type' ? (
+          <Select
+            onValueChange={(value) => handleInputChange(field, value)}
+            value={formData[field]}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select company type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Private Limited Company">Private Limited Company</SelectItem>
+              <SelectItem value="Public Limited Company">Public Limited Company</SelectItem>
+              <SelectItem value="Sole Proprietorship">Sole Proprietorship</SelectItem>
+              <SelectItem value="Partnership">Partnership</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : field === 'industry' ? (
+          <Select
+            onValueChange={(value) => handleInputChange(field, value)}
+            value={formData[field]}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select industry" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Information Technology">Information Technology</SelectItem>
+              <SelectItem value="Finance">Finance</SelectItem>
+              <SelectItem value="Healthcare">Healthcare</SelectItem>
+              <SelectItem value="Manufacturing">Manufacturing</SelectItem>
+              <SelectItem value="Retail">Retail</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : field === 'description' ? (
+          <Textarea
+            id={field}
+            value={formData[field] || ''}
+            onChange={(e) => handleInputChange(field, e.target.value)}
+            rows={4}
+          />
+        ) : (
+          <Input
+            id={field}
+            type={field === 'date_established' ? 'date' :
+              field === 'employees' ? 'number' : 'text'}
+            value={formData[field] || ''}
+            onChange={(e) => handleInputChange(field, e.target.value)}
+          />
+        )}
+      </div>
+    ));
+  };
+
   return (
     <div className="space-y-6 w-full">
+      {missingFields.length === 0 && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            className="bg-blue-500 hover:bg-blue-600 text-white"
+            onClick={() => handleOpenDialog('edit')}
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Edit Company Info
+          </Button>
+        </div>
+      )}
+
       {missingFields.length > 0 && (
         <Card className="bg-yellow-200 border border-red-600">
           <CardContent className="flex justify-between items-center p-4">
             <p className="text-yellow-800 font-extrabold text-md">Some company information is missing.</p>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className='animate-bounce'>Add Missing Info</Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[1225px]">
-                <DialogHeader>
-                  <DialogTitle>Add Missing Information</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4 grid grid-cols-4 gap-4 capitalize">
-                  {missingFields.map((field) => (
-                    <div key={field} className={`space-y-2 ${field === 'description' ? 'col-span-4' : ''}`}>
-                      <Label htmlFor={field}>{field.replace(/_/g, ' ')}</Label>
-                      {field === 'company_type' ? (
-                        <Select 
-                          onValueChange={(value) => handleInputChange(field, value)}
-                          value={formData[field]}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select company type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Private Limited Company">Private Limited Company</SelectItem>
-                            <SelectItem value="Public Limited Company">Public Limited Company</SelectItem>
-                            <SelectItem value="Sole Proprietorship">Sole Proprietorship</SelectItem>
-                            <SelectItem value="Partnership">Partnership</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : field === 'industry' ? (
-                        <Select 
-                          onValueChange={(value) => handleInputChange(field, value)}
-                          value={formData[field]}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select industry" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Information Technology">Information Technology</SelectItem>
-                            <SelectItem value="Finance">Finance</SelectItem>
-                            <SelectItem value="Healthcare">Healthcare</SelectItem>
-                            <SelectItem value="Manufacturing">Manufacturing</SelectItem>
-                            <SelectItem value="Retail">Retail</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : field === 'description' ? (
-                        <Textarea 
-                          id={field}
-                          value={formData[field]}
-                          onChange={(e) => handleInputChange(field, e.target.value)}
-                          rows={4}
-                        />
-                      ) : (
-                        <Input 
-                          id={field}
-                          type={field === 'date_established' ? 'date' : 'text'}
-                          value={formData[field]}
-                          onChange={(e) => handleInputChange(field, e.target.value)}
-                        />
-                      )}
-                    </div>
-                  ))}
-                  <Button type="submit" className="w-full col-span-4">Submit</Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button
+              variant="outline"
+              className='animate-bounce'
+              onClick={() => handleOpenDialog('missing')}
+            >
+              Add Missing Info
+            </Button>
           </CardContent>
         </Card>
       )}
 
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[1225px]">
+          <DialogHeader>
+            <DialogTitle>
+              {dialogMode === 'edit' ? 'Edit Company Information' : 'Add Missing Information'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 grid grid-cols-4 gap-4 capitalize">
+            {renderFormFields()}
+            <Button type="submit" className="w-full col-span-4">
+              {isLoading ? 'Saving...' : dialogMode === 'edit' ? 'Save Changes' : 'Submit'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold flex items-center">
