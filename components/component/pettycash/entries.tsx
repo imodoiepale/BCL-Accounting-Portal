@@ -536,7 +536,7 @@ export function TransactionsTab() {
       cell: (entry: PettyCashEntry) => (
         <span className={`px-2 py-1 rounded-full text-xs ${entry.approved_by ? 'bg-green-100 text-green-800' :
           entry.checked_by ? 'bg-yellow-100 text-yellow-800' :
-            'bg-gray-100 text-gray-800'
+            'bg-red-100 text-red-800'
           }`}>
           {entry.approved_by ? 'Approved' :
             entry.checked_by ? 'Checked' :
