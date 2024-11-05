@@ -126,15 +126,15 @@ export const formFields = {
             { name: 'itax_status', label: 'iTax Status', type: 'text', category: 'Tax Status' },
             { name: 'tax_year_end', label: 'Tax Year End', type: 'date', category: 'Tax Status' },
 
-            // Compliance Details
-            { name: 'fire_prevention_license', label: 'Fire Prevention License', type: 'text', category: 'Compliance' },
-            { name: 'business_permit', label: 'Single Business Permit', type: 'text', category: 'Compliance' },
-            { name: 'tourism_fund_levy', label: 'Tourism Fund Levy', type: 'text', category: 'Compliance' },
+            // // Compliance Details
+            // { name: 'fire_prevention_license', label: 'Fire Prevention License', type: 'text', category: 'Compliance' },
+            // { name: 'business_permit', label: 'Single Business Permit', type: 'text', category: 'Compliance' },
+            // { name: 'tourism_fund_levy', label: 'Tourism Fund Levy', type: 'text', category: 'Compliance' },
 
-            // Statutory Details
-            { name: 'nea_status', label: 'NEA Status', type: 'text', category: 'Statutory Details' },
-            { name: 'nhif_status', label: 'NHIF Status', type: 'text', category: 'Statutory Details' },
-            { name: 'nssf_status', label: 'NSSF Status', type: 'text', category: 'Statutory Details' },
+            // // Statutory Details
+            // { name: 'nea_status', label: 'NEA Status', type: 'text', category: 'Statutory Details' },
+            // { name: 'nhif_status', label: 'NHIF Status', type: 'text', category: 'Statutory Details' },
+            // { name: 'nssf_status', label: 'NSSF Status', type: 'text', category: 'Statutory Details' },
 
 
             // Other Company Details
