@@ -1,7 +1,3 @@
-
-// @ts-nocheck
-"use client"
-
 import * as React from "react"
 import {
   Archive,
@@ -10,14 +6,19 @@ import {
   Inbox,
   MessagesSquare,
   Send,
+  Search,
   Trash2,
   Users2,
   AlertCircle,
+  Settings,
+  Plus,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import {
   ResizableHandle,
   ResizablePanelGroup,
@@ -30,6 +31,69 @@ import { Nav } from "./nav"
 import { useGmail } from "../hooks/use-gmail"
 import { useMail } from "../hooks/use-mail"
 import { MailProps } from "../types"
+
+const MailHeader = () => {
+  return (
+    <div className="border-b">
+      {/* Top row with Inbox title and view options */}
+      <div className="flex items-center justify-between p-2 pb-0">
+        <h1 className="text-xl font-semibold">Inbox</h1>
+        <div className="flex gap-2">
+          <Button variant="secondary" className="bg-blue-500 text-white hover:bg-blue-600">
+            All mail
+          </Button>
+          <Button variant="ghost">Unread</Button>
+        </div>
+      </div>
+
+      {/* Search bar */}
+      <div className="p-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+          <Input 
+            className="w-full pl-9 bg-gray-50" 
+            placeholder="Search" 
+            type="search"
+          />
+        </div>
+      </div>
+
+      {/* Category tabs */}
+      <div className="px-2 flex items-center justify-between">
+        <Tabs defaultValue="primary" className="w-full">
+          <TabsList className="w-full justify-start gap-2 bg-transparent h-auto p-0">
+            <TabsTrigger 
+              value="primary" 
+              className="data-[state=active]:bg-blue-500 data-[state=active]:text-white px-4 py-2 rounded"
+            >
+              Primary
+            </TabsTrigger>
+            <TabsTrigger 
+              value="social"
+              className="data-[state=active]:bg-gray-100 px-4 py-2 rounded"
+            >
+              Social
+            </TabsTrigger>
+            <TabsTrigger 
+              value="promotions"
+              className="data-[state=active]:bg-gray-100 px-4 py-2 rounded"
+            >
+              Promotions
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon">
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon">
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function Mail({
   defaultLayout = [20, 32, 48],
@@ -159,6 +223,7 @@ export function Mail({
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={defaultLayout[1]} minSize={30}>
+          <MailHeader />
           <MailList
             accounts={accounts}
             onLoadMore={loadMore}
@@ -172,7 +237,8 @@ export function Mail({
           <MailDisplay
             mail={accounts
               .flatMap(acc => acc.messages || [])
-              .find(msg => msg.id === mail.selected)}
+
+              .find(msg => msg.id === mail.selected) || null}
           />
         </ResizablePanel>
       </ResizablePanelGroup>
