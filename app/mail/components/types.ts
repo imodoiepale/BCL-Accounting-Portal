@@ -1,19 +1,43 @@
+export interface Mail {
+  id: string
+  name: string
+  email: string
+  subject: string
+  text: string
+  date: string
+  read: boolean
+  labels: string[]
+}
 
-export interface EmailAccount {
-    id: string
-    user_id: string
-    email: string
-    label: string
-    auth_type: 'password' | 'google'
-    created_at: string
+export interface Account {
+  email: string
+  token: {
+    access_token: string
+    expires_in: number
   }
-  
-  export interface AccountSwitcherProps {
-    isCollapsed: boolean
-    accounts: {
-      label: string
-      email: string
-      icon: React.ReactNode
-    }[]
-    onAccountsUpdate: () => void
+  messages?: GmailMessage[]
+}
+
+export interface GmailMessage {
+  id: string
+  payload: {
+    headers: Array<{
+      name: string
+      value: string
+    }>
   }
+  snippet: string
+  internalDate: string
+  labelIds?: string[]
+}
+
+export interface FormattedMail {
+  id: string
+  name: string
+  email: string
+  subject: string
+  text: string
+  date: string
+  read: boolean
+  labels: string[]
+}

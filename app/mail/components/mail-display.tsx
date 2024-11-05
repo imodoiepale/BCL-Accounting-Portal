@@ -1,9 +1,6 @@
 //@ts-nocheck
 
-import {addDays} from "date-fns/addDays"
-import {addHours} from "date-fns/addHours"
-import {format} from "date-fns/format"
-import {nextSaturday} from "date-fns/nextSaturday"
+import { addDays, addHours, format, nextSaturday } from "date-fns"
 import {
   Archive,
   ArchiveX,
@@ -16,10 +13,6 @@ import {
 } from "lucide-react"
 
 import {
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu"
-import {
   Avatar,
   AvatarFallback,
   AvatarImage,
@@ -28,6 +21,8 @@ import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
   DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
@@ -44,14 +39,37 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Mail } from "../data"
+import { GmailMessage } from "../types"
 
 interface MailDisplayProps {
-  mail: Mail | null
+  mail: GmailMessage | null
 }
 
 export function MailDisplay({ mail }: MailDisplayProps) {
   const today = new Date()
+  
+  const getHeader = (headers: Array<{ name: string; value: string }>, name: string) => {
+    return headers.find(header => header.name === name)?.value || ''
+  }
+
+  const getName = (mail: GmailMessage) => {
+    const from = getHeader(mail.payload.headers, 'From')
+    return from.split('<')[0].trim()
+  }
+
+  const getEmail = (mail: GmailMessage) => {
+    const from = getHeader(mail.payload.headers, 'From')
+    const matches = from.match(/<(.+)>/)
+    return matches ? matches[1] : from
+  }
+
+  const getSubject = (mail: GmailMessage) => {
+    return getHeader(mail.payload.headers, 'Subject')
+  }
+
+  const getDate = (mail: GmailMessage) => {
+    return new Date(parseInt(mail.internalDate))
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -99,37 +117,25 @@ export function MailDisplay({ mail }: MailDisplayProps) {
                 <div className="flex flex-col gap-2 border-r px-2 py-4">
                   <div className="px-4 text-sm font-medium">Snooze until</div>
                   <div className="grid min-w-[250px] gap-1">
-                    <Button
-                      variant="ghost"
-                      className="justify-start font-normal"
-                    >
+                    <Button variant="ghost" className="justify-start font-normal">
                       Later today{" "}
                       <span className="ml-auto text-muted-foreground">
                         {format(addHours(today, 4), "E, h:m b")}
                       </span>
                     </Button>
-                    <Button
-                      variant="ghost"
-                      className="justify-start font-normal"
-                    >
+                    <Button variant="ghost" className="justify-start font-normal">
                       Tomorrow
                       <span className="ml-auto text-muted-foreground">
                         {format(addDays(today, 1), "E, h:m b")}
                       </span>
                     </Button>
-                    <Button
-                      variant="ghost"
-                      className="justify-start font-normal"
-                    >
+                    <Button variant="ghost" className="justify-start font-normal">
                       This weekend
                       <span className="ml-auto text-muted-foreground">
                         {format(nextSaturday(today), "E, h:m b")}
                       </span>
                     </Button>
-                    <Button
-                      variant="ghost"
-                      className="justify-start font-normal"
-                    >
+                    <Button variant="ghost" className="justify-start font-normal">
                       Next week
                       <span className="ml-auto text-muted-foreground">
                         {format(addDays(today, 7), "E, h:m b")}
@@ -196,31 +202,29 @@ export function MailDisplay({ mail }: MailDisplayProps) {
           <div className="flex items-start p-4">
             <div className="flex items-start gap-4 text-sm">
               <Avatar>
-                <AvatarImage alt={mail.name} />
+                <AvatarImage alt={getName(mail)} />
                 <AvatarFallback>
-                  {mail.name
+                  {getName(mail)
                     .split(" ")
                     .map((chunk) => chunk[0])
                     .join("")}
                 </AvatarFallback>
               </Avatar>
               <div className="grid gap-1">
-                <div className="font-semibold">{mail.name}</div>
-                <div className="line-clamp-1 text-xs">{mail.subject}</div>
+                <div className="font-semibold">{getName(mail)}</div>
+                <div className="line-clamp-1 text-xs">{getSubject(mail)}</div>
                 <div className="line-clamp-1 text-xs">
-                  <span className="font-medium">Reply-To:</span> {mail.email}
+                  <span className="font-medium">Reply-To:</span> {getEmail(mail)}
                 </div>
               </div>
             </div>
-            {mail.date && (
-              <div className="ml-auto text-xs text-muted-foreground">
-                {format(new Date(mail.date), "PPpp")}
-              </div>
-            )}
+            <div className="ml-auto text-xs text-muted-foreground">
+              {format(getDate(mail), "PPpp")}
+            </div>
           </div>
           <Separator />
           <div className="flex-1 whitespace-pre-wrap p-4 text-sm">
-            {mail.text}
+            {mail.snippet}
           </div>
           <Separator className="mt-auto" />
           <div className="p-4">
@@ -228,7 +232,7 @@ export function MailDisplay({ mail }: MailDisplayProps) {
               <div className="grid gap-4">
                 <Textarea
                   className="p-4"
-                  placeholder={`Reply ${mail.name}...`}
+                  placeholder={`Reply to ${getName(mail)}...`}
                 />
                 <div className="flex items-center">
                   <Label
