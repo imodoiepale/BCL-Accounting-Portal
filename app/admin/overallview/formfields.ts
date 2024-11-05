@@ -24,7 +24,7 @@ export const formFields = {
 
             // NSSF Details
             { name: 'nssf_code', label: 'NSSF Code', type: 'text', category: 'NSSF Details' },
-            { name: 'nssf_user', label: 'NSSF User', type: 'text', category: 'NSSF Details' },
+            // { name: 'nssf_user', label: 'NSSF User', type: 'text', category: 'NSSF Details' },
             { name: 'nssf_password', label: 'NSSF Password', type: 'text', category: 'NSSF Details' },
             { name: 'nssf_reg_date', label: 'NSSF Registration Date', type: 'date', category: 'NSSF Details' },
             { name: 'nssf_compliance_date', label: 'NSSF Compliance Certificate Date', type: 'date', category: 'NSSF Details' },
@@ -45,7 +45,7 @@ export const formFields = {
             { name: 'ecitizen_id', label: 'E-Citizen ID', type: 'text', category: 'E-Citizen Details' },
             { name: 'ecitizen_email', label: 'E-Citizen Email', type: 'email', category: 'E-Citizen Details' },
             { name: 'ecitizen_mobile', label: 'E-Citizen Mobile', type: 'tel', category: 'E-Citizen Details' },
-            
+
 
             // NITA Details
             { name: 'nita_identifier', label: 'NITA Identifier', type: 'text', category: 'NITA Details' },
@@ -78,9 +78,14 @@ export const formFields = {
             { name: 'vat_to', label: 'VAT To', type: 'date', category: 'VAT Details' },
 
             // Tax Status Details
-            { name: 'income_tax_resident_status', label: 'Income Tax - Resident Individual Status', type: 'text', category: 'Income Tax Status' },
-            { name: 'income_tax_resident_from', label: 'Income Tax - Resident Individual From', type: 'date', category: 'Income Tax Status' },
-            { name: 'income_tax_resident_to', label: 'Income Tax - Resident Individual To', type: 'date', category: 'Income Tax Status' },
+            { name: 'pin_status', label: 'PIN Status', type: 'text' , category: 'Tax Status' },
+            { name: 'itax_status', label: 'iTax Status', type: 'text' , category: 'Tax Status' },
+            { name: 'vat_status', label: 'VAT Status', type: 'text' , category: 'Tax Status' },
+            { name: 'vat_from', label: 'VAT From', type: 'date' , category: 'Tax Status' },
+            { name: 'vat_to', label: 'VAT To', type: 'date' , category: 'Tax Status' },
+            { name: 'income_tax_resident_status', label: 'Income Tax - Resident Individual Status', type: 'text', category: 'Tax Status' },
+            { name: 'income_tax_resident_from', label: 'Income Tax - Resident Individual From', type: 'date', category: 'Tax Status' },
+            { name: 'income_tax_resident_to', label: 'Income Tax - Resident Individual To', type: 'date', category: 'Tax Status' },
 
             // NEA Details
             { name: 'nea_username', label: 'NEA Username', type: 'text', category: 'NEA Details' },
@@ -121,11 +126,6 @@ export const formFields = {
             { name: 'company_status', label: 'Company Status', type: 'select', options: ['Active', 'Dormant', 'To Start'], category: 'Client Category' },
             { name: 'company_type', label: 'Company Type', type: 'select', options: ['Limited', 'Sole Proprietorship', 'Partnership'], category: 'Client Category' },
 
-            // Tax Status Details
-            { name: 'pin_status', label: 'PIN Status', type: 'text', category: 'Tax Status' },
-            { name: 'itax_status', label: 'iTax Status', type: 'text', category: 'Tax Status' },
-            { name: 'tax_year_end', label: 'Tax Year End', type: 'date', category: 'Tax Status' },
-
             // // Compliance Details
             // { name: 'fire_prevention_license', label: 'Fire Prevention License', type: 'text', category: 'Compliance' },
             // { name: 'business_permit', label: 'Single Business Permit', type: 'text', category: 'Compliance' },
@@ -165,46 +165,49 @@ export const formFields = {
 
     supplierDetails: {
         fields: [
-            { name: 'data.supplierName', label: 'Supplier Name', type: 'text' },
-            { name: 'data.supplierType', label: 'Supplier Type', type: 'text' },
-            { name: 'data.tradingType', label: 'Trading Type', type: 'text' },
-            { name: 'data.pin', label: 'PIN', type: 'text' },
-            { name: 'data.idNumber', label: 'ID Number', type: 'text' },
-            { name: 'data.mobile', label: 'Mobile', type: 'tel' },
-            { name: 'data.email', label: 'Email', type: 'email' },
-            { name: 'created_at', label: 'Created Date', type: 'date' },
-            { name: 'updated_at', label: 'Updated Date', type: 'date' }
-        ]
-    },
-
-    bankDetails: {
-        fields: [
-            { name: 'bank_name', label: 'Bank Name', type: 'text' },
-            { name: 'account_number', label: 'Account Number', type: 'text' },
-            { name: 'currency', label: 'Currency', type: 'text' },
-            { name: 'branch', label: 'Branch', type: 'text' },
-            { name: 'relationship_manager_name', label: 'RM Name', type: 'text' },
-            { name: 'relationship_manager_mobile', label: 'RM Mobile', type: 'tel' },
-            { name: 'relationship_manager_email', label: 'RM Email', type: 'email' },
-            { name: 'bank_startdate', label: 'Start Date', type: 'date' },
-            { name: 'bank_status', label: 'Status', type: 'boolean' },
-            { name: 'bank_verified', label: 'Verified', type: 'boolean' }
-        ]
-    },
-
-    employeeDetails: {
-        fields: [
-            { name: 'employee_name', label: 'Name', type: 'text' },
+            { name: 'supplier_name', label: 'Supplier Name', type: 'text' },
+            { name: 'supplier_type', label: 'Supplier Type', type: 'text' },
+            { name: 'trading_type', label: 'Trading Type', type: 'text' },
+            { name: 'pin', label: 'PIN', type: 'text' },
             { name: 'id_number', label: 'ID Number', type: 'text' },
-            { name: 'employee_kra_pin', label: 'KRA PIN', type: 'text' },
-            { name: 'employee_email', label: 'Email', type: 'email' },
-            { name: 'employee_mobile', label: 'Mobile', type: 'tel' },
-            { name: 'employee_nhif', label: 'NHIF', type: 'text' },
-            { name: 'employee_nssf', label: 'NSSF', type: 'text' },
-            { name: 'employee_startdate', label: 'Start Date', type: 'date' },
-            { name: 'employee_enddate', label: 'End Date', type: 'date' },
-            { name: 'employee_status', label: 'Status', type: 'boolean' },
-            { name: 'employee_verified', label: 'Verified', type: 'boolean' }
+            { name: 'mobile', label: 'Mobile', type: 'tel' },
+            { name: 'email', label: 'Email', type: 'email' }
         ]
     },
+
+// Update bank details fields to match database columns
+bankDetails: {
+    fields: [
+        { name: 'bank_name', label: 'Bank Name', type: 'text' },
+        { name: 'account_number', label: 'Account Number', type: 'text' },
+        { name: 'currency', label: 'Currency', type: 'text' },
+        { name: 'branch', label: 'Branch', type: 'text' },
+        { name: 'rm_name', label: 'RM Name', type: 'text' },
+        { name: 'rm_mobile', label: 'RM Mobile', type: 'tel' },
+        { name: 'rm_email', label: 'RM Email', type: 'email' },
+        { name: 'bank_startdate', label: 'Bank Start Date', type: 'date' },
+        { name: 'bank_status', label: 'Bank Status', type: 'boolean' },
+        { name: 'bank_verified', label: 'Bank Verified', type: 'boolean' },
+        { name: 'status', label: 'Status', type: 'text' }
+    ]
+},
+
+// Update employee details fields to match database columns 
+employeeDetails: {
+    fields: [
+        { name: 'employee_name', label: 'Employee Name', type: 'text' },
+        { name: 'id_number', label: 'ID Number', type: 'text' },
+        { name: 'employee_kra_pin', label: 'KRA PIN', type: 'text' },
+        { name: 'employee_email', label: 'Email', type: 'email' },
+        { name: 'employee_mobile', label: 'Mobile', type: 'tel' },
+        { name: 'employee_nhif', label: 'NHIF Number', type: 'text' },
+        { name: 'employee_nssf', label: 'NSSF Number', type: 'text' },
+        { name: 'employee_startdate', label: 'Employee Start Date', type: 'date' },
+        { name: 'employee_enddate', label: 'Employee End Date', type: 'date' },
+        { name: 'employee_status', label: 'Employee Status', type: 'boolean' },
+        { name: 'employee_verified', label: 'Employee Verified', type: 'boolean' },
+        { name: 'status', label: 'Status', type: 'text' }
+    ]
+}
+
 };

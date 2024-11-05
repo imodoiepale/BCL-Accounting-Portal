@@ -17,6 +17,7 @@ const CompanyGeneralTable = ({ data }) => {
         <Table>
             <TableHeader>
                 <TableRow className="bg-slate-100">
+                <TableHead className="w-20">#</TableHead>
                     {generalFields.map(field => (
                         <TableHead key={field.name} className="whitespace-nowrap font-semibold">
                             {field.label}
@@ -27,6 +28,7 @@ const CompanyGeneralTable = ({ data }) => {
             <TableBody>
                 {data.map((company, index) => (
                     <TableRow key={index} className="hover:bg-slate-50">
+                       <TableCell>{index + 1}</TableCell>
                         {generalFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
                                 {company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
@@ -48,6 +50,8 @@ const CompanyTaxTable = ({ data }) => {
         <Table>
             <TableHeader>
                 <TableRow className="bg-sky-100">
+                <TableHead className="w-20">#</TableHead>
+                <TableHead>Company Name</TableHead>
                     {taxFields.map(field => (
                         <TableHead key={field.name} className="whitespace-nowrap font-semibold">
                             {field.label}
@@ -58,6 +62,7 @@ const CompanyTaxTable = ({ data }) => {
             <TableBody>
                 {data.map((company, index) => (
                     <TableRow key={index} className="hover:bg-sky-50">
+                         <TableCell>{index + 1}</TableCell>
                         {taxFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
                                 {company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
@@ -73,10 +78,17 @@ const CompanyTaxTable = ({ data }) => {
 const DirectorsTable = ({ data }) => {
     const directorFields = formFields.directorDetails.fields;
 
+    // Transform the data to handle both array and object structures
+    const directors = Array.isArray(data) 
+        ? data 
+        : Object.values(data || {}).flatMap(group => group?.directors || []);
+
     return (
         <Table>
             <TableHeader>
                 <TableRow className="bg-emerald-100">
+                <TableHead className="w-20">#</TableHead>
+                <TableHead>Company Name</TableHead>
                     {directorFields.map(field => (
                         <TableHead key={field.name} className="whitespace-nowrap font-semibold">
                             {field.label}
@@ -85,19 +97,30 @@ const DirectorsTable = ({ data }) => {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {data.map((director, index) => (
-                    <TableRow key={index} className="hover:bg-emerald-50">
-                        {directorFields.map(field => (
-                            <TableCell key={field.name} className="whitespace-nowrap">
-                                {director[field.name] || <span className="text-red-500 font-medium">N/A</span>}
-                            </TableCell>
-                        ))}
+                {directors.length > 0 ? (
+                    directors.map((director, index) => (
+                        <TableRow key={index} className="hover:bg-emerald-50">
+                            
+                            {directorFields.map(field => (
+                                <TableCell key={field.name} className="whitespace-nowrap">
+                                    {director[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    ))
+                ) : (
+                    <TableRow>
+                        <TableCell colSpan={directorFields.length} className="text-center py-4">
+                            No director data available
+                        </TableCell>
                     </TableRow>
-                ))}
+                )}
             </TableBody>
         </Table>
     );
 };
+
+
 
 const ComplianceTable = ({ data }) => {
     const complianceFields = [
@@ -561,17 +584,18 @@ const OverallView = () => {
     return (
 
         <Tabs defaultValue="overview" className="w-full space-y-4">
-            <TabsList className="grid w-full grid-cols-8">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="client">Client Category</TabsTrigger>
-                <TabsTrigger value="sheria">Sheria Details</TabsTrigger>
-                <TabsTrigger value="ecitizen">E-Citizen</TabsTrigger>
-                <TabsTrigger value="tax">Tax Status</TabsTrigger>
-                <TabsTrigger value="compliance">Compliance</TabsTrigger>
-                <TabsTrigger value="statutory">Statutory</TabsTrigger>
-                <TabsTrigger value="other">Other Details</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-10 bg-gray-100 rounded-lg p-1">
+                <TabsTrigger value="overview" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Overview</TabsTrigger>
+                <TabsTrigger value="company" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Company</TabsTrigger>
+                {/* <TabsTrigger value="directors" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Directors</TabsTrigger> */}
+                <TabsTrigger value="clients" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Clients</TabsTrigger>
+                <TabsTrigger value="checklist" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Monthly Checklist</TabsTrigger>
+                <TabsTrigger value="sheria" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Sheria Details</TabsTrigger>
+                {/* <TabsTrigger value="directors" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Directors</TabsTrigger> */}
+                <TabsTrigger value="ecitizen" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">E-Citizen</TabsTrigger>
+                <TabsTrigger value="taxes" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Taxes</TabsTrigger>
+                <TabsTrigger value="other" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Other Details</TabsTrigger>
             </TabsList>
-
             <TabsContent value="overview" className="mt-6">
                 <Card>
                     <CardContent className="p-0">
@@ -580,31 +604,31 @@ const OverallView = () => {
                                 <TableHeader>
                                     {/* Section Headers */}
                                     <TableRow>
-    {processedSections.map((section, sectionIndex) => {
-        if (section.isSeparator) {
-            return renderSeparatorCell(`separator-header-1-${sectionIndex}`, true);
-        }
+                                        {processedSections.map((section, sectionIndex) => {
+                                            if (section.isSeparator) {
+                                                return renderSeparatorCell(`separator-header-1-${sectionIndex}`, true);
+                                            }
 
-        const totalColSpan = section.categorizedFields.reduce((total, cat) =>
-            total + (cat.isSeparator ? 1 : cat.fields.length), 0);
+                                            const totalColSpan = section.categorizedFields.reduce((total, cat) =>
+                                                total + (cat.isSeparator ? 1 : cat.fields.length), 0);
 
-        const sectionColor = sectionColors[section.name]?.main || 'bg-gray-600';
-        const sectionNumber = sectionIndex + 1;
+                                            const sectionColor = sectionColors[section.name]?.main || 'bg-gray-600';
+                                            const sectionNumber = sectionIndex + 1;
 
-        return (
-            <TableHead
-                key={section.name}
-                colSpan={totalColSpan}
-                className={`text-center ${sectionColor} text-white font-bold transition-colors`}
-            >
-                <div className="flex flex-col gap-1">
-                    <span className="text-xs opacity-75">{sectionNumber}.0</span>
-                    <span>{section.label}</span>
-                </div>
-            </TableHead>
-        );
-    })}
-</TableRow>
+                                            return (
+                                                <TableHead
+                                                    key={section.name}
+                                                    colSpan={totalColSpan}
+                                                    className={`text-center ${sectionColor} text-white font-bold transition-colors`}
+                                                >
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs opacity-75">{sectionNumber}.0</span>
+                                                        <span>{section.label}</span>
+                                                    </div>
+                                                </TableHead>
+                                            );
+                                        })}
+                                    </TableRow>
 
                                     {/* Category Headers */}
                                     <TableRow>
@@ -808,7 +832,6 @@ const OverallView = () => {
                     <TabsList>
                         <TabsTrigger value="general">General</TabsTrigger>
                         <TabsTrigger value="tax">Tax Details</TabsTrigger>
-                        <TabsTrigger value="ecitizen">E-Citizen</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="general">
@@ -819,13 +842,32 @@ const OverallView = () => {
                                 </ScrollArea>
                             </CardContent>
                         </Card>
-                    </TabsContent>
+                    </TabsContent>                  
+                </Tabs>
+            </TabsContent>
 
-                    <TabsContent value="tax">
+            <TabsContent value="ecitizen">
+                <Card>
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-[700px]">
+                            <ECitizenTable data={data} />
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            <TabsContent value="banking">
+                <Tabs defaultValue="accounts" className="space-y-4">
+                    <TabsList>
+                        <TabsTrigger value="accounts">Accounts</TabsTrigger>
+                        <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="accounts">
                         <Card>
                             <CardContent className="p-0">
                                 <ScrollArea className="h-[700px]">
-                                    <CompanyTaxTable data={data} />
+                                    <BankingTable data={data.flatMap(company => company.banks)} />
                                 </ScrollArea>
                             </CardContent>
                         </Card>
@@ -833,25 +875,145 @@ const OverallView = () => {
                 </Tabs>
             </TabsContent>
 
+            <TabsContent value="clients">
+                <Tabs defaultValue="acc">
+                    <TabsList>
+                        <TabsTrigger value="acc">ACC Clients</TabsTrigger>
+                        <TabsTrigger value="audit">Audit/Tax Clients</TabsTrigger>
+                        <TabsTrigger value="imm">IMM Clients</TabsTrigger>
+                        <TabsTrigger value="cps">CPS Sheria Clients</TabsTrigger>
+                        <TabsTrigger value="billing">Accounting Billing</TabsTrigger>
+                    </TabsList>
+                </Tabs>
+            </TabsContent>
+
             <TabsContent value="directors">
+                <Tabs defaultValue="details">
+                    <TabsList>
+                        <TabsTrigger value="details">Basic Details</TabsTrigger>
+                        <TabsTrigger value="passport">Passport Details</TabsTrigger>
+                        <TabsTrigger value="alien">Alien Details</TabsTrigger>
+                        <TabsTrigger value="permit">Permit Details</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="details">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <DirectorsTable data={data.flatMap(company => company.directors)} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                </Tabs>
+            </TabsContent>
+
+            <TabsContent value="taxes">
+                <Tabs defaultValue="all">
+                    <TabsList>
+                        <TabsTrigger value="all">All</TabsTrigger>
+                        <TabsTrigger value="kra">KRA Status</TabsTrigger>
+                        <TabsTrigger value="income">Income Tax</TabsTrigger>
+                        <TabsTrigger value="vat">VAT</TabsTrigger>
+                        <TabsTrigger value="paye">PAYE</TabsTrigger>
+                        <TabsTrigger value="rent">Rent Income</TabsTrigger>
+                        <TabsTrigger value="turnover">Turnover Tax</TabsTrigger>
+                    </TabsList>
+                </Tabs>
+
+                <TabsContent value="kra">
                 <Card>
                     <CardContent className="p-0">
                         <ScrollArea className="h-[700px]">
-                            <DirectorsTable data={data.flatMap(company => company.directors)} />
+                            <TaxStatusTable data={data} />
                         </ScrollArea>
                     </CardContent>
                 </Card>
             </TabsContent>
-            <TabsContent value="compliance">
-                <Tabs defaultValue="statutory" className="space-y-4">
+
+                <TabsContent value="all">
+                    <Card>
+                        <CardContent className="p-0">
+                            <ScrollArea className="h-[700px]">
+                                <ComplianceTable data={data} />
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="nssf">
+                    <Card>
+                        <CardContent className="p-0">
+                            <ScrollArea className="h-[700px]">
+                                <NSSFTable data={data.map(company => ({
+                                    ...company,
+                                    ...company.nssf
+                                }))} />
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="nhif">
+                    <Card>
+                        <CardContent className="p-0">
+                            <ScrollArea className="h-[700px]">
+                                <NHIFTable data={data.map(company => ({
+                                    ...company,
+                                    ...company.nhif
+                                }))} />
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="housing">
+                    <Card>
+                        <CardContent className="p-0">
+                            {/* <ScrollArea className="h-[700px]">
+                                    <HousingLevyTable data={data} />
+                                </ScrollArea> */}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </TabsContent>
+
+            <TabsContent value="client">
+                <Card>
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-[700px]">
+                            <ClientCategoryTable data={data} />
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            <TabsContent value="sheria">
+                <Card>
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-[700px]">
+                            <SheriaDetailsTable data={data} />
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            <TabsContent value="checklist">
+                <Tabs defaultValue="nssf" className="space-y-4">
                     <TabsList>
-                        <TabsTrigger value="statutory">Statutory</TabsTrigger>
+                        {/* <TabsTrigger value="all">All</TabsTrigger> */}
                         <TabsTrigger value="nssf">NSSF</TabsTrigger>
                         <TabsTrigger value="nhif">NHIF</TabsTrigger>
+                        <TabsTrigger value="paye">PAYE</TabsTrigger>
+                        <TabsTrigger value="nita">NITA</TabsTrigger>
+                        <TabsTrigger value="tourism">Tourism Levy</TabsTrigger>
                         <TabsTrigger value="housing">Housing Levy</TabsTrigger>
+                        <TabsTrigger value="vat">VAT</TabsTrigger>
+                        <TabsTrigger value="standard-levy">Standard Levy</TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="statutory">
+                    {/* <TabsContent value="all">
                         <Card>
                             <CardContent className="p-0">
                                 <ScrollArea className="h-[700px]">
@@ -859,7 +1021,7 @@ const OverallView = () => {
                                 </ScrollArea>
                             </CardContent>
                         </Card>
-                    </TabsContent>
+                    </TabsContent> */}
 
                     <TabsContent value="nssf">
                         <Card>
@@ -887,108 +1049,69 @@ const OverallView = () => {
                         </Card>
                     </TabsContent>
 
+                    <TabsContent value="paye">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <PAYETable data={data} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="nita">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <NITATable data={data} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="tourism">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <TourismLevyTable data={data} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
                     <TabsContent value="housing">
                         <Card>
                             <CardContent className="p-0">
-                                {/* <ScrollArea className="h-[700px]">
+                                <ScrollArea className="h-[700px]">
                                     <HousingLevyTable data={data} />
-                                </ScrollArea> */}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
-            </TabsContent>
-
-            <TabsContent value="ecitizen">
-                <Card>
-                    <CardContent className="p-0">
-                        <ScrollArea className="h-[700px]">
-                            <ECitizenTable data={data} />
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-            </TabsContent>
-
-
-            <TabsContent value="tax">
-                <Card>
-                    <CardContent className="p-0">
-                        <ScrollArea className="h-[700px]">
-                            <TaxStatusTable data={data} />
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-            </TabsContent>
-            <TabsContent value="payroll">
-                <Tabs defaultValue="employees" className="space-y-4">
-                    <TabsList>
-                        <TabsTrigger value="employees">Employees</TabsTrigger>
-                        <TabsTrigger value="payroll">Payroll</TabsTrigger>
-                        <TabsTrigger value="deductions">Deductions</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="employees">
-                        <Card>
-                            <CardContent className="p-0">
-                                <ScrollArea className="h-[700px]">
-                                    <EmployeesTable data={data.flatMap(company => company.employees)} />
                                 </ScrollArea>
                             </CardContent>
                         </Card>
                     </TabsContent>
 
-                    <TabsContent value="payroll">
-                        <Card>
-                            <CardContent className="p-0">
-                                {/* <ScrollArea className="h-[700px]">
-                                    <PayrollTable data={data.flatMap(company => company.employees)} />
-                                </ScrollArea> */}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
-            </TabsContent>
-
-            <TabsContent value="banking">
-                <Tabs defaultValue="accounts" className="space-y-4">
-                    <TabsList>
-                        <TabsTrigger value="accounts">Accounts</TabsTrigger>
-                        <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="accounts">
+                    <TabsContent value="vat">
                         <Card>
                             <CardContent className="p-0">
                                 <ScrollArea className="h-[700px]">
-                                    <BankingTable data={data.flatMap(company => company.banks)} />
+                                    <VATTable data={data} />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="standard-levy">
+                        <Card>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[700px]">
+                                    <StandardLevyTable data={data} />
                                 </ScrollArea>
                             </CardContent>
                         </Card>
                     </TabsContent>
                 </Tabs>
-            </TabsContent>
-
-            <TabsContent value="client">
-                <Card>
-                    <CardContent className="p-0">
-                        <ScrollArea className="h-[700px]">
-                            <ClientCategoryTable data={data} />
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-            </TabsContent>
-
-            <TabsContent value="sheria">
-                <Card>
-                    <CardContent className="p-0">
-                        <ScrollArea className="h-[700px]">
-                            <SheriaDetailsTable data={data} />
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-            </TabsContent>
-
-        </Tabs>
+            </TabsContent>        
+            
+            </Tabs>
     );
 };
 
@@ -1002,6 +1125,8 @@ const NSSFTable = ({ data }) => {
         <Table>
             <TableHeader>
                 <TableRow className="bg-emerald-100">
+                <TableHead className="w-20">#</TableHead>
+                <TableHead>Company Name</TableHead>
                     {nssfFields.map(field => (
                         <TableHead key={field.name} className="whitespace-nowrap font-semibold">
                             {field.label}
@@ -1012,6 +1137,8 @@ const NSSFTable = ({ data }) => {
             <TableBody>
                 {data.map((item, index) => (
                     <TableRow key={index} className="hover:bg-emerald-50">
+                         <TableCell>{index + 1}</TableCell>
+                    
                         {nssfFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
                                 {item[field.name] || <span className="text-red-500 font-medium">N/A</span>}
@@ -1033,6 +1160,8 @@ const NHIFTable = ({ data }) => {
         <Table>
             <TableHeader>
                 <TableRow className="bg-teal-100">
+                <TableHead className="w-20">#</TableHead>
+                <TableHead>Company Name</TableHead>
                     {nhifFields.map(field => (
                         <TableHead key={field.name} className="whitespace-nowrap font-semibold">
                             {field.label}
@@ -1043,6 +1172,8 @@ const NHIFTable = ({ data }) => {
             <TableBody>
                 {data.map((item, index) => (
                     <TableRow key={index} className="hover:bg-teal-50">
+                         <TableCell>{index + 1}</TableCell>
+                     
                         {nhifFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
                                 {item[field.name] || <span className="text-red-500 font-medium">N/A</span>}
@@ -1062,6 +1193,8 @@ const EmployeesTable = ({ data }) => {
         <Table>
             <TableHeader>
                 <TableRow className="bg-rose-100">
+                <TableHead className="w-20">#</TableHead>
+                <TableHead>Company Name</TableHead>
                     {employeeFields.map(field => (
                         <TableHead key={field.name} className="whitespace-nowrap font-semibold">
                             {field.label}
@@ -1072,6 +1205,8 @@ const EmployeesTable = ({ data }) => {
             <TableBody>
                 {data.map((employee, index) => (
                     <TableRow key={index} className="hover:bg-rose-50">
+                         <TableCell>{index + 1}</TableCell>
+                
                         {employeeFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
                                 {employee[field.name] || <span className="text-red-500 font-medium">N/A</span>}
@@ -1091,6 +1226,8 @@ const BankingTable = ({ data }) => {
         <Table>
             <TableHeader>
                 <TableRow className="bg-amber-100">
+                <TableHead className="w-20">#</TableHead>
+                <TableHead>Company Name</TableHead>
                     {bankFields.map(field => (
                         <TableHead key={field.name} className="whitespace-nowrap font-semibold">
                             {field.label}
@@ -1101,6 +1238,8 @@ const BankingTable = ({ data }) => {
             <TableBody>
                 {data.map((bank, index) => (
                     <TableRow key={index} className="hover:bg-amber-50">
+                         <TableCell>{index + 1}</TableCell>
+                         
                         {bankFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
                                 {bank[field.name] || <span className="text-red-500 font-medium">N/A</span>}
@@ -1113,4 +1252,216 @@ const BankingTable = ({ data }) => {
     );
 };
 
+const PAYETable = ({ data }) => {
+    const payeFields = formFields.companyDetails.fields.filter(
+        field => field.category === 'PAYE Details'
+    );
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-lime-100">
+                <TableHead className="w-20">#</TableHead>
+                    <TableHead>Company Name</TableHead>
+                    {payeFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((companyGroup, index) => (
+                    <TableRow key={index} className="hover:bg-lime-50">
+                         <TableCell>{index + 1}</TableCell>
+                        <TableCell>{companyGroup.company.company_name}</TableCell>
+                        {payeFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
+const VATTable = ({ data }) => {
+    const vatFields = formFields.companyDetails.fields.filter(
+        field => field.category === 'VAT Details'
+    );
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-orange-100">
+                <TableHead className="w-20">#</TableHead>
+                    <TableHead>Company Name</TableHead>
+                    {vatFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((companyGroup, index) => (
+                    <TableRow key={index} className="hover:bg-orange-50">
+                         <TableCell>{index + 1}</TableCell>
+                        <TableCell>{companyGroup.company.company_name}</TableCell>
+                        {vatFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
+const NITATable = ({ data }) => {
+    const nitaFields = formFields.companyDetails.fields.filter(
+        field => field.category === 'NITA Details'
+    );
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-violet-100">
+                <TableHead className="w-20">#</TableHead>
+                    <TableHead>Company Name</TableHead>
+                    {nitaFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((companyGroup, index) => (
+                    <TableRow key={index} className="hover:bg-violet-50">
+                         <TableCell>{index + 1}</TableCell>
+                        <TableCell>{companyGroup.company.company_name}</TableCell>
+                        {nitaFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
+const HousingLevyTable = ({ data }) => {
+    const housingFields = formFields.companyDetails.fields.filter(
+        field => field.category === 'Housing Levy Details'
+    );
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-purple-100">
+                <TableHead className="w-20">#</TableHead>
+                    <TableHead>Company Name</TableHead>
+                    {housingFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((companyGroup, index) => (
+                    <TableRow key={index} className="hover:bg-purple-50">
+                         <TableCell>{index + 1}</TableCell>
+                        <TableCell>{companyGroup.company.company_name}</TableCell>
+                        {housingFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
+const TourismLevyTable = ({ data }) => {
+    const tourismFields = formFields.companyDetails.fields.filter(
+        field => field.category === 'Tourism Levy Details'
+    );
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-rose-100">
+                <TableHead className="w-20">#</TableHead>
+                    <TableHead>Company Name</TableHead>
+                    {tourismFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((companyGroup, index) => (
+                    <TableRow key={index} className="hover:bg-rose-50">
+                         <TableCell>{index + 1}</TableCell>
+                        <TableCell>{companyGroup.company.company_name}</TableCell>
+                        {tourismFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
+const StandardLevyTable = ({ data }) => {
+    const standardLevyFields = formFields.companyDetails.fields.filter(
+        field => field.category === 'Standard Levy Details'
+    );
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-fuchsia-100">
+                <TableHead className="w-20">#</TableHead>
+                    <TableHead>Company Name</TableHead>
+                    {standardLevyFields.map(field => (
+                        <TableHead key={field.name} className="whitespace-nowrap font-semibold">
+                            {field.label}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((companyGroup, index) => (
+                    <TableRow key={index} className="hover:bg-fuchsia-50">
+                         <TableCell>{index + 1}</TableCell>
+                        <TableCell>{companyGroup.company.company_name}</TableCell>
+                        {standardLevyFields.map(field => (
+                            <TableCell key={field.name} className="whitespace-nowrap">
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
+
 export default OverallView;
+
+
