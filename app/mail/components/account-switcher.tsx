@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/dialog"
 import { AccountSwitcherProps } from "../types"
 
+const STORAGE_KEY = "selectedEmailAccount"
+
 export function AccountSwitcher({
   isCollapsed,
   accounts,
@@ -35,11 +37,61 @@ export function AccountSwitcher({
   const [searchQuery, setSearchQuery] = React.useState("")
   const [isAddAccountOpen, setIsAddAccountOpen] = React.useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false)
+  
+  // Initialize selectedAccount from localStorage or default to "all"
+  const [persistedAccount, setPersistedAccount] = React.useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      return saved || "all"
+    }
+    return "all"
+  })
+
+  // Update localStorage when account changes
+  React.useEffect(() => {
+    if (selectedAccount) {
+      localStorage.setItem(STORAGE_KEY, selectedAccount)
+      setPersistedAccount(selectedAccount)
+    }
+  }, [selectedAccount])
 
   const filteredAccounts = accounts.filter(account =>
     account.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     account.label.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  // Trigger initial account selection on mount
+  React.useEffect(() => {
+    if (persistedAccount && persistedAccount !== selectedAccount) {
+      onAccountSelect(persistedAccount)
+    }
+  }, [])
+
+  // Function to determine what to display in the SelectValue
+  const renderSelectedValue = () => {
+    if (selectedAccount === "all") {
+      return (
+        <>
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+            <Settings className="h-4 w-4" />
+          </div>
+          <span className={cn("ml-2", isCollapsed && "hidden")}>
+            All Accounts
+          </span>
+        </>
+      )
+    }
+    
+    const account = accounts.find((acc) => acc.email === selectedAccount)
+    return (
+      <>
+        {account?.icon}
+        <span className={cn("ml-2", isCollapsed && "hidden")}>
+          {account?.label}
+        </span>
+      </>
+    )
+  }
 
   return (
     <>
@@ -52,10 +104,7 @@ export function AccountSwitcher({
           )}
         >
           <SelectValue>
-            {accounts.find((account) => account.email === selectedAccount)?.icon}
-            <span className={cn("ml-2", isCollapsed && "hidden")}>
-              {accounts.find((account) => account.email === selectedAccount)?.label}
-            </span>
+            {renderSelectedValue()}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -95,6 +144,9 @@ export function AccountSwitcher({
             <ScrollArea className="h-[300px]">
               <SelectItem value="all" className="cursor-pointer">
                 <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                    <Settings className="h-4 w-4" />
+                  </div>
                   <div className="flex flex-col">
                     <span>All Accounts</span>
                   </div>
@@ -183,9 +235,11 @@ export function AccountSwitcher({
                   variant="destructive"
                   size="sm"
                   onClick={() => {
-                    onRemoveAccount()
+                    onRemoveAccount(account.email)
                     if (accounts.length === 1) {
                       setIsSettingsOpen(false)
+                      localStorage.setItem(STORAGE_KEY, "all")
+                      onAccountSelect("all")
                     }
                   }}
                 >
