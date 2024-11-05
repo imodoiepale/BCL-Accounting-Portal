@@ -207,6 +207,11 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
   const handleManualEntry = async (formData: any) => {
     try {
+      if (!formData) {
+        toast.error('Form data is required');
+        return false;
+    }
+
       const status = complianceStatus.find(s => s.name === stages[currentStage - 1].name)?.status;
       const baseData = { status, userid: companyData.userId };
       const cleanedData = await processFormData(formData, currentStage, baseData);
@@ -347,49 +352,6 @@ const processCompanyData = (formData: any, baseData: any) => {
   return processed;
 };
 
-const processSupplierData = (formData: any, baseData: any) => {
-  // For file upload
-  if (formData['Supplier Name']) {
-    return {
-      userid: baseData.userid,
-      status: baseData.status,
-      data: {
-        supplierName: formData['Supplier Name'] || '',
-        supplierType: formData['Supplier Type'] || '',
-        tradingType: formData['Trading Type'] || '',
-        pin: formData['PIN'] || '',
-        idNumber: formData['ID Number'] || '',
-        mobile: formData['Mobile'] || '',
-        email: formData['Email'] || ''
-      }
-    };
-  }
-
-  // For form submission with numbered fields
-  const supplierData = {
-    userid: baseData.userid,
-    status: baseData.status,
-    data: {
-      supplierName: formData['data.supplierName_1'] || formData.supplierName_1 || '',
-      supplierType: formData['data.supplierType_1'] || formData.supplierType_1 || '',
-      tradingType: formData['data.tradingType_1'] || formData.tradingType_1 || '',
-      pin: formData['data.pin_1'] || formData.pin_1 || '',
-      idNumber: formData['data.idNumber_1'] || formData.idNumber_1 || '',
-      mobile: formData['data.mobile_1'] || formData.mobile_1 || '',
-      email: formData['data.email_1'] || formData.email_1 || ''
-    }
-  };
-
-  // Filter out empty values from the data object
-  Object.keys(supplierData.data).forEach(key => {
-    if (!supplierData.data[key]) {
-      delete supplierData.data[key];
-    }
-  });
-
-  return supplierData;
-};
-
 const processDirectorData = (formData: any, baseData: any) => {
   const directorData = {
     ...baseData,
@@ -416,62 +378,79 @@ const processDirectorData = (formData: any, baseData: any) => {
 };
 
 const processBankData = (formData: any, baseData: any) => {
+  const bankData = {
+    
+    status: baseData.status, // Keep as text
+    bank_name: formData.bank_name_1 || formData['Bank Name'] || '',
+    account_number: formData.account_number_1 || formData['Account Number'] || '',
+    currency: formData.currency_1 || formData['Currency'] || '',
+    branch: formData.branch_1 || formData['Branch'] || '',
+    relationship_manager_name: formData.relationship_manager_name_1 || formData['RM Name'] || '',
+    relationship_manager_mobile: formData.relationship_manager_mobile_1 || formData['RM Mobile'] || '',
+    relationship_manager_email: formData.relationship_manager_email_1 || formData['RM Email'] || '',
+    bank_startdate: formData.bank_startdate_1 || null,
+    bank_status: baseData.status === 'has_details', // Convert to boolean
+    bank_verified: false,
+    userid: baseData.userid,
+  };
+  
+  // Filter out empty fields
+  return Object.fromEntries(
+    Object.entries(bankData).filter(([_, value]) => value !== '')
+  );
+};
+
+const processSupplierData = (formData: any, baseData: any) => {
   // For file upload
-  if (formData['Bank Name']) {
+  if (formData['Supplier Name']) {
     return {
-      bank_name: formData['Bank Name'] || '',
-      account_number: formData['Account Number'] || '',
-      currency: formData['Currency'] || '',
-      branch: formData['Branch'] || '',
-      relationship_manager_name: formData['RM Name'] || '',
-      relationship_manager_mobile: formData['RM Mobile'] || '',
-      relationship_manager_email: formData['RM Email'] || '',
-      bank_startdate: formData['Start Date'] || null,
-      bank_status: baseData.status === 'has_details',
-      bank_verified: false,
       userid: baseData.userid,
+      supplier_name: formData['Supplier Name'],
+      supplier_type: formData['Supplier Type'],
+      trading_type: formData['Trading Type'],
+      pin: formData['PIN'],
+      id_number: formData['ID Number'],
+      mobile: formData['Mobile'],
+      email: formData['Email'],
       status: baseData.status
     };
   }
 
   // For form submission
-  const processed = {
-    bank_name: formData.bank_name_1 || formData.bank_name || '',
-    account_number: formData.account_number_1 || formData.account_number || '',
-    currency: formData.currency_1 || formData.currency || '',
-    branch: formData.branch_1 || formData.branch || '',
-    relationship_manager_name: formData.relationship_manager_name_1 || formData.relationship_manager_name || '',
-    relationship_manager_mobile: formData.relationship_manager_mobile_1 || formData.relationship_manager_mobile || '',
-    relationship_manager_email: formData.relationship_manager_email_1 || formData.relationship_manager_email || '',
-    bank_startdate: formData.bank_startdate_1 || formData.bank_startdate || null,
-    bank_status: baseData.status === 'has_details',
-    bank_verified: false,
+  const supplierData = {
     userid: baseData.userid,
+    supplier_name: formData.supplier_name_1 || formData['data.supplierName_1'] || '',
+    supplier_type: formData.supplier_type_1 || formData['data.supplierType_1'] || '',
+    trading_type: formData.trading_type_1 || formData['data.tradingType_1'] || '',
+    pin: formData.pin_1 || formData['data.pin_1'] || '',
+    id_number: formData.id_number_1 || formData['data.idNumber_1'] || '',
+    mobile: formData.mobile_1 || formData['data.mobile_1'] || '',
+    email: formData.email_1 || formData['data.email_1'] || '',
     status: baseData.status
   };
 
-  return processed;
+  // Filter out empty values
+  return Object.fromEntries(
+    Object.entries(supplierData).filter(([_, value]) => value !== '')
+  );
 };
 
 const processEmployeeData = (formData: any, baseData: any) => {
-  console.log('Processing employee data:', formData);
-  const processed = {
-    employee_name: formData.employee_name || '',
-    id_number: formData.id_number || '',
-    employee_kra_pin: formData.employee_kra_pin || '',
-    employee_email: formData.employee_email || '',
-    employee_mobile: formData.employee_mobile || '',
-    employee_nhif: formData.employee_nhif || '',
-    employee_nssf: formData.employee_nssf || '',
-    employee_startdate: formData.employee_startdate || null,
-    employee_enddate: formData.employee_enddate || null,
+  return {
+    employee_name: formData.employee_name_1 || '', // Add _1 suffix for form fields
+    id_number: formData.id_number_1 || '',
+    employee_kra_pin: formData.employee_kra_pin_1 || '',
+    employee_email: formData.employee_email_1 || '',
+    employee_mobile: formData.employee_mobile_1 || '',
+    employee_nhif: formData.employee_nhif_1 || '',
+    employee_nssf: formData.employee_nssf_1 || '',
+    employee_startdate: formData.employee_startdate_1 || null,
+    employee_enddate: formData.employee_enddate_1 || null,
     employee_status: baseData.status === 'has_details',
     employee_verified: false,
     userid: baseData.userid,
     status: baseData.status
   };
-  console.log('Processed employee data:', processed);
-  return processed;
 };
   
 const submitAllData = async () => {
@@ -537,23 +516,26 @@ const submitAllData = async () => {
     console.log('Supplier Data to submit:', data[3]);
     const supplierStatus = complianceStatus.find(s => s.name === "Suppliers")?.status || 'missing';
     if (data[3]?.length > 0) {
-      const sanitizedSupplierData = data[3].map(supplier => 
-        sanitizeData({
-          ...supplier,
-          status: supplierStatus,
-          userid: userId
+      const sanitizedSupplierData = data[3]
+        .map(supplier => {
+          const processed = processSupplierData(supplier, {
+            status: supplierStatus,
+            userid: userId
+          });
+          return processed ? sanitizeData(processed) : null;
         })
-      );
-
-      console.log('Submitting supplier data:', sanitizedSupplierData);
-      const { error: supplierError } = await supabase
-        .from('acc_portal_suppliers')
-        .insert(sanitizedSupplierData);
-
-      if (supplierError) throw supplierError;
-      console.log('Supplier data submitted successfully');
+        .filter(supplier => supplier !== null && supplier.data && Object.keys(supplier.data).length > 0);
+    
+      if (sanitizedSupplierData.length > 0) {
+        console.log('Submitting supplier data:', sanitizedSupplierData);
+        const { error: supplierError } = await supabase
+          .from('acc_portal_supplierss')
+          .insert(sanitizedSupplierData);
+    
+        if (supplierError) throw supplierError;
+        console.log('Supplier data submitted successfully');
+      }
     }
-
     // Submit Banks
     console.log('Bank Data to submit:', data[4]);
     const bankStatus = complianceStatus.find(s => s.name === "Banks")?.status || 'missing';
@@ -563,7 +545,6 @@ const submitAllData = async () => {
           ...bank,
           status: bankStatus,
           userid: userId,
-          bank_status: bankStatus === 'has_details'
         })
       );
 
