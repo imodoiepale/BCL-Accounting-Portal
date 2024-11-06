@@ -36,7 +36,7 @@ export const ACCOUNT_TYPES = [
     { value: 'Corporate', label: 'Corporate' },
     { value: 'Personal', label: 'Personal' }
 ] as const;
-
+// 
 export const DEFAULT_ACCOUNT_DATA: AccountData = {
     accountUser: [],
     pettyCashType: [],
