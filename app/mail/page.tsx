@@ -1,17 +1,31 @@
 //@ts-nocheck
+"use client"
 
-import { cookies } from "next/headers"
 import Image from "next/image"
-
+import { useEffect, useState } from 'react'
 import { Mail } from "./components/mail"
-import { accounts, mails } from "./data"
 
 export default function MailPage() {
-  const layout = cookies().get("react-resizable-panels:layout:mail")
-  const collapsed = cookies().get("react-resizable-panels:collapsed")
+  const [layout, setLayout] = useState<number[] | undefined>(undefined)
+  const [collapsed, setCollapsed] = useState<boolean>(false)
 
-  const defaultLayout = layout ? JSON.parse(layout.value) : undefined
-  const defaultCollapsed = collapsed ? JSON.parse(collapsed.value) : undefined
+  useEffect(() => {
+    const layoutCookie = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('react-resizable-panels:layout:mail'))
+    
+    const collapsedCookie = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('react-resizable-panels:collapsed'))
+
+    if (layoutCookie) {
+      setLayout(JSON.parse(layoutCookie.split('=')[1]))
+    }
+
+    if (collapsedCookie) {
+      setCollapsed(JSON.parse(collapsedCookie.split('=')[1]))
+    }
+  }, [])
 
   return (
     <>
@@ -33,10 +47,8 @@ export default function MailPage() {
       </div>
       <div className="hidden flex-col md:flex">
         <Mail
-          accounts={accounts}
-          mails={mails}
-          defaultLayout={defaultLayout}
-          defaultCollapsed={defaultCollapsed}
+          defaultLayout={layout}
+          defaultCollapsed={collapsed}
           navCollapsedSize={4}
         />
       </div>
