@@ -1,4 +1,6 @@
+
 // @ts-nocheck
+
 "use client"
 
 import * as React from "react"
@@ -342,7 +344,7 @@ const MailHeader: React.FC<MailHeaderProps> = ({
                       <div className="flex flex-col">
                         {filter.conditions.map((condition, idx) => (
                           <Badge key={idx} variant="outline" className="w-fit">
-                            {condition.field} {condition.operator} "{condition.value}"
+                            {condition.field} {condition.operator} “{condition.value}”
                           </Badge>
                         ))}
                       </div>

@@ -1,4 +1,5 @@
 export interface GmailMessage {
+    accountEmail: any
     id: string
     threadId: string
     labelIds: string[]

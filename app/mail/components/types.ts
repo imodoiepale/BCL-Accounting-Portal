@@ -1,7 +1,7 @@
 // types.ts
+
 import { ReactNode } from 'react'
 
-// Mail related interfaces
 export interface Mail {
   id: string
   name: string
@@ -13,32 +13,23 @@ export interface Mail {
   labels: string[]
 }
 
-export interface GmailMessage {
-  id: string
-  threadId: string
-  labelIds: string[]
-  snippet: string
-  payload: {
-    headers: Array<{
-      name: string
-      value: string
-    }>
-    parts?: Array<{
-      filename: string
-      [key: string]: any
-    }>
-  }
-  internalDate: string
-  accountEmail?: string
+export interface TokenInfo {
+  access_token: string
+  refresh_token?: string
+  token_type: string
+  expires_in: number
+  expiry_date?: number
+  scope: string
 }
 
-// Account related interfaces
 export interface EmailAccount {
   id: string
   user_id: string | null
   email: string
   label: string
   token: string
+  refresh_token?: string
+  token_expiry?: string
   created_at: string
   updated_at: string
 }
@@ -46,17 +37,47 @@ export interface EmailAccount {
 export interface Account {
   email: string
   label: string
-  token: {
-    access_token: string
-    token_type: string
-    expires_in: number
-    scope: string
-  }
+  token: TokenInfo
   messages?: GmailMessage[]
   icon?: ReactNode
 }
 
-// Component Props interfaces
+export interface GmailMessage {
+  id: string
+  threadId: string
+  labelIds: string[]
+  snippet: string
+  payload: {
+    mimeType: any
+    headers: Array<{
+      name: string
+      value: string
+    }>
+    parts?: Array<{
+      filename: string
+      mimeType: string
+      body: {
+        size(size: any): ReactNode
+        data?: string
+        attachmentId?: string
+      }
+      [key: string]: any
+    }>
+    body?: {
+      data?: string
+      [key: string]: any
+    }
+  }
+  internalDate: string
+  accountEmail?: string
+}
+
+export interface GmailThread {
+  id: string
+  historyId: string
+  messages: GmailMessage[]
+}
+
 export interface MailProps {
   defaultLayout?: number[]
   defaultCollapsed?: boolean
@@ -89,9 +110,11 @@ export interface MailListProps {
   activeTab?: string
 }
 
-export interface NavProps {
-  isCollapsed: boolean
-  links: NavLink[]
+export interface MailDisplayProps {
+  mail: GmailMessage | null
+  onSendReply?: (messageId: string, content: string, threadId: string) => Promise<void>
+  onLoadThread?: (threadId: string, accountEmail: string) => Promise<GmailThread>
+  loading?: boolean
 }
 
 export interface NavLink {
@@ -101,7 +124,11 @@ export interface NavLink {
   variant?: "default" | "ghost"
 }
 
-// Mail Store State interface
+export interface NavProps {
+  isCollapsed: boolean
+  links: NavLink[]
+}
+
 export interface MailState {
   selected: string | null
   mail: GmailMessage[]
