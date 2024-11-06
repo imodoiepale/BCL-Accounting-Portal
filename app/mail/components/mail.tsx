@@ -1,4 +1,6 @@
 // @ts-nocheck
+/* eslint-disable react/no-unescaped-entities */
+
 "use client"
 
 import * as React from "react"
@@ -597,7 +599,6 @@ export function Mail({
             hasMore={hasMore}
             loading={loading}
             selectedAccount={selectedAccount}
-            searchQuery={searchQuery}
             activeTab={activeTab}
           />
         </ResizablePanel>
