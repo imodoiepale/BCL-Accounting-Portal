@@ -1,10 +1,7 @@
 // utils.ts
-// @ts-nocheck
 
 import { formFields } from './formfields';
-import { supabase } from '@/lib/supabaseClient';
-import * as XLSX from 'xlsx';
-import { toast } from "sonner";
+
 export interface CompanyData {
   company_name: string;
   [key: string]: any;
@@ -211,46 +208,4 @@ export const groupDataByCategory = (fields: any[]) => {
     acc[category].push(field);
     return acc;
   }, {});
-};
-
-export const handleFileImport = async (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-
-  try {
-      // ... File parsing code ...
-      // ... Data transformation code ...
-      // ... Database operations ...
-  } catch (error) {
-      console.error('Import error:', error);
-      toast.error('Failed to import data');
-  }
-};
-
-export const handleExport = (data) => {
-  // ... Export code ...
-};
-
-export const calculateFieldStats = (fieldName, data) => {
-  // ... Stats calculation code ...
-};
-
-export const groupFieldsByCategory = (fields) => {
-  // ... Category grouping code ...
-};
-
-export const generateReferenceNumbers = (sections) => {
-  // ... Reference number generation code ...
-};
-
-export const calculateTotalFields = (section) => {
-  // ... Total fields calculation ...
-};
-
-export const calculateCompletedFields = (section, data) => {
-  // ... Completed fields calculation ...
-};
-
-export const calculatePendingFields = (section, data) => {
-  // ... Pending fields calculation ...
 };
