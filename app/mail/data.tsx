@@ -41,7 +41,7 @@ export const mails = [
   },
   {
     id: "8f7b5db9-d935-4e42-8e05-1f1d0a3dfb97",
-    name: "Michael Wilson",
+    name: "Michael Wilsons",
     email: "michaelwilson@example.com",
     subject: "Important Announcement",
     text: "I have an important announcement to make during our team meeting. It pertains to a strategic shift in our approach to the upcoming product launch. We've received valuable feedback from our beta testers, and I believe it's time to make some adjustments to better meet our customers' needs.\n\nThis change is crucial to our success, and I look forward to discussing it with the team. Please be prepared to share your insights during the meeting.\n\nRegards, Michael",
