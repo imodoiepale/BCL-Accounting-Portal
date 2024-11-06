@@ -1,15 +1,16 @@
-
-
+// hooks/use-gmail.ts
 "use client"
 import { useState, useEffect, useCallback } from 'react'
 import { Account, GmailMessage } from '../types'
-
-declare const google: any
-declare const gapi: any
+import { supabase } from '@/lib/supabaseClient'
+import toast from 'react-hot-toast'
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY
 const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly'
+
+declare const google: any
+declare const gapi: any
 
 export function useGmail() {
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -37,22 +38,26 @@ export function useGmail() {
     setTokenClient(client)
   }, [])
 
-  useEffect(() => {
-    const loadGapiScript = document.createElement('script')
-    loadGapiScript.src = 'https://apis.google.com/js/api.js'
-    loadGapiScript.onload = initGapi
-    document.body.appendChild(loadGapiScript)
+  const saveAccountToDatabase = async (account: Account) => {
+    try {
+      const { error } = await supabase
+        .from('email_accounts')
+        .insert([{
+          email: account.email,
+          label: account.email.split('@')[0],
+          token: JSON.stringify(account.token),
+          user_id: (await supabase.auth.getUser()).data.user?.id
+        }])
 
-    const loadGsiScript = document.createElement('script')
-    loadGsiScript.src = 'https://accounts.google.com/gsi/client'
-    loadGsiScript.onload = initGsi
-    document.body.appendChild(loadGsiScript)
-
-    return () => {
-      document.body.removeChild(loadGapiScript)
-      document.body.removeChild(loadGsiScript)
+      if (error) throw error
+      
+      toast.success('Account saved successfully')
+    } catch (error) {
+      console.error('Error saving account:', error)
+      toast.error('Failed to save account')
+      throw error
     }
-  }, [initGsi])
+  }
 
   const handleTokenResponse = async (response: any) => {
     if (response.error) return
@@ -64,14 +69,50 @@ export function useGmail() {
       if (!accounts.find(acc => acc.email === email)) {
         const newAccount = {
           email,
+          label: email.split('@')[0],
           token: gapi.client.getToken()
         }
+
+        await saveAccountToDatabase(newAccount)
+
         setAccounts(prev => [...prev, newAccount])
         setSelectedAccount(email)
         await fetchMessages(email)
       }
     } catch (error) {
       console.error('Error getting user profile:', error)
+      toast.error('Failed to add account')
+    }
+  }
+
+  const loadAccountsFromDatabase = async () => {
+    setLoading(true)
+    try {
+      const { data: dbAccounts, error } = await supabase
+        .from('email_accounts')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      if (dbAccounts) {
+        const formattedAccounts = dbAccounts.map(acc => ({
+          email: acc.email,
+          token: JSON.parse(acc.token),
+          label: acc.label
+        }))
+
+        setAccounts(formattedAccounts)
+
+        if (!selectedAccount && formattedAccounts.length > 0) {
+          setSelectedAccount(formattedAccounts[0].email)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading accounts:', error)
+      toast.error('Failed to load accounts')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -110,6 +151,7 @@ export function useGmail() {
       }))
     } catch (error) {
       console.error('Error fetching messages:', error)
+      toast.error('Failed to fetch messages')
     }
     setLoading(false)
   }
@@ -120,23 +162,68 @@ export function useGmail() {
     }
   }
 
-  const removeAccount = () => {
-    const account = accounts.find(acc => acc.email === selectedAccount)
+  const removeAccount = async (email: string) => {
+    const account = accounts.find(acc => acc.email === email)
     if (account?.token) {
-      google.accounts.oauth2.revoke(account.token.access_token)
+      try {
+        google.accounts.oauth2.revoke(account.token.access_token)
+
+        const { error } = await supabase
+          .from('email_accounts')
+          .delete()
+          .eq('email', email)
+
+        if (error) throw error
+
+        setAccounts(prev => prev.filter(acc => acc.email !== email))
+        setSelectedAccount(accounts[0]?.email || 'all')
+        
+        toast.success('Account removed successfully')
+      } catch (error) {
+        console.error('Error removing account:', error)
+        toast.error('Failed to remove account')
+      }
     }
-    setAccounts(prev => prev.filter(acc => acc.email !== selectedAccount))
-    setSelectedAccount(accounts[0]?.email || 'all')
   }
 
   const refreshAllAccounts = async () => {
     setLoading(true)
-    for (const account of accounts) {
-      gapi.client.setToken(account.token)
-      await fetchMessages(account.email)
+    try {
+      await loadAccountsFromDatabase()
+      for (const account of accounts) {
+        gapi.client.setToken(account.token)
+        await fetchMessages(account.email)
+      }
+      toast.success('Accounts refreshed successfully')
+    } catch (error) {
+      console.error('Error refreshing accounts:', error)
+      toast.error('Failed to refresh accounts')
     }
     setLoading(false)
   }
+
+  useEffect(() => {
+    const loadScripts = async () => {
+      const loadGapiScript = document.createElement('script')
+      loadGapiScript.src = 'https://apis.google.com/js/api.js'
+      loadGapiScript.onload = initGapi
+
+      const loadGsiScript = document.createElement('script')
+      loadGsiScript.src = 'https://accounts.google.com/gsi/client'
+      loadGsiScript.onload = initGsi
+
+      document.body.appendChild(loadGapiScript)
+      document.body.appendChild(loadGsiScript)
+
+      return () => {
+        document.body.removeChild(loadGapiScript)
+        document.body.removeChild(loadGsiScript)
+      }
+    }
+
+    loadScripts()
+    loadAccountsFromDatabase()
+  }, [initGsi])
 
   const loadMore = async () => {
     if (loading || !hasMore || !selectedAccount) return
@@ -155,6 +242,7 @@ export function useGmail() {
     addAccount,
     removeAccount,
     refreshAllAccounts,
-    loadMore
+    loadMore,
+    loadAccountsFromDatabase
   }
 }
