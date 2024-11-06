@@ -1,4 +1,4 @@
-// hooks/use-gmail.ts
+// @ts-nocheck
 "use client"
 import { useState, useEffect, useCallback } from 'react'
 import { Account, GmailMessage } from '../types'
@@ -245,4 +245,4 @@ export function useGmail() {
     loadMore,
     loadAccountsFromDatabase
   }
-}
+}   

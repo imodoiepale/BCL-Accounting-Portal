@@ -131,7 +131,7 @@ const Email = ({ message, accountEmail, selected, onClick }) => {
               {accountEmail} {/* Display the email account here */}
             </Badge>
           </div>
-          <div className="flex items-center gap-2 text-gray-500 text-sm">
+          <div className="flex items-center gap-2 text-blue-500 text-sm">
             {hasAttachments && <Paperclip className="h-4 w-4" />}
             <div className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
