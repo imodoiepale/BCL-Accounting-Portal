@@ -36,27 +36,132 @@ import { useGmail } from "../hooks/use-gmail"
 import { useMail } from "../hooks/use-mail"
 import { MailProps } from "../types"
 import toast from "react-hot-toast"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+
+interface FilterCondition {
+  field: string
+  operator: string
+  value: string
+}
+
+interface CustomFilter {
+  id: string
+  name: string
+  conditions: FilterCondition[]
+  color?: string
+}
+
+const DEFAULT_FILTERS: CustomFilter[] = [
+  {
+    id: "primary",
+    name: "Primary",
+    conditions: [{ field: "labels", operator: "includes", value: "work" }],
+    color: "blue",
+  },
+  {
+    id: "social",
+    name: "Social",
+    conditions: [{ field: "labels", operator: "includes", value: "personal" }],
+    color: "green",
+  },
+  {
+    id: "promotions",
+    name: "Promotions",
+    conditions: [{ field: "labels", operator: "includes", value: "promotions" }],
+    color: "yellow",
+  },
+]
 
 interface MailHeaderProps {
   onSearch: (query: string) => void;
   activeTab: string;
   onTabChange: (tab: string) => void;
   loading: boolean;
+  filters: CustomFilter[];
+  onCreateFilter: (filter: CustomFilter) => void;
+  onEditFilter: (filter: CustomFilter) => void;
+  onDeleteFilter: (filterId: string) => void;
 }
 
 const MailHeader: React.FC<MailHeaderProps> = ({
   onSearch,
   activeTab,
   onTabChange,
-  loading
+  loading,
+  filters,
+  onCreateFilter,
+  onEditFilter,
+  onDeleteFilter,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [viewMode, setViewMode] = React.useState<'all' | 'unread'>('all')
+  const [isCreateFilterOpen, setIsCreateFilterOpen] = React.useState(false)
+  const [editingFilter, setEditingFilter] = React.useState<CustomFilter | null>(null)
+  const [newFilter, setNewFilter] = React.useState<CustomFilter>({
+    id: "",
+    name: "",
+    conditions: [{ field: "subject", operator: "contains", value: "" }],
+  })
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value
     setSearchQuery(query)
     onSearch(query)
+  }
+
+  const addCondition = () => {
+    setNewFilter({
+      ...newFilter,
+      conditions: [
+        ...newFilter.conditions,
+        { field: "subject", operator: "contains", value: "" },
+      ],
+    })
+  }
+
+  const removeCondition = (index: number) => {
+    setNewFilter({
+      ...newFilter,
+      conditions: newFilter.conditions.filter((_, i) => i !== index),
+    })
+  }
+
+  const updateCondition = (index: number, field: string, value: string) => {
+    const updatedConditions = [...newFilter.conditions]
+    updatedConditions[index] = { ...updatedConditions[index], [field]: value }
+    setNewFilter({ ...newFilter, conditions: updatedConditions })
+  }
+
+  const createFilter = () => {
+    if (newFilter.name.trim() === "") return
+
+    const filterId = newFilter.name.toLowerCase().replace(/\s+/g, "-")
+    const newCustomFilter = {
+      ...newFilter,
+      id: filterId,
+    }
+
+    if (editingFilter) {
+      onEditFilter(newCustomFilter)
+    } else {
+      onCreateFilter(newCustomFilter)
+    }
+
+    setIsCreateFilterOpen(false)
+    setNewFilter({
+      id: "",
+      name: "",
+      conditions: [{ field: "subject", operator: "contains", value: "" }],
+    })
+    setEditingFilter(null)
   }
 
   return (
@@ -69,11 +174,11 @@ const MailHeader: React.FC<MailHeaderProps> = ({
             variant="secondary"
             className={cn(
               "transition-colors",
-              viewMode === 'all' 
+              activeTab === 'all' 
                 ? "bg-blue-500 text-white hover:bg-blue-600" 
                 : "bg-gray-100 hover:bg-gray-200"
             )}
-            onClick={() => setViewMode('all')}
+            onClick={() => onTabChange('all')}
             disabled={loading}
           >
             All mail
@@ -81,9 +186,9 @@ const MailHeader: React.FC<MailHeaderProps> = ({
           <Button
             variant="ghost"
             className={cn(
-              viewMode === 'unread' && "bg-gray-100"
+              activeTab === 'unread' && "bg-gray-100"
             )}
-            onClick={() => setViewMode('unread')}
+            onClick={() => onTabChange('unread')}
             disabled={loading}
           >
             Unread
@@ -138,22 +243,132 @@ const MailHeader: React.FC<MailHeaderProps> = ({
           </TabsList>
         </Tabs>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="icon"
-            disabled={loading}
-            onClick={() => toast.success('Feature coming soon!')}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            disabled={loading}
-            onClick={() => toast.success('Settings coming soon!')}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+          <Dialog open={isCreateFilterOpen} onOpenChange={setIsCreateFilterOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                disabled={loading}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[525px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingFilter ? "Edit Filter" : "Create Filter"}
+                </DialogTitle>
+                <DialogDescription>
+                  Create a new filter to organize your emails. Add one or more conditions.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Input
+                    placeholder="Filter name"
+                    value={newFilter.name}
+                    onChange={(e) => setNewFilter({ ...newFilter, name: e.target.value })}
+                  />
+                </div>
+                {newFilter.conditions.map((condition, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      placeholder="Field"
+                      value={condition.field}
+                      onChange={(e) => updateCondition(index, "field", e.target.value)}
+                      className="flex-1"
+                    />
+                    <Input
+                      placeholder="Operator"
+                      value={condition.operator}
+                      onChange={(e) => updateCondition(index, "operator", e.target.value)}
+                      className="flex-1"
+                    />
+                    <Input
+                      placeholder="Value"
+                      value={condition.value}
+                      onChange={(e) => updateCondition(index, "value", e.target.value)}
+                      className="flex-1"
+                    />
+                    {newFilter.conditions.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeCondition(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  className="mt-2"
+                  onClick={addCondition}
+                >
+                  Add condition
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateFilterOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={createFilter}>Create filter</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                disabled={loading}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[900px]">
+              <DialogHeader>
+                <DialogTitle>Manage Filters</DialogTitle>
+                <DialogDescription>
+                  View, edit, and manage your custom email filters.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-4">
+                {filters.map((filter) => (
+                  <div key={filter.id} className="flex justify-between items-center p-2 border-b">
+                    <div>
+                      <span className="font-medium">{filter.name}</span>
+                      <div className="flex flex-col">
+                        {filter.conditions.map((condition, idx) => (
+                          <Badge key={idx} variant="outline" className="w-fit">
+                            {condition.field} {condition.operator} "{condition.value}"
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={() => {
+                        setEditingFilter(filter)
+                        setNewFilter(filter)
+                        setIsCreateFilterOpen(true)
+                      }}>
+                        Edit
+                      </Button>
+                      <Button onClick={() => onDeleteFilter(filter.id)} className="text-red-600">
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => toast.success('Filters managed!')}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>
@@ -181,6 +396,8 @@ export function Mail({
     refreshAllAccounts,
     loadMore
   } = useGmail()
+
+  const [customFilters, setCustomFilters] = React.useState<CustomFilter[]>(DEFAULT_FILTERS)
 
   // Load layout from cookie
   React.useEffect(() => {
@@ -213,6 +430,20 @@ export function Mail({
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     // Implement tab change functionality here
+  }
+
+  const createFilter = (filter: CustomFilter) => {
+    setCustomFilters((prev) => [...prev, filter])
+  }
+
+  const editFilter = (updatedFilter: CustomFilter) => {
+    setCustomFilters((prev) =>
+      prev.map((filter) => (filter.id === updatedFilter.id ? updatedFilter : filter))
+    )
+  }
+
+  const deleteFilter = (filterId: string) => {
+    setCustomFilters((prev) => prev.filter((filter) => filter.id !== filterId))
   }
 
   // Filter messages based on search and active tab
@@ -355,6 +586,10 @@ export function Mail({
             activeTab={activeTab}
             onTabChange={handleTabChange}
             loading={loading}
+            filters={customFilters}
+            onCreateFilter={createFilter}
+            onEditFilter={editFilter}
+            onDeleteFilter={deleteFilter}
           />
           <MailList
             accounts={accounts}
