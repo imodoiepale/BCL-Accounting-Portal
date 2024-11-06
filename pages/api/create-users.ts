@@ -42,19 +42,42 @@ export default async function handler(
       }
     });
 
+    console.log('Attempting to insert user into acc_portal_clerk_users_duplicate...');
     // Insert user into database
-    const { error } = await supabase
-      .from('acc_portal_clerk_users')
-      .upsert({
-        username: username,
-        userid: user.id,
-        metadata: { companyName: name },
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'userid'
-      });
+    const { error: userError } = await supabase
+    .from('acc_portal_clerk_users_duplicate')
+    .upsert({
+      username: username,
+      userid: user.id,
+      metadata: { companyName: name },
+      company_name: name,
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: 'userid'
+    });
 
-    if (error) throw error;
+    if (userError) {
+      console.error('Error inserting user:', userError);
+      throw userError;
+    }
+    console.log('Successfully inserted user into acc_portal_clerk_users_duplicate');
+
+    console.log('Attempting to insert company into acc_portal_company_duplicate...');
+    // Insert company into database
+    const { error: companyError } = await supabase
+  .from('acc_portal_company_duplicate')
+  .upsert({
+    company_name: name,
+    userid: user.id,  // Add this line to link the tables
+    status: 'active'
+  }, {
+    onConflict: 'userid'
+  });
+    if (companyError) {
+      console.error('Error inserting company:', companyError);
+      throw companyError;
+    }
+    console.log('Successfully inserted company into acc_portal_company_duplicate');
 
     return res.status(200).json({
       success: true,

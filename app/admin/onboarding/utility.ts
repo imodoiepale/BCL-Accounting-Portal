@@ -594,67 +594,35 @@ export const submitNSSFData = (userId: string, name: string, data: any) =>
         nssf_code: data.nssf_code,
         userid: userId
     });
-
-export const handleTemplateDownload = (currentStage: number, complianceStatus: any[], stages: any[], getFormFields: () => { fields: any[] }) => {
-    const status = complianceStatus.find(s => s.name === stages[currentStage - 1].name)?.status;
-
-    if (currentStage === 1) {
-        // For Company Information, always include general fields
-        const currentFields = getFormFields().fields;
-        const generalFields = currentFields.filter(field => !field.category);
-
-        // Get fields from categories that have 'has_details' status
-        const categoryFields = currentFields.filter(field => {
-            if (!field.category) return false;
-            const categoryName = field.category.replace(' Details', '');
-            return complianceStatus.find(s =>
-                s.name === categoryName &&
-                s.status === 'has_details'
-            );
-        });
-
-        const templateHeaders = [...generalFields, ...categoryFields].map(field => field.label);
-        const ws = XLSX.utils.aoa_to_sheet([templateHeaders]);
+    
+    export const handleTemplateDownload = (currentStage: number, complianceStatus: any[], stages: any[], getFormFields: () => { fields: any[] }) => {
+        const status = complianceStatus.find(s => s.name === stages[currentStage - 1].name)?.status;
+        const { fields } = getFormFields();
+    
+        if (currentStage === 1) {
+            // Company Information template
+            const headers = [['Fields', 'Details']];
+            const rows = fields.map(field => [field.label, '']);
+            const ws = XLSX.utils.aoa_to_sheet(headers.concat(rows));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Template");
+            XLSX.writeFile(wb, "Company_Information_Template.xlsx");
+            return;
+        }
+    
+        if (status !== 'has_details') {
+            toast.error('Template is only available for items with details');
+            return;
+        }
+    
+        // For other stages (Directors, Suppliers, Banks, Employees)
+        const count = complianceStatus.find(s => s.name === stages[currentStage - 1].name)?.count || 1;
+        const headers = [['Fields', ...Array(count).fill(0).map((_, i) => `${stages[currentStage - 1].name} ${i + 1}`)]];
+        const rows = fields.map(field => [field.label, ...Array(count).fill('')]);
+        
+        const ws = XLSX.utils.aoa_to_sheet(headers.concat(rows));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Template");
-        XLSX.writeFile(wb, "Company_Information_Template.xlsx");
-        return;
-    }
-
-    // For other stages, keep existing logic
-    if (status !== 'has_details') {
-        toast.error('Template is only available for items with details');
-        return;
-    }
-
-    // Rest of the existing template download logic
-    const currentFields = getFormFields().fields;
-    const templateHeaders = currentFields.map(field => {
-        switch (currentStage) {
-            case 2:
-                return field.name === 'director_start_date' ? 'Director Start Date' :
-                    field.name === 'director_end_date' ? 'Director End Date' :
-                        field.name === 'director_valid' ? 'Director Valid' :
-                            field.label;
-            case 4:
-                return field.name === 'bank_start_date' ? 'Bank Start Date' :
-                    field.name === 'bank_end_date' ? 'Bank End Date' :
-                        field.name === 'bank_valid' ? 'Bank Valid' :
-                            field.label;
-            case 5:
-                return field.name === 'employee_start_date' ? 'Employee Start Date' :
-                    field.name === 'employee_end_date' ? 'Employee End Date' :
-                        field.name === 'employee_valid' ? 'Employee Valid' :
-                            field.label;
-            default:
-                return field.label;
-        }
-    });
-
-
-    const ws = XLSX.utils.aoa_to_sheet([templateHeaders]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    const fileName = `${stages[currentStage - 1].name.replace(/\s+/g, '_')}_Template.xlsx`;
-    XLSX.writeFile(wb, fileName);
-};
+        XLSX.writeFile(wb, `${stages[currentStage - 1].name.replace(/\s+/g, '_')}_Template.xlsx`);
+    };
+    
