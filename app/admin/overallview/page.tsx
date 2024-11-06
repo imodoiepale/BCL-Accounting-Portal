@@ -128,48 +128,91 @@ const sectionColors = {
     );
 
     useEffect(() => {
-        const fetchAllData = async () => {
-            try {
-                const [
-                    { data: companies },
-                    { data: users },
-                    { data: directors }
-                ] = await Promise.all([
-                    supabase.from('acc_portal_company_duplicate').select('*'),
-                    supabase.from('acc_portal_clerk_users_duplicate').select('*'),
-                    supabase.from('acc_portal_directors_duplicate').select('*'),
-                ]);
-
-                // Group and combine the data
-                const groupedData = companies.map(company => {
-                    const user = users.find(u => u.userid === company.userid);
-                    const companyDirectors = directors.filter(d => d.userid === company.userid);
-
-                    return {
-                        company: {
-                            ...company,
-                            ...user?.metadata,
-                        },
-                        directors: companyDirectors,
-                        rows: [{
-                            ...company,
-                            ...user?.metadata,
-                            isFirstRow: true
-                        }],
-                        rowSpan: 1
-                    };
-                });
-
-                setData(groupedData);
-            } catch (error) {
-                console.error('Error fetching data:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchAllData();
     }, []);
+
+    const fetchAllData = async () => {
+        try {
+            // Fetch data from all company-related tables concurrently
+            const [
+                { data: companies, error: companiesError },
+                { data: users, error: usersError },
+                { data: directors, error: directorsError },
+                { data: nssfData, error: nssfError },
+                { data: nhifData, error: nhifError },
+                { data: passwordCheckers, error: passwordCheckersError },
+                { data: ecitizenData, error: ecitizenError },
+                { data: accPortalDirectors, error: accPortalDirectorsError }
+            ] = await Promise.all([
+                supabase.from('acc_portal_company_duplicate').select('*').order('id', { ascending: true }),
+                supabase.from('acc_portal_clerk_users_duplicate').select('*'),
+                supabase.from('acc_portal_directors_duplicate').select('*'),
+                supabase.from('nssf_companies_duplicate').select('*'),
+                supabase.from('nhif_companies_duplicate2').select('*'),
+                supabase.from('PasswordChecker_duplicate').select('*'),
+                supabase.from('ecitizen_companies_duplicate').select('*'),
+                supabase.from('acc_portal_directors_duplicate').select('*')
+            ]);
+    
+            // Handle any errors that occurred during the fetch
+            if (companiesError || usersError || directorsError || nssfError || nhifError || passwordCheckersError || ecitizenError || accPortalDirectorsError) {
+                console.error('Error fetching data from one or more tables:', {
+                    companiesError,
+                    usersError,
+                    directorsError,
+                    nssfError,
+                    nhifError,
+                    passwordCheckersError,
+                    ecitizenError,
+                    accPortalDirectorsError
+                });
+                toast.error('Failed to fetch data from one or more tables');
+                return;
+            }
+    
+            // Group and combine the data
+            const groupedData = companies.map(company => {
+                const user = users.find(u => u.userid === company.userid);
+                const companyDirectors = directors.filter(d => d.company_name === company.company_name);
+                const nssfInfo = nssfData.find(n => n.company_name === company.company_name);
+                const nhifInfo = nhifData.find(n => n.company_name === company.company_name);
+                const passwordCheckerInfo = passwordCheckers.find(p => p.company_name === company.company_name);
+                const ecitizenInfo = ecitizenData.find(e => e.name === company.company_name);
+                const accPortalDirectorInfo = accPortalDirectors.filter(d => d.company_id === company.id); // Assuming company_id links to directors
+    
+                return {
+                    company: {
+                        ...company,
+                        ...user?.metadata,
+                        ...nssfInfo,
+                        nhif_details: nhifInfo,
+                        password_checker: passwordCheckerInfo,
+                        ecitizen_details: ecitizenInfo
+                    },
+                    directors: accPortalDirectorInfo,
+                    rows: [{
+                        ...company,
+                        ...user?.metadata,
+                        ...nssfInfo,
+                        ...nhifInfo,
+                        ...passwordCheckerInfo,
+                        ...ecitizenInfo,
+                        isFirstRow: true
+                    }],
+                    rowSpan: 1
+                };
+            });
+    
+            setData(groupedData);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            toast.error('An error occurred while fetching data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
 
     if (loading) {
         return <div>Loading...</div>;
@@ -321,34 +364,24 @@ const sectionColors = {
     const handleExport = () => {
         const exportRows = [];
         
-        // Add headers
-        const headers = ['Section', 'Category', 'Field', 'Value', 'Value 2', 'Value 3'];
-        exportRows.push(headers);
-    
-        // Define colors for different sections
-        const sectionColors = {
-            'Basic Information': 'FFE6E6',  // Light Red
-            'Financial Details': 'E6FFE6',  // Light Green
-            'Contact Information': 'E6E6FF', // Light Blue
-            'Operations': 'FFFFE6',         // Light Yellow
-            'Compliance': 'FFE6FF',         // Light Purple
-            'Other': 'E6FFFF'              // Light Cyan
-        };
-    
         // Process data in the desired structure, skipping redundant section/category labels
-        sectionsWithSeparators.forEach(section => {
+        processedSections.forEach(section => {
             if (!section.isSeparator) {
                 let isFirstField = true;
-    
-                section.fields.forEach(field => {
-                    const row = [
-                        isFirstField ? section.label : '',         // Section only for the first field
-                        isFirstField ? (field.category || 'General') : '',  // Category only for the first field
-                        field.label,
-                        ...data.map(item => item.company[field.name] || '')
-                    ];
-                    exportRows.push(row);
-                    isFirstField = false; // Set to false after the first field in each section
+                
+                section.categorizedFields?.forEach(category => {
+                    if (!category.isSeparator) {
+                        category.fields.forEach(field => {
+                            const row = [
+                                isFirstField ? section.label : '',         // Section only for the first field
+                                isFirstField ? category.category : '',  // Category only for the first field
+                                field.label,
+                                ...data.map(item => item.company[field.name] || '')
+                            ];
+                            exportRows.push(row);
+                            isFirstField = false; // Set to false after the first field in each section
+                        });
+                    }
                 });
             }
         });
@@ -368,43 +401,45 @@ const sectionColors = {
     
         // Initialize styles for all cells and set background colors
         for (let rowIndex = 0; rowIndex < exportRows.length; rowIndex++) {
-            for (let colIndex = 0; colIndex < headers.length; colIndex++) {
+            for (let colIndex = 0; colIndex < 6; colIndex++) {
                 const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
                 ws[cellAddress] = ws[cellAddress] || { v: '', t: 's' };
                 ws[cellAddress].s = {};
             }
         }
     
-        // Style header row with gray background and bold text
-        headers.forEach((_, colIndex) => {
-            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: colIndex });
-            ws[cellAddress].s = {
-                font: { bold: true },
-                fill: {
-                    fgColor: { rgb: 'C0C0C0' },
-                    patternType: 'solid'
-                }
-            };
-        });
+        // Define colors for different sections
+        const sectionColors = {
+            'Basic Information': 'FFE6E6',  // Light Red
+            'Financial Details': 'E6FFE6',  // Light Green
+            'Contact Information': 'E6E6FF', // Light Blue
+            'Operations': 'FFFFE6',         // Light Yellow
+            'Compliance': 'FFE6FF',         // Light Purple
+            'Other': 'E6FFFF'              // Light Cyan
+        };
     
         // Apply colors to data rows based on section
-        let currentRowIndex = 1; // Start after header row
-        sectionsWithSeparators.forEach(section => {
+        let currentRowIndex = 0;
+        processedSections.forEach(section => {
             if (!section.isSeparator) {
                 const fillColor = sectionColors[section.label] || 'FFFFFF';
-    
-                section.fields.forEach(() => {
-                    // Apply fill color to each cell in the row
-                    for (let colIndex = 0; colIndex < headers.length; colIndex++) {
-                        const cellAddress = XLSX.utils.encode_cell({ r: currentRowIndex, c: colIndex });
-                        ws[cellAddress].s = {
-                            fill: {
-                                fgColor: { rgb: fillColor },
-                                patternType: 'solid'
+                
+                section.categorizedFields?.forEach(category => {
+                    if (!category.isSeparator) {
+                        category.fields.forEach(() => {
+                            // Apply fill color to each cell in the row
+                            for (let colIndex = 0; colIndex < 6; colIndex++) {
+                                const cellAddress = XLSX.utils.encode_cell({ r: currentRowIndex, c: colIndex });
+                                ws[cellAddress].s = {
+                                    fill: {
+                                        fgColor: { rgb: fillColor },
+                                        patternType: 'solid'
+                                    }
+                                };
                             }
-                        };
+                            currentRowIndex++;
+                        });
                     }
-                    currentRowIndex++;
                 });
             }
         });
@@ -413,223 +448,375 @@ const sectionColors = {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Companies");
         XLSX.writeFile(wb, "Companies_Report.xlsx");
-    };
-    const handleFileImport = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    };    
     
-        try {
-            let parsedData;
-            if (file.name.endsWith('.csv')) {
-                const text = await file.text();
-                parsedData = Papa.parse(text, { header: true }).data;
-            } else {
-                const buffer = await file.arrayBuffer();
-                const wb = XLSX.read(buffer);
-                const ws = wb.Sheets[wb.SheetNames[0]];
-                parsedData = XLSX.utils.sheet_to_json(ws);
-            }
-    
-            console.log('Raw Parsed Data:', parsedData);
-    
-            // Get existing data from database for comparison
-            const { data: existingData, error: fetchError } = await supabase
-                .from('acc_portal_company_duplicate')
-                .select('*');
-    
-            if (fetchError) {
-                console.error('Error fetching existing data:', fetchError);
-                throw fetchError;
-            }
-    
-            // Transform Excel/CSV data format to match database schema
-            const transformedData = [];
-            const companiesMap = new Map(); // To store companies by index
-            
-            // First, identify all value columns
-            const valueColumns = Object.keys(parsedData[0]).filter(key => key.startsWith('Value'));
-            console.log('Value columns found:', valueColumns);
-    
-            parsedData.forEach(row => {
-                if (row.Section === 'Company Details') {
-                    // For each value column, create a new company object
-                    valueColumns.forEach((valueCol, index) => {
-                        if (!companiesMap.has(index)) {
-                            companiesMap.set(index, {
-                                company_name: null,
-                                company_type: null,
-                                description: null,
-                                registration_number: null,
-                                date_established: null,
-                                kra_pin_number: null,
-                                industry: null,
-                                employees: null,
-                                annual_revenue: null,
-                                fiscal_year: null,
-                                website: null,
-                                email: null,
-                                phone: null,
-                                street: null,
-                                city: null,
-                                postal_code: null,
-                                country: null,
-                                status: ''
-                            });
-                        }
-                    });
-                }
-    
-                // Update each company's data if it exists
-                valueColumns.forEach((valueCol, index) => {
-                    const company = companiesMap.get(index);
-                    if (company) {
-                        const value = row[valueCol];
-                        if (value) { // Only update if value exists
-                            switch (row.Field) {
-                                case 'Company Name':
-                                    company.company_name = value;
-                                    break;
-                                case 'Company Type':
-                                    company.company_type = value;
-                                    break;
-                                case 'Description':
-                                    company.description = value;
-                                    break;
-                                case 'Registration Number':
-                                    company.registration_number = value;
-                                    break;
-                                case 'Date Established':
-                                    company.date_established = value;
-                                    break;
-                                case 'Industry':
-                                    company.industry = value;
-                                    break;
-                                case 'Employees':
-                                    company.employees = value;
-                                    break;
-                                case 'Annual Revenue':
-                                    company.annual_revenue = value;
-                                    break;
-                                case 'Fiscal Year':
-                                    company.fiscal_year = value;
-                                    break;
-                                case 'Website':
-                                    company.website = value;
-                                    break;
-                                case 'Email':
-                                    company.email = value;
-                                    break;
-                                case 'Phone':
-                                    company.phone = value;
-                                    break;
-                                case 'Street':
-                                    company.street = value;
-                                    break;
-                                case 'City':
-                                    company.city = value;
-                                    break;
-                                case 'Postal Code':
-                                    company.postal_code = value;
-                                    break;
-                                case 'Country':
-                                    company.country = value;
-                                    break;
-                                case 'Status':
-                                    company.status = value;
-                                    break;
-                                case 'KRA PIN':
-                                    company.kra_pin_number = value;
-                                    break;
-                            }
-                        }
-                    }
-                });
-            });
-    
-            // Convert map to array, filtering out empty companies
-            const transformedCompanies = Array.from(companiesMap.values()).filter(company => 
-                company.company_name || company.registration_number
-            );
-    
-            console.log('Transformed Companies:', transformedCompanies);
-    
-            // Filter out companies with no changes
-            const updates = transformedCompanies.filter(newCompany => {
-                const existingCompany = existingData.find(existing => 
-                    existing.registration_number === newCompany.registration_number ||
-                    existing.company_name === newCompany.company_name
-                );
-    
-                if (!existingCompany) return true;
-    
-                return Object.keys(newCompany).some(key => 
-                    newCompany[key] !== null && 
-                    newCompany[key] !== '' && 
-                    newCompany[key] !== existingCompany[key]
-                );
-            });
-    
-            console.log('Updates to be applied:', updates);
-    
-            if (updates.length === 0) {
-                toast.info('No changes detected');
-                return;
-            }
-    
-   // In the handleFileImport function, replace the batch update code with this:
-const batchSize = 100;
-for (let i = 0; i < updates.length; i += batchSize) {
-    const batch = updates.slice(i, i + batchSize);
-    
-    // For each company in the batch
-    for (const company of batch) {
-        // Try to find existing company first
-        const { data: existing, error: findError } = await supabase
-            .from('acc_portal_company_duplicate')
-            .select('id')
-            .eq('company_name', company.company_name)
-            .single();
+  const handleFileImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-        if (findError && findError.code !== 'PGRST116') { // PGRST116 means no rows found
-            console.error('Error finding company:', findError);
-            continue;
-        }
-
-        if (existing) {
-            // Update existing company
-            const { error: updateError } = await supabase
-                .from('acc_portal_company_duplicate')
-                .update(company)
-                .eq('id', existing.id);
-
-            if (updateError) {
-                console.error('Error updating company:', updateError);
-            }
+    try {
+        let parsedData;
+        if (file.name.endsWith('.csv')) {
+            const text = await file.text();
+            parsedData = Papa.parse(text, { header: true }).data;
         } else {
-            // Insert new company
-            const { error: insertError } = await supabase
-                .from('acc_portal_company_duplicate')
-                .insert([company]);
+            const buffer = await file.arrayBuffer();
+            const wb = XLSX.read(buffer);
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            parsedData = XLSX.utils.sheet_to_json(ws);
+        }
 
-            if (insertError) {
-                console.error('Error inserting company:', insertError);
+        console.log('Raw Parsed Data:', parsedData);
+        const valueColumns = Object.keys(parsedData[0]).filter(key => 
+            key !== '#' && 
+            key !== 'General' && 
+            key !== '#_1' && 
+            !key.includes('Section') && 
+            !key.includes('Category')
+        );
+
+        console.log('Detected value columns:', valueColumns);
+        const companiesMap = new Map();
+
+        valueColumns.forEach((colName) => {
+            companiesMap.set(colName, {
+                mainCompany: {
+                    company_name: null,
+                    company_type: null,
+                    description: null,
+                    registration_number: null,
+                    date_established: null,
+                    kra_pin: null,
+                    industry: null,
+                    employees: null,
+                    annual_revenue: null,
+                    fiscal_year: null,
+                    website: null,
+                    email: null,
+                    phone: null,
+                    street: null,
+                    city: null,
+                    postal_code: null,
+                    country: null,
+                    status: ''
+                },
+                nssfDetails: {
+                    company_name: null,
+                    identifier: null,
+                    nssf_password: null,
+                    nssf_status: 'Pending',
+                    nssf_code: null,
+                    nssf_compliance_certificate_date: null,
+                    nssf_registration_date: null,
+                    status: null
+                },
+                nhifDetails: {
+                    company_name: null,
+                    identifier: null,
+                    nhif_password: null,
+                    nhif_status: 'Pending',
+                    nhif_code: null,
+                    director: null,
+                    nhif_mobile: null,
+                    nhif_email: null,
+                    email_password: null
+                },
+                passwordDetails: {
+                    company_name: null,
+                    kra_pin: null,
+                    kra_password: null,
+                    pin_status: null,
+                    status: null
+                },
+                ecitizenDetails: {
+                    name: null,
+                    ecitizen_identifier: null,
+                    ecitizen_password: null,
+                    ecitizen_status: 'Pending',
+                    director: null
+                },
+                accPortalDirectors: {
+                    company_id: null,
+                    first_name: null,
+                    middle_name: null,
+                    last_name: null,
+                    other_names: null,
+                    full_name: null,
+                    gender: null,
+                    place_of_birth: null,
+                    country_of_birth: null,
+                    nationality: null,
+                    marital_status: null,
+                    date_of_birth: null,
+                    passport_number: null,
+                    passport_place_of_issue: null,
+                    passport_issue_date: null,
+                    passport_expiry_date: null,
+                    passport_file_number: null,
+                    id_number: null,
+                    alien_number: null,
+                    tax_pin: null,
+                    eye_color: null,
+                    hair_color: null,
+                    height: null,
+                    special_marks: null,
+                    mobile_number: null,
+                    email_address: null,
+                    alternative_email: null,
+                    building_name: null,
+                    floor_number: null,
+                    block_number: null,
+                    road_name: null,
+                    area_name: null,
+                    town: null,
+                    country: null,
+                    full_residential_address: null,
+                    residential_county: null,
+                    sub_county: null,
+                    postal_address: null,
+                    postal_code: null,
+                    postal_town: null,
+                    full_postal_address: null,
+                    university_name: null,
+                    course_name: null,
+                    course_start_date: null,
+                    course_end_date: null,
+                    job_position: null,
+                    job_description: null,
+                    shares_held: null,
+                    other_directorships: null,
+                    dependents: null,
+                    annual_income: null,
+                    languages_spoken: null,
+                    occupation: null,
+                    education_level: null,
+                    criminal_record: null,
+                    bankruptcy_history: null,
+                    professional_memberships: null,
+                    userid: null,
+                    status: 'missing'
+                },
+                nhifCompanies: {
+                    company_name: null,
+                    identifier: null,
+                    nhif_password: null,
+                    nhif_status: 'Pending',
+                    nhif_code: null,
+                    director: null,
+                    nhif_mobile: null,
+                    nhif_email: null,
+                    email_password: null
+                },
+                nssfCompanies: {
+                    company_name: null,
+                    identifier: null,
+                    nssf_password: null,
+                    nssf_status: 'Pending',
+                    nssf_code: null,
+                    nssf_compliance_certificate_date: null,
+                    nssf_registration_date: null,
+                    status: null
+                }
+            });
+        });
+
+        parsedData.forEach(row => {
+            const fieldName = row["#_1"];
+            if (!fieldName) return;
+
+            valueColumns.forEach(colName => {
+                const companyData = companiesMap.get(colName);
+                const value = row[colName];
+
+                if (companyData && value) {
+                    // Main Company Details
+                    switch (fieldName) {
+                        case "Company Name":
+                            companyData.mainCompany.company_name = value;
+                            companyData.nssfDetails.company_name = value;
+                            companyData.nhifDetails.company_name = value;
+                            companyData.passwordDetails.company_name = value;
+                            companyData.ecitizenDetails.name = value;
+                            companyData.nhifCompanies.company_name = value;
+                            companyData.nssfCompanies.company_name = value;
+                            break;
+                        case "Company Type":
+                            companyData.mainCompany.company_type = value;
+                            break;
+                        case "Description":
+                            companyData.mainCompany.description = value;
+                            break;
+                        case "Registration Number":
+                            companyData.mainCompany.registration_number = value;
+                            break;
+                        case "Date Established":
+                            companyData.mainCompany.date_established = value;
+                            break;
+                        case "Industry":
+                            companyData.mainCompany.industry = value;
+                            break;
+                        case "Employees":
+                            companyData.mainCompany.employees = value;
+                            break;
+                        case "Annual Revenue":
+                            companyData.mainCompany.annual_revenue = value;
+                            break;
+                        case "Fiscal Year":
+                            companyData.mainCompany.fiscal_year = value;
+                            break;
+                        case "Website":
+                            companyData.mainCompany.website = value;
+                            break;
+                        case "Email":
+                            companyData.mainCompany.email = value;
+                            break;
+                        case "Phone":
+                            companyData.mainCompany.phone = value;
+                            break;
+                        case "Street":
+                            companyData.mainCompany.street = value;
+                            break;
+                        case "City":
+                            companyData.mainCompany.city = value;
+                            break;
+                        case "Postal Code":
+                            companyData.mainCompany.postal_code = value;
+                            break;
+                        case "Country":
+                            companyData.mainCompany.country = value;
+                            break;
+
+                        // NSSF Details
+                        case "NSSF Code":
+                            companyData.nssfDetails.nssf_code = value;
+                            break;
+                        case "NSSF Password":
+                            companyData.nssfDetails.nssf_password = value;
+                            break;
+                        case "NSSF Status":
+                            companyData.nssfDetails.nssf_status = value;
+                            break;
+                        case "NSSF Registration Date":
+                            companyData.nssfDetails.nssf_registration_date = value;
+                            break;
+                        case "NSSF Compliance Certificate Date":
+                            companyData.nssfDetails.nssf_compliance_certificate_date = value;
+                            break;
+
+                        // NHIF Details
+                        case "NHIF Code":
+                            companyData.nhifDetails.nhif_code = value;
+                            companyData.nhifDetails.identifier = value;
+                            break;
+                        case "NHIF Password":
+                            companyData.nhifDetails.nhif_password = value;
+                            break;
+                        case "NHIF Mobile":
+                            companyData.nhifDetails.nhif_mobile = value;
+                            break;
+                        case "NHIF Email":
+                            companyData.nhifDetails.nhif_email = value;
+                            break;
+                        case "NHIF Email Password":
+                            companyData.nhifDetails.email_password = value;
+                            break;
+                        case "Director":
+                            companyData.nhifDetails.director = value;
+                            break;
+
+                        // Password Checker Details
+                        case "KRA PIN":
+                            companyData.passwordDetails.kra_pin = value;
+                            break;
+                        case "KRA Password":
+                            companyData.passwordDetails.kra_password = value;
+                            break;
+                        case "PIN Status":
+                            companyData.passwordDetails.pin_status = value;
+                            break;
+
+                        // ECitizen Details
+                        case "ECitizen Identifier":
+                            companyData.ecitizenDetails.ecitizen_identifier = value;
+                            break;
+                        case "ECitizen Password":
+                            companyData.ecitizenDetails.ecitizen_password = value;
+                            break;
+                        case "ECitizen Status":
+                            companyData.ecitizenDetails.ecitizen_status = value;
+                            break;
+
+                        // Acc Portal Directors
+                        case "First Name":
+                            companyData.accPortalDirectors.first_name = value;
+                            break;
+                        case "Last Name":
+                            companyData.accPortalDirectors.last_name = value;
+                            break;
+                        case "Middle Name":
+                            companyData.accPortalDirectors.middle_name = value;
+                            break;
+                        case "Other Names":
+                            companyData.accPortalDirectors.other_names = value;
+                            break;
+                        case "Gender":
+                            companyData.accPortalDirectors.gender = value;
+                            break;
+                        case "Date of Birth":
+                            companyData.accPortalDirectors.date_of_birth = value;
+                            break;
+                        case "ID Number":
+                            companyData.accPortalDirectors.id_number = value;
+                            break;
+                    }
+                }
+            });
+        });
+
+        const transformedData = Array.from(companiesMap.values())
+            .filter(data => data.mainCompany.company_name);
+
+        console.log('Transformed Data:', transformedData);
+
+        for (const data of transformedData) {
+            const { data: mainCompanyData, error: mainCompanyError } = await supabase
+                .from('acc_portal_company_duplicate')
+                .insert([data.mainCompany]);
+
+            const { data: nssfData, error: nssfError } = await supabase
+                .from('nssf_companies_duplicate')
+                .insert([data.nssfDetails]);
+
+            const { data: nhifData, error: nhifError } = await supabase
+                .from('nhif_companies_duplicate2')
+                .insert([data.nhifDetails]);
+
+            const { data: passwordData, error: passwordError } = await supabase
+                .from('PasswordChecker_duplicate')
+                .insert([data.passwordDetails]);
+
+            const { data: ecitizenData, error: ecitizenError } = await supabase
+                .from('ecitizen_companies_duplicate')
+                .insert([data.ecitizenDetails]);
+
+            const { data: directorData, error: directorError } = await supabase
+                .from('acc_portal_directors_duplicate')
+                .insert([data.accPortalDirectors]);
+
+            if (mainCompanyError || nssfError || nhifError || passwordError || ecitizenError || directorError) {
+                throw new Error('Error updating data');
             }
         }
+
+        toast.success(`Successfully updated ${transformedData.length} companies`);
+        fetchAllData();
+
+    } catch (error) {
+        console.error('Import error:', error);
+        toast.error('Failed to import data');
     }
-}
-    
-            console.log('All updates completed');
-            toast.success(`Successfully updated ${updates.length} records`);
-    
-            // Refresh the data
-            window.location.reload();
-    
-        } catch (error) {
-            console.error('Import error:', error);
-            toast.error('Failed to import data');
-        }
-    };
-    const ImportDialog = () => {
+};
+const ImportDialog = () => {
         return (
             <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
                 <DialogContent className="max-w-md">
@@ -661,7 +848,6 @@ for (let i = 0; i < updates.length; i += batchSize) {
             </Dialog>
         );
     };
-
     const calculateTotalFields = (section) => {
         return section.categorizedFields?.reduce((total, category) => {
           if (category.isSeparator) return total;
@@ -811,7 +997,10 @@ for (let i = 0; i < updates.length; i += batchSize) {
                         key={`${section.name}-${field.name}`}
                         className={`whitespace-nowrap ${sectionColors[section.name]?.sub || 'bg-gray-500'} text-white`}
                     >
-                        {`${field.reference ?? ''} ${field.label}`}
+                                            <div className="flex flex-col">
+                                                <span>{field.reference ?? ''}</span>
+                                                <span>{field.label}</span>
+                                            </div>
                     </TableHead>
                     ));
                 });
