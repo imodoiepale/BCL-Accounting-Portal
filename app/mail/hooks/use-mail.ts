@@ -1,9 +1,10 @@
+// hooks/use-mail.ts
 import { atom, useAtom } from 'jotai'
-import { Mail } from './types'
+import { GmailMessage } from '../types'
 
 type MailState = {
-  selected: string | null
-  mail: Mail[]
+  selected: string | null;
+  mail: GmailMessage[];
 }
 
 const mailAtom = atom<MailState>({
