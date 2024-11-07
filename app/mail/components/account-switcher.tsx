@@ -394,34 +394,39 @@ export function AccountSwitcher({
       </Dialog>
 
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Manage Accounts</DialogTitle>
-            <DialogDescription>
-              Manage your connected Gmail accounts
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
+      <DialogContent className="max-w-5xl h-[80vh] flex flex-col">
+        <DialogHeader className="border-b pb-4">
+          <DialogTitle>Manage Accounts</DialogTitle>
+          <DialogDescription>
+            Manage your connected Gmail accounts
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="flex-1 overflow-y-auto py-4">
+          <div className="grid grid-cols-2 gap-4">
             {accounts.map((account, index) => {
               const uniqueId = generateUniqueId(account.email, index);
               return (
                 <div
                   key={uniqueId}
-                  className="flex items-center justify-between p-2 rounded-lg border"
+                  className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent/50 transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    {renderAccountIcon(account)}
-                    <div className="flex flex-col">
-                      <span className="font-medium">{account.label}</span>
-                      <span className="text-xs text-muted-foreground">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-shrink-0">
+                      {renderAccountIcon(account)}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-medium truncate">{account.label}</span>
+                      <span className="text-sm text-muted-foreground truncate">
                         {account.email}
                       </span>
-                      <Badge variant="secondary" className="mt-1 w-fit">
+                      <Badge variant="secondary" className="mt-2 w-fit">
                         {account.messages?.length || 0} messages
                       </Badge>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  
+                  <div className="flex gap-2 ml-4">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -467,44 +472,46 @@ export function AccountSwitcher({
               );
             })}
           </div>
-          <DialogFooter className="flex justify-between">
-            <div className="flex gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleRefreshMessages()}
-                    disabled={isLoading || isRefreshing}
-                    aria-label="Refresh all messages"
-                  >
-                    {isRefreshing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Refreshing...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        Refresh All Messages
-                      </>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Refresh messages for all accounts
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <Button 
-              variant="outline" 
-              onClick={() => setIsSettingsOpen(false)}
-              disabled={isLoading || isRefreshing}
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+        
+        <DialogFooter className="border-t pt-4 flex justify-between">
+          <div className="flex gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  onClick={() => handleRefreshMessages()}
+                  disabled={isLoading || isRefreshing}
+                  aria-label="Refresh all messages"
+                >
+                  {isRefreshing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Refreshing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Refresh All Messages
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                Refresh messages for all accounts
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => setIsSettingsOpen(false)}
+            disabled={isLoading || isRefreshing}
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </TooltipProvider>
   )
 }
