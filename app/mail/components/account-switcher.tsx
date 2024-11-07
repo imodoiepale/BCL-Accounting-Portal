@@ -39,9 +39,30 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { toast } from "react-hot-toast"
-import { AccountSwitcherProps, Account } from "../types"
+
+interface Account {
+  id: string
+  email: string
+  label: string
+  icon: React.ReactNode
+  messages?: any[]
+}
+
+interface AccountSwitcherProps {
+  isCollapsed: boolean
+  accounts: Account[]
+  selectedAccount: string
+  onAccountSelect: (email: string) => void
+  onAddAccount: () => Promise<void>
+  onRemoveAccount: (email: string) => Promise<void>
+  onRefreshAccounts: (email?: string) => Promise<void>
+}
 
 const STORAGE_KEY = "selectedEmailAccount"
+
+const generateUniqueId = (email: string, index: number) => {
+  return `account-${email.replace(/[^a-zA-Z0-9]/g, '-')}-${index}`
+}
 
 export function AccountSwitcher({
   isCollapsed,
@@ -109,7 +130,6 @@ export function AccountSwitcher({
       setIsLoading(true)
       await onRemoveAccount(email)
       
-      // If removing currently selected account or last account
       if (selectedAccount === email || accounts.length <= 1) {
         onAccountSelect("all")
         setIsSettingsOpen(false)
@@ -166,7 +186,6 @@ export function AccountSwitcher({
     accounts.reduce((total, acc) => total + (acc.messages?.length || 0), 0),
     [accounts]
   )
-
   return (
     <TooltipProvider delayDuration={0}>
       <Select 
@@ -213,7 +232,6 @@ export function AccountSwitcher({
         </SelectTrigger>
         <SelectContent>
           <div className="flex flex-col gap-2 p-2">
-            {/* Refresh Messages Button */}
             <Button
               variant="secondary"
               className="w-full justify-start gap-2"
@@ -230,7 +248,6 @@ export function AccountSwitcher({
               {isRefreshing && <span className="ml-auto">Refreshing...</span>}
             </Button>
 
-            {/* Search Box */}
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -242,7 +259,6 @@ export function AccountSwitcher({
               />
             </div>
             
-            {/* Add Account Button */}
             <Button
               variant="outline"
               className="w-full justify-start gap-2"
@@ -258,7 +274,6 @@ export function AccountSwitcher({
               Add Gmail Account
             </Button>
 
-            {/* Manage Accounts Button */}
             {accounts.length > 0 && (
               <Button
                 variant="outline"
@@ -277,56 +292,64 @@ export function AccountSwitcher({
 
             <Separator className="my-2" />
             
-            {/* Accounts List */}
             <ScrollArea className="h-[300px]">
-              <SelectItem value="all" className="cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                    <Mail className="h-4 w-4" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span>All Accounts</span>
-                    <span className="text-xs text-muted-foreground">
-                      {totalMessages} messages total
-                    </span>
-                  </div>
-                </div>
-              </SelectItem>
-              {filteredAccounts.map((account) => (
-                <SelectItem
-                  key={account.email}
-                  value={account.email}
-                  className="cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    {renderAccountIcon(account)}
-                    <div className="flex flex-col">
-                      <span>{account.label}</span>
-                      <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-1">
+                <div key="all-accounts-item">
+                  <SelectItem value="all" className="cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                        <Mail className="h-4 w-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span>All Accounts</span>
                         <span className="text-xs text-muted-foreground">
-                          {account.email}
+                          {totalMessages} messages total
                         </span>
-                        <Badge variant="secondary" className="text-xs">
-                          {account.messages?.length || 0} messages
-                        </Badge>
                       </div>
                     </div>
-                  </div>
-                </SelectItem>
-              ))}
-              {filteredAccounts.length === 0 && (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  {searchQuery 
-                    ? `No accounts found matching "${searchQuery}"`
-                    : "No accounts added yet"}
+                  </SelectItem>
                 </div>
-              )}
+                
+                {filteredAccounts.map((account, index) => {
+                  const uniqueId = generateUniqueId(account.email, index);
+                  return (
+                    <div key={uniqueId}>
+                      <SelectItem
+                        value={account.email}
+                        className="cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          {renderAccountIcon(account)}
+                          <div className="flex flex-col">
+                            <span>{account.label}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {account.email}
+                              </span>
+                              <Badge variant="secondary" className="text-xs">
+                                {account.messages?.length || 0} messages
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    </div>
+                  );
+                })}
+                
+                {filteredAccounts.length === 0 && (
+                  <div key="no-accounts-found" className="p-4 text-center text-sm text-muted-foreground">
+                    {searchQuery 
+                      ? `No accounts found matching "${searchQuery}"`
+                      : "No accounts added yet"}
+                  </div>
+                )}
+              </div>
             </ScrollArea>
           </div>
         </SelectContent>
       </Select>
 
-      {/* Add Account Dialog */}
       <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
         <DialogContent>
           <DialogHeader>
@@ -345,7 +368,7 @@ export function AccountSwitcher({
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+                <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                   <path
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                     fill="#4285F4"
@@ -370,7 +393,6 @@ export function AccountSwitcher({
         </DialogContent>
       </Dialog>
 
-      {/* Manage Accounts Dialog */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -380,67 +402,70 @@ export function AccountSwitcher({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {accounts.map((account) => (
-              <div
-                key={account.email}
-                className="flex items-center justify-between p-2 rounded-lg border"
-              >
-                <div className="flex items-center gap-3">
-                  {renderAccountIcon(account)}
-                  <div className="flex flex-col">
-                    <span className="font-medium">{account.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {account.email}
-                    </span>
-                    <Badge variant="secondary" className="mt-1 w-fit">
-                      {account.messages?.length || 0} messages
-                    </Badge>
+            {accounts.map((account, index) => {
+              const uniqueId = generateUniqueId(account.email, index);
+              return (
+                <div
+                  key={uniqueId}
+                  className="flex items-center justify-between p-2 rounded-lg border"
+                >
+                  <div className="flex items-center gap-3">
+                    {renderAccountIcon(account)}
+                    <div className="flex flex-col">
+                      <span className="font-medium">{account.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {account.email}
+                      </span>
+                      <Badge variant="secondary" className="mt-1 w-fit">
+                        {account.messages?.length || 0} messages
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRefreshMessages(account.email)}
+                          disabled={isLoading || refreshingAccount === account.email}
+                          aria-label={`Refresh ${account.label}'s messages`}
+                        >
+                          {refreshingAccount === account.email ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Refresh messages
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          onClick={() => handleRemoveAccount(account.email)}
+                          disabled={isLoading || isRefreshing}
+                          aria-label={`Remove ${account.label}'s account`}
+                        >
+                          {isLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Remove account
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRefreshMessages(account.email)}
-                        disabled={isLoading || refreshingAccount === account.email}
-                        aria-label={`Refresh ${account.label}'s messages`}
-                      >
-                        {refreshingAccount === account.email ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Refresh messages
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => handleRemoveAccount(account.email)}
-                        disabled={isLoading || isRefreshing}
-                        aria-label={`Remove ${account.label}'s account`}
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Remove account
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <DialogFooter className="flex justify-between">
             <div className="flex gap-2">
@@ -483,3 +508,5 @@ export function AccountSwitcher({
     </TooltipProvider>
   )
 }
+
+export type { Account, AccountSwitcherProps }

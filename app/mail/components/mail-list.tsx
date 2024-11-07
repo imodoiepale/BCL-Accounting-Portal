@@ -8,9 +8,23 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { useMail } from "../hooks/use-mail"
-import { MailListProps } from "../types"
+import { MailListProps, GmailMessage } from "../types"
 
-export function MailList({ accounts, onLoadMore, hasMore, loading, selectedAccount }: MailListProps) {
+interface EmailProps {
+  message: GmailMessage
+  accountEmail: string
+  selected: boolean
+  onClick: () => void
+}
+
+export function MailList({ 
+  accounts, 
+  onLoadMore, 
+  hasMore, 
+  loading, 
+  selectedAccount,
+  onMailSelect 
+}: MailListProps) {
   const [mail, setMail] = useMail()
   const observer = useRef()
   const messageCache = useRef(new Set())
@@ -26,26 +40,26 @@ export function MailList({ accounts, onLoadMore, hasMore, loading, selectedAccou
     if (node) observer.current.observe(node)
   }, [loading, hasMore, onLoadMore])
 
-  // Process messages with memoization to prevent unnecessary recalculations
+  const handleMailSelect = (message: GmailMessage) => {
+    setMail({ ...mail, selected: message.id })
+    if (onMailSelect) {
+      onMailSelect(message)
+    }
+  }
+
   const processedMessages = useMemo(() => {
-    // Clear cache when processing new messages
     messageCache.current.clear()
 
     const allMessages = accounts.reduce((acc, account) => {
       if (account.messages) {
         const messagesWithAccount = account.messages.map(message => {
-          // Create a unique identifier for the message
           const baseKey = `${account.email}-${message.id}`
-          
-          // If this message was already processed, add a suffix
           let uniqueKey = baseKey
           let counter = 1
           while (messageCache.current.has(uniqueKey)) {
             uniqueKey = `${baseKey}-${counter}`
             counter++
           }
-          
-          // Add to cache
           messageCache.current.add(uniqueKey)
 
           return {
@@ -59,12 +73,10 @@ export function MailList({ accounts, onLoadMore, hasMore, loading, selectedAccou
       return acc
     }, [])
 
-    // Filter messages based on selected account
     const filtered = selectedAccount === 'all'
       ? allMessages
       : allMessages.filter(message => message.accountEmail === selectedAccount)
 
-    // Sort messages by date
     return filtered.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate))
   }, [accounts, selectedAccount])
 
@@ -90,7 +102,7 @@ export function MailList({ accounts, onLoadMore, hasMore, loading, selectedAccou
               message={message} 
               accountEmail={message.accountEmail}
               selected={mail.selected === message.id}
-              onClick={() => setMail({ ...mail, selected: message.id })}
+              onClick={() => handleMailSelect(message)}
             />
           )
           
@@ -113,12 +125,12 @@ export function MailList({ accounts, onLoadMore, hasMore, loading, selectedAccou
   )
 }
 
-const Email = ({ message, accountEmail, selected, onClick }) => {
-  const getHeader = useCallback((headers, name) => {
+const Email = ({ message, accountEmail, selected, onClick }: EmailProps) => {
+  const getHeader = useCallback((headers: any[], name: string) => {
     return headers.find(header => header.name === name)?.value || ''
   }, [])
 
-  const formatDate = useCallback((internalDate) => {
+  const formatDate = useCallback((internalDate: string) => {
     const date = new Date(parseInt(internalDate))
     const now = new Date()
     const diffTime = Math.abs(now - date)
