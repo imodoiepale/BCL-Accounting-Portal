@@ -492,7 +492,7 @@ const OverallView = () => {
                         description: null,
                         registration_number: null,
                         date_established: null,
-                        kra_pin: 'Missing',
+                        kra_pin: '',
                         industry: null,
                         employees: null,
                         annual_revenue: null,
@@ -561,7 +561,7 @@ const OverallView = () => {
                     },
                     passwordDetails: {
                         company_name: null,
-                        kra_pin: 'Missing',
+                        kra_pin: '',
                         kra_password: null,
                         pin_status: null,
                         status: null
@@ -646,7 +646,7 @@ const OverallView = () => {
                         bankruptcy_history: null,
                         professional_memberships: null,
                         userid: null,
-                        status: 'missing'
+                        status: ''
                     },
                     nhifCompanies: {
                         company_name: null,
@@ -891,7 +891,7 @@ const OverallView = () => {
 
                             // Password Checker Details
                             case "KRA PIN":
-                                companyData.passwordDetails.kra_pin = value;
+                                companyData.mainCompany.kra_pin = value;
                                 break;
                             case "KRA Password":
                                 companyData.passwordDetails.kra_password = value;
@@ -1133,50 +1133,62 @@ const OverallView = () => {
             console.log('Transformed Data:', transformedData);
 
             for (const data of transformedData) {
-                // Check if company exists before upserting
-                const { data: existingCompany } = await supabase
+                // Upsert main company data using registration_number as unique key
+                const { data: companyData, error: companyError } = await supabase
                     .from('acc_portal_company_duplicate')
-                    .select('company_name')
-                    .eq('company_name', data.mainCompany.company_name)
-                    .single();
+                    .upsert([data.mainCompany], { onConflict: ['registration_number'] }); 
     
-                if (!existingCompany) {
-                    // Company doesn't exist - insert new record
-                    const { error: mainCompanyError } = await supabase
-                        .from('acc_portal_company_duplicate')
-                        .insert([data.mainCompany]);
-                    
-                    if (mainCompanyError) throw mainCompanyError;
-                    
-                    // Insert related records for new company
+                if (!companyError) {
+                    // Upsert related tables using company_name as reference
                     await Promise.all([
-                        supabase.from('nssf_companies_duplicate').insert([data.nssfDetails]),
-                        supabase.from('nhif_companies_duplicate2').insert([data.nhifDetails]),
-                        supabase.from('PasswordChecker_duplicate').insert([data.passwordDetails]),
-                        supabase.from('ecitizen_companies_duplicate').insert([data.ecitizenDetails]),
-                        supabase.from('etims_companies_duplicate').insert([data.etimsDetails]),
-                        supabase.from('acc_portal_directors_duplicate').insert([data.accPortalDirectors])
+                        supabase
+                            .from('nssf_companies_duplicate')
+                            .upsert([data.nssfDetails], {
+                                onConflict: 'nssf_code',
+                                ignoreDuplicates: false
+                            }),
+                        supabase
+                            .from('nhif_companies_duplicate2')
+                            .upsert([data.nhifDetails], {
+                                onConflict: 'nhif_code',
+                                ignoreDuplicates: false
+                            }),
+                        supabase
+                            .from('PasswordChecker_duplicate')
+                            .upsert([data.passwordDetails], {
+                                onConflict: 'kra_pin',
+                                ignoreDuplicates: false
+                            }),
+                        supabase
+                            .from('ecitizen_companies_duplicate')
+                            .upsert([data.ecitizenDetails], {
+                                onConflict: 'ecitizen_identifier',
+                                ignoreDuplicates: false
+                            }),
+                            supabase
+                            .from('etims_companies_duplicate')
+                            .upsert([data.etimsDetails], {
+                                onConflict: 'etims_pin',
+                                ignoreDuplicates: false
+                            }),
+                            supabase
+                            .from('acc_portal_directors_duplicate')
+                            .upsert([data.accPortalDirectors], {
+                                onConflict: 'company_name',
+                                ignoreDuplicates: false
+                            })
                     ]);
-                } else {
-                    // Company exists - update only changed fields
-                    const { error: updateError } = await supabase
-                        .from('acc_portal_company_duplicate')
-                        .update(data.mainCompany)
-                        .eq('company_name', data.mainCompany.company_name);
-                    
-                    if (updateError) throw updateError;
                 }
             }
     
             toast.success(`Successfully updated ${transformedData.length} companies`);
             fetchAllData();
-
+    
         } catch (error) {
             console.error('Import error:', error);
             toast.error('Failed to import data');
         }
     };
-
 
     const ImportDialog = () => {
         return (
