@@ -1,7 +1,7 @@
 //@ts-nocheck
 "use client"
 
-import { useCallback, useRef } from "react"
+import { useCallback, useRef, useMemo } from "react"
 import { Clock, Mail, Paperclip } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -13,6 +13,7 @@ import { MailListProps } from "../types"
 export function MailList({ accounts, onLoadMore, hasMore, loading, selectedAccount }: MailListProps) {
   const [mail, setMail] = useMail()
   const observer = useRef()
+  const messageCache = useRef(new Set())
 
   const lastEmailRef = useCallback(node => {
     if (loading) return
@@ -25,26 +26,49 @@ export function MailList({ accounts, onLoadMore, hasMore, loading, selectedAccou
     if (node) observer.current.observe(node)
   }, [loading, hasMore, onLoadMore])
 
-  const allMessages = accounts.reduce((acc, account) => {
-    if (account.messages) {
-      const messagesWithAccount = account.messages.map(message => ({
-        ...message,
-        accountEmail: account.email
-      }))
-      return [...acc, ...messagesWithAccount]
-    }
-    return acc
-  }, [])
+  // Process messages with memoization to prevent unnecessary recalculations
+  const processedMessages = useMemo(() => {
+    // Clear cache when processing new messages
+    messageCache.current.clear()
 
-  const filteredMessages = selectedAccount === 'all'
-    ? allMessages
-    : allMessages.filter(message => message.accountEmail === selectedAccount)
+    const allMessages = accounts.reduce((acc, account) => {
+      if (account.messages) {
+        const messagesWithAccount = account.messages.map(message => {
+          // Create a unique identifier for the message
+          const baseKey = `${account.email}-${message.id}`
+          
+          // If this message was already processed, add a suffix
+          let uniqueKey = baseKey
+          let counter = 1
+          while (messageCache.current.has(uniqueKey)) {
+            uniqueKey = `${baseKey}-${counter}`
+            counter++
+          }
+          
+          // Add to cache
+          messageCache.current.add(uniqueKey)
 
-  const sortedMessages = filteredMessages.sort((a, b) => {
-    return parseInt(b.internalDate) - parseInt(a.internalDate)
-  })
+          return {
+            ...message,
+            accountEmail: account.email,
+            uniqueKey
+          }
+        })
+        return [...acc, ...messagesWithAccount]
+      }
+      return acc
+    }, [])
 
-  if (!sortedMessages.length && !loading) {
+    // Filter messages based on selected account
+    const filtered = selectedAccount === 'all'
+      ? allMessages
+      : allMessages.filter(message => message.accountEmail === selectedAccount)
+
+    // Sort messages by date
+    return filtered.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate))
+  }, [accounts, selectedAccount])
+
+  if (!processedMessages.length && !loading) {
     return (
       <div className="text-center p-8 text-gray-500">
         <Mail className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -57,24 +81,26 @@ export function MailList({ accounts, onLoadMore, hasMore, loading, selectedAccou
   return (
     <ScrollArea className="h-screen">
       <div className="flex flex-col">
-        {sortedMessages.map((message, index) => {
-          const isLast = index === sortedMessages.length - 1
-          const component = (
+        {processedMessages.map((message, index) => {
+          const isLast = index === processedMessages.length - 1
+          
+          const emailComponent = (
             <Email 
-              key={`${message.accountEmail}-${message.id}`} 
+              key={message.uniqueKey}
               message={message} 
-              accountEmail={message.accountEmail} // Pass the account email here
+              accountEmail={message.accountEmail}
               selected={mail.selected === message.id}
               onClick={() => setMail({ ...mail, selected: message.id })}
             />
           )
           
           return isLast ? (
-            <div ref={lastEmailRef} key={`${message.accountEmail}-${message.id}`}>
-              {component}
+            <div ref={lastEmailRef} key={`last-${message.uniqueKey}`}>
+              {emailComponent}
             </div>
-          ) : component
+          ) : emailComponent
         })}
+        
         {loading && (
           <div className="p-4">
             <EmailSkeleton />
@@ -88,28 +114,28 @@ export function MailList({ accounts, onLoadMore, hasMore, loading, selectedAccou
 }
 
 const Email = ({ message, accountEmail, selected, onClick }) => {
-  const getHeader = (headers, name) => {
-    return headers.find(header => header.name === name)?.value || '';
-  };
+  const getHeader = useCallback((headers, name) => {
+    return headers.find(header => header.name === name)?.value || ''
+  }, [])
 
-  const formatDate = (internalDate) => {
-    const date = new Date(parseInt(internalDate));
-    const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const formatDate = useCallback((internalDate) => {
+    const date = new Date(parseInt(internalDate))
+    const now = new Date()
+    const diffTime = Math.abs(now - date)
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
 
     if (diffDays === 0) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     } else if (diffDays < 7) {
-      return date.toLocaleDateString([], { weekday: 'short' });
+      return date.toLocaleDateString([], { weekday: 'short' })
     } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
     }
-  };
+  }, [])
 
-  const hasAttachments = message.payload.parts?.some(part => part.filename && part.filename.length > 0);
-  const from = getHeader(message.payload.headers, 'From');
-  const subject = getHeader(message.payload.headers, 'Subject');
+  const hasAttachments = message.payload.parts?.some(part => part.filename && part.filename.length > 0)
+  const from = getHeader(message.payload.headers, 'From')
+  const subject = getHeader(message.payload.headers, 'Subject')
 
   return (
     <div 
@@ -120,7 +146,6 @@ const Email = ({ message, accountEmail, selected, onClick }) => {
       onClick={onClick}
     >
       <div className="flex flex-col gap-1">
-        {/* Header Row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="font-medium">{from.split('<')[0].trim()}</span>
@@ -128,7 +153,7 @@ const Email = ({ message, accountEmail, selected, onClick }) => {
               variant="secondary" 
               className="bg-blue-500 text-white hover:bg-blue-600"
             >
-              {accountEmail} {/* Display the email account here */}
+              {accountEmail}
             </Badge>
           </div>
           <div className="flex items-center gap-2 text-blue-500 text-sm">
@@ -140,35 +165,35 @@ const Email = ({ message, accountEmail, selected, onClick }) => {
           </div>
         </div>
 
-        {/* Subject Row */}
         <div className="text-sm">
           <span className="font-medium">{subject || '(no subject)'}</span>
         </div>
 
-        {/* Snippet Row */}
         <div className="text-sm text-gray-600 line-clamp-1">
           {message.snippet}
         </div>
 
-        {/* Labels Row */}
         <div className="flex gap-2 mt-1">
           {message.labelIds?.map((label, index) => {
-            let labelText = label.toLowerCase().replace('category_', '');
-            // Only show specific labels
+            const labelText = label.toLowerCase().replace('category_', '')
             if (['inbox', 'important', 'work', 'meeting', 'budget'].includes(labelText)) {
               return (
-                <Badge key={index} variant="outline" className="text-xs">
+                <Badge 
+                  key={`${message.uniqueKey}-label-${index}`} 
+                  variant="outline" 
+                  className="text-xs"
+                >
                   {labelText}
                 </Badge>
-              );
+              )
             }
-            return null;
+            return null
           })}
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
 const EmailSkeleton = () => (
   <div className="px-4 py-3 border-b">
@@ -185,4 +210,4 @@ const EmailSkeleton = () => (
       </div>
     </div>
   </div>
-);
+)
