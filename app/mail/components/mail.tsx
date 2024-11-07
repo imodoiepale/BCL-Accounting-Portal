@@ -4,22 +4,24 @@
 
 import * as React from "react"
 import {
+  AlertCircle,
   Archive,
   ArchiveX,
   File,
   Inbox,
   MessagesSquare,
-  Send,
+  Pencil,
+  Plus,
   Search,
+  Send,
+  Settings,
+  Settings2,
+  SettingsIcon,
+  ShoppingCart,
+  Star,
+  Tags,
   Trash2,
   Users2,
-  AlertCircle,
-  Settings,
-  Plus,
-  Loader2,
-  Tags,
-  Settings2,
-  Filter,
   X,
   MoreHorizontal,
   Edit,
@@ -27,16 +29,8 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TooltipProvider } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import {
-  ResizableHandle,
-  ResizablePanelGroup,
-  ResizablePanel,
-} from "@/components/ui/resizable"
 import {
   Dialog,
   DialogContent,
@@ -56,20 +50,20 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
+import { Separator } from "@/components/ui/separator"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Table,
   TableBody,
@@ -78,6 +72,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 import { AccountSwitcher } from "./account-switcher"
 import { MailDisplay } from "./mail-display"
@@ -112,6 +121,8 @@ interface MailHeaderProps {
   activeTab: string
   onTabChange: (tab: string) => void
   loading: boolean
+  customFilters: CustomFilter[]
+  setCustomFilters: React.Dispatch<React.SetStateAction<CustomFilter[]>>
 }
 const DEFAULT_FILTERS: CustomFilter[] = [
   {
@@ -277,10 +288,11 @@ const MailHeader: React.FC<MailHeaderProps> = ({
   activeTab,
   onTabChange,
   loading,
+  customFilters,
+  setCustomFilters,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState("")
   const [viewMode, setViewMode] = React.useState<'all' | 'unread'>('all')
-  const [customFilters, setCustomFilters] = React.useState<CustomFilter[]>(DEFAULT_FILTERS)
   const [isCreateFilterOpen, setIsCreateFilterOpen] = React.useState(false)
   const [isManageFiltersOpen, setIsManageFiltersOpen] = React.useState(false)
   const [editingFilter, setEditingFilter] = React.useState<CustomFilter | null>(null)
@@ -330,10 +342,14 @@ const MailHeader: React.FC<MailHeaderProps> = ({
 
   const handleDeleteFilter = (filterId: string) => {
     setCustomFilters(filters => filters.filter(f => f.id !== filterId))
+    toast.success('Filter deleted successfully')
   }
 
   const createFilter = () => {
-    if (newFilter.name.trim() === "") return
+    if (newFilter.name.trim() === "") {
+      toast.error('Filter name is required')
+      return
+    }
 
     if (editingFilter) {
       updateFilter()
@@ -344,13 +360,14 @@ const MailHeader: React.FC<MailHeaderProps> = ({
         id: filterId,
       }
 
-      setCustomFilters([...customFilters, newCustomFilter])
+      setCustomFilters(prev => [...prev, newCustomFilter])
       setIsCreateFilterOpen(false)
       setNewFilter({
         id: "",
         name: "",
         conditions: [{ field: "subject", operator: "contains", value: "" }],
       })
+      toast.success('Filter created successfully')
     }
   }
 
@@ -369,6 +386,7 @@ const MailHeader: React.FC<MailHeaderProps> = ({
         name: "",
         conditions: [{ field: "subject", operator: "contains", value: "" }],
       })
+      toast.success('Filter updated successfully')
     }
   }
 
@@ -570,7 +588,9 @@ export function Mail({
   const [isCollapsed, setIsCollapsed] = React.useState(defaultCollapsed)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [activeTab, setActiveTab] = React.useState("primary")
-  const [mail] = useMail()
+  const [customFilters, setCustomFilters] = React.useState<CustomFilter[]>(DEFAULT_FILTERS)
+  const [selectedMail, setSelectedMail] = React.useState<any>(null)
+  const [mail, setMail] = useMail()
   
   const {
     accounts,
@@ -612,10 +632,17 @@ export function Mail({
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
   }
+
+  const handleMailSelect = (selectedMail: any) => {
+    setSelectedMail(selectedMail)
+    setMail({ ...mail, selected: selectedMail.id })
+  }
+
   // Filter messages based on search and active tab
   const filteredMessages = React.useMemo(() => {
     let messages = accounts.flatMap(acc => acc.messages || [])
 
+    // Apply search filter
     if (searchQuery) {
       messages = messages.filter(msg => {
         const subject = msg.payload.headers.find(h => h.name === 'Subject')?.value
@@ -629,23 +656,71 @@ export function Mail({
     }
 
     // Filter based on active tab and custom filters
-    const activeFilter = DEFAULT_FILTERS.find(f => f.id === activeTab)
-    if (activeFilter) {
-      messages = messages.filter(msg => {
-        return activeFilter.conditions.every(condition => {
-          if (condition.field === 'labels') {
-            return msg.labelIds?.some(label => 
-              label.toLowerCase().includes(condition.value.toLowerCase())
-            )
-          }
-          // Add other filter condition checks as needed
-          return true
+    if (activeTab && customFilters) {
+      const activeFilter = customFilters.find(f => f.id === activeTab)
+      if (activeFilter) {
+        messages = messages.filter(msg => {
+          return activeFilter.conditions.every(condition => {
+            switch (condition.field) {
+              case 'labels':
+                return msg.labelIds?.some(label => 
+                  label.toLowerCase().includes(condition.value.toLowerCase())
+                )
+              case 'subject':
+                const subject = msg.payload.headers.find(h => h.name === 'Subject')?.value || ''
+                return subject.toLowerCase().includes(condition.value.toLowerCase())
+              case 'from':
+                const from = msg.payload.headers.find(h => h.name === 'From')?.value || ''
+                return from.toLowerCase().includes(condition.value.toLowerCase())
+              case 'to':
+                const to = msg.payload.headers.find(h => h.name === 'To')?.value || ''
+                return to.toLowerCase().includes(condition.value.toLowerCase())
+              case 'text':
+                return msg.snippet.toLowerCase().includes(condition.value.toLowerCase())
+              default:
+                return true
+            }
+          })
         })
-      })
+      }
     }
 
-    return messages
-  }, [accounts, searchQuery, activeTab])
+    return messages.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate))
+  }, [accounts, searchQuery, activeTab, customFilters])
+
+  const handleMailActions = {
+    reply: (message: string) => {
+      if (selectedMail) {
+        toast.success('Reply sent')
+        console.log('Reply to:', selectedMail.id, 'with message:', message)
+      }
+    },
+    forward: (message: string) => {
+      if (selectedMail) {
+        toast.success('Mail forwarded')
+        console.log('Forward:', selectedMail.id, 'with message:', message)
+      }
+    },
+    delete: () => {
+      if (selectedMail) {
+        toast.success('Mail moved to trash')
+        console.log('Delete:', selectedMail.id)
+        setSelectedMail(null)
+      }
+    },
+    archive: () => {
+      if (selectedMail) {
+        toast.success('Mail archived')
+        console.log('Archive:', selectedMail.id)
+      }
+    },
+    snooze: (date: Date) => {
+      if (selectedMail) {
+        toast.success(`Mail snoozed until ${date.toLocaleDateString()}`)
+        console.log('Snooze until:', date)
+      }
+    }
+  }
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -671,9 +746,11 @@ export function Mail({
             <AccountSwitcher
               isCollapsed={isCollapsed}
               accounts={accounts.map(acc => ({
+                id: `account-${acc.email}`,
                 label: acc.email.split('@')[0],
                 email: acc.email,
-                icon: <Users2 className="h-4 w-4" />
+                icon: <Users2 className="h-4 w-4" />,
+                messages: acc.messages
               }))}
               selectedAccount={selectedAccount}
               onAccountSelect={setSelectedAccount}
@@ -687,36 +764,42 @@ export function Mail({
             isCollapsed={isCollapsed}
             links={[
               {
+                key: "nav-inbox",
                 title: "Inbox",
                 label: filteredMessages.length.toString(),
                 icon: Inbox,
                 variant: "default",
               },
               {
+                key: "nav-drafts",
                 title: "Drafts",
                 label: "9",
                 icon: File,
                 variant: "ghost",
               },
               {
+                key: "nav-sent",
                 title: "Sent",
                 label: "",
                 icon: Send,
                 variant: "ghost",
               },
               {
+                key: "nav-junk",
                 title: "Junk",
                 label: "23",
                 icon: ArchiveX,
                 variant: "ghost",
               },
               {
+                key: "nav-trash",
                 title: "Trash",
                 label: "",
                 icon: Trash2,
                 variant: "ghost",
               },
               {
+                key: "nav-archive",
                 title: "Archive",
                 label: "",
                 icon: Archive,
@@ -729,6 +812,7 @@ export function Mail({
             isCollapsed={isCollapsed}
             links={[
               {
+                key: "nav-social",
                 title: "Social",
                 label: filteredMessages.filter(msg => 
                   msg.labelIds?.includes('CATEGORY_SOCIAL')
@@ -737,6 +821,7 @@ export function Mail({
                 variant: "ghost",
               },
               {
+                key: "nav-updates",
                 title: "Updates",
                 label: filteredMessages.filter(msg => 
                   msg.labelIds?.includes('CATEGORY_UPDATES')
@@ -745,6 +830,7 @@ export function Mail({
                 variant: "ghost",
               },
               {
+                key: "nav-forums",
                 title: "Forums",
                 label: filteredMessages.filter(msg => 
                   msg.labelIds?.includes('CATEGORY_FORUMS')
@@ -762,6 +848,8 @@ export function Mail({
             activeTab={activeTab}
             onTabChange={handleTabChange}
             loading={loading}
+            customFilters={customFilters}
+            setCustomFilters={setCustomFilters}
           />
           <MailList
             accounts={accounts}
@@ -771,12 +859,19 @@ export function Mail({
             selectedAccount={selectedAccount}
             searchQuery={searchQuery}
             activeTab={activeTab}
+            onMailSelect={handleMailSelect}
+            selectedMail={selectedMail}
           />
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={defaultLayout[2]} minSize={30}>
           <MailDisplay
-            mail={filteredMessages.find(msg => msg.id === mail.selected) || null}
+            mail={selectedMail}
+            onReply={handleMailActions.reply}
+            onForward={handleMailActions.forward}
+            onDelete={handleMailActions.delete}
+            onArchive={handleMailActions.archive}
+            onSnooze={handleMailActions.snooze}
           />
         </ResizablePanel>
       </ResizablePanelGroup>
