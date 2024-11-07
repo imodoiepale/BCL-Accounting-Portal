@@ -254,3 +254,57 @@ export const calculateCompletedFields = (section, data) => {
 export const calculatePendingFields = (section, data) => {
   // ... Pending fields calculation ...
 };
+
+
+
+
+for (const data of transformedData) {
+  // Upsert main company data
+  const { data: mainCompanyData, error: mainCompanyError } = await supabase
+      .from('acc_portal_company_duplicate')
+      .upsert([data.mainCompany], { onConflict: ['userid'] }); // Using userid as unique identifier
+
+  // Upsert NSSF details
+  const { data: nssfData, error: nssfError } = await supabase
+      .from('nssf_companies_duplicate')
+      .upsert([data.nssfDetails]); // No unique constraint, consider adding one
+
+  // Upsert NHIF details
+  const { data: nhifData, error: nhifError } = await supabase
+      .from('nhif_companies_duplicate2')
+      .upsert([data.nhifDetails]); // No unique constraint, consider adding one
+
+  // Upsert Password Checker details
+  const { data: passwordData, error: passwordError } = await supabase
+      .from('PasswordChecker_duplicate')
+      .upsert([data.passwordDetails], { onConflict: ['kra_pin'] }); // Using kra_pin as unique identifier
+
+  // Upsert ECitizen details
+  const { data: ecitizenData, error: ecitizenError } = await supabase
+      .from('ecitizen_companies_duplicate')
+      .upsert([data.ecitizenDetails]); // No unique constraint, consider adding one
+
+                 // Upsert ECitizen details
+  const { data: etimsData, error: etimsError } = await supabase
+  .from('etims_companies_duplicate')
+  .upsert([data.etimsDetails]); // No unique constraint, consider adding one
+
+  // Upsert Acc Portal Directors details
+  const { data: directorData, error: directorError } = await supabase
+      .from('acc_portal_directors_duplicate')
+      .upsert([data.accPortalDirectors]); // No unique constraint, consider adding one
+
+  // Check for errors
+  if (mainCompanyError || nssfError || nhifError || passwordError || ecitizenError || etimsError|| directorError) {
+      console.error('Errors during upsert:', {
+          mainCompanyError,
+          nssfError,
+          nhifError,
+          passwordError,
+          ecitizenError,
+          etimsError,
+          directorError
+      });
+      throw new Error('Error updating data');
+  }
+}
