@@ -11,7 +11,7 @@ export const formFields = {
             { name: 'annual_revenue', label: 'Annual Revenue', type: 'text' },
             { name: 'fiscal_year', label: 'Fiscal Year', type: 'text' },
             { name: 'website', label: 'Website', type: 'url' },
-            { name: 'email', label: 'Email', type: 'email' },
+            { name: 'company_email', label: 'Company Email', type: 'email' },
             { name: 'phone', label: 'Phone', type: 'tel' },
             { name: 'street', label: 'Street', type: 'text' },
             { name: 'city', label: 'City', type: 'text' },
@@ -23,30 +23,46 @@ export const formFields = {
             { name: 'kra_password', label: 'KRA Password', type: 'text', category: 'KRA Details' },
 
             // NSSF Details
+            { name: 'nssf_identifier', label: 'NSSF Identifier', type: 'text', category: 'NSSF Details' },
             { name: 'nssf_code', label: 'NSSF Code', type: 'text', category: 'NSSF Details' },
-            // { name: 'nssf_user', label: 'NSSF User', type: 'text', category: 'NSSF Details' },
             { name: 'nssf_password', label: 'NSSF Password', type: 'text', category: 'NSSF Details' },
-            { name: 'nssf_reg_date', label: 'NSSF Registration Date', type: 'date', category: 'NSSF Details' },
-            { name: 'nssf_compliance_date', label: 'NSSF Compliance Certificate Date', type: 'date', category: 'NSSF Details' },
+            { name: 'nssf_registration_date', label: 'NSSF Registration Date', type: 'date', category: 'NSSF Details' },
+            { name: 'nssf_compliance_certificate_date', label: 'NSSF Compliance Certificate Date', type: 'date', category: 'NSSF Details' },
+            { name: 'nssf_status', label: 'NSSF Status', type: 'text', category: 'NSSF Details' },
 
             // NHIF Details
+            { name: 'nhif_identifier', label: 'NHIF Identifier', type: 'text', category: 'NHIF Details' },
             { name: 'nhif_code', label: 'NHIF Code', type: 'text', category: 'NHIF Details' },
             { name: 'nhif_password', label: 'NHIF Password', type: 'text', category: 'NHIF Details' },
             { name: 'nhif_mobile', label: 'NHIF Mobile', type: 'text', category: 'NHIF Details' },
             { name: 'nhif_email', label: 'NHIF Email', type: 'text', category: 'NHIF Details' },
+            { name: 'nhif_email_password', label: 'NHIF Email Password', type: 'text', category: 'NHIF Details' },
             { name: 'nhif_status', label: 'NHIF Status', type: 'text', category: 'NHIF Details' },
-            { name: 'nhif_reg_date', label: 'NHIF Registration Date', type: 'date', category: 'NHIF Details' },
+            { name: 'nhif_registration_date', label: 'NHIF Registration Date', type: 'date', category: 'NHIF Details' },
             { name: 'nhif_compliance_date', label: 'NHIF Compliance Certificate Date', type: 'date', category: 'NHIF Details' },
 
             // Ecitizen Details
-            { name: 'ecitizen_identifier', label: 'E-Citizen Identifier', type: 'text', category: 'E-Citizen Details' },
-            { name: 'ecitizen_password', label: 'E-Citizen Password', type: 'text', category: 'E-Citizen Details' },
-            { name: 'ecitizen_status', label: 'E-Citizen Status', type: 'text', category: 'E-Citizen Details' },
-            { name: 'ecitizen_id', label: 'E-Citizen ID', type: 'text', category: 'E-Citizen Details' },
-            { name: 'ecitizen_email', label: 'E-Citizen Email', type: 'email', category: 'E-Citizen Details' },
-            { name: 'ecitizen_mobile', label: 'E-Citizen Mobile', type: 'tel', category: 'E-Citizen Details' },
+            { name: 'ecitizen_identifier', label: 'ECitizen Identifier', type: 'text', category: 'E-Citizen Details' },
+            { name: 'ecitizen_password', label: 'ECitizen Password', type: 'text', category: 'E-Citizen Details' },
+            { name: 'ecitizen_status', label: 'ECitizen Status', type: 'text', category: 'E-Citizen Details' },
+            { name: 'ecitizen_id', label: 'ECitizen ID', type: 'text', category: 'E-Citizen Details' },
+            { name: 'ecitizen_email', label: 'ECitizen Email', type: 'email', category: 'E-Citizen Details' },
+            { name: 'ecitizen_mobile', label: 'ECitizen Mobile', type: 'tel', category: 'E-Citizen Details' },
 
+                // TIMS Details
+                { name: 'etims_username', label: 'ETIMS Username', type: 'text', category: 'TIMS Details' },
+                { name: 'etims_cert_incorporation', label: 'ETIMS Certificate of Incorporation', type: 'text', category: 'TIMS Details' },
+                { name: 'etims_pin', label: 'ETIMS PIN Number', type: 'text', category: 'TIMS Details' },
+                { name: 'etims_comment', label: 'ETIMS Comment', type: 'text', category: 'TIMS Details' },
+                { name: 'etims_director_pin', label: 'ETIMS Director PIN in System', type: 'text', category: 'TIMS Details' },
+                { name: 'etims_current_director_pin', label: 'ETIMS Current Director PIN', type: 'text', category: 'TIMS Details' },
+                { name: 'etims_operator', label: 'ETIMS Operator (ID Name + Number)', type: 'text', category: 'TIMS Details' },
+                { name: 'etims_password', label: 'ETIMS Password', type: 'text', category: 'TIMS Details' },
+                { name: 'etims_mobile', label: 'ETIMS Mobile Number + Name', type: 'text', category: 'TIMS Details' },
+                { name: 'etims_email', label: 'ETIMS Email Address', type: 'email', category: 'TIMS Details' },
+                { name: 'etims_reg_doc_number', label: 'Registration Document Number', type: 'text', category: 'TIMS Details' },
 
+                
             // NITA Details
             { name: 'nita_identifier', label: 'NITA Identifier', type: 'text', category: 'NITA Details' },
             { name: 'nita_password', label: 'NITA Password', type: 'text', category: 'NITA Details' },
@@ -61,7 +77,6 @@ export const formFields = {
             { name: 'standard_levy_identifier', label: 'Standard Levy Identifier', type: 'text', category: 'Standard Levy Details' },
             { name: 'standard_levy_password', label: 'Standard Levy Password', type: 'text', category: 'Standard Levy Details' },
             { name: 'standard_levy_status', label: 'Standard Levy Status', type: 'text', category: 'Standard Levy Details' },
-
 
             // Tourism Levy Details
             { name: 'tourism_levy_identifier', label: 'Tourism Levy Identifier', type: 'text', category: 'Tourism Levy Details' },
@@ -78,11 +93,8 @@ export const formFields = {
             { name: 'vat_to', label: 'VAT To', type: 'date', category: 'VAT Details' },
 
             // Tax Status Details
-            { name: 'pin_status', label: 'PIN Status', type: 'text' , category: 'Tax Status' },
-            { name: 'itax_status', label: 'iTax Status', type: 'text' , category: 'Tax Status' },
-            { name: 'vat_status', label: 'VAT Status', type: 'text' , category: 'Tax Status' },
-            { name: 'vat_from', label: 'VAT From', type: 'date' , category: 'Tax Status' },
-            { name: 'vat_to', label: 'VAT To', type: 'date' , category: 'Tax Status' },
+            { name: 'pin_status', label: 'PIN Status', type: 'text', category: 'Tax Status' },
+            { name: 'itax_status', label: 'iTax Status', type: 'text', category: 'Tax Status' },
             { name: 'income_tax_resident_status', label: 'Income Tax - Resident Individual Status', type: 'text', category: 'Tax Status' },
             { name: 'income_tax_resident_from', label: 'Income Tax - Resident Individual From', type: 'date', category: 'Tax Status' },
             { name: 'income_tax_resident_to', label: 'Income Tax - Resident Individual To', type: 'date', category: 'Tax Status' },
@@ -93,49 +105,6 @@ export const formFields = {
             { name: 'paye_status', label: 'PAYE Status', type: 'text', category: 'PAYE Details' },
             { name: 'paye_from', label: 'PAYE From', type: 'date', category: 'PAYE Details' },
             { name: 'paye_to', label: 'PAYE To', type: 'date', category: 'PAYE Details' },
-
-            { name: 'rent_income_status', label: 'Rent Income Status', type: 'text', category: 'MRI' },
-            { name: 'rent_income_from', label: 'Rent Income From', type: 'date', category: 'MRI' },
-            { name: 'rent_income_to', label: 'Rent Income To', type: 'date', category: 'MRI' },
-
-            { name: 'turnover_tax_status', label: 'Turnover Tax Status', type: 'text', category: 'TOT' },
-            { name: 'turnover_tax_from', label: 'Turnover Tax From', type: 'date', category: 'TOT' },
-            { name: 'turnover_tax_to', label: 'Turnover Tax To', type: 'date', category: 'TOT' },
-
-            // TIMS Details
-            { name: 'tims_username', label: 'TIMS Username', type: 'text', category: 'TIMS Details' },
-            { name: 'tims_cert_incorporation', label: 'Certificate of Incorporation', type: 'text', category: 'TIMS Details' },
-            { name: 'tims_pin', label: 'PIN Number', type: 'text', category: 'TIMS Details' },
-            { name: 'tims_comment', label: 'Comment', type: 'text', category: 'TIMS Details' },
-            { name: 'tims_director_pin', label: 'Director PIN in System', type: 'text', category: 'TIMS Details' },
-            { name: 'tims_current_director_pin', label: 'Current Director PIN', type: 'text', category: 'TIMS Details' },
-            { name: 'tims_operator', label: 'Operator (ID Name + Number)', type: 'text', category: 'TIMS Details' },
-            { name: 'tims_password', label: 'TIMS Password', type: 'text', category: 'TIMS Details' },
-            { name: 'tims_mobile', label: 'TIMS Mobile Number + Name', type: 'text', category: 'TIMS Details' },
-            { name: 'tims_email', label: 'TIMS Email Address', type: 'email', category: 'TIMS Details' },
-            { name: 'tims_reg_doc_number', label: 'Registration Document Number', type: 'text', category: 'TIMS Details' },
-
-            // Sheria Details
-            { name: 'sheria_mobile', label: 'Sheria Mobile', type: 'text', category: 'Sheria Details' },
-            { name: 'sheria_email', label: 'Sheria Email', type: 'text', category: 'Sheria Details' },
-            { name: 'sheria_postal_address', label: 'Sheria Postal Address', type: 'text', category: 'Sheria Details' },
-
-            // Client Category
-            { name: 'account_manager', label: 'Account Manager', type: 'text', category: 'Client Category' },
-            { name: 'client_accountant', label: 'Client Company Accountant', type: 'text', category: 'Client Category' },
-            { name: 'company_status', label: 'Company Status', type: 'select', options: ['Active', 'Dormant', 'To Start'], category: 'Client Category' },
-            { name: 'company_type', label: 'Company Type', type: 'select', options: ['Limited', 'Sole Proprietorship', 'Partnership'], category: 'Client Category' },
-
-            // // Compliance Details
-            // { name: 'fire_prevention_license', label: 'Fire Prevention License', type: 'text', category: 'Compliance' },
-            // { name: 'business_permit', label: 'Single Business Permit', type: 'text', category: 'Compliance' },
-            // { name: 'tourism_fund_levy', label: 'Tourism Fund Levy', type: 'text', category: 'Compliance' },
-
-            // // Statutory Details
-            // { name: 'nea_status', label: 'NEA Status', type: 'text', category: 'Statutory Details' },
-            // { name: 'nhif_status', label: 'NHIF Status', type: 'text', category: 'Statutory Details' },
-            // { name: 'nssf_status', label: 'NSSF Status', type: 'text', category: 'Statutory Details' },
-
 
             // Other Company Details
             { name: 'nature_of_business', label: 'Nature of Business', type: 'text', category: 'Other Details' },
@@ -162,7 +131,6 @@ export const formFields = {
             { name: 'shares_held', label: 'Shares Held', type: 'number' }
         ]
     },
-
     supplierDetails: {
         fields: [
             { name: 'supplier_name', label: 'Supplier Name', type: 'text' },
@@ -174,40 +142,35 @@ export const formFields = {
             { name: 'email', label: 'Email', type: 'email' }
         ]
     },
-
-// Update bank details fields to match database columns
-bankDetails: {
-    fields: [
-        { name: 'bank_name', label: 'Bank Name', type: 'text' },
-        { name: 'account_number', label: 'Account Number', type: 'text' },
-        { name: 'currency', label: 'Currency', type: 'text' },
-        { name: 'branch', label: 'Branch', type: 'text' },
-        { name: 'rm_name', label: 'RM Name', type: 'text' },
-        { name: 'rm_mobile', label: 'RM Mobile', type: 'tel' },
-        { name: 'rm_email', label: 'RM Email', type: 'email' },
-        { name: 'bank_startdate', label: 'Bank Start Date', type: 'date' },
-        { name: 'bank_status', label: 'Bank Status', type: 'boolean' },
-        { name: 'bank_verified', label: 'Bank Verified', type: 'boolean' },
-        { name: 'status', label: 'Status', type: 'text' }
-    ]
-},
-
-// Update employee details fields to match database columns 
-employeeDetails: {
-    fields: [
-        { name: 'employee_name', label: 'Employee Name', type: 'text' },
-        { name: 'id_number', label: 'ID Number', type: 'text' },
-        { name: 'employee_kra_pin', label: 'KRA PIN', type: 'text' },
-        { name: 'employee_email', label: 'Email', type: 'email' },
-        { name: 'employee_mobile', label: 'Mobile', type: 'tel' },
-        { name: 'employee_nhif', label: 'NHIF Number', type: 'text' },
-        { name: 'employee_nssf', label: 'NSSF Number', type: 'text' },
-        { name: 'employee_startdate', label: 'Employee Start Date', type: 'date' },
-        { name: 'employee_enddate', label: 'Employee End Date', type: 'date' },
-        { name: 'employee_status', label: 'Employee Status', type: 'boolean' },
-        { name: 'employee_verified', label: 'Employee Verified', type: 'boolean' },
-        { name: 'status', label: 'Status', type: 'text' }
-    ]
-}
-
+    bankDetails: {
+        fields: [
+            { name: 'bank_name', label: 'Bank Name', type: 'text' },
+            { name: 'account_number', label: 'Account Number', type: 'text' },
+            { name: 'currency', label: 'Currency', type: 'text' },
+            { name: 'branch', label: 'Branch', type: 'text' },
+            { name: 'rm_name', label: 'RM Name', type: 'text' },
+            { name: 'rm_mobile', label: 'RM Mobile', type: 'tel' },
+            { name: 'rm_email', label: 'RM Email', type: 'email' },
+            { name: 'bank_startdate', label: 'Bank Start Date', type: 'date' },
+            { name: 'bank_status', label: 'Bank Status', type: 'boolean' },
+            { name: 'bank_verified', label: 'Bank Verified', type: 'boolean' },
+            { name: 'status', label: 'Status', type: 'text' }
+        ]
+    },
+    employeeDetails: {
+        fields: [
+            { name: 'employee_name', label: 'Employee Name', type: 'text' },
+            { name: 'id_number', label: 'ID Number', type: 'text' },
+            { name: 'employee_kra_pin', label: 'KRA PIN', type: 'text' },
+            { name: 'employee_email', label: 'Email', type: 'email' },
+            { name: 'employee_mobile', label: 'Mobile', type: 'tel' },
+            { name: 'employee_nhif', label: 'NHIF Number', type: 'text' },
+            { name: 'employee_nssf', label: 'NSSF Number', type: 'text' },
+            { name: 'employee_startdate', label: 'Employee Start Date', type: 'date' },
+            { name: 'employee_enddate', label: 'Employee End Date', type: 'date' },
+            { name: 'employee_status', label: 'Employee Status', type: 'boolean' },
+            { name: 'employee_verified', label: 'Employee Verified', type: 'boolean' },
+            { name: 'status', label: 'Status', type: 'text' }
+        ]
+    }
 };

@@ -17,75 +17,75 @@ import { toast } from "sonner";
 
 function generateReferenceNumbers(sections) {
     let sectionCounter = 1;
-    
+
     return sections.map(section => {
-      if (section.isSeparator) return section;
-      
-      // Skip numbering for index section
-      if (section.name === 'index') return section;
-      
-      // Add section number (e.g., "1. Company Details")
-      const sectionRef = `${sectionCounter}`;
-      
-      // Process categorized fields
-      if (section.categorizedFields) {
-        let categoryCounter = 1;
-        
-        const processedCategories = section.categorizedFields.map(category => {
-          if (category.isSeparator) return category;
-          
-          // Add category number (e.g., "1.1 General")
-          const categoryRef = `${sectionRef}.${categoryCounter}`;
-          categoryCounter++;
-          
-          let fieldCounter = 1;
-          const processedFields = category.fields.map(field => {
-            // Add field number (e.g., "1.1.1 Company Name")
-            const fieldRef = `${categoryRef}.${fieldCounter}`;
-            fieldCounter++;
-            
+        if (section.isSeparator) return section;
+
+        // Skip numbering for index section
+        if (section.name === 'index') return section;
+
+        // Add section number (e.g., "1. Company Details")
+        const sectionRef = `${sectionCounter}`;
+
+        // Process categorized fields
+        if (section.categorizedFields) {
+            let categoryCounter = 1;
+
+            const processedCategories = section.categorizedFields.map(category => {
+                if (category.isSeparator) return category;
+
+                // Add category number (e.g., "1.1 General")
+                const categoryRef = `${sectionRef}.${categoryCounter}`;
+                categoryCounter++;
+
+                let fieldCounter = 1;
+                const processedFields = category.fields.map(field => {
+                    // Add field number (e.g., "1.1.1 Company Name")
+                    const fieldRef = `${categoryRef}.${fieldCounter}`;
+                    fieldCounter++;
+
+                    return {
+                        ...field,
+                        reference: fieldRef
+                    };
+                });
+
+                return {
+                    ...category,
+                    reference: categoryRef,
+                    fields: processedFields
+                };
+            });
+
+
+            if (section.name !== 'index') sectionCounter++;
             return {
-              ...field,
-              reference: fieldRef
+                ...section,
+                reference: sectionRef,
+                categorizedFields: processedCategories
             };
-          });
-          
-          return {
-            ...category,
-            reference: categoryRef,
-            fields: processedFields
-          };
-        });
-        
+        }
+
 
         if (section.name !== 'index') sectionCounter++;
-        return {
-          ...section,
-          reference: sectionRef,
-          categorizedFields: processedCategories
-        };
-      }
-      
-
-      if (section.name !== 'index') sectionCounter++;
-      return section;
+        return section;
     });
-  }
-  
+}
+
 const OverallView = () => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
-// Update color styles
-const sectionColors = {
-    index: { main: 'bg-gray-600', sub: 'bg-gray-500', cell: 'bg-gray-50' },
-    companyDetails: { main: 'bg-blue-600', sub: 'bg-blue-500', cell: 'bg-blue-50' },
-    directorDetails: { main: 'bg-emerald-600', sub: 'bg-emerald-500', cell: 'bg-emerald-50' },
-    supplierDetails: { main: 'bg-purple-600', sub: 'bg-purple-500', cell: 'bg-purple-50' },
-    bankDetails: { main: 'bg-amber-600', sub: 'bg-amber-500', cell: 'bg-amber-50' },
-    employeeDetails: { main: 'bg-rose-600', sub: 'bg-rose-500', cell: 'bg-rose-50' }
-  };
+    // Update color styles
+    const sectionColors = {
+        index: { main: 'bg-gray-600', sub: 'bg-gray-500', cell: 'bg-gray-50' },
+        companyDetails: { main: 'bg-blue-600', sub: 'bg-blue-500', cell: 'bg-blue-50' },
+        directorDetails: { main: 'bg-emerald-600', sub: 'bg-emerald-500', cell: 'bg-emerald-50' },
+        supplierDetails: { main: 'bg-purple-600', sub: 'bg-purple-500', cell: 'bg-purple-50' },
+        bankDetails: { main: 'bg-amber-600', sub: 'bg-amber-500', cell: 'bg-amber-50' },
+        employeeDetails: { main: 'bg-rose-600', sub: 'bg-rose-500', cell: 'bg-rose-50' }
+    };
     const categoryColors = {
         'General Information': { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
         'KRA Details': { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' },
@@ -142,6 +142,7 @@ const sectionColors = {
                 { data: nhifData, error: nhifError },
                 { data: passwordCheckers, error: passwordCheckersError },
                 { data: ecitizenData, error: ecitizenError },
+                { data: etimsData, error: etimsError },
                 { data: accPortalDirectors, error: accPortalDirectorsError }
             ] = await Promise.all([
                 supabase.from('acc_portal_company_duplicate').select('*').order('id', { ascending: true }),
@@ -151,11 +152,12 @@ const sectionColors = {
                 supabase.from('nhif_companies_duplicate2').select('*'),
                 supabase.from('PasswordChecker_duplicate').select('*'),
                 supabase.from('ecitizen_companies_duplicate').select('*'),
+                supabase.from('etims_companies_duplicate').select('*'),
                 supabase.from('acc_portal_directors_duplicate').select('*')
             ]);
-    
+
             // Handle any errors that occurred during the fetch
-            if (companiesError || usersError || directorsError || nssfError || nhifError || passwordCheckersError || ecitizenError || accPortalDirectorsError) {
+            if (companiesError || usersError || directorsError || nssfError || nhifError || passwordCheckersError || ecitizenError || etimsError || accPortalDirectorsError) {
                 console.error('Error fetching data from one or more tables:', {
                     companiesError,
                     usersError,
@@ -164,12 +166,13 @@ const sectionColors = {
                     nhifError,
                     passwordCheckersError,
                     ecitizenError,
+                    etimsError,
                     accPortalDirectorsError
                 });
                 toast.error('Failed to fetch data from one or more tables');
                 return;
             }
-    
+
             // Group and combine the data
             const groupedData = companies.map(company => {
                 const user = users.find(u => u.userid === company.userid);
@@ -178,8 +181,9 @@ const sectionColors = {
                 const nhifInfo = nhifData.find(n => n.company_name === company.company_name);
                 const passwordCheckerInfo = passwordCheckers.find(p => p.company_name === company.company_name);
                 const ecitizenInfo = ecitizenData.find(e => e.name === company.company_name);
+                const etimsInfo = etimsData.find(e => e.company_name === company.company_name);
                 const accPortalDirectorInfo = accPortalDirectors.filter(d => d.company_id === company.id); // Assuming company_id links to directors
-    
+
                 return {
                     company: {
                         ...company,
@@ -187,7 +191,8 @@ const sectionColors = {
                         ...nssfInfo,
                         nhif_details: nhifInfo,
                         password_checker: passwordCheckerInfo,
-                        ecitizen_details: ecitizenInfo
+                        ecitizen_details: ecitizenInfo,
+                        etims_details: etimsInfo
                     },
                     directors: accPortalDirectorInfo,
                     rows: [{
@@ -197,12 +202,13 @@ const sectionColors = {
                         ...nhifInfo,
                         ...passwordCheckerInfo,
                         ...ecitizenInfo,
+                        ...etimsInfo,
                         isFirstRow: true
                     }],
                     rowSpan: 1
                 };
             });
-    
+
             setData(groupedData);
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -341,7 +347,7 @@ const sectionColors = {
 
     const processedSections = generateReferenceNumbers(sectionsWithSeparators.map(section => {
         if (section.isSeparator) return section;
-    
+
         // Group fields by category for company details
         if (section.name === 'companyDetails') {
             return {
@@ -349,7 +355,7 @@ const sectionColors = {
                 categorizedFields: groupFieldsByCategory(section.fields)
             };
         }
-    
+
         // For other sections, treat all fields as 'General' category
         return {
             ...section,
@@ -360,15 +366,15 @@ const sectionColors = {
             }]
         };
     }));
-    
+
     const handleExport = () => {
         const exportRows = [];
-        
+
         // Process data in the desired structure, skipping redundant section/category labels
         processedSections.forEach(section => {
             if (!section.isSeparator) {
                 let isFirstField = true;
-                
+
                 section.categorizedFields?.forEach(category => {
                     if (!category.isSeparator) {
                         category.fields.forEach(field => {
@@ -385,10 +391,10 @@ const sectionColors = {
                 });
             }
         });
-    
+
         // Create worksheet from data
         const ws = XLSX.utils.aoa_to_sheet(exportRows);
-    
+
         // Set column widths
         ws['!cols'] = [
             { wch: 20 },  // Section
@@ -398,7 +404,7 @@ const sectionColors = {
             { wch: 30 },  // Value 2
             { wch: 30 }   // Value 3
         ];
-    
+
         // Initialize styles for all cells and set background colors
         for (let rowIndex = 0; rowIndex < exportRows.length; rowIndex++) {
             for (let colIndex = 0; colIndex < 6; colIndex++) {
@@ -407,7 +413,7 @@ const sectionColors = {
                 ws[cellAddress].s = {};
             }
         }
-    
+
         // Define colors for different sections
         const sectionColors = {
             'Basic Information': 'FFE6E6',  // Light Red
@@ -417,13 +423,13 @@ const sectionColors = {
             'Compliance': 'FFE6FF',         // Light Purple
             'Other': 'E6FFFF'              // Light Cyan
         };
-    
+
         // Apply colors to data rows based on section
         let currentRowIndex = 0;
         processedSections.forEach(section => {
             if (!section.isSeparator) {
                 const fillColor = sectionColors[section.label] || 'FFFFFF';
-                
+
                 section.categorizedFields?.forEach(category => {
                     if (!category.isSeparator) {
                         category.fields.forEach(() => {
@@ -443,380 +449,736 @@ const sectionColors = {
                 });
             }
         });
-    
+
         // Create and save the workbook
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Companies");
         XLSX.writeFile(wb, "Companies_Report.xlsx");
-    };    
-    
-  const handleFileImport = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    };
 
-    try {
-        let parsedData;
-        if (file.name.endsWith('.csv')) {
-            const text = await file.text();
-            parsedData = Papa.parse(text, { header: true }).data;
-        } else {
-            const buffer = await file.arrayBuffer();
-            const wb = XLSX.read(buffer);
-            const ws = wb.Sheets[wb.SheetNames[0]];
-            parsedData = XLSX.utils.sheet_to_json(ws);
-        }
+    const handleFileImport = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
 
-        console.log('Raw Parsed Data:', parsedData);
-        const valueColumns = Object.keys(parsedData[0]).filter(key => 
-            key !== '#' && 
-            key !== 'General' && 
-            key !== '#_1' && 
-            !key.includes('Section') && 
-            !key.includes('Category')
-        );
-
-        console.log('Detected value columns:', valueColumns);
-        const companiesMap = new Map();
-
-        valueColumns.forEach((colName) => {
-            companiesMap.set(colName, {
-                mainCompany: {
-                    company_name: null,
-                    company_type: null,
-                    description: null,
-                    registration_number: null,
-                    date_established: null,
-                    kra_pin: null,
-                    industry: null,
-                    employees: null,
-                    annual_revenue: null,
-                    fiscal_year: null,
-                    website: null,
-                    email: null,
-                    phone: null,
-                    street: null,
-                    city: null,
-                    postal_code: null,
-                    country: null,
-                    status: ''
-                },
-                nssfDetails: {
-                    company_name: null,
-                    identifier: null,
-                    nssf_password: null,
-                    nssf_status: 'Pending',
-                    nssf_code: null,
-                    nssf_compliance_certificate_date: null,
-                    nssf_registration_date: null,
-                    status: null
-                },
-                nhifDetails: {
-                    company_name: null,
-                    identifier: null,
-                    nhif_password: null,
-                    nhif_status: 'Pending',
-                    nhif_code: null,
-                    director: null,
-                    nhif_mobile: null,
-                    nhif_email: null,
-                    email_password: null
-                },
-                passwordDetails: {
-                    company_name: null,
-                    kra_pin: null,
-                    kra_password: null,
-                    pin_status: null,
-                    status: null
-                },
-                ecitizenDetails: {
-                    name: null,
-                    ecitizen_identifier: null,
-                    ecitizen_password: null,
-                    ecitizen_status: 'Pending',
-                    director: null
-                },
-                accPortalDirectors: {
-                    company_id: null,
-                    first_name: null,
-                    middle_name: null,
-                    last_name: null,
-                    other_names: null,
-                    full_name: null,
-                    gender: null,
-                    place_of_birth: null,
-                    country_of_birth: null,
-                    nationality: null,
-                    marital_status: null,
-                    date_of_birth: null,
-                    passport_number: null,
-                    passport_place_of_issue: null,
-                    passport_issue_date: null,
-                    passport_expiry_date: null,
-                    passport_file_number: null,
-                    id_number: null,
-                    alien_number: null,
-                    tax_pin: null,
-                    eye_color: null,
-                    hair_color: null,
-                    height: null,
-                    special_marks: null,
-                    mobile_number: null,
-                    email_address: null,
-                    alternative_email: null,
-                    building_name: null,
-                    floor_number: null,
-                    block_number: null,
-                    road_name: null,
-                    area_name: null,
-                    town: null,
-                    country: null,
-                    full_residential_address: null,
-                    residential_county: null,
-                    sub_county: null,
-                    postal_address: null,
-                    postal_code: null,
-                    postal_town: null,
-                    full_postal_address: null,
-                    university_name: null,
-                    course_name: null,
-                    course_start_date: null,
-                    course_end_date: null,
-                    job_position: null,
-                    job_description: null,
-                    shares_held: null,
-                    other_directorships: null,
-                    dependents: null,
-                    annual_income: null,
-                    languages_spoken: null,
-                    occupation: null,
-                    education_level: null,
-                    criminal_record: null,
-                    bankruptcy_history: null,
-                    professional_memberships: null,
-                    userid: null,
-                    status: 'missing'
-                },
-                nhifCompanies: {
-                    company_name: null,
-                    identifier: null,
-                    nhif_password: null,
-                    nhif_status: 'Pending',
-                    nhif_code: null,
-                    director: null,
-                    nhif_mobile: null,
-                    nhif_email: null,
-                    email_password: null
-                },
-                nssfCompanies: {
-                    company_name: null,
-                    identifier: null,
-                    nssf_password: null,
-                    nssf_status: 'Pending',
-                    nssf_code: null,
-                    nssf_compliance_certificate_date: null,
-                    nssf_registration_date: null,
-                    status: null
-                }
-            });
-        });
-
-        parsedData.forEach(row => {
-            const fieldName = row["#_1"];
-            if (!fieldName) return;
-
-            valueColumns.forEach(colName => {
-                const companyData = companiesMap.get(colName);
-                const value = row[colName];
-
-                if (companyData && value) {
-                    // Main Company Details
-                    switch (fieldName) {
-                        case "Company Name":
-                            companyData.mainCompany.company_name = value;
-                            companyData.nssfDetails.company_name = value;
-                            companyData.nhifDetails.company_name = value;
-                            companyData.passwordDetails.company_name = value;
-                            companyData.ecitizenDetails.name = value;
-                            companyData.nhifCompanies.company_name = value;
-                            companyData.nssfCompanies.company_name = value;
-                            break;
-                        case "Company Type":
-                            companyData.mainCompany.company_type = value;
-                            break;
-                        case "Description":
-                            companyData.mainCompany.description = value;
-                            break;
-                        case "Registration Number":
-                            companyData.mainCompany.registration_number = value;
-                            break;
-                        case "Date Established":
-                            companyData.mainCompany.date_established = value;
-                            break;
-                        case "Industry":
-                            companyData.mainCompany.industry = value;
-                            break;
-                        case "Employees":
-                            companyData.mainCompany.employees = value;
-                            break;
-                        case "Annual Revenue":
-                            companyData.mainCompany.annual_revenue = value;
-                            break;
-                        case "Fiscal Year":
-                            companyData.mainCompany.fiscal_year = value;
-                            break;
-                        case "Website":
-                            companyData.mainCompany.website = value;
-                            break;
-                        case "Email":
-                            companyData.mainCompany.email = value;
-                            break;
-                        case "Phone":
-                            companyData.mainCompany.phone = value;
-                            break;
-                        case "Street":
-                            companyData.mainCompany.street = value;
-                            break;
-                        case "City":
-                            companyData.mainCompany.city = value;
-                            break;
-                        case "Postal Code":
-                            companyData.mainCompany.postal_code = value;
-                            break;
-                        case "Country":
-                            companyData.mainCompany.country = value;
-                            break;
-
-                        // NSSF Details
-                        case "NSSF Code":
-                            companyData.nssfDetails.nssf_code = value;
-                            break;
-                        case "NSSF Password":
-                            companyData.nssfDetails.nssf_password = value;
-                            break;
-                        case "NSSF Status":
-                            companyData.nssfDetails.nssf_status = value;
-                            break;
-                        case "NSSF Registration Date":
-                            companyData.nssfDetails.nssf_registration_date = value;
-                            break;
-                        case "NSSF Compliance Certificate Date":
-                            companyData.nssfDetails.nssf_compliance_certificate_date = value;
-                            break;
-
-                        // NHIF Details
-                        case "NHIF Code":
-                            companyData.nhifDetails.nhif_code = value;
-                            companyData.nhifDetails.identifier = value;
-                            break;
-                        case "NHIF Password":
-                            companyData.nhifDetails.nhif_password = value;
-                            break;
-                        case "NHIF Mobile":
-                            companyData.nhifDetails.nhif_mobile = value;
-                            break;
-                        case "NHIF Email":
-                            companyData.nhifDetails.nhif_email = value;
-                            break;
-                        case "NHIF Email Password":
-                            companyData.nhifDetails.email_password = value;
-                            break;
-                        case "Director":
-                            companyData.nhifDetails.director = value;
-                            break;
-
-                        // Password Checker Details
-                        case "KRA PIN":
-                            companyData.passwordDetails.kra_pin = value;
-                            break;
-                        case "KRA Password":
-                            companyData.passwordDetails.kra_password = value;
-                            break;
-                        case "PIN Status":
-                            companyData.passwordDetails.pin_status = value;
-                            break;
-
-                        // ECitizen Details
-                        case "ECitizen Identifier":
-                            companyData.ecitizenDetails.ecitizen_identifier = value;
-                            break;
-                        case "ECitizen Password":
-                            companyData.ecitizenDetails.ecitizen_password = value;
-                            break;
-                        case "ECitizen Status":
-                            companyData.ecitizenDetails.ecitizen_status = value;
-                            break;
-
-                        // Acc Portal Directors
-                        case "First Name":
-                            companyData.accPortalDirectors.first_name = value;
-                            break;
-                        case "Last Name":
-                            companyData.accPortalDirectors.last_name = value;
-                            break;
-                        case "Middle Name":
-                            companyData.accPortalDirectors.middle_name = value;
-                            break;
-                        case "Other Names":
-                            companyData.accPortalDirectors.other_names = value;
-                            break;
-                        case "Gender":
-                            companyData.accPortalDirectors.gender = value;
-                            break;
-                        case "Date of Birth":
-                            companyData.accPortalDirectors.date_of_birth = value;
-                            break;
-                        case "ID Number":
-                            companyData.accPortalDirectors.id_number = value;
-                            break;
-                    }
-                }
-            });
-        });
-
-        const transformedData = Array.from(companiesMap.values())
-            .filter(data => data.mainCompany.company_name);
-
-        console.log('Transformed Data:', transformedData);
-
-        for (const data of transformedData) {
-            const { data: mainCompanyData, error: mainCompanyError } = await supabase
-                .from('acc_portal_company_duplicate')
-                .insert([data.mainCompany]);
-
-            const { data: nssfData, error: nssfError } = await supabase
-                .from('nssf_companies_duplicate')
-                .insert([data.nssfDetails]);
-
-            const { data: nhifData, error: nhifError } = await supabase
-                .from('nhif_companies_duplicate2')
-                .insert([data.nhifDetails]);
-
-            const { data: passwordData, error: passwordError } = await supabase
-                .from('PasswordChecker_duplicate')
-                .insert([data.passwordDetails]);
-
-            const { data: ecitizenData, error: ecitizenError } = await supabase
-                .from('ecitizen_companies_duplicate')
-                .insert([data.ecitizenDetails]);
-
-            const { data: directorData, error: directorError } = await supabase
-                .from('acc_portal_directors_duplicate')
-                .insert([data.accPortalDirectors]);
-
-            if (mainCompanyError || nssfError || nhifError || passwordError || ecitizenError || directorError) {
-                throw new Error('Error updating data');
+        try {
+            let parsedData;
+            if (file.name.endsWith('.csv')) {
+                const text = await file.text();
+                parsedData = Papa.parse(text, { header: true }).data;
+            } else {
+                const buffer = await file.arrayBuffer();
+                const wb = XLSX.read(buffer);
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                parsedData = XLSX.utils.sheet_to_json(ws);
             }
+
+            console.log('Raw Parsed Data:', parsedData);
+            const valueColumns = Object.keys(parsedData[0]).filter(key =>
+                key !== '#' &&
+                key !== 'General' &&
+                key !== '#_1' &&
+                !key.includes('Section') &&
+                !key.includes('Category')
+            );
+
+            console.log('Detected value columns:', valueColumns);
+            const companiesMap = new Map();
+
+            valueColumns.forEach((colName) => {
+                companiesMap.set(colName, {
+                    mainCompany: {
+                        company_name: null,
+                        company_type: null,
+                        description: null,
+                        registration_number: null,
+                        date_established: null,
+                        kra_pin: 'Missing',
+                        industry: null,
+                        employees: null,
+                        annual_revenue: null,
+                        fiscal_year: null,
+                        website: null,
+                        company_email: null,
+                        phone: null,
+                        street: null,
+                        city: null,
+                        postal_code: null,
+                        country: null,
+                        status: '',
+                        housing_levy_identifier: null,
+                        housing_levy_password: null,
+                        housing_levy_status: null,
+                        standard_levy_identifier: null,
+                        standard_levy_password: null,
+                        standard_levy_status: null,
+                        tourism_levy_identifier: null,
+                        tourism_levy_password: null,
+                        tourism_levy_status: null,
+                        tourism_fund_username: null,
+                        tourism_fund_password: null,
+                        vat_identifier: null,
+                        vat_password: null,
+                        vat_status: null,
+                        vat_from: null,
+                        vat_to: null,
+                        pin_status: null,
+                        itax_status: null,
+                        income_tax_resident_status: null,
+                        income_tax_resident_from: null,
+                        income_tax_resident_to: null,
+                        nea_username: null,
+                        nea_password: null,
+                        rent_income_status: null,
+                        rent_income_from: null,
+                        rent_income_to: null,
+                        turnover_tax_status: null,
+                        turnover_tax_from: null,
+                        turnover_tax_to: null,
+                        nature_of_business: null,
+                        audit_period: null,
+                        sale_terms: null
+                    },
+                    nssfDetails: {
+                        company_name: null,
+                        nssf_identifier: null,
+                        nssf_password: null,
+                        nssf_status: 'Pending',
+                        nssf_code: null,
+                        nssf_compliance_certificate_date: null,
+                        nssf_registration_date: null,
+                        status: null
+                    },
+                    nhifDetails: {
+                        company_name: null,
+                        nhif_identifier: null,
+                        nhif_password: null,
+                        nhif_status: 'Pending',
+                        nhif_code: null,
+                        director: null,
+                        nhif_mobile: null,
+                        nhif_email: null,
+                        nhif_email_password: null
+                    },
+                    passwordDetails: {
+                        company_name: null,
+                        kra_pin: 'Missing',
+                        kra_password: null,
+                        pin_status: null,
+                        status: null
+                    },
+                    ecitizenDetails: {
+                        name: null,
+                        ecitizen_identifier: null,
+                        ecitizen_password: null,
+                        ecitizen_status: 'Pending',
+                        director: null
+                    },
+                    etimsDetails: {
+                        company_name: null,
+                        etims_username: null,
+                        etims_cert_incorporation: null,
+                        etims_pin: null,
+                        etims_comment: null,
+                        etims_director_pin: null,
+                        etims_current_director_pin: null,
+                        etims_operator: null,
+                        etims_password: null,
+                        etims_mobile: null,
+                        etims_email: null,
+                        etims_reg_doc_number: null
+                    },
+                    accPortalDirectors: {
+                        company_id: null,
+                        first_name: null,
+                        middle_name: null,
+                        last_name: null,
+                        other_names: null,
+                        full_name: null,
+                        gender: null,
+                        place_of_birth: null,
+                        country_of_birth: null,
+                        nationality: null,
+                        marital_status: null,
+                        date_of_birth: null,
+                        passport_number: null,
+                        passport_place_of_issue: null,
+                        passport_issue_date: null,
+                        passport_expiry_date: null,
+                        passport_file_number: null,
+                        id_number: null,
+                        alien_number: null,
+                        tax_pin: null,
+                        eye_color: null,
+                        hair_color: null,
+                        height: null,
+                        special_marks: null,
+                        mobile_number: null,
+                        email_address: null,
+                        alternative_email: null,
+                        building_name: null,
+                        floor_number: null,
+                        block_number: null,
+                        road_name: null,
+                        area_name: null,
+                        town: null,
+                        country: null,
+                        full_residential_address: null,
+                        residential_county: null,
+                        sub_county: null,
+                        postal_address: null,
+                        postal_code: null,
+                        postal_town: null,
+                        full_postal_address: null,
+                        university_name: null,
+                        course_name: null,
+                        course_start_date: null,
+                        course_end_date: null,
+                        job_position: null,
+                        job_description: null,
+                        shares_held: null,
+                        other_directorships: null,
+                        dependents: null,
+                        annual_income: null,
+                        languages_spoken: null,
+                        occupation: null,
+                        education_level: null,
+                        criminal_record: null,
+                        bankruptcy_history: null,
+                        professional_memberships: null,
+                        userid: null,
+                        status: 'missing'
+                    },
+                    nhifCompanies: {
+                        company_name: null,
+                        nhif_identifier: null,
+                        nhif_password: null,
+                        nhif_status: 'Pending',
+                        nhif_code: null,
+                        director: null,
+                        nhif_mobile: null,
+                        nhif_email: null,
+                        nhif_email_password: null
+                    },
+                    nssfCompanies: {
+                        company_name: null,
+                        nssf_identifier: null,
+                        nssf_password: null,
+                        nssf_status: 'Pending',
+                        nssf_code: null,
+                        nssf_compliance_certificate_date: null,
+                        nssf_registration_date: null,
+                        status: null
+                    }
+                });
+            });
+
+            parsedData.forEach(row => {
+                const fieldName = row["#_1"];
+                if (!fieldName) return;
+
+                valueColumns.forEach(colName => {
+                    const companyData = companiesMap.get(colName);
+                    const value = row[colName];
+
+                    if (companyData && value) {
+                        // Main Company Details
+                        switch (fieldName) {
+                            case "Company Name":
+                                companyData.mainCompany.company_name = value;
+                                companyData.nssfDetails.company_name = value;
+                                companyData.nhifDetails.company_name = value;
+                                companyData.passwordDetails.company_name = value;
+                                companyData.ecitizenDetails.name = value;
+                                companyData.etimsDetails.company_name = value;
+                                companyData.nhifCompanies.company_name = value;
+                                companyData.nssfCompanies.company_name = value;
+                                break;
+                            case "Company Type":
+                                companyData.mainCompany.company_type = value;
+                                break;
+                            case "Description":
+                                companyData.mainCompany.description = value;
+                                break;
+                            case "Registration Number":
+                                companyData.mainCompany.registration_number = value;
+                                break;
+                            case "Date Established":
+                                companyData.mainCompany.date_established = value;
+                                break;
+                            case "KRA PIN":
+                                companyData.mainCompany.kra_pin = value;
+                                break;
+                            case "Industry":
+                                companyData.mainCompany.industry = value;
+                                break;
+                            case "Employees":
+                                companyData.mainCompany.employees = value;
+                                break;
+                            case "Annual Revenue":
+                                companyData.mainCompany.annual_revenue = value;
+                                break;
+                            case "Fiscal Year":
+                                companyData.mainCompany.fiscal_year = value;
+                                break;
+                            case "Website":
+                                companyData.mainCompany.website = value;
+                                break;
+                            case "Company Email":
+                                companyData.mainCompany.company_email = value;
+                                break;
+                            case "Phone":
+                                companyData.mainCompany.phone = value;
+                                break;
+                            case "Street":
+                                companyData.mainCompany.street = value;
+                                break;
+                            case "City":
+                                companyData.mainCompany.city = value;
+                                break;
+                            case "Postal Code":
+                                companyData.mainCompany.postal_code = value;
+                                break;
+                            case "Country":
+                                companyData.mainCompany.country = value;
+                                break;
+                            case "Housing Levy Identifier":
+                                companyData.mainCompany.housing_levy_identifier = value;
+                                break;
+                            case "Housing Levy Password":
+                                companyData.mainCompany.housing_levy_password = value;
+                                break;
+                            case "Housing Levy Status":
+                                companyData.mainCompany.housing_levy_status = value;
+                                break;
+                            case "Standard Levy Identifier":
+                                companyData.mainCompany.standard_levy_identifier = value;
+                                break;
+                            case "Standard Levy Password":
+                                companyData.mainCompany.standard_levy_password = value;
+                                break;
+                            case "Standard Levy Status":
+                                companyData.mainCompany.standard_levy_status = value;
+                                break;
+                            case "Tourism Levy Identifier":
+                                companyData.mainCompany.tourism_levy_identifier = value;
+                                break;
+                            case "Tourism Levy Password":
+                                companyData.mainCompany.tourism_levy_password = value;
+                                break;
+                            case "Tourism Levy Status":
+                                companyData.mainCompany.tourism_levy_status = value;
+                                break;
+                            case "Tourism Fund Username":
+                                companyData.mainCompany.tourism_fund_username = value;
+                                break;
+                            case "Tourism Fund Password":
+                                companyData.mainCompany.tourism_fund_password = value;
+                                break;
+                            case "VAT Identifier":
+                                companyData.mainCompany.vat_identifier = value;
+                                break;
+                            case "VAT Password":
+                                companyData.mainCompany.vat_password = value;
+                                break;
+                            case "VAT Status":
+                                companyData.mainCompany.vat_status = value;
+                                break;
+                            case "VAT From":
+                                companyData.mainCompany.vat_from = value;
+                                break;
+                            case "VAT To":
+                                companyData.mainCompany.vat_to = value;
+                                break;
+                            case "PIN Status":
+                                companyData.mainCompany.pin_status = value;
+                                break;
+                            case "iTax Status":
+                                companyData.mainCompany.itax_status = value;
+                                break;
+                            case "Income Tax Resident Status":
+                                companyData.mainCompany.income_tax_resident_status = value;
+                                break;
+                            case "Income Tax Resident From":
+                                companyData.mainCompany.income_tax_resident_from = value;
+                                break;
+                            case "Income Tax Resident To":
+                                companyData.mainCompany.income_tax_resident_to = value;
+                                break;
+                            case "NEA Username":
+                                companyData.mainCompany.nea_username = value;
+                                break;
+                            case "NEA Password":
+                                companyData.mainCompany.nea_password = value;
+                                break;
+                            case "Rent Income Status":
+                                companyData.mainCompany.rent_income_status = value;
+                                break;
+                            case "Rent Income From":
+                                companyData.mainCompany.rent_income_from = value;
+                                break;
+                            case "Rent Income To":
+                                companyData.mainCompany.rent_income_to = value;
+                                break;
+                            case "Turnover Tax Status":
+                                companyData.mainCompany.turnover_tax_status = value;
+                                break;
+                            case "Turnover Tax From":
+                                companyData.mainCompany.turnover_tax_from = value;
+                                break;
+                            case "Turnover Tax To":
+                                companyData.mainCompany.turnover_tax_to = value;
+                                break;
+                            case "Nature of Business":
+                                companyData.mainCompany.nature_of_business = value;
+                                break;
+                            case "Audit Period":
+                                companyData.mainCompany.audit_period = value;
+                                break;
+                            case "Sale Terms":
+                                companyData.mainCompany.sale_terms = value;
+                                break;
+                            // NSSF Details
+                            case "NSSF Code":
+                                companyData.nssfDetails.nssf_code = value;
+                                break;
+                            case "NSSF Identifier":
+                                companyData.nssfDetails.nssf_identifier = value;
+                                break;
+                            case "NSSF Password":
+                                companyData.nssfDetails.nssf_password = value;
+                                break;
+                            case "NSSF Status":
+                                companyData.nssfDetails.nssf_status = value;
+                                break;
+                            case "NSSF Registration Date":
+                                companyData.nssfDetails.nssf_registration_date = value;
+                                break;
+                            case "NSSF Compliance Certificate Date":
+                                companyData.nssfDetails.nssf_compliance_certificate_date = value;
+                                break;
+
+                            // NHIF Details
+                            case "NHIF Code":
+                                companyData.nhifDetails.nhif_code = value;
+
+                                break;
+                            case "NHIF Identifier":
+                                companyData.nhifDetails.nhif_identifier = value;
+
+                                break;
+                            case "NHIF Password":
+                                companyData.nhifDetails.nhif_password = value;
+                                break;
+                            case "NHIF Mobile":
+                                companyData.nhifDetails.nhif_mobile = value;
+                                break;
+                            case "NHIF Email":
+                                companyData.nhifDetails.nhif_email = value;
+                                break;
+                            case "NHIF Email Password":
+                                companyData.nhifDetails.nhif_email_password = value;
+                                break;
+                            case "NHIF Compliance Certificate Date":
+                                companyData.nhifDetails.nhif_compliance_date = value;
+                                break;
+                            case "NHIF Registration Date":
+                                companyData.nhifDetails.nhif_compliance_date = value;
+                                break;
+                            case "NHIF Status":
+                                companyData.nhifDetails.nhif_status = value;
+                                break;
+
+
+                            // Password Checker Details
+                            case "KRA PIN":
+                                companyData.passwordDetails.kra_pin = value;
+                                break;
+                            case "KRA Password":
+                                companyData.passwordDetails.kra_password = value;
+                                break;
+                            case "PIN Status":
+                                companyData.passwordDetails.pin_status = value;
+                                break;
+
+                            // ECitizen Details
+                            case "ECitizen Identifier":
+                                companyData.ecitizenDetails.ecitizen_identifier = value;
+                                break;
+                            case "ECitizen Password":
+                                companyData.ecitizenDetails.ecitizen_password = value;
+                                break;
+                            case "ECitizen Status":
+                                companyData.ecitizenDetails.ecitizen_status = value;
+                                break;
+
+                            // TIMS Details
+                            case "ETIMS Username":
+                                companyData.etimsDetails.etims_username = value;
+                                break;
+                            case "ETIMS Certificate of Incorporation":
+                                companyData.etimsDetails.etims_cert_incorporation = value;
+                                break;
+                            case "ETIMS PIN Number":
+                                companyData.etimsDetails.etims_pin = value;
+                                break;
+                            case "ETIMS Comment":
+                                companyData.etimsDetails.etims_comment = value;
+                                break;
+                            case "ETIMS Director PIN in System":
+                                companyData.etimsDetails.etims_director_pin = value;
+                                break;
+                            case "ETIMS Current Director PIN":
+                                companyData.etimsDetails.etims_current_director_pin = value;
+                                break;
+                            case "ETIMS Operator (ID Name + Number)":
+                                companyData.etimsDetails.etims_operator = value;
+                                break;
+                            case "ETIMS Password":
+                                companyData.etimsDetails.etims_password = value;
+                                break;
+                            case "ETIMS Mobile Number + Name":
+                                companyData.etimsDetails.etims_mobile = value;
+                                break;
+                            case "ETIMS Email Address":
+                                companyData.etimsDetails.etims_email = value;
+                                break;
+                            case "Registration Document Number":
+                                companyData.etimsDetails.etims_reg_doc_number = value;
+                                break;
+                            // Acc Portal Directors
+                            case "First Name":
+                                companyData.accPortalDirectors.first_name = value;
+                                break;
+                            case "Last Name":
+                                companyData.accPortalDirectors.last_name = value;
+                                break;
+                            case "Middle Name":
+                                companyData.accPortalDirectors.middle_name = value;
+                                break;
+                            case "Other Names":
+                                companyData.accPortalDirectors.other_names = value;
+                                break;
+                            case "Gender":
+                                companyData.accPortalDirectors.gender = value;
+                                break;
+                            case "Date of Birth":
+                                companyData.accPortalDirectors.date_of_birth = value;
+                                break;
+                            case "ID Number":
+                                companyData.accPortalDirectors.id_number = value;
+                                break;
+                            case "Company ID":
+                                companyData.accPortalDirectors.company_id = value;
+                                break;
+                            case "Full Name":
+                                companyData.accPortalDirectors.full_name = value;
+                                break;
+                            case "Place of Birth":
+                                companyData.accPortalDirectors.place_of_birth = value;
+                                break;
+                            case "Country of Birth":
+                                companyData.accPortalDirectors.country_of_birth = value;
+                                break;
+                            case "Nationality":
+                                companyData.accPortalDirectors.nationality = value;
+                                break;
+                            case "Marital Status":
+                                companyData.accPortalDirectors.marital_status = value;
+                                break;
+                            case "Passport Number":
+                                companyData.accPortalDirectors.passport_number = value;
+                                break;
+                            case "Passport Place of Issue":
+                                companyData.accPortalDirectors.passport_place_of_issue = value;
+                                break;
+                            case "Passport Issue Date":
+                                companyData.accPortalDirectors.passport_issue_date = value;
+                                break;
+                            case "Passport Expiry Date":
+                                companyData.accPortalDirectors.passport_expiry_date = value;
+                                break;
+                            case "Passport File Number":
+                                companyData.accPortalDirectors.passport_file_number = value;
+                                break;
+                            case "Alien Number":
+                                companyData.accPortalDirectors.alien_number = value;
+                                break;
+                            case "Tax PIN":
+                                companyData.accPortalDirectors.tax_pin = value;
+                                break;
+                            case "Eye Color":
+                                companyData.accPortalDirectors.eye_color = value;
+                                break;
+                            case "Hair Color":
+                                companyData.accPortalDirectors.hair_color = value;
+                                break;
+                            case "Height":
+                                companyData.accPortalDirectors.height = value;
+                                break;
+                            case "Special Marks":
+                                companyData.accPortalDirectors.special_marks = value;
+                                break;
+                            case "Mobile Number":
+                                companyData.accPortalDirectors.mobile_number = value;
+                                break;
+                            case "Email Address":
+                                companyData.accPortalDirectors.email_address = value;
+                                break;
+                            case "Alternative Email":
+                                companyData.accPortalDirectors.alternative_email = value;
+                                break;
+                            case "Building Name":
+                                companyData.accPortalDirectors.building_name = value;
+                                break;
+                            case "Floor Number":
+                                companyData.accPortalDirectors.floor_number = value;
+                                break;
+                            case "Block Number":
+                                companyData.accPortalDirectors.block_number = value;
+                                break;
+                            case "Road Name":
+                                companyData.accPortalDirectors.road_name = value;
+                                break;
+                            case "Area Name":
+                                companyData.accPortalDirectors.area_name = value;
+                                break;
+                            case "Town":
+                                companyData.accPortalDirectors.town = value;
+                                break;
+                            case "Country":
+                                companyData.accPortalDirectors.country = value;
+                                break;
+                            case "Full Residential Address":
+                                companyData.accPortalDirectors.full_residential_address = value;
+                                break;
+                            case "Residential County":
+                                companyData.accPortalDirectors.residential_county = value;
+                                break;
+                            case "Sub County":
+                                companyData.accPortalDirectors.sub_county = value;
+                                break;
+                            case "Postal Address":
+                                companyData.accPortalDirectors.postal_address = value;
+                                break;
+                            case "Postal Code":
+                                companyData.accPortalDirectors.postal_code = value;
+                                break;
+                            case "Postal Town":
+                                companyData.accPortalDirectors.postal_town = value;
+                                break;
+                            case "Full Postal Address":
+                                companyData.accPortalDirectors.full_postal_address = value;
+                                break;
+                            case "University Name":
+                                companyData.accPortalDirectors.university_name = value;
+                                break;
+                            case "Course Name":
+                                companyData.accPortalDirectors.course_name = value;
+                                break;
+                            case "Course Start Date":
+                                companyData.accPortalDirectors.course_start_date = value;
+                                break;
+                            case "Course End Date":
+                                companyData.accPortalDirectors.course_end_date = value;
+                                break;
+                            case "Job Position":
+                                companyData.accPortalDirectors.job_position = value;
+                                break;
+                            case "Job Description":
+                                companyData.accPortalDirectors.job_description = value;
+                                break;
+                            case "Shares Held":
+                                companyData.accPortalDirectors.shares_held = value;
+                                break;
+                            case "Other Directorships":
+                                companyData.accPortalDirectors.other_directorships = value;
+                                break;
+                            case "Dependents":
+                                companyData.accPortalDirectors.dependents = value;
+                                break;
+                            case "Annual Income":
+                                companyData.accPortalDirectors.annual_income = value;
+                                break;
+                            case "Languages Spoken":
+                                companyData.accPortalDirectors.languages_spoken = value;
+                                break;
+                            case "Occupation":
+                                companyData.accPortalDirectors.occupation = value;
+                                break;
+                            case "Education Level":
+                                companyData.accPortalDirectors.education_level = value;
+                                break;
+                            case "Criminal Record":
+                                companyData.accPortalDirectors.criminal_record = value;
+                                break;
+                            case "Bankruptcy History":
+                                companyData.accPortalDirectors.bankruptcy_history = value;
+                                break;
+                            case "Professional Memberships":
+                                companyData.accPortalDirectors.professional_memberships = value;
+                                break;
+                            case "User ID":
+                                companyData.accPortalDirectors.userid = value;
+                                break;
+                            case "Status":
+                                companyData.accPortalDirectors.status = value;
+                                break;                        }
+                    }
+                });
+            });
+
+            const transformedData = Array.from(companiesMap.values())
+                .filter(data => data.mainCompany.company_name);
+
+            console.log('Transformed Data:', transformedData);
+
+            for (const data of transformedData) {
+                // Check if company exists before upserting
+                const { data: existingCompany } = await supabase
+                    .from('acc_portal_company_duplicate')
+                    .select('company_name')
+                    .eq('company_name', data.mainCompany.company_name)
+                    .single();
+    
+                if (!existingCompany) {
+                    // Company doesn't exist - insert new record
+                    const { error: mainCompanyError } = await supabase
+                        .from('acc_portal_company_duplicate')
+                        .insert([data.mainCompany]);
+                    
+                    if (mainCompanyError) throw mainCompanyError;
+                    
+                    // Insert related records for new company
+                    await Promise.all([
+                        supabase.from('nssf_companies_duplicate').insert([data.nssfDetails]),
+                        supabase.from('nhif_companies_duplicate2').insert([data.nhifDetails]),
+                        supabase.from('PasswordChecker_duplicate').insert([data.passwordDetails]),
+                        supabase.from('ecitizen_companies_duplicate').insert([data.ecitizenDetails]),
+                        supabase.from('etims_companies_duplicate').insert([data.etimsDetails]),
+                        supabase.from('acc_portal_directors_duplicate').insert([data.accPortalDirectors])
+                    ]);
+                } else {
+                    // Company exists - update only changed fields
+                    const { error: updateError } = await supabase
+                        .from('acc_portal_company_duplicate')
+                        .update(data.mainCompany)
+                        .eq('company_name', data.mainCompany.company_name);
+                    
+                    if (updateError) throw updateError;
+                }
+            }
+    
+            toast.success(`Successfully updated ${transformedData.length} companies`);
+            fetchAllData();
+
+        } catch (error) {
+            console.error('Import error:', error);
+            toast.error('Failed to import data');
         }
+    };
 
-        toast.success(`Successfully updated ${transformedData.length} companies`);
-        fetchAllData();
 
-    } catch (error) {
-        console.error('Import error:', error);
-        toast.error('Failed to import data');
-    }
-};
-const ImportDialog = () => {
+    const ImportDialog = () => {
         return (
             <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
                 <DialogContent className="max-w-md">
@@ -850,39 +1212,39 @@ const ImportDialog = () => {
     };
     const calculateTotalFields = (section) => {
         return section.categorizedFields?.reduce((total, category) => {
-          if (category.isSeparator) return total;
-          return total + category.fields.length;
+            if (category.isSeparator) return total;
+            return total + category.fields.length;
         }, 0) || 0;
-      };
-      
-      const calculateCompletedFields = (section, data) => {
+    };
+
+    const calculateCompletedFields = (section, data) => {
         let completed = 0;
         section.categorizedFields?.forEach(category => {
-          if (!category.isSeparator) {
-            category.fields.forEach(field => {
-              if (data.some(item => item[field.name])) {
-                completed++;
-              }
-            });
-          }
+            if (!category.isSeparator) {
+                category.fields.forEach(field => {
+                    if (data.some(item => item[field.name])) {
+                        completed++;
+                    }
+                });
+            }
         });
         return completed;
-      };
-      
-      const calculatePendingFields = (section, data) => {
+    };
+
+    const calculatePendingFields = (section, data) => {
         const total = calculateTotalFields(section);
         const completed = calculateCompletedFields(section, data);
         return total - completed;
-      };
+    };
 
-      const calculateFieldStats = (fieldName, data) => {
+    const calculateFieldStats = (fieldName, data) => {
         const total = data.length;
-        const completed = data.filter(item => 
-            item.company[fieldName] !== null && 
-            item.company[fieldName] !== undefined && 
+        const completed = data.filter(item =>
+            item.company[fieldName] !== null &&
+            item.company[fieldName] !== undefined &&
             item.company[fieldName] !== ''
         ).length;
-        
+
         return {
             total,
             completed,
@@ -942,144 +1304,144 @@ const ImportDialog = () => {
     );
   })}
 </TableRow> */}
-                                
-    {/* Section Headers */}
-    <TableRow>
-            {processedSections.map(section => {
-                if (section.isSeparator) return renderSeparatorCell();
-                const sectionColor = sectionColors[section.name]?.main || 'bg-gray-600';
-                
-                return (
-                    <TableHead 
-                    key={section.name}
-                    colSpan={section.categorizedFields?.reduce((total, cat) => 
-                        total + (cat.isSeparator ? 1 : cat.fields.length), 0)}
-                    className={`text-center text-white ${sectionColor}`}
-                >
-                    {`${section.reference ?? ''} ${section.label}`}
-                </TableHead>
-                );
-            })}
-        </TableRow>
 
-        {/* Category Headers */}
-        <TableRow>
-            {processedSections.map(section => {
-                if (section.isSeparator) return renderSeparatorCell();
-                
-                return section.categorizedFields?.map(category => {
-                    if (category.isSeparator) return renderSeparatorCell();
-                    const categoryColor = categoryColors[category.category]?.bg || 'bg-gray-50';
-                    
-                    return (
-                        <TableHead
-                        key={`${section.name}-${category.category}`}
-                        colSpan={category.fields.length}
-                        className={`text-center ${categoryColor}`}
-                    >
-                        {`${category.reference ?? ''} ${category.category}`}
-                    </TableHead>
-                    );
-                });
-            })}
-        </TableRow>
+                                    {/* Section Headers */}
+                                    <TableRow>
+                                        {processedSections.map(section => {
+                                            if (section.isSeparator) return renderSeparatorCell();
+                                            const sectionColor = sectionColors[section.name]?.main || 'bg-gray-600';
 
-        {/* Field Headers */}
-        <TableRow>
-            {processedSections.map(section => {
-                if (section.isSeparator) return renderSeparatorCell();
-                
-                return section.categorizedFields?.map(category => {
-                    if (category.isSeparator) return renderSeparatorCell();
-                    
-                    return category.fields.map(field => (
-                        <TableHead 
-                        key={`${section.name}-${field.name}`}
-                        className={`whitespace-nowrap ${sectionColors[section.name]?.sub || 'bg-gray-500'} text-white`}
-                    >
-                                            <div className="flex flex-col">
-                                                <span>{field.reference ?? ''}</span>
-                                                <span>{field.label}</span>
-                                            </div>
-                    </TableHead>
-                    ));
-                });
-            })}
-        </TableRow>
+                                            return (
+                                                <TableHead
+                                                    key={section.name}
+                                                    colSpan={section.categorizedFields?.reduce((total, cat) =>
+                                                        total + (cat.isSeparator ? 1 : cat.fields.length), 0)}
+                                                    className={`text-center text-white ${sectionColor}`}
+                                                >
+                                                    {`${section.reference ?? ''} ${section.label}`}
+                                                </TableHead>
+                                            );
+                                        })}
+                                    </TableRow>
 
-        <TableRow className="bg-blue-50">
-    <TableHead className="font-semibold text-blue-900">Total Companies</TableHead>
-    {processedSections.map((section, sectionIndex) => {
-        if (section.isSeparator) return renderSeparatorCell(`total-sep-${sectionIndex}`);
-        if (sectionIndex === 0) return null;
-        
-        return section.categorizedFields?.map(category => {
-            if (category.isSeparator) return renderSeparatorCell(`total-cat-sep-${sectionIndex}`);
-            
-            return category.fields.map(field => {
-                const stats = calculateFieldStats(field.name, data);
-                return (
-                    <TableCell 
-                        key={`total-${field.name}`}
-                        className="text-center font-medium text-blue-700"
-                    >
-                        {stats.total}
-                    </TableCell>
-                );
-            });
-        });
-    })}
-</TableRow>
+                                    {/* Category Headers */}
+                                    <TableRow>
+                                        {processedSections.map(section => {
+                                            if (section.isSeparator) return renderSeparatorCell();
 
-<TableRow className="bg-green-50">
-    <TableHead className="font-semibold text-green-900">Completed</TableHead>
-    {processedSections.map((section, sectionIndex) => {
-        if (section.isSeparator) return renderSeparatorCell(`completed-sep-${sectionIndex}`);
-        if (sectionIndex === 0) return null;
-        
-        return section.categorizedFields?.map(category => {
-            if (category.isSeparator) return renderSeparatorCell(`completed-cat-sep-${sectionIndex}`);
-            
-            return category.fields.map(field => {
-                const stats = calculateFieldStats(field.name, data);
-                return (
-                    <TableCell 
-                        key={`completed-${field.name}`}
-                        className="text-center font-medium text-green-700"
-                    >
-                        {stats.completed}
-                    </TableCell>
-                );
-            });
-        });
-    })}
-</TableRow>
+                                            return section.categorizedFields?.map(category => {
+                                                if (category.isSeparator) return renderSeparatorCell();
+                                                const categoryColor = categoryColors[category.category]?.bg || 'bg-gray-50';
 
-<TableRow className="bg-red-50">
-    <TableHead className="font-semibold text-red-900">Pending</TableHead>
-    {processedSections.map((section, sectionIndex) => {
-        if (section.isSeparator) return renderSeparatorCell(`pending-sep-${sectionIndex}`);
-        if (sectionIndex === 0) return null;
-        
-        return section.categorizedFields?.map(category => {
-            if (category.isSeparator) return renderSeparatorCell(`pending-cat-sep-${sectionIndex}`);
-            
-            return category.fields.map(field => {
-                const stats = calculateFieldStats(field.name, data);
-                return (
-                    <TableCell 
-                        key={`pending-${field.name}`}
-                        className="text-center font-medium text-red-700"
-                    >
-                        {stats.pending}
-                    </TableCell>
-                );
-            });
-        });
-    })}
-</TableRow>
+                                                return (
+                                                    <TableHead
+                                                        key={`${section.name}-${category.category}`}
+                                                        colSpan={category.fields.length}
+                                                        className={`text-center ${categoryColor}`}
+                                                    >
+                                                        {`${category.reference ?? ''} ${category.category}`}
+                                                    </TableHead>
+                                                );
+                                            });
+                                        })}
+                                    </TableRow>
 
-    </TableHeader>
+                                    {/* Field Headers */}
+                                    <TableRow>
+                                        {processedSections.map(section => {
+                                            if (section.isSeparator) return renderSeparatorCell();
+
+                                            return section.categorizedFields?.map(category => {
+                                                if (category.isSeparator) return renderSeparatorCell();
+
+                                                return category.fields.map(field => (
+                                                    <TableHead
+                                                        key={`${section.name}-${field.name}`}
+                                                        className={`whitespace-nowrap ${sectionColors[section.name]?.sub || 'bg-gray-500'} text-white`}
+                                                    >
+                                                        <div className="flex flex-col">
+                                                            <span>{field.reference ?? ''}</span>
+                                                            <span>{field.label}</span>
+                                                        </div>
+                                                    </TableHead>
+                                                ));
+                                            });
+                                        })}
+                                    </TableRow>
+
+                                    <TableRow className="bg-blue-50">
+                                        <TableHead className="font-semibold text-blue-900">Total Companies</TableHead>
+                                        {processedSections.map((section, sectionIndex) => {
+                                            if (section.isSeparator) return renderSeparatorCell(`total-sep-${sectionIndex}`);
+                                            if (sectionIndex === 0) return null;
+
+                                            return section.categorizedFields?.map(category => {
+                                                if (category.isSeparator) return renderSeparatorCell(`total-cat-sep-${sectionIndex}`);
+
+                                                return category.fields.map(field => {
+                                                    const stats = calculateFieldStats(field.name, data);
+                                                    return (
+                                                        <TableCell
+                                                            key={`total-${field.name}`}
+                                                            className="text-center font-medium text-blue-700"
+                                                        >
+                                                            {stats.total}
+                                                        </TableCell>
+                                                    );
+                                                });
+                                            });
+                                        })}
+                                    </TableRow>
+
+                                    <TableRow className="bg-green-50">
+                                        <TableHead className="font-semibold text-green-900">Completed</TableHead>
+                                        {processedSections.map((section, sectionIndex) => {
+                                            if (section.isSeparator) return renderSeparatorCell(`completed-sep-${sectionIndex}`);
+                                            if (sectionIndex === 0) return null;
+
+                                            return section.categorizedFields?.map(category => {
+                                                if (category.isSeparator) return renderSeparatorCell(`completed-cat-sep-${sectionIndex}`);
+
+                                                return category.fields.map(field => {
+                                                    const stats = calculateFieldStats(field.name, data);
+                                                    return (
+                                                        <TableCell
+                                                            key={`completed-${field.name}`}
+                                                            className="text-center font-medium text-green-700"
+                                                        >
+                                                            {stats.completed}
+                                                        </TableCell>
+                                                    );
+                                                });
+                                            });
+                                        })}
+                                    </TableRow>
+
+                                    <TableRow className="bg-red-50">
+                                        <TableHead className="font-semibold text-red-900">Pending</TableHead>
+                                        {processedSections.map((section, sectionIndex) => {
+                                            if (section.isSeparator) return renderSeparatorCell(`pending-sep-${sectionIndex}`);
+                                            if (sectionIndex === 0) return null;
+
+                                            return section.categorizedFields?.map(category => {
+                                                if (category.isSeparator) return renderSeparatorCell(`pending-cat-sep-${sectionIndex}`);
+
+                                                return category.fields.map(field => {
+                                                    const stats = calculateFieldStats(field.name, data);
+                                                    return (
+                                                        <TableCell
+                                                            key={`pending-${field.name}`}
+                                                            className="text-center font-medium text-red-700"
+                                                        >
+                                                            {stats.pending}
+                                                        </TableCell>
+                                                    );
+                                                });
+                                            });
+                                        })}
+                                    </TableRow>
+
+                                </TableHeader>
                                 <TableBody>
                                     {data.map((companyGroup, groupIndex) => (
                                         companyGroup.rows.map((row, rowIndex) => (
