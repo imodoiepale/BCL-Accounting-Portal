@@ -13,11 +13,11 @@ export const formFields = {
             { name: 'annual_revenue', label: 'Annual Revenue', type: 'text' },
             { name: 'fiscal_year', label: 'Fiscal Year', type: 'text' },
             { name: 'website', label: 'Website', type: 'url' },
-            { name: 'company_email', label: 'Company Email', type: 'email' },
+            { name: 'current_communication_email', label: 'Current Communication Email', type: 'email' },
             { name: 'phone', label: 'Phone', type: 'tel' },
             { name: 'street', label: 'Street', type: 'text' },
             { name: 'city', label: 'City', type: 'text' },
-            { name: 'postal_code', label: 'Postal Code', type: 'text' },
+            { name: 'postal_address', label: 'Postal Address', type: 'text' },
             { name: 'country', label: 'Country', type: 'text' },
             { name: 'name_verified_with_pin', label: 'Name Verified with PIN', type: 'text' },
             { name: 'client_category', label: 'Client Category', type: 'text' },
@@ -46,7 +46,7 @@ export const formFields = {
             { name: 'nhif_email_password', label: 'NHIF Email Password', type: 'text', category: 'NHIF Details' },
             { name: 'nhif_status', label: 'NHIF Status', type: 'text', category: 'NHIF Details' },
             { name: 'nhif_registration_date', label: 'NHIF Registration Date', type: 'date', category: 'NHIF Details' },
-            { name: 'nhif_compliance_date', label: 'NHIF Compliance Certificate Date', type: 'date', category: 'NHIF Details' },
+            { name: 'nhif_compliance_certificate_date', label: 'NHIF Compliance Certificate Date', type: 'date', category: 'NHIF Details' },
 
             // Ecitizen Details
             { name: 'ecitizen_password', label: 'ECitizen Password', type: 'text', category: 'E-Citizen Details' },
@@ -95,7 +95,9 @@ export const formFields = {
                            
 
                 // Sheria Details
-                { name: 'verified_status', label: 'Verified Status', type: 'text', category: 'Sheria Details' },
+                { name: 'verified', label: 'Verified', type: 'text', category: 'Sheria Details' },
+                { name: 'published', label: 'Pubilished', type: 'text', category: 'Sheria Details' },
+                { name: 'sheria_status', label: 'Status', type: 'text', category: 'Sheria Details' },
                 { name: 'bo_status', label: 'BO Status', type: 'text', category: 'Sheria Details' },
                 { name: 'co_cr_12_issue_date', label: 'CO CR 12 Issue Date', type: 'date', category: 'Sheria Details' },
                 { name: 'cr_12_as_at_date_of_issue', label: 'CR 12 as at Date of Issue', type: 'date', category: 'Sheria Details' },
@@ -112,9 +114,9 @@ export const formFields = {
             // Tax Status Details
             { name: 'pin_status', label: 'PIN Status', type: 'text', category: 'Pin Details' },
             { name: 'itax_status', label: 'iTax Status', type: 'text', category: 'Pin Details' },
-            { name: 'income_tax_resident_individual_status', label: 'Income Tax Resident Individual Status', type: 'text', category: 'Pin Details' },
-            { name: 'income_tax_resident_individual_from', label: 'Income Tax Resident Individual From', type: 'date', category: 'Pin Details' },
-            { name: 'income_tax_resident_individual_to', label: 'Income Tax Resident Individual To', type: 'date', category: 'Pin Details' },
+            { name: 'income_tax_company_status', label: 'Income Tax Company Status', type: 'text', category: 'Pin Details' },
+            { name: 'income_tax_company_from', label: 'Income Tax Company From', type: 'date', category: 'Pin Details' },
+            { name: 'income_tax_company_to', label: 'Income Tax Company To', type: 'date', category: 'Pin Details' },
             { name: 'income_tax_rent_income_current_status', label: 'Income Tax Rent Income Current Status', type: 'text' , category: 'Pin Details'  },
             { name: 'income_tax_rent_income_effective_from', label: 'Income Tax Rent Income Effective From', type: 'text' , category: 'Pin Details'  },
             { name: 'income_tax_rent_income_effective_to', label: 'Income Tax Rent Income Effective To', type: 'text' , category: 'Pin Details'  },
@@ -125,14 +127,19 @@ export const formFields = {
             { name: 'income_tax_turnover_tax_effective_from', label: 'Income Tax Turnover Tax Effective From', type: 'text' , category: 'Pin Details'  },
             { name: 'income_tax_turnover_tax_effective_to', label: 'Income Tax Turnover Tax Effective To', type: 'text' , category: 'Pin Details'  },
             { name: 'current_itax_gmail_yahoo_email_recovery', label: 'Current iTax Gmail Yahoo Email Recovery Email', type: 'email', category: 'Pin Details'  },
-            { name: 'current_tax_password', label: 'Current Tax Password', type: 'text', category: 'Pin Details'  },
+             { name: 'current_itax_password', label: 'Current iTax Password', type: 'text', category: 'Pin Details'  },
+            { name: 'old_itax_email', label: 'Old iTax Email', type: 'text', category: 'Pin Details'  },
+            { name: 'old_itax_password', label: 'Old iTax Email Password', type: 'text', category: 'Pin Details'  },
             { name: 'current_itax_gmail_email', label: 'Current iTax Gmail Email Address', type: 'email', category: 'Pin Details'  },
             { name: 'current_itax_system_gmail_password', label: 'Current iTax System Gmail Email Password', type: 'text', category: 'Pin Details'  },
+            { name: 'old_itax_system_gmail_password', label: 'Old iTax System Gmail Email Password', type: 'text', category: 'Pin Details'  },
+            { name: 'current_itax_gmail_email_recovery_email', label: 'Current iTax Gmail Email Recovery Email', type: 'text', category: 'Pin Details'  },
             { name: 'current_itax_gmail_email_recovery_mobile', label: 'Current iTax Gmail Email Recovery Mobile', type: 'text', category: 'Pin Details'  },
             { name: 'pin_station', label: 'PIN Station', type: 'text', category: 'Pin Details'  },
             { name: 'pin_station_manager_name', label: 'PIN Station Manager Name', type: 'text', category: 'Pin Details'  },
             { name: 'pin_station_manager_mobile', label: 'PIN Station Manager Mobile', type: 'text', category: 'Pin Details'  },
             { name: 'tax_year_end', label: 'Tax Year End', type: 'date', category: 'Pin Details'  },
+            { name: 'annual_income', label: 'Annual Income', type: 'date', category: 'Pin Details'  },
 
             // NEA Details
             { name: 'nea_username', label: 'NEA Username', type: 'text', category: 'NEA Details' },
