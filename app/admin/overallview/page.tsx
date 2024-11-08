@@ -189,10 +189,10 @@ const OverallView = () => {
                         ...company,
                         ...user?.metadata,
                         ...nssfInfo,
-                        nhif_details: nhifInfo,
-                        password_checker: passwordCheckerInfo,
-                        ecitizen_details: ecitizenInfo,
-                        etims_details: etimsInfo
+                        ...nhifInfo,
+                        ...passwordCheckerInfo,
+                        ...etimsInfo,
+                        ...ecitizenInfo,
                     },
                     directors: accPortalDirectorInfo,
                     rows: [{
@@ -370,22 +370,25 @@ const OverallView = () => {
     const handleExport = () => {
         const exportRows = [];
 
-        // Process data in the desired structure, skipping redundant section/category labels
+        // Process data in the desired structure, with section/category labels only on first occurrence
         processedSections.forEach(section => {
             if (!section.isSeparator) {
-                let isFirstField = true;
-
+                let currentSection = section.label;
+                
                 section.categorizedFields?.forEach(category => {
                     if (!category.isSeparator) {
-                        category.fields.forEach(field => {
-                            const row = [
-                                isFirstField ? section.label : '',         // Section only for the first field
-                                isFirstField ? category.category : '',  // Category only for the first field
-                                field.label,
-                                ...data.map(item => item.company[field.name] || '')
-                            ];
-                            exportRows.push(row);
-                            isFirstField = false; // Set to false after the first field in each section
+                        let currentCategory = category.category;
+                        
+                        category.fields.forEach((field, fieldIndex) => {
+                            if (field.name !== '#' && field.name !== 'General' && field.name !== '#_1') {
+                                const row = [
+                                    fieldIndex === 0 ? currentSection : '',  // Show section only for first field
+                                    fieldIndex === 0 ? currentCategory : '', // Show category only for first field
+                                    field.label,
+                                    ...data.map(item => item.company[field.name] || '')
+                                ];
+                                exportRows.push(row);
+                            }
                         });
                     }
                 });
@@ -414,7 +417,7 @@ const OverallView = () => {
             }
         }
 
-        // Define colors for different sections
+        // Define colors for different sections and categories
         const sectionColors = {
             'Basic Information': 'FFE6E6',  // Light Red
             'Financial Details': 'E6FFE6',  // Light Green
@@ -424,42 +427,69 @@ const OverallView = () => {
             'Other': 'E6FFFF'              // Light Cyan
         };
 
-        // Apply colors to data rows based on section
-        let currentRowIndex = 0;
-        processedSections.forEach(section => {
-            if (!section.isSeparator) {
-                const fillColor = sectionColors[section.label] || 'FFFFFF';
+        const categoryColors = {
+            'General': 'F0F0F0',           // Light Gray
+            'Financial': 'E6FFE6',         // Light Green
+            'Contact': 'E6E6FF',           // Light Blue
+            'Address': 'FFE6E6',           // Light Red
+            'Legal': 'FFE6FF'              // Light Purple
+        };
 
-                section.categorizedFields?.forEach(category => {
-                    if (!category.isSeparator) {
-                        category.fields.forEach(() => {
-                            // Apply fill color to each cell in the row
-                            for (let colIndex = 0; colIndex < 6; colIndex++) {
-                                const cellAddress = XLSX.utils.encode_cell({ r: currentRowIndex, c: colIndex });
-                                ws[cellAddress].s = {
-                                    fill: {
-                                        fgColor: { rgb: fillColor },
-                                        patternType: 'solid'
-                                    }
-                                };
-                            }
-                            currentRowIndex++;
-                        });
-                    }
-                });
+        // Apply colors to header row
+        const headerRow = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 0, c: exportRows[0].length - 1 } });
+        Object.keys(ws).forEach(cell => {
+            if (headerRow.includes(cell)) {
+                ws[cell].s = {
+                    fill: { fgColor: { rgb: 'CCCCCC' }, patternType: 'solid' },
+                    font: { bold: true }
+                };
             }
         });
+
+        // Apply colors to data rows based on section and category
+        let lastSection = '';
+        let lastCategory = '';
+        
+        for (let rowIndex = 1; rowIndex < exportRows.length; rowIndex++) {
+            const section = exportRows[rowIndex][0] || lastSection;
+            const category = exportRows[rowIndex][1] || lastCategory;
+            
+            lastSection = section;
+            lastCategory = category;
+            
+            const sectionColor = sectionColors[section] || 'FFFFFF';
+            const categoryColor = categoryColors[category] || 'FFFFFF';
+
+            // Apply section color to section column
+            const sectionCell = XLSX.utils.encode_cell({ r: rowIndex, c: 0 });
+            ws[sectionCell].s = {
+                fill: { fgColor: { rgb: sectionColor }, patternType: 'solid' }
+            };
+
+            // Apply category color to category column
+            const categoryCell = XLSX.utils.encode_cell({ r: rowIndex, c: 1 });
+            ws[categoryCell].s = {
+                fill: { fgColor: { rgb: categoryColor }, patternType: 'solid' }
+            };
+
+            // Apply lighter version of section color to remaining cells
+            for (let colIndex = 2; colIndex < exportRows[rowIndex].length; colIndex++) {
+                const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+                ws[cellAddress].s = {
+                    fill: { fgColor: { rgb: sectionColor + '80' }, patternType: 'solid' }
+                };
+            }
+        }
 
         // Create and save the workbook
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Companies");
         XLSX.writeFile(wb, "Companies_Report.xlsx");
     };
-
     const handleFileImport = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
+    
         try {
             let parsedData;
             if (file.name.endsWith('.csv')) {
@@ -470,29 +500,40 @@ const OverallView = () => {
                 const wb = XLSX.read(buffer);
                 const ws = wb.Sheets[wb.SheetNames[0]];
                 parsedData = XLSX.utils.sheet_to_json(ws);
+            }    
+    
+            if (!parsedData || !parsedData.length) {
+                throw new Error('No data found in the imported file');
             }
 
             console.log('Raw Parsed Data:', parsedData);
-            const valueColumns = Object.keys(parsedData[0]).filter(key =>
+            const firstRow = parsedData[0];
+            if (!firstRow) {
+                throw new Error('No data rows found in the imported file');
+            }
+
+            const valueColumns = Object.keys(firstRow).filter(key =>
                 key !== '#' &&
                 key !== 'General' &&
                 key !== '#_1' &&
                 !key.includes('Section') &&
                 !key.includes('Category')
             );
-
-            console.log('Detected value columns:', valueColumns);
+    
+            if (!valueColumns.length) {
+                throw new Error('No valid columns found in the imported file');
+            }
             const companiesMap = new Map();
-
+    
             valueColumns.forEach((colName) => {
                 companiesMap.set(colName, {
                     mainCompany: {
                         company_name: null,
                         company_type: null,
+                        company_status: null,
                         description: null,
                         registration_number: null,
                         date_established: null,
-                        kra_pin: '',
                         industry: null,
                         employees: null,
                         annual_revenue: null,
@@ -521,23 +562,32 @@ const OverallView = () => {
                         vat_status: null,
                         vat_from: null,
                         vat_to: null,
-                        pin_status: null,
-                        itax_status: null,
-                        income_tax_resident_status: null,
-                        income_tax_resident_from: null,
-                        income_tax_resident_to: null,
-                        nea_username: null,
-                        nea_password: null,
-                        rent_income_status: null,
-                        rent_income_from: null,
-                        rent_income_to: null,
-                        turnover_tax_status: null,
-                        turnover_tax_from: null,
-                        turnover_tax_to: null,
                         nature_of_business: null,
                         audit_period: null,
-                        sale_terms: null
+                        sale_terms: null,
+                        tcc_expiry_date: null,
+                        tcc_reminders_notice_days: null,
+                        tcc_reminder_date: null,
+                        good_conduct_issue_date: null,
+                        co_cert_number: null,
+                        co_registration_date: null,
+                        co_nssf_number: null,
+                        verified_status: null,
+                        bo_status: null,
+                        co_cr_12_issue_date: null,
+                        cr_12_as_at_date_of_issue: null,
+                        cr_12_reminders_notice_days: null,
+                        cr_12_reminder_date: null,
+                        wh_vat_agent_customers: null,
+                        wh_vat_agent_suppliers: null,
+                        account_manager: null,
+                        name_verified_with_pin: null,
+                        client_category: null,
+                        nita_identifier: null,
+                        nita_password: null,
+                        nita_status: null,
                     },
+              
                     nssfDetails: {
                         company_name: null,
                         nssf_identifier: null,
@@ -557,21 +607,48 @@ const OverallView = () => {
                         director: null,
                         nhif_mobile: null,
                         nhif_email: null,
-                        nhif_email_password: null
+                        nhif_email_password: null,
+                        nhif_registration_date: null,
+                        nhif_compliance_certificate_date: null,
                     },
-                    passwordDetails: {
+                    pinDetails: {
                         company_name: null,
-                        kra_pin: '',
+                        kra_pin:null,
                         kra_password: null,
+                        pin_certification_profile_download_dates: null,
                         pin_status: null,
-                        status: null
-                    },
+                        itax_status: null,
+                        income_tax_resident_individual_status: null,
+                        income_tax_resident_individual_from: null,
+                        income_tax_resident_individual_to: null,
+                        income_tax_rent_income_current_status: null,
+                        income_tax_rent_income_effective_from: null,
+                        income_tax_rent_income_effective_to: null,
+                        income_tax_paye_current_status: null,
+                        income_tax_paye_effective_from: null,
+                        income_tax_paye_effective_to: null,
+                        income_tax_turnover_tax_current_status: null,
+                        income_tax_turnover_tax_effective_from: null,
+                        income_tax_turnover_tax_effective_to: null,
+                        annual_income: null,
+                        tax_year_end: null,
+                        current_itax_gmail_yahoo_email_recovery: null,
+                        current_tax_password: null,
+                        current_itax_gmail_email: null,
+                        current_itax_system_gmail_password: null,
+                        current_itax_gmail_email_recovery_mobile: null,
+                        pin_station: null,
+                        pin_station_manager_name: null,
+                        pin_station_manager_mobile: null,
+                    },                    
                     ecitizenDetails: {
                         name: null,
-                        ecitizen_identifier: null,
                         ecitizen_password: null,
                         ecitizen_status: 'Pending',
-                        director: null
+                        director: null,
+                        ecitizen_id: null,
+                        ecitizen_mobile: null,
+                        ecitizen_email: null,
                     },
                     etimsDetails: {
                         company_name: null,
@@ -581,7 +658,8 @@ const OverallView = () => {
                         etims_comment: null,
                         etims_director_pin: null,
                         etims_current_director_pin: null,
-                        etims_operator: null,
+                        etims_operator_name: null,
+                        etims_operator_id_number: null,
                         etims_password: null,
                         etims_mobile: null,
                         etims_email: null,
@@ -647,39 +725,18 @@ const OverallView = () => {
                         professional_memberships: null,
                         userid: null,
                         status: ''
-                    },
-                    nhifCompanies: {
-                        company_name: null,
-                        nhif_identifier: null,
-                        nhif_password: null,
-                        nhif_status: 'Pending',
-                        nhif_code: null,
-                        director: null,
-                        nhif_mobile: null,
-                        nhif_email: null,
-                        nhif_email_password: null
-                    },
-                    nssfCompanies: {
-                        company_name: null,
-                        nssf_identifier: null,
-                        nssf_password: null,
-                        nssf_status: 'Pending',
-                        nssf_code: null,
-                        nssf_compliance_certificate_date: null,
-                        nssf_registration_date: null,
-                        status: null
                     }
                 });
             });
-
+    
             parsedData.forEach(row => {
                 const fieldName = row["#_1"];
                 if (!fieldName) return;
-
+    
                 valueColumns.forEach(colName => {
                     const companyData = companiesMap.get(colName);
                     const value = row[colName];
-
+    
                     if (companyData && value) {
                         // Main Company Details
                         switch (fieldName) {
@@ -687,15 +744,16 @@ const OverallView = () => {
                                 companyData.mainCompany.company_name = value;
                                 companyData.nssfDetails.company_name = value;
                                 companyData.nhifDetails.company_name = value;
-                                companyData.passwordDetails.company_name = value;
+                                companyData.pinDetails.company_name = value;
                                 companyData.ecitizenDetails.name = value;
                                 companyData.etimsDetails.company_name = value;
-                                companyData.nhifCompanies.company_name = value;
-                                companyData.nssfCompanies.company_name = value;
                                 break;
-                            case "Company Type":
-                                companyData.mainCompany.company_type = value;
-                                break;
+                                case "Company Type":
+                                    companyData.mainCompany.company_type = value;
+                                    break;
+                                    case "Company Status":
+                                        companyData.mainCompany.company_status = value;
+                                        break;
                             case "Description":
                                 companyData.mainCompany.description = value;
                                 break;
@@ -705,9 +763,7 @@ const OverallView = () => {
                             case "Date Established":
                                 companyData.mainCompany.date_established = value;
                                 break;
-                            case "KRA PIN":
-                                companyData.mainCompany.kra_pin = value;
-                                break;
+  
                             case "Industry":
                                 companyData.mainCompany.industry = value;
                                 break;
@@ -774,6 +830,15 @@ const OverallView = () => {
                             case "Tourism Fund Password":
                                 companyData.mainCompany.tourism_fund_password = value;
                                 break;
+                                case "NITA Identifier":
+                                    companyData.mainCompany.nita_identifier = value;
+                                    break;
+                                    case "NITA Password":
+                                        companyData.mainCompany.nita_password = value;
+                                        break;
+                                        case "NITA Status":
+                                            companyData.mainCompany.nita_status = value;
+                                            break;
                             case "VAT Identifier":
                                 companyData.mainCompany.vat_identifier = value;
                                 break;
@@ -789,45 +854,12 @@ const OverallView = () => {
                             case "VAT To":
                                 companyData.mainCompany.vat_to = value;
                                 break;
-                            case "PIN Status":
-                                companyData.mainCompany.pin_status = value;
-                                break;
-                            case "iTax Status":
-                                companyData.mainCompany.itax_status = value;
-                                break;
-                            case "Income Tax Resident Status":
-                                companyData.mainCompany.income_tax_resident_status = value;
-                                break;
-                            case "Income Tax Resident From":
-                                companyData.mainCompany.income_tax_resident_from = value;
-                                break;
-                            case "Income Tax Resident To":
-                                companyData.mainCompany.income_tax_resident_to = value;
-                                break;
                             case "NEA Username":
                                 companyData.mainCompany.nea_username = value;
                                 break;
                             case "NEA Password":
                                 companyData.mainCompany.nea_password = value;
-                                break;
-                            case "Rent Income Status":
-                                companyData.mainCompany.rent_income_status = value;
-                                break;
-                            case "Rent Income From":
-                                companyData.mainCompany.rent_income_from = value;
-                                break;
-                            case "Rent Income To":
-                                companyData.mainCompany.rent_income_to = value;
-                                break;
-                            case "Turnover Tax Status":
-                                companyData.mainCompany.turnover_tax_status = value;
-                                break;
-                            case "Turnover Tax From":
-                                companyData.mainCompany.turnover_tax_from = value;
-                                break;
-                            case "Turnover Tax To":
-                                companyData.mainCompany.turnover_tax_to = value;
-                                break;
+                                break;        
                             case "Nature of Business":
                                 companyData.mainCompany.nature_of_business = value;
                                 break;
@@ -837,6 +869,81 @@ const OverallView = () => {
                             case "Sale Terms":
                                 companyData.mainCompany.sale_terms = value;
                                 break;
+                            case "Source of Income Business 1 (Primary)":
+                                companyData.mainCompany.source_of_income_business_1 = value;
+                                break;
+                            case "Source of Income Business 2 (Secondary)":
+                                companyData.mainCompany.source_of_income_business_2 = value;
+                                break;
+                            case "Source of Income Employment 1 (Primary)":
+                                companyData.mainCompany.source_of_income_employment_1 = value;
+                                break;
+                            case "Source of Income Employment 2 (Secondary)":
+                                companyData.mainCompany.source_of_income_employment_2 = value;
+                                break;
+                            case "Source of Income Rental Income (MRI)":
+                                companyData.mainCompany.source_of_income_rental = value;
+                                break;
+                            case "Source of Income Bank FD + Other Interest Income + Dividends + Commission":
+                                companyData.mainCompany.source_of_income_interest_dividends = value;
+                                break;                           
+                            case "TCC Expiry Date":
+                                companyData.mainCompany.tcc_expiry_date = value;
+                                break;
+                            case "TCC Reminders Notice Days":
+                                companyData.mainCompany.tcc_reminders_notice_days = value;
+                                break;
+                            case "TCC Reminder Date":
+                                companyData.mainCompany.tcc_reminder_date = value;
+                                break;
+                            case "Good Conduct Issue Date":
+                                companyData.mainCompany.good_conduct_issue_date = value;
+                                break;
+                            case "CO Certificate Number":
+                                companyData.mainCompany.co_cert_number = value;
+                                break;
+                            case "CO Registration Date":
+                                companyData.mainCompany.co_registration_date = value;
+                                break;
+                            case "CO NSSF Number":
+                                companyData.mainCompany.co_nssf_number = value;
+                                break;
+                            case "Verified Status":
+                                companyData.mainCompany.verified_status = value;
+                                break;
+                            case "BO Status":
+                                companyData.mainCompany.bo_status = value;
+                                break;
+                            case "CO CR 12 Issue Date":
+                                companyData.mainCompany.co_cr_12_issue_date = value;
+                                break;
+                            case "CR 12 as at Date Of Issue":
+                                companyData.mainCompany.cr_12_as_at_date_of_issue = value;
+                                break;
+                            case "CR 12 Reminders Notice Days":
+                                companyData.mainCompany.cr_12_reminders_notice_days = value;
+                                break;
+                                case "CR 12 Reminder Date":
+                                    companyData.mainCompany.cr_12_reminder_date = value;
+                                    break;
+                            case "Account Manager":
+                                companyData.mainCompany.account_manager = value;
+                                break;
+                            case "Name Verified with PIN":
+                                companyData.mainCompany.name_verified_with_pin = value;
+                                break;
+                            case "Client Category":
+                                companyData.mainCompany.client_category = value;
+                                break;
+                            case "W/H VAT Agent Suppliers":
+                                companyData.mainCompany.wh_vat_agent_suppliers = value;
+                                break;
+                            case "W/H VAT Agent Customers":
+                                companyData.mainCompany.wh_vat_agent_customers = value;
+                                break;
+
+
+
                             // NSSF Details
                             case "NSSF Code":
                                 companyData.nssfDetails.nssf_code = value;
@@ -856,15 +963,13 @@ const OverallView = () => {
                             case "NSSF Compliance Certificate Date":
                                 companyData.nssfDetails.nssf_compliance_certificate_date = value;
                                 break;
-
+    
                             // NHIF Details
                             case "NHIF Code":
                                 companyData.nhifDetails.nhif_code = value;
-
                                 break;
                             case "NHIF Identifier":
                                 companyData.nhifDetails.nhif_identifier = value;
-
                                 break;
                             case "NHIF Password":
                                 companyData.nhifDetails.nhif_password = value;
@@ -872,45 +977,126 @@ const OverallView = () => {
                             case "NHIF Mobile":
                                 companyData.nhifDetails.nhif_mobile = value;
                                 break;
-                            case "NHIF Email":
-                                companyData.nhifDetails.nhif_email = value;
-                                break;
+                                case "NHIF Email":
+                                    companyData.nhifDetails.nhif_email = value;
+                                    break;
+                                    case "NHIF Registration Date":
+                                        companyData.nhifDetails.nhif_registration_date = value;
+                                        break;
                             case "NHIF Email Password":
                                 companyData.nhifDetails.nhif_email_password = value;
                                 break;
-                            case "NHIF Compliance Certificate Date":
-                                companyData.nhifDetails.nhif_compliance_date = value;
-                                break;
-                            case "NHIF Registration Date":
-                                companyData.nhifDetails.nhif_compliance_date = value;
-                                break;
-                            case "NHIF Status":
-                                companyData.nhifDetails.nhif_status = value;
-                                break;
-
-
+                                case "NHIF Status":
+                                    companyData.nhifDetails.nhif_status = value;
+                                    break; 
+                                     case "NHIF Compliance Certificate Date":
+                                    companyData.nhifDetails.nhif_compliance_certificate_date = value;
+                                    break;
+    
                             // Password Checker Details
-                            case "KRA PIN":
-                                companyData.mainCompany.kra_pin = value;
+                            case "KRA PIN":                             
+                                companyData.pinDetails.kra_pin = value;
+                                break;
+                            case "Company Name":
+                                companyData.pinDetails.company_name = value;
                                 break;
                             case "KRA Password":
-                                companyData.passwordDetails.kra_password = value;
-                                break;
+                                companyData.pinDetails.kra_password = value;
+                                break;        
                             case "PIN Status":
-                                companyData.passwordDetails.pin_status = value;
+                                companyData.pinDetails.pin_status = value;
                                 break;
-
-                            // ECitizen Details
-                            case "ECitizen Identifier":
-                                companyData.ecitizenDetails.ecitizen_identifier = value;
+                            case "PIN Certification Profile Download Dates":
+                                companyData.pinDetails.pin_certification_profile_download_dates = value;
                                 break;
+                            case "iTax Status":
+                                companyData.pinDetails.itax_status = value;
+                                break;
+                            case "Income Tax Resident Individual Status":
+                                companyData.pinDetails.income_tax_resident_individual_status = value;
+                                break;
+                            case "Income Tax Resident Individual From":
+                                companyData.pinDetails.income_tax_resident_individual_from = value;
+                                break;
+                            case "Income Tax Resident Individual To":
+                                companyData.pinDetails.income_tax_resident_individual_to = value;
+                                break;
+                            case "Income Tax Rent Income Current Status":
+                                companyData.pinDetails.income_tax_rent_income_current_status = value;
+                                break;
+                            case "Income Tax Rent Income Effective From":
+                                companyData.pinDetails.income_tax_rent_income_effective_from = value;
+                                break;
+                            case "Income Tax Rent Income Effective To":
+                                companyData.pinDetails.income_tax_rent_income_effective_to = value;
+                                break;
+                            case "Income Tax PAYE Current Status":
+                                companyData.pinDetails.income_tax_paye_current_status = value;
+                                break;
+                            case "Income Tax PAYE Effective From":
+                                companyData.pinDetails.income_tax_paye_effective_from = value;
+                                break;
+                            case "Income Tax PAYE Effective To":
+                                companyData.pinDetails.income_tax_paye_effective_to = value;
+                                break;
+                            case "Income Tax Turnover Tax Current Status":
+                                companyData.pinDetails.income_tax_turnover_tax_current_status = value;
+                                break;
+                            case "Income Tax Turnover Tax Effective From":
+                                companyData.pinDetails.income_tax_turnover_tax_effective_from = value;
+                                break;
+                            case "Income Tax Turnover Tax Effective To":
+                                companyData.pinDetails.income_tax_turnover_tax_effective_to = value;
+                                break;
+                            case "Annual Income":
+                                companyData.pinDetails.annual_income = value;
+                                break;
+                            case "Tax Year End":
+                                companyData.pinDetails.tax_year_end = value;
+                                break;
+                            case "Current iTax Gmail Yahoo Email Recovery Email":
+                                companyData.pinDetails.current_itax_gmail_yahoo_email_recovery = value;
+                                break;
+                            case "Current Tax Password":
+                                companyData.pinDetails.current_tax_password = value;
+                                break;
+                            case "Current iTax Gmail Email Address":
+                                companyData.pinDetails.current_itax_gmail_email = value;
+                                break;
+                            case "Current iTax System Gmail Email Password":
+                                companyData.pinDetails.current_itax_system_gmail_password = value;
+                                break;
+                            case "Current iTax Gmail Email Recovery Mobile":
+                                companyData.pinDetails.current_itax_gmail_email_recovery_mobile = value;
+                                break;
+                            case "PIN Station":
+                                companyData.pinDetails.pin_station = value;
+                                break;
+                                case "PIN Station Manager Name":
+                                    companyData.pinDetails.pin_station_manager_name = value;
+                                    break;  
+                                    case "PIN Station Manager Mobile":
+                                        companyData.pinDetails.pin_station_manager_mobile = value;
+                                        break;  
+                                        
+                                        
+                                        // ECitizen Details
+                            case "ECitizen ID":
+                                companyData.ecitizenDetails.ecitizen_id = value;
+                                break;
+                                case "ECitizen Email":
+                                    companyData.ecitizenDetails.ecitizen_email = value;
+                                    break;
+                                    case "ECitizen Mobile":
+                                        companyData.ecitizenDetails.ecitizen_mobile = value;
+                                        break;
                             case "ECitizen Password":
                                 companyData.ecitizenDetails.ecitizen_password = value;
                                 break;
                             case "ECitizen Status":
                                 companyData.ecitizenDetails.ecitizen_status = value;
                                 break;
-
+    
                             // TIMS Details
                             case "ETIMS Username":
                                 companyData.etimsDetails.etims_username = value;
@@ -930,13 +1116,16 @@ const OverallView = () => {
                             case "ETIMS Current Director PIN":
                                 companyData.etimsDetails.etims_current_director_pin = value;
                                 break;
-                            case "ETIMS Operator (ID Name + Number)":
-                                companyData.etimsDetails.etims_operator = value;
-                                break;
-                            case "ETIMS Password":
+                                case "ETIMS Operator Name ":
+                                    companyData.etimsDetails.etims_operator_name = value;
+                                    break;
+                                    case "ETIMS Operator ID Number":
+                                        companyData.etimsDetails.etims_operator_id_number = value;
+                                        break;
+                                        case "ETIMS Password":
                                 companyData.etimsDetails.etims_password = value;
                                 break;
-                            case "ETIMS Mobile Number + Name":
+                            case "ETIMS Mobile Number":
                                 companyData.etimsDetails.etims_mobile = value;
                                 break;
                             case "ETIMS Email Address":
@@ -945,6 +1134,7 @@ const OverallView = () => {
                             case "Registration Document Number":
                                 companyData.etimsDetails.etims_reg_doc_number = value;
                                 break;
+    
                             // Acc Portal Directors
                             case "First Name":
                                 companyData.accPortalDirectors.first_name = value;
@@ -967,56 +1157,8 @@ const OverallView = () => {
                             case "ID Number":
                                 companyData.accPortalDirectors.id_number = value;
                                 break;
-                            case "Company ID":
-                                companyData.accPortalDirectors.company_id = value;
-                                break;
-                            case "Full Name":
-                                companyData.accPortalDirectors.full_name = value;
-                                break;
-                            case "Place of Birth":
-                                companyData.accPortalDirectors.place_of_birth = value;
-                                break;
-                            case "Country of Birth":
-                                companyData.accPortalDirectors.country_of_birth = value;
-                                break;
-                            case "Nationality":
-                                companyData.accPortalDirectors.nationality = value;
-                                break;
-                            case "Marital Status":
-                                companyData.accPortalDirectors.marital_status = value;
-                                break;
-                            case "Passport Number":
-                                companyData.accPortalDirectors.passport_number = value;
-                                break;
-                            case "Passport Place of Issue":
-                                companyData.accPortalDirectors.passport_place_of_issue = value;
-                                break;
-                            case "Passport Issue Date":
-                                companyData.accPortalDirectors.passport_issue_date = value;
-                                break;
-                            case "Passport Expiry Date":
-                                companyData.accPortalDirectors.passport_expiry_date = value;
-                                break;
-                            case "Passport File Number":
-                                companyData.accPortalDirectors.passport_file_number = value;
-                                break;
-                            case "Alien Number":
-                                companyData.accPortalDirectors.alien_number = value;
-                                break;
                             case "Tax PIN":
                                 companyData.accPortalDirectors.tax_pin = value;
-                                break;
-                            case "Eye Color":
-                                companyData.accPortalDirectors.eye_color = value;
-                                break;
-                            case "Hair Color":
-                                companyData.accPortalDirectors.hair_color = value;
-                                break;
-                            case "Height":
-                                companyData.accPortalDirectors.height = value;
-                                break;
-                            case "Special Marks":
-                                companyData.accPortalDirectors.special_marks = value;
                                 break;
                             case "Mobile Number":
                                 companyData.accPortalDirectors.mobile_number = value;
@@ -1122,65 +1264,109 @@ const OverallView = () => {
                                 break;
                             case "Status":
                                 companyData.accPortalDirectors.status = value;
-                                break;                        }
+                                break;
+                        }
                     }
                 });
             });
-
+    
             const transformedData = Array.from(companiesMap.values())
                 .filter(data => data.mainCompany.company_name);
-
+    
             console.log('Transformed Data:', transformedData);
-
+    
             for (const data of transformedData) {
+                if (!data.mainCompany?.registration_number) {
+                    console.warn('Skipping record with missing registration number:', data);
+                    continue;
+                }
+    
+                try {
                 // Upsert main company data using registration_number as unique key
                 const { data: companyData, error: companyError } = await supabase
                     .from('acc_portal_company_duplicate')
                     .upsert([data.mainCompany], { onConflict: ['registration_number'] }); 
     
-                if (!companyError) {
-                    // Upsert related tables using company_name as reference
-                    await Promise.all([
-                        supabase
+           
+                    if (companyError) {
+                        console.error('Error upserting company:', companyError);
+                        continue;
+                    }
+
+                    const upsertPromises = [];
+
+                    if (data.nssfDetails) {
+                        upsertPromises.push(supabase
                             .from('nssf_companies_duplicate')
                             .upsert([data.nssfDetails], {
                                 onConflict: 'nssf_code',
                                 ignoreDuplicates: false
-                            }),
-                        supabase
+                            }));
+                    }
+
+                    if (data.nhifDetails) {
+                        upsertPromises.push(supabase
                             .from('nhif_companies_duplicate2')
                             .upsert([data.nhifDetails], {
                                 onConflict: 'nhif_code',
                                 ignoreDuplicates: false
-                            }),
-                        supabase
+                            }));
+                    }
+
+                    if (data.pinDetails) {
+                        upsertPromises.push(supabase
                             .from('PasswordChecker_duplicate')
-                            .upsert([data.passwordDetails], {
-                                onConflict: 'kra_pin',
+                            .upsert([data.pinDetails], {
+                                onConflict: ['kra_pin'],                               
                                 ignoreDuplicates: false
-                            }),
-                        supabase
+                            }));
+                    }
+
+                    if (data.ecitizenDetails) {
+                        upsertPromises.push(supabase
                             .from('ecitizen_companies_duplicate')
                             .upsert([data.ecitizenDetails], {
                                 onConflict: 'ecitizen_identifier',
                                 ignoreDuplicates: false
-                            }),
-                            supabase
+                            }));
+                    }
+
+                    if (data.etimsDetails) {
+                        upsertPromises.push(supabase
                             .from('etims_companies_duplicate')
                             .upsert([data.etimsDetails], {
                                 onConflict: 'etims_pin',
                                 ignoreDuplicates: false
-                            }),
-                            supabase
+                            }));
+                    }
+
+                    if (data.accPortalDirectors) {
+                        upsertPromises.push(supabase
                             .from('acc_portal_directors_duplicate')
                             .upsert([data.accPortalDirectors], {
                                 onConflict: 'company_name',
                                 ignoreDuplicates: false
-                            })
-                    ]);
-                }
+                            }));
+                    }
+
+                    if (data.incomeTaxDetails) {
+                        upsertPromises.push(supabase
+                            .from('income_tax')
+                            .upsert([data.incomeTaxDetails], {
+                                onConflict: 'company_name',
+                                ignoreDuplicates: false
+                            }));
+                    }
+
+                    try {
+                        await Promise.all(upsertPromises);
+                    } catch (tableError) {
+                        console.error('Error updating related tables:', tableError);
+                    }
+            } catch (companyError) {
+                console.error('Error processing company:', companyError);
             }
-    
+        }
             toast.success(`Successfully updated ${transformedData.length} companies`);
             fetchAllData();
     

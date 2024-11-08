@@ -2,11 +2,12 @@ export const formFields = {
     companyDetails: {
         fields: [
             { name: 'company_name', label: 'Company Name', type: 'text', required: true },
-            { name: 'company_status', label: 'Company Status (Active/Dormant)', type: 'text' },
-                { name: 'company_type', label: 'Company Type (LTD/SOLE/PARTNERSHIP)', type: 'text' },
-              { name: 'description', label: 'Description', type: 'text' },
+            { name: 'description', label: 'Description', type: 'text' },
+            { name: 'company_type', label: 'Company Type', type: 'text' },
+            { name: 'company_status', label: 'Company Status', type: 'text' },
             { name: 'registration_number', label: 'Registration Number', type: 'text' },
             { name: 'date_established', label: 'Date Established', type: 'date' },
+            { name: 'account_manager', label: 'Account Manager', type: 'text' },
             { name: 'industry', label: 'Industry', type: 'text' },
             { name: 'employees', label: 'Employees', type: 'text' },
             { name: 'annual_revenue', label: 'Annual Revenue', type: 'text' },
@@ -20,19 +21,13 @@ export const formFields = {
             { name: 'country', label: 'Country', type: 'text' },
             { name: 'name_verified_with_pin', label: 'Name Verified with PIN', type: 'text' },
             { name: 'client_category', label: 'Client Category', type: 'text' },
-            { name: 'wh_vat_agent_suppliers', label: 'W/H VAT Agent (Suppliers)', type: 'text' },
-            { name: 'wh_vat_agent_customers', label: 'W/H VAT Agent (Customers)', type: 'text' },
-            { name: 'verified_status', label: 'Verified Status', type: 'text' },
-            { name: 'bo_status', label: 'B.O. Status', type: 'text' },
-            { name: 'co_cr_12_issue_date', label: 'CO-CR 12 Issue Date', type: 'date' },
-            { name: 'cr_12_as_at_date_of_issue', label: 'CR 12 as at Date of Issue', type: 'date' },
-            { name: 'cr_12_reminders_notice_days', label: 'CR 12 Reminders Notice Days', type: 'number' },
-            { name: 'cr_12_reminder_date', label: 'CR 12 Reminder Date', type: 'date' },
+            { name: 'wh_vat_agent_suppliers', label: 'W/H VAT Agent Suppliers', type: 'text' },
+            { name: 'wh_vat_agent_customers', label: 'W/H VAT Agent Customers', type: 'text' },
             
             // KRA Details
-            { name: 'kra_pin', label: 'KRA PIN', type: 'text', category: 'KRA Details' },
-            { name: 'kra_password', label: 'KRA Password', type: 'text', category: 'KRA Details' },
-            { name: 'pin_certification_profile_download_dates', label: 'PIN Certification Profile Download Dates', type: 'text' },
+            { name: 'kra_pin', label: 'KRA PIN', type: 'text', category: 'Pin Details' },
+            { name: 'kra_password', label: 'KRA Password', type: 'text', category: 'Pin Details' },
+            { name: 'pin_certification_profile_download_dates', label: 'PIN Certification Profile Download Dates', type: 'text', category: 'Pin Details' },
                
             // NSSF Details
             { name: 'nssf_identifier', label: 'NSSF Identifier', type: 'text', category: 'NSSF Details' },
@@ -41,7 +36,6 @@ export const formFields = {
             { name: 'nssf_registration_date', label: 'NSSF Registration Date', type: 'date', category: 'NSSF Details' },
             { name: 'nssf_compliance_certificate_date', label: 'NSSF Compliance Certificate Date', type: 'date', category: 'NSSF Details' },
             { name: 'nssf_status', label: 'NSSF Status', type: 'text', category: 'NSSF Details' },
-            { name: 'nssf_user', label: 'NSSF User', type: 'text' },
           
             // NHIF Details
             { name: 'nhif_identifier', label: 'NHIF Identifier', type: 'text', category: 'NHIF Details' },
@@ -55,7 +49,6 @@ export const formFields = {
             { name: 'nhif_compliance_date', label: 'NHIF Compliance Certificate Date', type: 'date', category: 'NHIF Details' },
 
             // Ecitizen Details
-            { name: 'ecitizen_identifier', label: 'ECitizen Identifier', type: 'text', category: 'E-Citizen Details' },
             { name: 'ecitizen_password', label: 'ECitizen Password', type: 'text', category: 'E-Citizen Details' },
             { name: 'ecitizen_status', label: 'ECitizen Status', type: 'text', category: 'E-Citizen Details' },
             { name: 'ecitizen_id', label: 'ECitizen ID', type: 'text', category: 'E-Citizen Details' },
@@ -69,9 +62,10 @@ export const formFields = {
             { name: 'etims_comment', label: 'ETIMS Comment', type: 'text', category: 'TIMS Details' },
             { name: 'etims_director_pin', label: 'ETIMS Director PIN in System', type: 'text', category: 'TIMS Details' },
             { name: 'etims_current_director_pin', label: 'ETIMS Current Director PIN', type: 'text', category: 'TIMS Details' },
-            { name: 'etims_operator', label: 'ETIMS Operator (ID Name + Number)', type: 'text', category: 'TIMS Details' },
+            { name: 'etims_operator_name', label: 'ETIMS Operator Name ', type: 'text', category: 'TIMS Details' },
+            { name: 'etims_operator_id_number', label: 'ETIMS Operator ID Number', type: 'text', category: 'TIMS Details' },
             { name: 'etims_password', label: 'ETIMS Password', type: 'text', category: 'TIMS Details' },
-            { name: 'etims_mobile', label: 'ETIMS Mobile Number + Name', type: 'text', category: 'TIMS Details' },
+            { name: 'etims_mobile', label: 'ETIMS Mobile Number', type: 'text', category: 'TIMS Details' },
             { name: 'etims_email', label: 'ETIMS Email Address', type: 'email', category: 'TIMS Details' },
             { name: 'etims_reg_doc_number', label: 'Registration Document Number', type: 'text', category: 'TIMS Details' },
 
@@ -98,6 +92,16 @@ export const formFields = {
             { name: 'tourism_fund_username', label: 'Tourism Fund Username', type: 'text', category: 'Tourism Fund Details' },
             { name: 'tourism_fund_password', label: 'Tourism Fund Password', type: 'text', category: 'Tourism Fund Details' },
 
+                           
+
+                // Sheria Details
+                { name: 'verified_status', label: 'Verified Status', type: 'text', category: 'Sheria Details' },
+                { name: 'bo_status', label: 'BO Status', type: 'text', category: 'Sheria Details' },
+                { name: 'co_cr_12_issue_date', label: 'CO CR 12 Issue Date', type: 'date', category: 'Sheria Details' },
+                { name: 'cr_12_as_at_date_of_issue', label: 'CR 12 as at Date of Issue', type: 'date', category: 'Sheria Details' },
+                { name: 'cr_12_reminders_notice_days', label: 'CR 12 Reminders Notice Days', type: 'number', category: 'Sheria Details' },
+                { name: 'cr_12_reminder_date', label: 'CR 12 Reminder Date', type: 'date', category: 'Sheria Details' },
+      
             // VAT Details
             { name: 'vat_identifier', label: 'VAT Identifier', type: 'text', category: 'VAT Details' },
             { name: 'vat_password', label: 'VAT Password', type: 'text', category: 'VAT Details' },
@@ -106,52 +110,52 @@ export const formFields = {
             { name: 'vat_to', label: 'VAT To', type: 'date', category: 'VAT Details' },
 
             // Tax Status Details
-            { name: 'pin_status', label: 'PIN Status', type: 'text', category: 'Tax Status' },
-            { name: 'itax_status', label: 'iTax Status', type: 'text', category: 'Tax Status' },
-            { name: 'income_tax_resident_status', label: 'Income Tax - Resident Individual Status', type: 'text', category: 'Tax Status' },
-            { name: 'income_tax_resident_from', label: 'Income Tax - Resident Individual From', type: 'date', category: 'Tax Status' },
-            { name: 'income_tax_resident_to', label: 'Income Tax - Resident Individual To', type: 'date', category: 'Tax Status' },
-            { name: 'income_tax_rent_income', label: 'Income Tax - Rent Income', type: 'text' },
-            { name: 'income_tax_paye', label: 'Income Tax - PAYE', type: 'text' },
-            { name: 'income_tax_turnover_tax', label: 'Income Tax - Turnover Tax', type: 'text' },
-            { name: 'current_itax_gmail_yahoo_email_recovery', label: 'Current iTax Gmail Yahoo Email Recovery - Email', type: 'email' },
-            { name: 'current_tax_password', label: 'Current Tax Password', type: 'text' },
-            { name: 'current_itax_gmail_email', label: 'Current iTax Gmail Email Address', type: 'email' },
-            { name: 'current_itax_system_gmail_password', label: 'Current iTax System Gmail Email Password', type: 'text' },
-            { name: 'current_itax_gmail_email_recovery_mobile', label: 'Current iTax Gmail Email Recovery - Mobile', type: 'text' },
-            { name: 'pin_station', label: 'PIN Station', type: 'text' },
-            { name: 'pin_station_manager_name_mobile', label: 'PIN Station Manager Name + Mobile', type: 'text' },
-            { name: 'tax_year_end', label: 'Tax Year End', type: 'date' },
+            { name: 'pin_status', label: 'PIN Status', type: 'text', category: 'Pin Details' },
+            { name: 'itax_status', label: 'iTax Status', type: 'text', category: 'Pin Details' },
+            { name: 'income_tax_resident_individual_status', label: 'Income Tax Resident Individual Status', type: 'text', category: 'Pin Details' },
+            { name: 'income_tax_resident_individual_from', label: 'Income Tax Resident Individual From', type: 'date', category: 'Pin Details' },
+            { name: 'income_tax_resident_individual_to', label: 'Income Tax Resident Individual To', type: 'date', category: 'Pin Details' },
+            { name: 'income_tax_rent_income_current_status', label: 'Income Tax Rent Income Current Status', type: 'text' , category: 'Pin Details'  },
+            { name: 'income_tax_rent_income_effective_from', label: 'Income Tax Rent Income Effective From', type: 'text' , category: 'Pin Details'  },
+            { name: 'income_tax_rent_income_effective_to', label: 'Income Tax Rent Income Effective To', type: 'text' , category: 'Pin Details'  },
+            { name: 'income_tax_paye_current_status', label: 'Income Tax PAYE Current Status', type: 'text' , category: 'Pin Details'  },
+            { name: 'income_tax_paye_effective_from', label: 'Income Tax PAYE Effective From', type: 'text' , category: 'Pin Details'  },
+            { name: 'income_tax_paye_effective_to', label: 'Income Tax PAYE Effective To', type: 'text' , category: 'Pin Details'  },
+            { name: 'income_tax_turnover_tax_current_status', label: 'Income Tax Turnover Tax Current Status', type: 'text' , category: 'Pin Details'  },
+            { name: 'income_tax_turnover_tax_effective_from', label: 'Income Tax Turnover Tax Effective From', type: 'text' , category: 'Pin Details'  },
+            { name: 'income_tax_turnover_tax_effective_to', label: 'Income Tax Turnover Tax Effective To', type: 'text' , category: 'Pin Details'  },
+            { name: 'current_itax_gmail_yahoo_email_recovery', label: 'Current iTax Gmail Yahoo Email Recovery Email', type: 'email', category: 'Pin Details'  },
+            { name: 'current_tax_password', label: 'Current Tax Password', type: 'text', category: 'Pin Details'  },
+            { name: 'current_itax_gmail_email', label: 'Current iTax Gmail Email Address', type: 'email', category: 'Pin Details'  },
+            { name: 'current_itax_system_gmail_password', label: 'Current iTax System Gmail Email Password', type: 'text', category: 'Pin Details'  },
+            { name: 'current_itax_gmail_email_recovery_mobile', label: 'Current iTax Gmail Email Recovery Mobile', type: 'text', category: 'Pin Details'  },
+            { name: 'pin_station', label: 'PIN Station', type: 'text', category: 'Pin Details'  },
+            { name: 'pin_station_manager_name', label: 'PIN Station Manager Name', type: 'text', category: 'Pin Details'  },
+            { name: 'pin_station_manager_mobile', label: 'PIN Station Manager Mobile', type: 'text', category: 'Pin Details'  },
+            { name: 'tax_year_end', label: 'Tax Year End', type: 'date', category: 'Pin Details'  },
 
             // NEA Details
             { name: 'nea_username', label: 'NEA Username', type: 'text', category: 'NEA Details' },
             { name: 'nea_password', label: 'NEA Password', type: 'text', category: 'NEA Details' },
-            { name: 'paye_status', label: 'PAYE Status', type: 'text', category: 'PAYE Details' },
-            { name: 'paye_from', label: 'PAYE From', type: 'date', category: 'PAYE Details' },
-            { name: 'paye_to', label: 'PAYE To', type: 'date', category: 'PAYE Details' },
-
+          
             // Other Company Details
             { name: 'nature_of_business', label: 'Nature of Business', type: 'text', category: 'Other Details' },
             { name: 'audit_period', label: 'Audit Period', type: 'text', category: 'Other Details' },
             { name: 'sale_terms', label: 'Sale Terms', type: 'text', category: 'Other Details' },
-            { name: 'source_of_income_business_1', label: 'Source of Income - Business 1 (Primary)', type: 'text' },
-            { name: 'source_of_income_business_2', label: 'Source of Income - Business 2 (Secondary)', type: 'text' },
-            { name: 'source_of_income_employment_1', label: 'Source of Income - Employment 1 (Primary)', type: 'text' },
-            { name: 'source_of_income_employment_2', label: 'Source of Income - Employment 2 (Secondary)', type: 'text' },
-            { name: 'source_of_income_rental', label: 'Source of Income - Rental Income (MRI)', type: 'text' },
-            { name: 'source_of_income_interest_dividends', label: 'Source of Income - Bank FD + Other Interest Income + Dividends + Commission', type: 'text' },
-            
-
-                // Existing fields...
-                { name: 'tcc_expiry_date', label: 'TCC Expiry Date', type: 'date' },
-                { name: 'tcc_reminders_notice_days', label: 'TCC Reminders Notice Days', type: 'number' },
-                { name: 'tcc_reminder_date', label: 'TCC Reminder Date', type: 'date' },
-                { name: 'good_conduct_issue_date', label: 'Good Conduct Issue Date', type: 'date' },
-                { name: 'co_cert_number', label: 'CO Certificate Number', type: 'text' },
-                 { name: 'co_registration_date', label: 'CO Registration Date', type: 'date' },
-                 { name: 'co_nssf_number', label: 'CO NSSF Number', type: 'text' },
-               
-        ]
+            { name: 'source_of_income_business_1', label: 'Source of Income Business 1 (Primary)', type: 'text' , category: 'Other Details' },
+            { name: 'source_of_income_business_2', label: 'Source of Income Business 2 (Secondary)', type: 'text' , category: 'Other Details' },
+            { name: 'source_of_income_employment_1', label: 'Source of Income Employment 1 (Primary)', type: 'text' , category: 'Other Details' },
+            { name: 'source_of_income_employment_2', label: 'Source of Income Employment 2 (Secondary)', type: 'text' , category: 'Other Details' },
+            { name: 'source_of_income_rental', label: 'Source of Income Rental Income (MRI)', type: 'text' , category: 'Other Details' },
+            { name: 'source_of_income_interest_dividends', label: 'Source of Income Bank FD + Other Interest Income + Dividends + Commission', type: 'text' , category: 'Other Details' },
+                { name: 'tcc_expiry_date', label: 'TCC Expiry Date', type: 'date', category: 'Other Details' },
+                { name: 'tcc_reminders_notice_days', label: 'TCC Reminders Notice Days', type: 'number', category: 'Other Details' },
+                { name: 'tcc_reminder_date', label: 'TCC Reminder Date', type: 'date', category: 'Other Details' },
+                { name: 'good_conduct_issue_date', label: 'Good Conduct Issue Date', type: 'date', category: 'Other Details' },
+                { name: 'co_cert_number', label: 'CO Certificate Number', type: 'text' , category: 'Other Details' },
+                 { name: 'co_registration_date', label: 'CO Registration Date', type: 'date' , category: 'Other Details' },
+                 { name: 'co_nssf_number', label: 'CO NSSF Number', type: 'text' , category: 'Other Details' },
+ ]
     },
     directorDetails: {
         fields: [
