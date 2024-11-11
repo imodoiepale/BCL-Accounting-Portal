@@ -1,4 +1,5 @@
 // @ts-check
+// #ts-ignore
 "use client"
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
@@ -7,11 +8,11 @@ import toast from 'react-hot-toast'
 // Types
 interface Token {
   access_token: string
-  refresh_token?: string
+  refresh_token: string  // Required for offline access
   scope: string
   expires_in: number
   expiry_time: number
-  last_refresh?: string
+  last_refresh: string
   token_type: string
 }
 
@@ -21,6 +22,7 @@ interface Account {
   token: Token
   messages?: GmailMessage[]
   retryCount?: number
+  lastTokenCheck?: number
 }
 
 interface GmailMessage {
@@ -36,12 +38,21 @@ interface GmailMessage {
 
 // Constants
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+const CLIENT_SECRET = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY
 const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly'
-const TOKEN_CHECK_INTERVAL = 4 * 60 * 1000 // 4 minutes
-const TOKEN_REFRESH_THRESHOLD = 5 * 60 * 1000 // 5 minutes
+const TOKEN_CHECK_INTERVAL = 30 * 60 * 1000 // 30 minutes
+const TOKEN_REFRESH_THRESHOLD = 10 * 60 * 1000 // 10 minutes
 const MAX_RETRY_COUNT = 3
-const RETRY_DELAY = 1000 // 1 second
+const RETRY_DELAY = 1000 // 1 second base delay for exponential backoff
+
+// const SCOPES = [
+//   'https://www.googleapis.com/auth/gmail.readonly',     // Read-only access to Gmail
+//   'https://www.googleapis.com/auth/gmail.metadata',     // Read message metadata
+//   'https://www.googleapis.com/auth/userinfo.email',     // Get user's email address
+//   'https://www.googleapis.com/auth/userinfo.profile',   // Get basic profile info
+//   'offline_access'                                      // Enable refresh tokens
+// ].join(' ')
 
 // Declare global types
 declare const google: any
@@ -77,6 +88,8 @@ export function useGmail() {
         client_id: CLIENT_ID,
         scope: SCOPES,
         callback: handleTokenResponse,
+        access_type: 'offline',  // Request offline access
+        prompt: 'consent',       // Force consent screen to get refresh token
         redirect_uri: window.location.origin,
       })
       setTokenClient(client)
@@ -85,6 +98,159 @@ export function useGmail() {
       toast.error('Failed to initialize Google Sign-In')
     }
   }, [])
+
+  // Token Management
+  const refreshToken = useCallback(async (account: Account): Promise<Token> => {
+    if (!isInitialized || !tokenClient) {
+      throw new Error('Gmail client not initialized')
+    }
+
+    try {
+      // First try using refresh token if available
+      if (account.token.refresh_token) {
+        const params = new URLSearchParams({
+          client_id: CLIENT_ID || '',
+          client_secret: CLIENT_SECRET || '',
+          refresh_token: account.token.refresh_token,
+          grant_type: 'refresh_token',
+        })
+
+        const response = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params,
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const tokenExpiryTime = new Date().getTime() + (data.expires_in * 1000)
+          
+          const updatedToken = {
+            ...account.token,
+            access_token: data.access_token,
+            expires_in: data.expires_in,
+            expiry_time: tokenExpiryTime,
+            last_refresh: new Date().toISOString(),
+          }
+
+          // Update token in database
+          await updateAccountInDatabase(account.email, updatedToken)
+
+          // Update account in state
+          setAccounts(prev => prev.map(acc => 
+            acc.email === account.email 
+              ? { ...acc, token: updatedToken, lastTokenCheck: Date.now() }
+              : acc
+          ))
+
+          // Set the token for gapi client
+          gapi.client.setToken(updatedToken)
+
+          return updatedToken
+        }
+      }
+
+      // If refresh token doesn't work or isn't available, request new tokens
+      return new Promise((resolve, reject) => {
+        tokenClient.requestAccessToken({
+          prompt: '',
+          hint: account.email,
+          callback: async (response: any) => {
+            if (response.error) {
+              reject(response)
+              return
+            }
+
+            const newToken = gapi.client.getToken()
+            const tokenExpiryTime = new Date().getTime() + (newToken.expires_in * 1000)
+            
+            const updatedToken = {
+              ...newToken,
+              expiry_time: tokenExpiryTime,
+              last_refresh: new Date().toISOString(),
+            }
+
+            try {
+              await updateAccountInDatabase(account.email, updatedToken)
+              
+              setAccounts(prev => prev.map(acc => 
+                acc.email === account.email 
+                  ? { ...acc, token: updatedToken, lastTokenCheck: Date.now() }
+                  : acc
+              ))
+
+              resolve(updatedToken)
+            } catch (error) {
+              reject(error)
+            }
+          }
+        })
+      })
+
+    } catch (error) {
+      console.error('Error refreshing token:', error)
+      
+      // Implement retry mechanism with exponential backoff
+      if (!account.retryCount || account.retryCount < MAX_RETRY_COUNT) {
+        const delay = RETRY_DELAY * Math.pow(2, account.retryCount || 0)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        return refreshToken({
+          ...account,
+          retryCount: (account.retryCount || 0) + 1
+        })
+      }
+      
+      throw error
+    }
+  }, [tokenClient, isInitialized]) 
+  
+  const checkTokenHealth = async (account: Account) => {
+    if (!isInitialized) return false
+
+    const currentTime = new Date().getTime()
+    
+    // Skip check if token was checked recently (within last 5 minutes)
+    if (account.lastTokenCheck && currentTime - account.lastTokenCheck < 5 * 60 * 1000) {
+      return true
+    }
+
+    const tokenExpiryTime = account.token.expiry_time
+    
+    // Proactively refresh token if it will expire soon
+    if (tokenExpiryTime - currentTime < TOKEN_REFRESH_THRESHOLD) {
+      try {
+        await refreshToken(account)
+        return true
+      } catch (error) {
+        console.error('Token refresh failed:', error)
+        return false
+      }
+    }
+
+    try {
+      gapi.client.setToken(account.token)
+      await gapi.client.gmail.users.getProfile({ userId: 'me' })
+      
+      // Update last check time
+      setAccounts(prev => prev.map(acc => 
+        acc.email === account.email 
+          ? { ...acc, lastTokenCheck: currentTime }
+          : acc
+      ))
+      
+      return true
+    } catch (error) {
+      try {
+        await refreshToken(account)
+        return true
+      } catch (refreshError) {
+        console.error('Token health check failed:', refreshError)
+        return false
+      }
+    }
+  }
 
   // Database Operations
   const updateAccountInDatabase = async (email: string, token: Token) => {
@@ -102,7 +268,8 @@ export function useGmail() {
         const { error: updateError } = await supabase
           .from('email_accounts')
           .update({
-            token: JSON.stringify(token)
+            token: JSON.stringify(token),
+            last_token_refresh: new Date().toISOString()
           })
           .eq('email', email)
 
@@ -116,6 +283,7 @@ export function useGmail() {
             email: email,
             label: email.split('@')[0],
             token: JSON.stringify(token),
+            last_token_refresh: new Date().toISOString(),
             user_id: (await supabase.auth.getUser()).data.user?.id
           }])
 
@@ -144,7 +312,9 @@ export function useGmail() {
         const formattedAccounts = dbAccounts.map(acc => ({
           email: acc.email,
           token: JSON.parse(acc.token),
-          label: acc.label
+          label: acc.label,
+          lastTokenCheck: undefined,
+          messages: []
         }))
 
         setAccounts(formattedAccounts)
@@ -160,104 +330,6 @@ export function useGmail() {
       setLoading(false)
     }
   }, [isInitialized, selectedAccount])
-
-  // Token Management
-  const checkTokenHealth = async (account: Account) => {
-    if (!isInitialized) return false
-
-    try {
-      gapi.client.setToken(account.token)
-      await gapi.client.gmail.users.getProfile({ userId: 'me' })
-      return true
-    } catch (error) {
-      try {
-        await refreshToken(account)
-        return true
-      } catch (refreshError) {
-        console.error('Token health check failed:', refreshError)
-        return false
-      }
-    }
-  }
-
-  const refreshToken = useCallback(async (account: Account): Promise<Token> => {
-    if (!isInitialized || !tokenClient) {
-      throw new Error('Gmail client not initialized')
-    }
-
-    try {
-      gapi.client.setToken(account.token)
-      
-      await new Promise((resolve, reject) => {
-        tokenClient.requestAccessToken({
-          prompt: '',
-          hint: account.email,
-          callback: (response: any) => {
-            if (response.error) reject(response)
-            else resolve(response)
-          }
-        })
-      })
-
-      const newToken = gapi.client.getToken()
-      const tokenExpiryTime = new Date().getTime() + (newToken.expires_in * 1000)
-      
-      const updatedToken = {
-        ...newToken,
-        expiry_time: tokenExpiryTime,
-        last_refresh: new Date().toISOString()
-      }
-
-      // Update token in database
-      await updateAccountInDatabase(account.email, updatedToken)
-
-      // Update account in state
-      setAccounts(prev => prev.map(acc => 
-        acc.email === account.email 
-          ? { ...acc, token: updatedToken }
-          : acc
-      ))
-
-      return updatedToken
-    } catch (error) {
-      console.error('Error refreshing token:', error)
-      
-      // Implement retry mechanism
-      if (!account.retryCount || account.retryCount < MAX_RETRY_COUNT) {
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
-        return refreshToken({
-          ...account,
-          retryCount: (account.retryCount || 0) + 1
-        })
-      }
-      
-      toast.error(`Failed to refresh token for ${account.email}`)
-      throw error
-    }
-  }, [tokenClient, isInitialized])
-
-  const checkAndRefreshTokenIfNeeded = useCallback(async (account: Account) => {
-    const tokenData = account.token
-    const expiryTime = tokenData.expiry_time
-    const currentTime = new Date().getTime()
-    
-    if (expiryTime - currentTime < TOKEN_REFRESH_THRESHOLD) {
-      return await refreshToken(account)
-    }
-    
-    return tokenData
-  }, [refreshToken])
-
-  const ensureValidToken = async (account: Account) => {
-    try {
-      const validToken = await checkAndRefreshTokenIfNeeded(account)
-      gapi.client.setToken(validToken)
-      return true
-    } catch (error) {
-      console.error('Failed to ensure valid token:', error)
-      return false
-    }
-  }
   // Message Operations
   const fetchMessages = async (email: string, nextPageToken: string | null = null) => {
     if (!isInitialized) return
@@ -267,12 +339,12 @@ export function useGmail() {
       const account = accounts.find(acc => acc.email === email)
       if (!account) throw new Error('Account not found')
 
-      const isValid = await ensureValidToken(account)
+      const isValid = await checkTokenHealth(account)
       if (!isValid) throw new Error('Failed to validate token')
 
       const response = await gapi.client.gmail.users.messages.list({
         userId: 'me',
-        maxResults: 20,
+        maxResults: 50,
         pageToken: nextPageToken
       })
 
@@ -308,109 +380,29 @@ export function useGmail() {
     }
   }
 
-  // Account Management
-  const handleTokenResponse = async (response: any) => {
-    if (response.error) return
+  // Periodic token management
+  useEffect(() => {
+    if (!isInitialized || accounts.length === 0) return
 
-    try {
-      const userInfo = await gapi.client.gmail.users.getProfile({ userId: 'me' })
-      const email = userInfo.result.emailAddress
-      const token = gapi.client.getToken()
-      const tokenExpiryTime = new Date().getTime() + (token.expires_in * 1000)
-      
-      const updatedToken = {
-        ...token,
-        expiry_time: tokenExpiryTime,
-        last_refresh: new Date().toISOString()
-      }
-
-      const existingAccount = accounts.find(acc => acc.email === email)
-      
-      // Update or create account in database
-      const wasUpdated = await updateAccountInDatabase(email, updatedToken)
-
-      if (existingAccount) {
-        // Update existing account in state
-        setAccounts(prev => prev.map(acc => 
-          acc.email === email 
-            ? { ...acc, token: updatedToken }
-            : acc
-        ))
-      } else {
-        // Add new account to state
-        const newAccount = {
-          email,
-          label: email.split('@')[0],
-          token: updatedToken
-        }
-        setAccounts(prev => [...prev, newAccount])
-        setSelectedAccount(email)
-      }
-
-      // Only fetch messages for new accounts
-      if (!wasUpdated) {
-        await fetchMessages(email)
-      }
-
-      toast.success(wasUpdated ? 'Account updated successfully' : 'Account added successfully')
-    } catch (error) {
-      console.error('Error handling token response:', error)
-      toast.error('Failed to process account')
-    }
-  }
-
-  const addAccount = () => {
-    if (tokenClient) {
-      tokenClient.requestAccessToken({ prompt: 'consent' })
-    } else {
-      toast.error('Google Sign-In not initialized')
-    }
-  }
-
-  const removeAccount = async (email: string) => {
-    const account = accounts.find(acc => acc.email === email)
-    if (account?.token) {
-      try {
-        google.accounts.oauth2.revoke(account.token.access_token)
-
-        const { error } = await supabase
-          .from('email_accounts')
-          .delete()
-          .eq('email', email)
-        
-        if (error) throw error
-        
-        setAccounts(prev => prev.filter(acc => acc.email !== email))
-        setSelectedAccount(accounts[0]?.email || 'all')
-        
-        toast.success('Account removed successfully')
-      } catch (error) {
-        console.error('Error removing account:', error)
-        toast.error('Failed to remove account')
-      }
-    }
-  }
-
-  const refreshAllAccounts = async () => {
-    if (!isInitialized) return
-
-    setLoading(true)
-    try {
-      await loadAccountsFromDatabase()
+    const refreshTokens = async () => {
       for (const account of accounts) {
-        await checkTokenHealth(account)
-        await fetchMessages(account.email)
+        try {
+          await checkTokenHealth(account)
+        } catch (error) {
+          console.error(`Failed to refresh token for ${account.email}:`, error)
+        }
       }
-      toast.success('Accounts refreshed successfully')
-    } catch (error) {
-      console.error('Error refreshing accounts:', error)
-      toast.error('Failed to refresh accounts')
-    } finally {
-      setLoading(false)
     }
-  }
 
-  // Effects
+    // Initial refresh
+    refreshTokens()
+
+    // Set up periodic refresh
+    const intervalId = setInterval(refreshTokens, TOKEN_CHECK_INTERVAL)
+    return () => clearInterval(intervalId)
+  }, [accounts, isInitialized])
+
+  // Initialize Google APIs
   useEffect(() => {
     const loadScripts = async () => {
       const loadGapiScript = document.createElement('script')
@@ -440,11 +432,104 @@ export function useGmail() {
     }
   }, [isInitialized, loadAccountsFromDatabase])
 
-  // Periodic token check
-  useEffect(() => {
-    if (!isInitialized || accounts.length === 0) return
+  // Handle token response
+  const handleTokenResponse = async (response: any) => {
+    if (response.error) return
 
-    const checkTokens = async () => {
+    try {
+      const userInfo = await gapi.client.gmail.users.getProfile({ userId: 'me' })
+      const email = userInfo.result.emailAddress
+      const token = gapi.client.getToken()
+      const tokenExpiryTime = new Date().getTime() + (token.expires_in * 1000)
+      
+      const updatedToken = {
+        ...token,
+        expiry_time: tokenExpiryTime,
+        last_refresh: new Date().toISOString(),
+      }
+
+      const existingAccount = accounts.find(acc => acc.email === email)
+      
+      // Update or create account in database
+      const wasUpdated = await updateAccountInDatabase(email, updatedToken)
+
+      if (existingAccount) {
+        // Update existing account in state
+        setAccounts(prev => prev.map(acc => 
+          acc.email === email 
+            ? { ...acc, token: updatedToken, lastTokenCheck: Date.now() }
+            : acc
+        ))
+      } else {
+        // Add new account to state
+        const newAccount = {
+          email,
+          label: email.split('@')[0],
+          token: updatedToken,
+          lastTokenCheck: Date.now()
+        }
+        setAccounts(prev => [...prev, newAccount])
+        setSelectedAccount(email)
+      }
+
+      // Only fetch messages for new accounts
+      if (!wasUpdated) {
+        await fetchMessages(email)
+      }
+
+      toast.success(wasUpdated ? 'Account updated successfully' : 'Account added successfully')
+    } catch (error) {
+      console.error('Error handling token response:', error)
+      toast.error('Failed to process account')
+    }
+  }
+
+  // Public methods
+  const addAccount = () => {
+    if (tokenClient) {
+      tokenClient.requestAccessToken({ prompt: 'consent' })
+    } else {
+      toast.error('Google Sign-In not initialized')
+    }
+  }
+
+  const removeAccount = async (email: string) => {
+    const account = accounts.find(acc => acc.email === email)
+    if (account?.token) {
+      try {
+        // Revoke the token
+        google.accounts.oauth2.revoke(account.token.access_token, () => {
+          console.log('Token revoked successfully')
+        })
+
+        // Remove from database
+        const { error } = await supabase
+          .from('email_accounts')
+          .delete()
+          .eq('email', email)
+        
+        if (error) throw error
+        
+        // Update state
+        setAccounts(prev => prev.filter(acc => acc.email !== email))
+        if (selectedAccount === email) {
+          setSelectedAccount(accounts[0]?.email || 'all')
+        }
+        
+        toast.success('Account removed successfully')
+      } catch (error) {
+        console.error('Error removing account:', error)
+        toast.error('Failed to remove account')
+      }
+    }
+  }
+
+  const refreshAllAccounts = async () => {
+    if (!isInitialized) return
+
+    setLoading(true)
+    try {
+      // First refresh tokens
       for (const account of accounts) {
         try {
           await checkTokenHealth(account)
@@ -452,32 +537,125 @@ export function useGmail() {
           console.error(`Failed to refresh token for ${account.email}:`, error)
         }
       }
-    }
 
-    const intervalId = setInterval(checkTokens, TOKEN_CHECK_INTERVAL)
-    return () => clearInterval(intervalId)
-  }, [accounts, isInitialized])
+      // Then fetch messages
+      for (const account of accounts) {
+        try {
+          await fetchMessages(account.email)
+        } catch (error) {
+          console.error(`Failed to fetch messages for ${account.email}:`, error)
+        }
+      }
+
+      toast.success('Accounts refreshed successfully')
+    } catch (error) {
+      console.error('Error refreshing accounts:', error)
+      toast.error('Failed to refresh accounts')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Pagination
   const loadMore = async () => {
     if (loading || !hasMore || !selectedAccount || !isInitialized) return
-    await fetchMessages(
-      selectedAccount === 'all' ? accounts[0].email : selectedAccount,
-      pageToken
-    )
+    
+    try {
+      if (selectedAccount === 'all') {
+        // Load more for all accounts
+        for (const account of accounts) {
+          const accountMessages = account.messages || []
+          if (accountMessages.length > 0) {
+            await fetchMessages(
+              account.email,
+              accountMessages[accountMessages.length - 1].id
+            )
+          }
+        }
+      } else {
+        // Load more for selected account
+        await fetchMessages(selectedAccount, pageToken)
+      }
+    } catch (error) {
+      console.error('Error loading more messages:', error)
+      toast.error('Failed to load more messages')
+    }
+  }
+
+  // Error handling wrapper for API calls
+  const handleApiCall = async <T>(
+    apiCall: () => Promise<T>,
+    errorMessage: string
+  ): Promise<T> => {
+    try {
+      return await apiCall()
+    } catch (error: any) {
+      // Check if error is due to token expiration
+      if (error.status === 401 || error.status === 403) {
+        const account = accounts.find(acc => 
+          acc.token.access_token === gapi.client.getToken()?.access_token
+        )
+        if (account) {
+          try {
+            await refreshToken(account)
+            return await apiCall()
+          } catch (refreshError) {
+            console.error('Token refresh failed:', refreshError)
+            throw new Error('Authentication failed. Please sign in again.')
+          }
+        }
+      }
+      console.error(`${errorMessage}:`, error)
+      throw error
+    }
+  }
+
+  // Utility function to ensure account is ready for API calls
+  const ensureAccountReady = async (email: string): Promise<boolean> => {
+    const account = accounts.find(acc => acc.email === email)
+    if (!account) return false
+
+    try {
+      const isValid = await checkTokenHealth(account)
+      if (!isValid) {
+        throw new Error('Token validation failed')
+      }
+      return true
+    } catch (error) {
+      console.error(`Failed to prepare account ${email}:`, error)
+      return false
+    }
   }
 
   return {
+    // State
     accounts,
     selectedAccount,
     loading,
     hasMore,
     isInitialized,
+    
+    // Account management
     setSelectedAccount,
     addAccount,
     removeAccount,
     refreshAllAccounts,
+    
+    // Message operations
     loadMore,
+    fetchMessages,
+    
+    // Token management
+    checkTokenHealth,
+    refreshToken,
+    
+    // Utility functions
+    ensureAccountReady,
+    handleApiCall,
+    
+    // Database operations
     loadAccountsFromDatabase
   }
 }
+
+export type { Account, Token, GmailMessage }
