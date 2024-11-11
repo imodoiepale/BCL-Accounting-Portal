@@ -168,8 +168,8 @@ const FilterManagement: React.FC<FilterManagementProps> = ({
   return (
     <Tabs defaultValue="table" className="w-full">
       <TabsList className="w-full">
-        <TabsTrigger value="table" className="flex-1">Table View</TabsTrigger>
-        <TabsTrigger value="cards" className="flex-1">Card View</TabsTrigger>
+        <TabsTrigger value="table" className="flex-1">Filters</TabsTrigger>
+        
       </TabsList>
       <TabsContent value="table" className="mt-4">
         <Table>
@@ -229,57 +229,7 @@ const FilterManagement: React.FC<FilterManagementProps> = ({
           </TableBody>
         </Table>
       </TabsContent>
-      <TabsContent value="cards" className="mt-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filters.map((filter) => (
-            <Card key={filter.id}>
-              <CardHeader className="space-y-1">
-                <CardTitle className="flex items-center gap-2">
-                  <Tags className="h-4 w-4" />
-                  {filter.name}
-                </CardTitle>
-                <CardDescription>
-                  {filter.conditions.length} condition(s)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-2">
-                  {filter.conditions.map((condition, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-md border border-border p-2 text-sm"
-                    >
-                      <div className="font-medium">{condition.field}</div>
-                      <div className="text-muted-foreground">
-                        {condition.operator} "{condition.value}"
-                      </div>
-                    </div>
-                  ))}
-                  <div className="mt-4 flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onEdit(filter)}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600"
-                      onClick={() => onDelete(filter.id)}
-                    >
-                      <Trash className="mr-2 h-4 w-4" />
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </TabsContent>
+    
     </Tabs>
   )
 }
