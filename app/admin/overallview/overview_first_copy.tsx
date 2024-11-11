@@ -14,15 +14,6 @@ import { Download, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from "sonner";
-import { useTableFunctionalities } from './functionalities'
-import { Search, Filter, X } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
 
 function generateReferenceNumbers(sections) {
     let sectionCounter = 1;
@@ -85,37 +76,7 @@ const OverallView = () => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-    const {
-        filteredData,
-        globalFilter,
-        handleGlobalSearch,
-        columnVisibility,
-        toggleColumnVisibility,
-        sectionVisibility,
-        toggleSectionVisibility,
-        categoryVisibility,
-        toggleCategoryVisibility,
-        getVisibleColumns,
-        resetAll
-      } = useTableFunctionalities(data);
-    
-      // Add search input
-      const searchInput = (
-        <input
-          type="text"
-          value={globalFilter}
-          onChange={(e) => handleGlobalSearch(e.target.value)}
-          placeholder="Search all columns..."
-          className="px-3 py-2 border rounded"
-        />
-      );
 
-      const visibilityControls = (
-        <div className="flex gap-4 mb-4">
-          <Button onClick={resetAll}>Reset All</Button>
-          {/* Add more visibility toggle buttons as needed */}
-        </div>
-      );
     // Update color styles
     const sectionColors = {
         index: { main: 'bg-gray-600', sub: 'bg-gray-500', cell: 'bg-gray-50' },
@@ -257,6 +218,8 @@ const OverallView = () => {
             setLoading(false);
         }
     };
+
+
 
     if (loading) {
         return <div>Loading...</div>;
@@ -417,13 +380,15 @@ const OverallView = () => {
                         let currentCategory = category.category;
 
                         category.fields.forEach((field, fieldIndex) => {
-                            const row = [
-                                fieldIndex === 0 ? currentSection : '',  // Show section only for first field
-                                fieldIndex === 0 ? currentCategory : '', // Show category only for first field
-                                field.label,
-                                ...data.map(item => item.company[field.name] || '')
-                            ];
-                            exportRows.push(row);
+                            if (field.name !== '#' && field.name !== 'General' && field.name !== '#_1') {
+                                const row = [
+                                    fieldIndex === 0 ? currentSection : '',  // Show section only for first field
+                                    fieldIndex === 0 ? currentCategory : '', // Show category only for first field
+                                    field.label,
+                                    ...data.map(item => item.company[field.name] || '')
+                                ];
+                                exportRows.push(row);
+                            }
                         });
                     }
                 });
@@ -521,7 +486,6 @@ const OverallView = () => {
         XLSX.utils.book_append_sheet(wb, ws, "Companies");
         XLSX.writeFile(wb, "Companies_Report.xlsx");
     };
-    
     const handleFileImport = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -1466,7 +1430,6 @@ const OverallView = () => {
             </Dialog>
         );
     };
-
     const calculateTotalFields = (section) => {
         return section.categorizedFields?.reduce((total, category) => {
             if (category.isSeparator) return total;
@@ -1509,6 +1472,7 @@ const OverallView = () => {
         };
     };
 
+
     // Calculate section and column references
     const generateReferences = () => {
         let sectionRef = 1;
@@ -1537,7 +1501,8 @@ const OverallView = () => {
 
     const references = generateReferences();
 
-    
+
+
     return (
 
         <Tabs defaultValue="overview" className="w-full space-y-4">
@@ -1554,118 +1519,22 @@ const OverallView = () => {
                 <TabsTrigger value="other" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Other Details</TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="mt-6">
-  {/* Controls and buttons container */}
-  <div className="space-y-4">
-    {/* Search and filters row */}
-    <div className="flex justify-between items-center">
-      <div className="flex items-center gap-4">
-        {/* Global search */}
-        <div className="relative">
-          <input
-            type="text"
-            value={globalFilter}
-            onChange={(e) => handleGlobalSearch(e.target.value)}
-            placeholder="Search all columns..."
-            className="px-4 py-2 border rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <Search className="h-4 w-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"/>
-        </div>
-
-        {/* Section visibility dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Sections
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {processedSections.map((section) => !section.isSeparator && (
-              <DropdownMenuItem 
-                key={section.name}
-                onClick={() => toggleSectionVisibility(section.name)}
-              >
-                {section.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Category visibility dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Categories
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {Object.keys(categoryColors).map((category) => (
-              <DropdownMenuItem 
-                key={category}
-                onClick={() => toggleCategoryVisibility(category)}
-              >
-                {category}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Import/Export buttons */}
-      <div className="flex gap-2">
-        <Button
-          onClick={() => setIsImportDialogOpen(true)}
-          className="flex items-center gap-2"
-        >
-          <Upload className="h-4 w-4" />
-          Import
-        </Button>
-        <Button
-          onClick={handleExport}
-          className="flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Export
-        </Button>
-      </div>
-    </div>
-
-    {/* Stats cards row */}
-    <div className="grid grid-cols-4 gap-4">
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-sm font-medium text-gray-500">Total Fields</h3>
-        <p className="text-2xl font-semibold text-blue-600">{totalFields}</p>
-      </div>
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-sm font-medium text-gray-500">Completed</h3>
-        <p className="text-2xl font-semibold text-green-600">{completedFields}</p>
-      </div>
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-sm font-medium text-gray-500">Pending</h3>
-        <p className="text-2xl font-semibold text-red-600">{totalMissing}</p>
-      </div>
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-sm font-medium text-gray-500">Completion Rate</h3>
-        <p className="text-2xl font-semibold text-purple-600">
-          {((completedFields / totalFields) * 100).toFixed(1)}%
-        </p>
-      </div>
-    </div>
-
-    {/* Reset filters */}
-    <div className="flex justify-end">
-      <Button
-        onClick={resetAll}
-        variant="outline"
-        className="flex items-center gap-2"
-      >
-        <X className="h-4 w-4" />
-        Reset Filters
-      </Button>
-    </div>
-  </div>
-
+                <div className="flex justify-end gap-4 mb-4">
+                    <Button
+                        onClick={() => setIsImportDialogOpen(true)}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                    >
+                        <Upload className="h-4 w-4" />
+                        Import Data
+                    </Button>
+                    <Button
+                        onClick={handleExport}
+                        className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+                    >
+                        <Download className="h-4 w-4" />
+                        Export to Excel
+                    </Button>
+                </div>
 
                 <Card>
                     <CardContent className="p-0">
@@ -1736,17 +1605,17 @@ const OverallView = () => {
                                     {/* Category Headers */}
                                     <TableRow>
                                         <TableHead className="font-medium ">Category</TableHead>
-                                        {processedSections.slice(1).map((section, sectionIndex) => {
-                                            if (section.isSeparator) return renderSeparatorCell(`cat-sep-${sectionIndex}`);
+                                        {processedSections.slice(1).map(section => {
+                                            if (section.isSeparator) return renderSeparatorCell(`cat-sep-${section.name}`);
 
                                             return section.categorizedFields?.map((category, catIndex) => {
-                                                if (category.isSeparator) return renderSeparatorCell(`cat-${sectionIndex}-${catIndex}`);
+                                                if (category.isSeparator) return renderSeparatorCell(`cat-${section.name}-${catIndex}`);
 
                                                 const categoryColor = categoryColors[category.category] || { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' };
 
                                                 return (
                                                     <TableHead
-                                                        key={`cat-${sectionIndex}-${catIndex}`}
+                                                        key={`cat-${section.name}-${category.category}`}
                                                         colSpan={category.fields.length}
                                                         className={`text-center ${categoryColor.bg} ${categoryColor.text} ${categoryColor.border}`}
                                                     >
@@ -1756,6 +1625,7 @@ const OverallView = () => {
                                             });
                                         })}
                                     </TableRow>
+
                                     {/* Column Reference Row */}
                                     <TableRow className="bg-yellow-50">
                                         <TableHead className="font-medium">CLM REF</TableHead>
@@ -1807,8 +1677,7 @@ const OverallView = () => {
                                     </TableRow>
                                     {/* Statistics Rows */}
                                     <TableRow className="bg-blue-50">
-
-                                        <TableHead className="font-semibold text-blue-900 text-start">Total</TableHead>
+                                        <TableHead className="font-semibold text-blue-900">Total</TableHead>
                                         {processedSections.map((section, sectionIndex) => {
                                             if (section.isSeparator) return renderSeparatorCell(`total-sep-${sectionIndex}-${Date.now()}`);
                                             if (sectionIndex === 0) return null;
@@ -1832,8 +1701,7 @@ const OverallView = () => {
                                     </TableRow>
 
                                     <TableRow className="bg-green-50">
-
-                                        <TableHead className="font-semibold text-green-900 text-start">Completed</TableHead>
+                                        <TableHead className="font-semibold text-green-900">Completed</TableHead>
                                         {processedSections.map((section, sectionIndex) => {
                                             if (section.isSeparator) return renderSeparatorCell(`completed-sep-${sectionIndex}-${Date.now()}`);
                                             if (sectionIndex === 0) return null;
@@ -1857,8 +1725,7 @@ const OverallView = () => {
                                     </TableRow>
 
                                     <TableRow className="bg-red-50">
-
-                                        <TableHead className="font-semibold text-red-900 text-start">Pending</TableHead>
+                                        <TableHead className="font-semibold text-red-900">Pending</TableHead>
                                         {processedSections.map((section, sectionIndex) => {
                                             if (section.isSeparator) return renderSeparatorCell(`pending-sep-${sectionIndex}-${Date.now()}`);
                                             if (sectionIndex === 0) return null;
@@ -1881,7 +1748,7 @@ const OverallView = () => {
                                         })}
                                     </TableRow>                                </TableHeader>
                                 <TableBody>
-                                {filteredData.map((companyGroup, groupIndex) => (
+                                    {data.map((companyGroup, groupIndex) => (
                                         companyGroup.rows.map((row, rowIndex) => (
                                             <TableRow
                                                 key={`${groupIndex}-${rowIndex}`}
@@ -1949,12 +1816,6 @@ const OverallView = () => {
                                         ))
                                     ))}
                                 </TableBody>
-                                {/* Add a "No results found" message when filtered data is empty */}
-{filteredData.length === 0 && (
-  <div className="text-center py-8 text-gray-500">
-    No results found for your search criteria
-  </div>
-)}
                             </Table>
                             <ScrollBar orientation="horizontal" />
                         </ScrollArea>
@@ -2046,6 +1907,12 @@ const OverallView = () => {
                 </div>
                 <Tabs defaultValue="acc">
 
+
+
+
+
+
+
                     {/* Rest of the clients content remains the same */}
                     {/* ... */}
                 </Tabs>
@@ -2062,6 +1929,22 @@ const OverallView = () => {
                     </Button>
                 </div>
                 <Tabs defaultValue="details">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
                     {/* Rest of the directors content remains the same */}
                     {/* ... */}
