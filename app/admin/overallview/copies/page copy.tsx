@@ -2,7 +2,7 @@
 // @ts-nocheck
 "use client";
 import React, { useEffect, useState } from 'react';
-import { formFields } from './formfields';
+import { formFields } from '../formfields';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -539,11 +539,11 @@ const OverallView = () => {
                         annual_revenue: null,
                         fiscal_year: null,
                         website: null,
-                        current_communication_email: null,
+                        company_email: null,
                         phone: null,
                         street: null,
                         city: null,
-                        postal_address: null,
+                        postal_code: null,
                         country: null,
                         status: '',
                         housing_levy_identifier: null,
@@ -572,9 +572,7 @@ const OverallView = () => {
                         co_cert_number: null,
                         co_registration_date: null,
                         co_nssf_number: null,
-                        verified: null,
-                        sheria_status: null,
-                        published: null,
+                        verified_status: null,
                         bo_status: null,
                         co_cr_12_issue_date: null,
                         cr_12_as_at_date_of_issue: null,
@@ -620,9 +618,9 @@ const OverallView = () => {
                         pin_certification_profile_download_dates: null,
                         pin_status: null,
                         itax_status: null,
-                        income_tax_company_status: null,
-                        income_tax_company_from: null,
-                        income_tax_company_to: null,
+                        income_tax_resident_individual_status: null,
+                        income_tax_resident_individual_from: null,
+                        income_tax_resident_individual_to: null,
                         income_tax_rent_income_current_status: null,
                         income_tax_rent_income_effective_from: null,
                         income_tax_rent_income_effective_to: null,
@@ -635,14 +633,10 @@ const OverallView = () => {
                         annual_income: null,
                         tax_year_end: null,
                         current_itax_gmail_yahoo_email_recovery: null,
-                        current_itax_password: null,
+                        current_tax_password: null,
                         current_itax_gmail_email: null,
                         current_itax_system_gmail_password: null,
-                        old_itax_system_gmail_password: null,
-                        current_itax_gmail_email_recovery_email: null,
                         current_itax_gmail_email_recovery_mobile: null,
-                        old_itax_email: null,
-                        old_itax_password: null,
                         pin_station: null,
                         pin_station_manager_name: null,
                         pin_station_manager_mobile: null,
@@ -785,8 +779,8 @@ const OverallView = () => {
                             case "Website":
                                 companyData.mainCompany.website = value;
                                 break;
-                            case "Current Communication Email":
-                                companyData.mainCompany.current_communication_email = value;
+                            case "Company Email":
+                                companyData.mainCompany.company_email = value;
                                 break;
                             case "Phone":
                                 companyData.mainCompany.phone = value;
@@ -797,8 +791,8 @@ const OverallView = () => {
                             case "City":
                                 companyData.mainCompany.city = value;
                                 break;
-                            case "Postal Address":
-                                companyData.mainCompany.postal_address= value;
+                            case "Postal Code":
+                                companyData.mainCompany.postal_code = value;
                                 break;
                             case "Country":
                                 companyData.mainCompany.country = value;
@@ -914,13 +908,9 @@ const OverallView = () => {
                             case "CO NSSF Number":
                                 companyData.mainCompany.co_nssf_number = value;
                                 break;
-                                case "Verified":
-                                    companyData.mainCompany.verified = value;
-                                    break;       case "Pubilished":
-                                    companyData.mainCompany.published = value;
-                                    break;       case "Status":
-                                    companyData.mainCompany.sheria_status = value;
-                                    break;
+                            case "Verified Status":
+                                companyData.mainCompany.verified_status = value;
+                                break;
                             case "BO Status":
                                 companyData.mainCompany.bo_status = value;
                                 break;
@@ -1022,14 +1012,14 @@ const OverallView = () => {
                             case "iTax Status":
                                 companyData.pinDetails.itax_status = value;
                                 break;
-                            case "Income Tax Company Status":
-                                companyData.pinDetails.income_tax_company_status = value;
+                            case "Income Tax Resident Individual Status":
+                                companyData.pinDetails.income_tax_resident_individual_status = value;
                                 break;
-                            case "Income Tax Company From":
-                                companyData.pinDetails.income_tax_company_from = value;
+                            case "Income Tax Resident Individual From":
+                                companyData.pinDetails.income_tax_resident_individual_from = value;
                                 break;
-                            case "Income Tax Company To":
-                                companyData.pinDetails.income_tax_company_to = value;
+                            case "Income Tax Resident Individual To":
+                                companyData.pinDetails.income_tax_resident_individual_to = value;
                                 break;
                             case "Income Tax Rent Income Current Status":
                                 companyData.pinDetails.income_tax_rent_income_current_status = value;
@@ -1067,30 +1057,18 @@ const OverallView = () => {
                             case "Current iTax Gmail Yahoo Email Recovery Email":
                                 companyData.pinDetails.current_itax_gmail_yahoo_email_recovery = value;
                                 break;
-                                case "Current iTax Password":
-                                    companyData.pinDetails.current_itax_password = value;
-                                    break;  
-                                    case "Old iTax Email":
-                                        companyData.pinDetails.old_itax_email = value;
-                                        break;
-                                        case "Old iTax Email Password":
-                                            companyData.pinDetails.old_itax_password = value;
-                                            break;
+                            case "Current Tax Password":
+                                companyData.pinDetails.current_tax_password = value;
+                                break;
                             case "Current iTax Gmail Email Address":
                                 companyData.pinDetails.current_itax_gmail_email = value;
                                 break;
-                                case "Current iTax System Gmail Email Password":
-                                    companyData.pinDetails.current_itax_system_gmail_password = value;
-                                    break;
-                                    case "Old iTax System Gmail Email Password":
-                                companyData.pinDetails.old_itax_system_gmail_password = value;
+                            case "Current iTax System Gmail Email Password":
+                                companyData.pinDetails.current_itax_system_gmail_password = value;
                                 break;
                             case "Current iTax Gmail Email Recovery Mobile":
-                                companyData.pinDetails.current_itax_gmail_email_recovery_email = value;
+                                companyData.pinDetails.current_itax_gmail_email_recovery_mobile = value;
                                 break;
-                                case "Current iTax Gmail Email Recovery Mobile":
-                                    companyData.pinDetails.current_itax_gmail_email_recovery_mobile = value;
-                                    break;
                             case "PIN Station":
                                 companyData.pinDetails.pin_station = value;
                                 break;
@@ -1629,41 +1607,39 @@ const OverallView = () => {
                                     {/* Column Reference Row */}
                                     <TableRow className="bg-yellow-50">
                                         <TableHead className="font-medium">CLM REF</TableHead>
-                                        {(() => {
+                                        {processedSections.slice(1).map((section, sectionIndex) => {
+                                            if (section.isSeparator) return renderSeparatorCell(`col-ref-sep-${sectionIndex}`);
+
                                             let columnCounter = 1;
-                                            return processedSections.slice(1).map(section => {
-                                                if (section.isSeparator) {
-                                                    return renderSeparatorCell(`col-ref-sep-${columnCounter}`);
-                                                }
-                                                return section.categorizedFields?.map(category => {
-                                                    if (category.isSeparator) {
-                                                        return renderSeparatorCell(`col-ref-cat-${columnCounter}`);
-                                                    }
-                                                    return category.fields.map(field => (
+                                            return section.categorizedFields?.map(category => {
+                                                if (category.isSeparator) return renderSeparatorCell(`col-ref-cat-${category.category}`);
+
+                                                return category.fields.map(field => {
+                                                    const columnRef = columnCounter++;
+                                                    return (
                                                         <TableHead
-                                                            key={`col-ref-${columnCounter}`}
+                                                            key={`col-ref-${field.name}`}
                                                             className="text-center font-medium bg-yellow-50 border-b border-yellow-200"
                                                         >
-                                                            {columnCounter++}
+                                                            {columnRef}
                                                         </TableHead>
-                                                    ));
+                                                    );
                                                 });
                                             });
-                                        })()}
+                                        })}
                                     </TableRow>
-
 
                                     {/* Column Headers */}
                                     <TableRow>
-                                        {processedSections.map((section, sectionIndex) => {
-                                            if (section.isSeparator) {
-                                                return renderSeparatorCell(sectionIndex, 0, 'section');
-                                            }
+        {processedSections.map((section, sectionIndex) => {
+            if (section.isSeparator) {
+                return renderSeparatorCell(sectionIndex, 0, 'section');
+            }
 
-                                            return section.categorizedFields?.map((category, categoryIndex) => {
-                                                if (category.isSeparator) {
-                                                    return renderSeparatorCell(sectionIndex, categoryIndex, 'category');
-                                                }
+            return section.categorizedFields?.map((category, categoryIndex) => {
+                if (category.isSeparator) {
+                    return renderSeparatorCell(sectionIndex, categoryIndex, 'category');
+                }
 
                                                 return category.fields.map(field => (
                                                     <TableHead
@@ -1682,7 +1658,7 @@ const OverallView = () => {
                                             if (section.isSeparator) return renderSeparatorCell(`total-sep-${sectionIndex}-${Date.now()}`);
                                             if (sectionIndex === 0) return null;
 
-                                            return section.categorizedFields?.map((category, catIndex) => {
+                                            return section.categorizedFields?.map((category, catIndex)  => {
                                                 if (category.isSeparator) return renderSeparatorCell(`total-cat-sep-${sectionIndex}-${catIndex}-${Date.now()}`);
 
                                                 return category.fields.map(field => {
@@ -1706,7 +1682,7 @@ const OverallView = () => {
                                             if (section.isSeparator) return renderSeparatorCell(`completed-sep-${sectionIndex}-${Date.now()}`);
                                             if (sectionIndex === 0) return null;
 
-                                            return section.categorizedFields?.map((category, catIndex) => {
+                                            return section.categorizedFields?.map((category, catIndex)  => {
                                                 if (category.isSeparator) return renderSeparatorCell(`completed-cat-sep-${sectionIndex}-${catIndex}-${Date.now()}`);
 
                                                 return category.fields.map(field => {
@@ -1730,7 +1706,7 @@ const OverallView = () => {
                                             if (section.isSeparator) return renderSeparatorCell(`pending-sep-${sectionIndex}-${Date.now()}`);
                                             if (sectionIndex === 0) return null;
 
-                                            return section.categorizedFields?.map((category, catIndex) => {
+                                            return section.categorizedFields?.map((category, catIndex)  => {
                                                 if (category.isSeparator) return renderSeparatorCell(`pending-cat-sep-${sectionIndex}-${catIndex}-${Date.now()}`);
 
                                                 return category.fields.map(field => {

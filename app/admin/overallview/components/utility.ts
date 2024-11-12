@@ -1,7 +1,7 @@
 // utils.ts
 // @ts-nocheck
 
-import { formFields } from './formfields';
+import { formFields } from '../formfields';
 import { supabase } from '@/lib/supabaseClient';
 import * as XLSX from 'xlsx';
 import { toast } from "sonner";
