@@ -3,35 +3,38 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash, Settings } from 'lucide-react';
+import { Plus, Trash, Settings, Edit2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "sonner";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface StructureItem {
   id: number;
-  category: string;
-  subcategory: string;
+  section: string;
+  subsection: string;
   table_name: string;
-  column_mappings: any;
+  column_mappings: Record<string, string>;
+  Tabs: string;
 }
 
 export function SettingsDialog() {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedTab, setSelectedTab] = useState('');
-  const [selectedSection, setSelectedSection] = useState('');
   const [structure, setStructure] = useState<StructureItem[]>([]);
-  const [newItem, setNewItem] = useState({
-    category: '',
-    subcategory: '',
+  const [selectedTab, setSelectedTab] = useState('');
+  const [selectedSection, setSelectedSection] = useState<StructureItem | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [newField, setNewField] = useState({ key: '', value: '' });
+  const [newStructure, setNewStructure] = useState({
+    section: '',
+    subsection: '',
     table_name: '',
+    Tabs: '',
     column_mappings: {}
   });
 
-  // Fetch structure from database
   useEffect(() => {
     fetchStructure();
   }, []);
@@ -41,7 +44,7 @@ export function SettingsDialog() {
       const { data, error } = await supabase
         .from('profile_category_table_mapping')
         .select('*')
-        .order('category', { ascending: true });
+        .order('Tabs', { ascending: true });
 
       if (error) throw error;
       setStructure(data || []);
@@ -50,57 +53,62 @@ export function SettingsDialog() {
     }
   };
 
-  // Get unique tabs (categories)
-  const tabs = [...new Set(structure.map(item => item.category))];
+  const uniqueTabs = [...new Set(structure.map(item => item.Tabs))];
 
-  // Get sections for selected tab
-  const getSections = (tab: string) => {
-    return [...new Set(structure
-      .filter(item => item.category === tab)
-      .map(item => item.subcategory))];
+  const handleAddField = () => {
+    if (!selectedSection || !newField.key || !newField.value) return;
+
+    const updatedMappings = {
+      ...selectedSection.column_mappings,
+      [newField.key]: newField.value
+    };
+
+    handleUpdateSection(selectedSection.id, { column_mappings: updatedMappings });
+    setNewField({ key: '', value: '' });
   };
 
-  // Get column mappings for selected section
-  const getFields = (tab: string, section: string) => {
-    const item = structure.find(
-      item => item.category === tab && item.subcategory === section
-    );
-    return item?.column_mappings || {};
+  const handleDeleteField = async (key: string) => {
+    if (!selectedSection) return;
+
+    const updatedMappings = { ...selectedSection.column_mappings };
+    delete updatedMappings[key];
+
+    handleUpdateSection(selectedSection.id, { column_mappings: updatedMappings });
   };
 
-  // Add new structure item
-  const handleAdd = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profile_category_table_mapping')
-        .insert([newItem])
-        .select();
-
-      if (error) throw error;
-
-      setStructure([...structure, data[0]]);
-      toast.success('Structure updated successfully');
-    } catch (error) {
-      toast.error('Failed to update structure');
-    }
-  };
-
-  // Delete structure item
-  const handleDelete = async (category: string, subcategory: string) => {
+  const handleUpdateSection = async (id: number, updates: Partial<StructureItem>) => {
     try {
       const { error } = await supabase
         .from('profile_category_table_mapping')
-        .delete()
-        .match({ category, subcategory });
+        .update(updates)
+        .eq('id', id);
 
       if (error) throw error;
-
-      setStructure(structure.filter(
-        item => !(item.category === category && item.subcategory === subcategory)
-      ));
-      toast.success('Item deleted successfully');
+      await fetchStructure();
+      toast.success('Updated successfully');
     } catch (error) {
-      toast.error('Failed to delete item');
+      toast.error('Update failed');
+    }
+  };
+
+  const handleAddStructure = async () => {
+    try {
+      const { error } = await supabase
+        .from('profile_category_table_mapping')
+        .insert([newStructure]);
+
+      if (error) throw error;
+      await fetchStructure();
+      setNewStructure({
+        section: '',
+        subsection: '',
+        table_name: '',
+        Tabs: '',
+        column_mappings: {}
+      });
+      toast.success('Added new structure');
+    } catch (error) {
+      toast.error('Failed to add structure');
     }
   };
 
@@ -111,129 +119,185 @@ export function SettingsDialog() {
         Settings
       </Button>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
+      <Dialog open={isOpen} onOpenChange={setIsOpen} modal>
+        <DialogContent className="max-w-7xl max-h-[170vh]">
           <DialogHeader>
-            <DialogTitle>Structure Settings</DialogTitle>
+            <DialogTitle>Table Structure Settings</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-3 gap-4">
-            {/* Left panel - Structure tree */}
-            <div className="border rounded-lg p-4">
-              <h3 className="font-semibold mb-4">Structure</h3>
-              <ScrollArea className="h-[500px]">
-                {tabs.map(tab => (
-                  <div key={tab} className="mb-4">
-                    <div className="font-medium text-primary">{tab}</div>
-                    {getSections(tab).map(section => (
-                      <div 
-                        key={section}
-                        className="ml-4 py-1 cursor-pointer hover:text-primary"
-                        onClick={() => {
-                          setSelectedTab(tab);
-                          setSelectedSection(section);
-                        }}
+          <div className="grid grid-cols-12 gap-4">
+            {/* Tabs List */}
+            <Card className="col-span-2 h-[700px]">
+              <CardContent className="p-2">
+                <ScrollArea className="h-full">
+                  <h3 className="font-semibold mb-2 px-2">Tabs</h3>
+                  {uniqueTabs.map(tab => (
+                    <button
+                      key={tab}
+                      className={`w-full text-left px-3 py-2 rounded ${
+                        selectedTab === tab ? 'bg-primary text-white' : 'hover:bg-gray-100'
+                      }`}
+                      onClick={() => setSelectedTab(tab)}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            {/* Sections List */}
+            <Card className="col-span-3 h-[700px]">
+              <CardContent className="p-2">
+                <ScrollArea className="h-full">
+                  <h3 className="font-semibold mb-2 px-2">Sections</h3>
+                  {structure
+                    .filter(item => item.Tabs === selectedTab)
+                    .map(item => (
+                      <div
+                        key={item.id}
+                        className={`mb-2 p-2 rounded cursor-pointer ${
+                          selectedSection?.id === item.id ? 'bg-primary/10' : 'hover:bg-gray-100'
+                        }`}
+                        onClick={() => setSelectedSection(item)}
                       >
-                        {section}
+                        <div className="font-medium">{item.section}</div>
+                        <div className="text-sm text-gray-500">{item.subsection}</div>
                       </div>
                     ))}
-                  </div>
-                ))}
-              </ScrollArea>
-            </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
 
-            {/* Middle panel - Details */}
-            <div className="border rounded-lg p-4 col-span-2">
-              <h3 className="font-semibold mb-4">Details</h3>
-              {selectedTab && selectedSection ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium">Table Name</label>
-                    <Input 
-                      value={structure.find(
-                        item => item.category === selectedTab && 
-                               item.subcategory === selectedSection
-                      )?.table_name || ''}
-                      onChange={async (e) => {
-                        const { error } = await supabase
-                          .from('profile_category_table_mapping')
-                          .update({ table_name: e.target.value })
-                          .match({
-                            category: selectedTab,
-                            subcategory: selectedSection
-                          });
-                        
-                        if (error) toast.error('Failed to update table name');
-                        else fetchStructure();
-                      }}
-                    />
-                  </div>
+            {/* Details Panel */}
+            <Card className="col-span-7 h-[700px]">
+              <CardContent className="p-4">
+                <ScrollArea className="h-full">
+                  {selectedSection ? (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h3 className="font-semibold">Section Details</h3>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditing(!editing)}
+                        >
+                          <Edit2 className="h-4 w-4 mr-2" />
+                          {editing ? 'View' : 'Edit'}
+                        </Button>
+                      </div>
 
-                  <div>
-                    <label className="text-sm font-medium">Column Mappings</label>
-                    <div className="space-y-2">
-                      {Object.entries(getFields(selectedTab, selectedSection)).map(([key, value]) => (
-                        <div key={key} className="flex items-center gap-2">
-                          <Input value={key} disabled />
-                          <Input value={value as string} disabled />
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            onClick={() => {
-                              // Handle delete field
-                            }}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
+                      {/* Section Info */}
+                      <div className="grid gap-4">
+                        <div>
+                          <label className="text-sm font-medium">Section</label>
+                          <Input 
+                            value={selectedSection.section}
+                            disabled={!editing}
+                            onChange={(e) => handleUpdateSection(selectedSection.id, { section: e.target.value })}
+                          />
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                        <div>
+                          <label className="text-sm font-medium">Subsection</label>
+                          <Input 
+                            value={selectedSection.subsection}
+                            disabled={!editing}
+                            onChange={(e) => handleUpdateSection(selectedSection.id, { subsection: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Table Name</label>
+                          <Input 
+                            value={selectedSection.table_name}
+                            disabled={!editing}
+                            onChange={(e) => handleUpdateSection(selectedSection.id, { table_name: e.target.value })}
+                          />
+                        </div>
+                      </div>
 
-                  <Button
-                    variant="outline"
-                    onClick={() => handleDelete(selectedTab, selectedSection)}
-                  >
-                    Delete Section
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center text-gray-500">
-                  Select a section to view details
-                </div>
-              )}
-            </div>
+                      {/* Column Mappings */}
+                      <div>
+                        <h4 className="font-medium mb-2">Column Mappings</h4>
+                        <ScrollArea className="h-[260px]">
+                          <div className="space-y-2">
+                            {Object.entries(selectedSection.column_mappings).map(([key, value], index) => (
+                              <div key={key} className="flex items-center gap-2">
+                                <div className="w-8 text-center text-sm text-gray-500">{index + 1}</div>
+                                <Input 
+                                  value={key} 
+                                  disabled={!editing}
+                                  onChange={(e) => handleUpdateField(key, e.target.value, value)} 
+                                />
+                                <Input 
+                                  value={value} 
+                                  disabled={!editing}
+                                  onChange={(e) => handleUpdateField(key, key, e.target.value)}
+                                />
+                                {editing && (
+                                  <Button
+                                    variant="destructive"
+                                    size="icon"
+                                    onClick={() => handleDeleteField(key)}
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+
+                        {editing && (
+                          <div className="mt-4 flex items-end gap-2">
+                            <div className="flex-1">
+                              <label className="text-sm font-medium">Field Key</label>
+                              <Input
+                                value={newField.key}
+                                onChange={(e) => setNewField(prev => ({ ...prev, key: e.target.value }))}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label className="text-sm font-medium">Display Name</label>
+                              <Input
+                                value={newField.value}
+                                onChange={(e) => setNewField(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                            </div>
+                            <Button onClick={handleAddField}>Add Field</Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-500 mt-8">
+                      Select a section to view details
+                    </div>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Add new structure form */}
+          {/* New Structure Form */}
           <div className="border-t pt-4 mt-4">
             <h3 className="font-semibold mb-4">Add New Structure</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <Input
-                placeholder="Category (Tab)"
-                value={newItem.category}
-                onChange={(e) => setNewItem({
-                  ...newItem,
-                  category: e.target.value
-                })}
+                placeholder="Tab"
+                value={newStructure.Tabs}
+                onChange={(e) => setNewStructure(prev => ({ ...prev, Tabs: e.target.value }))}
               />
               <Input
-                placeholder="Subcategory (Section)"
-                value={newItem.subcategory}
-                onChange={(e) => setNewItem({
-                  ...newItem,
-                  subcategory: e.target.value
-                })}
+                placeholder="Section"
+                value={newStructure.section}
+                onChange={(e) => setNewStructure(prev => ({ ...prev, section: e.target.value }))}
               />
               <Input
-                placeholder="Table Name"
-                value={newItem.table_name}
-                onChange={(e) => setNewItem({
-                  ...newItem,
-                  table_name: e.target.value
-                })}
+                placeholder="Subsection"
+                value={newStructure.subsection}
+                onChange={(e) => setNewStructure(prev => ({ ...prev, subsection: e.target.value }))}
               />
-              <Button onClick={handleAdd}>
+              <Button onClick={handleAddStructure}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Structure
               </Button>
