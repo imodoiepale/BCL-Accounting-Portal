@@ -475,49 +475,13 @@ const OverallView = () => {
                                 <Search className="h-4 w-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                             </div>
 
-                            {/* Section visibility dropdown */}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="gap-2">
-                                        <Filter className="h-4 w-4" />
-                                        Sections
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    {processedSections.map((section) => !section.isSeparator && (
-                                        <DropdownMenuItem
-                                            key={section.name}
-                                            onClick={() => toggleSectionVisibility(section.name)}
-                                        >
-                                            {section.label}
-                                        </DropdownMenuItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
 
-                            {/* Category visibility dropdown */}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="gap-2">
-                                        <Filter className="h-4 w-4" />
-                                        Categories
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    {Object.keys(categoryColors).map((category) => (
-                                        <DropdownMenuItem
-                                            key={category}
-                                            onClick={() => toggleCategoryVisibility(category)}
-                                        >
-                                            {category}
-                                        </DropdownMenuItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
                         </div>
 
                         {/* Import/Export buttons */}
                         <div className="flex gap-2">
+
+                            <SettingsDialog />
                             <Button
                                 onClick={() => setIsImportDialogOpen(true)}
                                 className="flex items-center gap-2"
@@ -534,43 +498,6 @@ const OverallView = () => {
                             </Button>
                         </div>
                     </div>
-
-                    {/* Stats cards row */}
-                    <div className="grid grid-cols-4 gap-4">
-                        <div className="bg-white p-4 rounded-lg shadow">
-                            <h3 className="text-sm font-medium text-gray-500">Total Fields</h3>
-                            <p className="text-2xl font-semibold text-blue-600">{totalFields}</p>
-                        </div>
-                        <div className="bg-white p-4 rounded-lg shadow">
-                            <h3 className="text-sm font-medium text-gray-500">Completed</h3>
-                            <p className="text-2xl font-semibold text-green-600">{completedFields}</p>
-                        </div>
-                        <div className="bg-white p-4 rounded-lg shadow">
-                            <h3 className="text-sm font-medium text-gray-500">Pending</h3>
-                            <p className="text-2xl font-semibold text-red-600">{totalMissing}</p>
-                        </div>
-                        <div className="bg-white p-4 rounded-lg shadow">
-                            <h3 className="text-sm font-medium text-gray-500">Completion Rate</h3>
-                            <p className="text-2xl font-semibold text-purple-600">
-                                {((completedFields / totalFields) * 100).toFixed(1)}%
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Reset filters */}
-                    <div className="flex justify-end">
-                        <Button
-                            onClick={resetAll}
-                            variant="outline"
-                            className="flex items-center gap-2"
-                        >
-                            <X className="h-4 w-4" />
-                            Reset Filters
-                        </Button>
-                    </div>
-
-
-<SettingsDialog />
                 </div>
 
 
