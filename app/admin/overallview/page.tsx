@@ -8,21 +8,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { CompanyTaxTable, DirectorsTable, ComplianceTable, NSSFTable, NHIFTable, EmployeesTable, BankingTable, PAYETable, VATTable, NITATable, HousingLevyTable, TourismLevyTable, StandardLevyTable, ClientCategoryTable, SheriaDetailsTable, ECitizenTable, TaxStatusTable, CompanyGeneralTable } from './tableComponents';
+import { CompanyTaxTable, DirectorsTable, ComplianceTable, NSSFTable, NHIFTable, EmployeesTable, BankingTable, PAYETable, VATTable, NITATable, HousingLevyTable, TourismLevyTable, StandardLevyTable, ClientCategoryTable, SheriaDetailsTable, ECitizenTable, TaxStatusTable, CompanyGeneralTable } from './components/tableComponents';
 import { Button } from '@/components/ui/button';
 import { Download, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from "sonner";
-import { useTableFunctionalities } from './functionalities'
+import { useTableFunctionalities, CompanyEditDialog } from './components/functionalities'
 import { Search, Filter, X } from 'lucide-react';
-import { groupFieldsByCategory,groupDataByCategory, calculateFieldStats, handleExport,handleFileImport, calculateTotalFields, calculatePendingFields,calculateCompletedFields } from './utility';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { groupFieldsByCategory, groupDataByCategory, calculateFieldStats, handleExport, handleFileImport, calculateTotalFields, calculatePendingFields, calculateCompletedFields } from './components/utility';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { SettingsDialog } from './components/settingsDialog';
 
 
 function generateReferenceNumbers(sections) {
@@ -86,25 +82,27 @@ const OverallView = () => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-    const {filteredData, globalFilter, handleGlobalSearch, columnVisibility, toggleColumnVisibility, sectionVisibility, toggleSectionVisibility, categoryVisibility, toggleCategoryVisibility, getVisibleColumns, resetAll } = useTableFunctionalities(data);
-    
-      // Add search input
-      const searchInput = (
-        <input
-          type="text"
-          value={globalFilter}
-          onChange={(e) => handleGlobalSearch(e.target.value)}
-          placeholder="Search all columns..."
-          className="px-3 py-2 border rounded"
-        />
-      );
+    const { filteredData, globalFilter, handleGlobalSearch, columnVisibility, toggleColumnVisibility, sectionVisibility, toggleSectionVisibility, categoryVisibility, toggleCategoryVisibility, getVisibleColumns, resetAll } = useTableFunctionalities(data);
+    const [selectedCompany, setSelectedCompany] = useState(null);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-      const visibilityControls = (
+    // Add search input
+    const searchInput = (
+        <input
+            type="text"
+            value={globalFilter}
+            onChange={(e) => handleGlobalSearch(e.target.value)}
+            placeholder="Search all columns..."
+            className="px-3 py-2 border rounded"
+        />
+    );
+
+    const visibilityControls = (
         <div className="flex gap-4 mb-4">
-          <Button onClick={resetAll}>Reset All</Button>
-          {/* Add more visibility toggle buttons as needed */}
+            <Button onClick={resetAll}>Reset All</Button>
+            {/* Add more visibility toggle buttons as needed */}
         </div>
-      );
+    );
     // Update color styles
     const sectionColors = {
         index: { main: 'bg-gray-600', sub: 'bg-gray-500', cell: 'bg-gray-50' },
@@ -362,7 +360,7 @@ const OverallView = () => {
             }]
         };
     }));
-    
+
     const ImportDialog = () => {
         return (
             <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
@@ -424,7 +422,26 @@ const OverallView = () => {
 
     const references = generateReferences();
 
-    
+    // Add this handler function
+    const handleCompanyClick = (company) => {
+        setSelectedCompany(company);
+        setIsEditDialogOpen(true);
+    };
+
+    // Add this handler for after successful edit
+    const handleEditSave = (updatedData) => {
+        // Update the local data
+        const newData = data.map(item => {
+            if (item.company.id === updatedData.id) {
+                return {
+                    ...item,
+                    company: updatedData
+                };
+            }
+            return item;
+        });
+        setData(newData);
+    };
     return (
 
         <Tabs defaultValue="overview" className="w-full space-y-4">
@@ -441,117 +458,120 @@ const OverallView = () => {
                 <TabsTrigger value="other" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Other Details</TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="mt-6">
-  {/* Controls and buttons container */}
-  <div className="space-y-4">
-    {/* Search and filters row */}
-    <div className="flex justify-between items-center">
-      <div className="flex items-center gap-4">
-        {/* Global search */}
-        <div className="relative">
-          <input
-            type="text"
-            value={globalFilter}
-            onChange={(e) => handleGlobalSearch(e.target.value)}
-            placeholder="Search all columns..."
-            className="px-4 py-2 border rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <Search className="h-4 w-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"/>
-        </div>
+                {/* Controls and buttons container */}
+                <div className="space-y-4">
+                    {/* Search and filters row */}
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            {/* Global search */}
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={globalFilter}
+                                    onChange={(e) => handleGlobalSearch(e.target.value)}
+                                    placeholder="Search all columns..."
+                                    className="px-4 py-2 border rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <Search className="h-4 w-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                            </div>
 
-        {/* Section visibility dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Sections
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {processedSections.map((section) => !section.isSeparator && (
-              <DropdownMenuItem 
-                key={section.name}
-                onClick={() => toggleSectionVisibility(section.name)}
-              >
-                {section.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                            {/* Section visibility dropdown */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="gap-2">
+                                        <Filter className="h-4 w-4" />
+                                        Sections
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    {processedSections.map((section) => !section.isSeparator && (
+                                        <DropdownMenuItem
+                                            key={section.name}
+                                            onClick={() => toggleSectionVisibility(section.name)}
+                                        >
+                                            {section.label}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
 
-        {/* Category visibility dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Categories
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {Object.keys(categoryColors).map((category) => (
-              <DropdownMenuItem 
-                key={category}
-                onClick={() => toggleCategoryVisibility(category)}
-              >
-                {category}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+                            {/* Category visibility dropdown */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="gap-2">
+                                        <Filter className="h-4 w-4" />
+                                        Categories
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    {Object.keys(categoryColors).map((category) => (
+                                        <DropdownMenuItem
+                                            key={category}
+                                            onClick={() => toggleCategoryVisibility(category)}
+                                        >
+                                            {category}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
 
-      {/* Import/Export buttons */}
-      <div className="flex gap-2">
-        <Button
-          onClick={() => setIsImportDialogOpen(true)}
-          className="flex items-center gap-2"
-        >
-          <Upload className="h-4 w-4" />
-          Import
-        </Button>
-        <Button
-          onClick={handleExport}
-          className="flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Export
-        </Button>
-      </div>
-    </div>
+                        {/* Import/Export buttons */}
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={() => setIsImportDialogOpen(true)}
+                                className="flex items-center gap-2"
+                            >
+                                <Upload className="h-4 w-4" />
+                                Import
+                            </Button>
+                            <Button
+                                onClick={handleExport}
+                                className="flex items-center gap-2"
+                            >
+                                <Download className="h-4 w-4" />
+                                Export
+                            </Button>
+                        </div>
+                    </div>
 
-    {/* Stats cards row */}
-    <div className="grid grid-cols-4 gap-4">
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-sm font-medium text-gray-500">Total Fields</h3>
-        <p className="text-2xl font-semibold text-blue-600">{totalFields}</p>
-      </div>
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-sm font-medium text-gray-500">Completed</h3>
-        <p className="text-2xl font-semibold text-green-600">{completedFields}</p>
-      </div>
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-sm font-medium text-gray-500">Pending</h3>
-        <p className="text-2xl font-semibold text-red-600">{totalMissing}</p>
-      </div>
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-sm font-medium text-gray-500">Completion Rate</h3>
-        <p className="text-2xl font-semibold text-purple-600">
-          {((completedFields / totalFields) * 100).toFixed(1)}%
-        </p>
-      </div>
-    </div>
+                    {/* Stats cards row */}
+                    <div className="grid grid-cols-4 gap-4">
+                        <div className="bg-white p-4 rounded-lg shadow">
+                            <h3 className="text-sm font-medium text-gray-500">Total Fields</h3>
+                            <p className="text-2xl font-semibold text-blue-600">{totalFields}</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg shadow">
+                            <h3 className="text-sm font-medium text-gray-500">Completed</h3>
+                            <p className="text-2xl font-semibold text-green-600">{completedFields}</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg shadow">
+                            <h3 className="text-sm font-medium text-gray-500">Pending</h3>
+                            <p className="text-2xl font-semibold text-red-600">{totalMissing}</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg shadow">
+                            <h3 className="text-sm font-medium text-gray-500">Completion Rate</h3>
+                            <p className="text-2xl font-semibold text-purple-600">
+                                {((completedFields / totalFields) * 100).toFixed(1)}%
+                            </p>
+                        </div>
+                    </div>
 
-    {/* Reset filters */}
-    <div className="flex justify-end">
-      <Button
-        onClick={resetAll}
-        variant="outline"
-        className="flex items-center gap-2"
-      >
-        <X className="h-4 w-4" />
-        Reset Filters
-      </Button>
-    </div>
-  </div>
+                    {/* Reset filters */}
+                    <div className="flex justify-end">
+                        <Button
+                            onClick={resetAll}
+                            variant="outline"
+                            className="flex items-center gap-2"
+                        >
+                            <X className="h-4 w-4" />
+                            Reset Filters
+                        </Button>
+                    </div>
+
+
+<SettingsDialog />
+                </div>
 
 
                 <Card>
@@ -751,7 +771,7 @@ const OverallView = () => {
                                         })}
                                     </TableRow>                                </TableHeader>
                                 <TableBody>
-                                {filteredData.map((companyGroup, groupIndex) => (
+                                    {filteredData.map((companyGroup, groupIndex) => (
                                         companyGroup.rows.map((row, rowIndex) => (
                                             <TableRow
                                                 key={`${groupIndex}-${rowIndex}`}
@@ -803,7 +823,17 @@ const OverallView = () => {
                                                                 }
                                                             }
 
-                                                            return (
+                                                            // Return the appropriate cell based on field name
+                                                            return field.name === 'company_name' ? (
+                                                                <TableCell
+                                                                    key={`${groupIndex}-${rowIndex}-${field.name}`}
+                                                                    className={`whitespace-nowrap ${sectionColor} transition-colors cursor-pointer hover:text-primary`}
+                                                                    onClick={() => handleCompanyClick(row)}
+                                                                    rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
+                                                                >
+                                                                    {value || <span className="text-red-500 font-semibold">N/A</span>}
+                                                                </TableCell>
+                                                            ) : (
                                                                 <TableCell
                                                                     key={`${groupIndex}-${rowIndex}-${field.name}`}
                                                                     className={`whitespace-nowrap ${sectionColor} transition-colors`}
@@ -820,17 +850,25 @@ const OverallView = () => {
                                     ))}
                                 </TableBody>
                                 {/* Add a "No results found" message when filtered data is empty */}
-{filteredData.length === 0 && (
-  <div className="text-center py-8 text-gray-500">
-    No results found for your search criteria
-  </div>
-)}
+                                {filteredData.length === 0 && (
+                                    <div className="text-center py-8 text-gray-500">
+                                        No results found for your search criteria
+                                    </div>
+                                )}
                             </Table>
                             <ScrollBar orientation="horizontal" />
                         </ScrollArea>
                     </CardContent>
                 </Card>
                 {isImportDialogOpen && <ImportDialog />}
+                {selectedCompany && (
+                    <CompanyEditDialog
+                        isOpen={isEditDialogOpen}
+                        onClose={() => setIsEditDialogOpen(false)}
+                        companyData={selectedCompany}
+                        onSave={handleEditSave}
+                    />
+                )}
             </TabsContent>
 
             <TabsContent value="company">

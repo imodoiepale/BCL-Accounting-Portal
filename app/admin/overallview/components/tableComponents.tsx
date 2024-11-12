@@ -2,7 +2,7 @@
 // @ts-nocheck
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formFields } from './formfields';
+import { formFields } from '../formfields';
 
 export const CompanyGeneralTable = ({ data }) => {
     const generalFields = formFields.companyDetails.fields.filter(

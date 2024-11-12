@@ -1,8 +1,137 @@
 /* eslint-disable react/jsx-key */
 // @ts-nocheck
 "use client";
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import React, {  useState, useCallback, useMemo, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { formFields } from '../formfields';
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from "sonner";
 
+export function CompanyEditDialog({ isOpen, onClose, companyData, onSave }) {
+    const [editedData, setEditedData] = useState({});
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (companyData) {
+            setEditedData(companyData);
+        }
+    }, [companyData]);
+
+    const handleInputChange = (fieldName, value) => {
+        setEditedData(prev => ({
+            ...prev,
+            [fieldName]: value
+        }));
+    };
+
+    const handleSubmit = async () => {
+        setLoading(true);
+        try {
+            const tables = [
+                'acc_portal_company_duplicate',
+                'acc_portal_clerk_users_duplicate',
+                'acc_portal_directors_duplicate',
+                'nssf_companies_duplicate',
+                'nhif_companies_duplicate2',
+                'PasswordChecker_duplicate',
+                'ecitizen_companies_duplicate',
+                'etims_companies_duplicate',
+                'acc_portal_directors_duplicate'
+            ];
+
+            for (const table of tables) {
+                const { error } = await supabase
+                    .from(table)
+                    .update(editedData)
+                    .eq('id', companyData.id);
+
+                if (error) throw error;
+            }
+
+            toast.success('Company details updated successfully');
+            onSave(editedData);
+            onClose();
+        } catch (error) {
+            console.error('Error updating company:', error);
+            toast.error('Failed to update company details');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const renderField = (field) => {
+        const value = editedData[field.name] || '';
+        
+        return (
+            <div key={field.name} className="grid gap-2 mb-4">
+                <Label htmlFor={field.name} className="text-sm font-medium">
+                    {field.label}
+                </Label>
+                <Input
+                    id={field.name}
+                    type={field.type === 'date' ? 'date' : 'text'}
+                    value={value}
+                    onChange={(e) => handleInputChange(field.name, e.target.value)}
+                    className="w-full"
+                />
+            </div>
+        );
+    };
+
+    const renderFieldsByCategory = () => {
+        const categorizedFields = {};
+        formFields.companyDetails.fields.forEach(field => {
+            const category = field.category || 'General Information';
+            if (!categorizedFields[category]) {
+                categorizedFields[category] = [];
+            }
+            categorizedFields[category].push(field);
+        });
+
+        return Object.entries(categorizedFields).map(([category, fields]) => (
+            <div key={category} className="mb-6">
+                <h3 className="text-lg font-semibold mb-4 text-primary">{category}</h3>
+                <div className="grid grid-cols-2 gap-4">
+                    {fields.map(field => renderField(field))}
+                </div>
+            </div>
+        ));
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="max-w-4xl max-h-[90vh]">
+                <DialogHeader>
+                    <DialogTitle>Edit Company: {companyData?.company_name}</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="h-[70vh] px-4">
+                    <div className="space-y-6">
+                        {renderFieldsByCategory()}
+                    </div>
+                </ScrollArea>
+                <DialogFooter className="sticky bottom-0 bg-white pt-2">
+                    <Button
+                        variant="outline"
+                        onClick={onClose}
+                        className="mr-2"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleSubmit}
+                        disabled={loading}
+                    >
+                        {loading ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 export interface VisibilityState {
   [key: string]: boolean;
 }
