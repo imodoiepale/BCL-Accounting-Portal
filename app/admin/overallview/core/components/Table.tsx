@@ -1,51 +1,28 @@
-// /components/Table.tsx
-import { useTable } from '../core/context/TableContext';
+// components/AdvancedTable/index.tsx
+import React from 'react';
+import { Table } from '@/components/ui/table';
 import { TableHeader } from './TableHeader';
 import { TableBody } from './TableBody';
 import { TableFooter } from './TableFooter';
-import { HelperHeaders } from './HelperHeaders';
 
-export const AdvancedTable: React.FC<{
-    configId: string;
-    data?: any[];
+interface AdvancedTableProps {
+    data: any[];
+    config: TableConfiguration;
     onUpdate?: (data: any) => void;
-}> = ({ configId, data, onUpdate }) => {
-    const {
-        config,
-        state,
-        dispatch
-    } = useTable();
+}
 
-    useEffect(() => {
-        if (configId) {
-            dispatch({ type: 'LOAD_CONFIG', payload: configId });
-        }
-    }, [configId]);
-
+export const AdvancedTable: React.FC<AdvancedTableProps> = ({
+    data,
+    config,
+    onUpdate
+}) => {
     return (
-        <div className="advanced-table-container">
-            <div className="table-wrapper">
-                <Table>
-                    <TableHeader
-                        structure={config.structure}
-                        onSort={handleSort}
-                    />
-                    <TableBody
-                        data={state.processedData}
-                        structure={config.structure}
-                        onUpdate={handleUpdate}
-                    />
-                    <TableFooter
-                        calculations={state.calculations}
-                        structure={config.structure}
-                    />
-                </Table>
-            </div>
-            <HelperHeaders
-                config={config.helperHeaders}
-                data={state.processedData}
-                calculations={state.calculations}
-            />
+        <div className="advanced-table-wrapper">
+            <Table>
+                <TableHeader structure={config.structure} />
+                <TableBody data={data} structure={config.structure} onUpdate={onUpdate} />
+                <TableFooter calculations={config.calculations} />
+            </Table>
         </div>
     );
 };
