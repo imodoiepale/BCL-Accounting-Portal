@@ -2,9 +2,9 @@ export const formFields = {
     companyDetails: {
         fields: [
             { name: 'company_name', label: 'Company Name', type: 'text', required: true },
-            { name: 'description', label: 'Description', type: 'text' },
-            { name: 'company_type', label: 'Company Type', type: 'text' },
-            { name: 'company_status', label: 'Company Status', type: 'text' },
+            // { name: 'description', label: 'Description', type: 'text' },
+            { name: 'company_type', label: 'Company Type', type: 'select', options: ['LTD', 'SOLE PROPRIERTORSHIP', 'PARTNERSHIP'] },
+            { name: 'company_status', label: 'Company Status', type: 'select', options: ['ACTIVE', 'INACTIVE', 'DORMANT', 'FRESH REG'] },         
             { name: 'registration_number', label: 'Registration Number', type: 'text' },
             { name: 'date_established', label: 'Date Established', type: 'date' },
             { name: 'account_manager', label: 'Account Manager', type: 'text' },
@@ -20,7 +20,21 @@ export const formFields = {
             { name: 'postal_address', label: 'Postal Address', type: 'text' },
             { name: 'country', label: 'Country', type: 'text' },
             { name: 'name_verified_with_pin', label: 'Name Verified with PIN', type: 'text' },
-            { name: 'client_category', label: 'Client Category', type: 'text' },
+            { name: 'acc_client', label: 'Accounting Client ', type: 'select' , options: ['YES', 'NO'] , category: 'Client Category'},        
+            { name: 'acc_client_effective_from', label: 'Effective From', type: 'date'  , category: 'Client Category'},
+            { name: 'acc_client_effective_to', label: 'Effective To', type: 'date'  , category: 'Client Category'},
+            { name: 'audit_tax_client', label: 'Audit/Tax Client', type: 'select', options: ['YES', 'NO'] , category: 'Client Category'},
+            { name: 'audit_tax_client_effective_from', label: 'Effective From', type: 'date'  , category: 'Client Category'},
+            { name: 'audit_tax_client_effective_to', label: 'Effective To', type: 'date'  , category: 'Client Category'},
+            { name: 'imm_client', label: 'IMM Client', type: 'select', options: ['YES', 'NO'] , category: 'Client Category'},
+            { name: 'imm_client_effective_from', label: 'Effective From', type: 'date'  , category: 'Client Category'},
+            { name: 'imm_client_effective_to', label: 'Effective To', type: 'date'  , category: 'Client Category'},
+            { name: 'cps_sheria_client', label: 'CPS Sheria Client', type: 'select', options: ['YES', 'NO'] , category: 'Client Category'},
+            { name: 'cps_sheria_client_effective_from', label: 'Effective From', type: 'date'  , category: 'Client Category'},
+            { name: 'cps_sheria_client_effective_to', label: 'Effective To', type: 'date'  , category: 'Client Category'},
+            { name: 'acc_billing_client', label: 'Accounting Billing Client', type: 'select', options: ['YES', 'NO'] , category: 'Client Category'},
+            { name: 'acc_billing_client_effective_from', label: 'Effective From', type: 'date'  , category: 'Client Category'},
+            { name: 'acc_billing_client_effective_to', label: 'Effective To', type: 'date'  , category: 'Client Category'},            
             { name: 'wh_vat_agent_suppliers', label: 'W/H VAT Agent Suppliers', type: 'text' },
             { name: 'wh_vat_agent_customers', label: 'W/H VAT Agent Customers', type: 'text' },
             
@@ -35,8 +49,7 @@ export const formFields = {
             { name: 'nssf_password', label: 'NSSF Password', type: 'text', category: 'NSSF Details' },
             { name: 'nssf_registration_date', label: 'NSSF Registration Date', type: 'date', category: 'NSSF Details' },
             { name: 'nssf_compliance_certificate_date', label: 'NSSF Compliance Certificate Date', type: 'date', category: 'NSSF Details' },
-            { name: 'nssf_status', label: 'NSSF Status', type: 'text', category: 'NSSF Details' },
-          
+            { name: 'nssf_status', label: 'NSSF Status', type: 'select', options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'], category: 'NSSF Details' },          
             // NHIF Details
             { name: 'nhif_identifier', label: 'NHIF Identifier', type: 'text', category: 'NHIF Details' },
             { name: 'nhif_code', label: 'NHIF Code', type: 'text', category: 'NHIF Details' },
@@ -44,13 +57,13 @@ export const formFields = {
             { name: 'nhif_mobile', label: 'NHIF Mobile', type: 'text', category: 'NHIF Details' },
             { name: 'nhif_email', label: 'NHIF Email', type: 'text', category: 'NHIF Details' },
             { name: 'nhif_email_password', label: 'NHIF Email Password', type: 'text', category: 'NHIF Details' },
-            { name: 'nhif_status', label: 'NHIF Status', type: 'text', category: 'NHIF Details' },
+            { name: 'nhif_status', label: 'NHIF Status', type: 'select', category: 'NHIF Details', options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'], },
             { name: 'nhif_registration_date', label: 'NHIF Registration Date', type: 'date', category: 'NHIF Details' },
             { name: 'nhif_compliance_certificate_date', label: 'NHIF Compliance Certificate Date', type: 'date', category: 'NHIF Details' },
 
             // Ecitizen Details
             { name: 'ecitizen_password', label: 'ECitizen Password', type: 'text', category: 'E-Citizen Details' },
-            { name: 'ecitizen_status', label: 'ECitizen Status', type: 'text', category: 'E-Citizen Details' },
+            { name: 'ecitizen_status', label: 'ECitizen Status', type: 'select', category: 'E-Citizen Details', options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'] },
             { name: 'ecitizen_id', label: 'ECitizen ID', type: 'text', category: 'E-Citizen Details' },
             { name: 'ecitizen_email', label: 'ECitizen Email', type: 'email', category: 'E-Citizen Details' },
             { name: 'ecitizen_mobile', label: 'ECitizen Mobile', type: 'tel', category: 'E-Citizen Details' },
@@ -73,22 +86,22 @@ export const formFields = {
             // NITA Details
             { name: 'nita_identifier', label: 'NITA Identifier', type: 'text', category: 'NITA Details' },
             { name: 'nita_password', label: 'NITA Password', type: 'text', category: 'NITA Details' },
-            { name: 'nita_status', label: 'NITA Status', type: 'text', category: 'NITA Details' },
+            { name: 'nita_status', label: 'NITA Status', type: 'select', category: 'NITA Details', options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'] },
 
             // Housing Levy Details
             { name: 'housing_levy_identifier', label: 'Housing Levy Identifier', type: 'text', category: 'Housing Levy Details' },
             { name: 'housing_levy_password', label: 'Housing Levy Password', type: 'text', category: 'Housing Levy Details' },
-            { name: 'housing_levy_status', label: 'Housing Levy Status', type: 'text', category: 'Housing Levy Details' },
+            { name: 'housing_levy_status', label: 'Housing Levy Status', type: 'select', category: 'Housing Levy Details' , options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel']},
 
             // Standard Levy Details
             { name: 'standard_levy_identifier', label: 'Standard Levy Identifier', type: 'text', category: 'Standard Levy Details' },
             { name: 'standard_levy_password', label: 'Standard Levy Password', type: 'text', category: 'Standard Levy Details' },
-            { name: 'standard_levy_status', label: 'Standard Levy Status', type: 'text', category: 'Standard Levy Details' },
+            { name: 'standard_levy_status', label: 'Standard Levy Status', type: 'select', category: 'Standard Levy Details', options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'] },
 
             // Tourism Levy Details
             { name: 'tourism_levy_identifier', label: 'Tourism Levy Identifier', type: 'text', category: 'Tourism Levy Details' },
             { name: 'tourism_levy_password', label: 'Tourism Levy Password', type: 'text', category: 'Tourism Levy Details' },
-            { name: 'tourism_levy_status', label: 'Tourism Levy Status', type: 'text', category: 'Tourism Levy Details' },
+            { name: 'tourism_levy_status', label: 'Tourism Levy Status', type: 'select', category: 'Tourism Levy Details', options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'] },
             { name: 'tourism_fund_username', label: 'Tourism Fund Username', type: 'text', category: 'Tourism Fund Details' },
             { name: 'tourism_fund_password', label: 'Tourism Fund Password', type: 'text', category: 'Tourism Fund Details' },
 
@@ -97,7 +110,7 @@ export const formFields = {
                 // Sheria Details
                 { name: 'verified', label: 'Verified', type: 'text', category: 'Sheria Details' },
                 { name: 'published', label: 'Pubilished', type: 'text', category: 'Sheria Details' },
-                { name: 'sheria_status', label: 'Status', type: 'text', category: 'Sheria Details' },
+                { name: 'sheria_status', label: 'Status', type: 'select', category: 'Sheria Details' , options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'],},
                 { name: 'bo_status', label: 'BO Status', type: 'text', category: 'Sheria Details' },
                 { name: 'co_cr_12_issue_date', label: 'CO CR 12 Issue Date', type: 'date', category: 'Sheria Details' },
                 { name: 'cr_12_as_at_date_of_issue', label: 'CR 12 as at Date of Issue', type: 'date', category: 'Sheria Details' },
@@ -107,23 +120,23 @@ export const formFields = {
             // VAT Details
             { name: 'vat_identifier', label: 'VAT Identifier', type: 'text', category: 'VAT Details' },
             { name: 'vat_password', label: 'VAT Password', type: 'text', category: 'VAT Details' },
-            { name: 'vat_status', label: 'VAT Status', type: 'text', category: 'VAT Details' },
+            { name: 'vat_status', label: 'VAT Status', type: 'select', category: 'VAT Details' , options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel']},
             { name: 'vat_from', label: 'VAT From', type: 'date', category: 'VAT Details' },
             { name: 'vat_to', label: 'VAT To', type: 'date', category: 'VAT Details' },
 
             // Tax Status Details
-            { name: 'pin_status', label: 'PIN Status', type: 'text', category: 'Pin Details' },
-            { name: 'itax_status', label: 'iTax Status', type: 'text', category: 'Pin Details' },
-            { name: 'income_tax_company_status', label: 'Income Tax Company Status', type: 'text', category: 'Pin Details' },
+            { name: 'pin_status', label: 'PIN Status', type: 'select', category: 'Pin Details' , options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'],},
+            { name: 'itax_status', label: 'iTax Status', type: 'select', category: 'Pin Details' , options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'],},
+            { name: 'income_tax_company_status', label: 'Income Tax Company Status', type: 'select', category: 'Pin Details' , options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel']},
             { name: 'income_tax_company_from', label: 'Income Tax Company From', type: 'date', category: 'Pin Details' },
             { name: 'income_tax_company_to', label: 'Income Tax Company To', type: 'date', category: 'Pin Details' },
-            { name: 'income_tax_rent_income_current_status', label: 'Income Tax Rent Income Current Status', type: 'text' , category: 'Pin Details'  },
+            { name: 'income_tax_rent_income_current_status', label: 'Income Tax Rent Income Current Status', type: 'select' , category: 'Pin Details'  , options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'],},
             { name: 'income_tax_rent_income_effective_from', label: 'Income Tax Rent Income Effective From', type: 'text' , category: 'Pin Details'  },
             { name: 'income_tax_rent_income_effective_to', label: 'Income Tax Rent Income Effective To', type: 'text' , category: 'Pin Details'  },
-            { name: 'income_tax_paye_current_status', label: 'Income Tax PAYE Current Status', type: 'text' , category: 'Pin Details'  },
+            { name: 'income_tax_paye_current_status', label: 'Income Tax PAYE Current Status', type: 'select' , category: 'Pin Details' , options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'], },
             { name: 'income_tax_paye_effective_from', label: 'Income Tax PAYE Effective From', type: 'text' , category: 'Pin Details'  },
             { name: 'income_tax_paye_effective_to', label: 'Income Tax PAYE Effective To', type: 'text' , category: 'Pin Details'  },
-            { name: 'income_tax_turnover_tax_current_status', label: 'Income Tax Turnover Tax Current Status', type: 'text' , category: 'Pin Details'  },
+            { name: 'income_tax_turnover_tax_current_status', label: 'Income Tax Turnover Tax Current Status', type: 'select' , category: 'Pin Details' , options: ['Registered', 'To be registered', 'Cancelled', 'Missing', 'Dormant', 'No obligation', 'Not sure', 'To cancel'], },
             { name: 'income_tax_turnover_tax_effective_from', label: 'Income Tax Turnover Tax Effective From', type: 'text' , category: 'Pin Details'  },
             { name: 'income_tax_turnover_tax_effective_to', label: 'Income Tax Turnover Tax Effective To', type: 'text' , category: 'Pin Details'  },
             { name: 'current_itax_gmail_yahoo_email_recovery', label: 'Current iTax Gmail Yahoo Email Recovery Email', type: 'email', category: 'Pin Details'  },

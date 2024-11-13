@@ -27,7 +27,7 @@ export const CompanyGeneralTable = ({ data }) => {
                         <TableCell>{index + 1}</TableCell>
                         {generalFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -61,7 +61,7 @@ export const CompanyTaxTable = ({ data }) => {
                          <TableCell>{index + 1}</TableCell>
                         {taxFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -99,7 +99,7 @@ export const DirectorsTable = ({ data }) => {
                             
                             {directorFields.map(field => (
                                 <TableCell key={field.name} className="whitespace-nowrap">
-                                    {director[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                    {director[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                                 </TableCell>
                             ))}
                         </TableRow>
@@ -142,7 +142,7 @@ export const ComplianceTable = ({ data }) => {
                     <TableRow key={index} className="hover:bg-violet-50">
                         {complianceFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -178,7 +178,7 @@ export const NSSFTable = ({ data }) => {
                     
                         {nssfFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {item[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {item[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -213,7 +213,7 @@ export const NHIFTable = ({ data }) => {
                      
                         {nhifFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {item[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {item[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -246,7 +246,7 @@ export const EmployeesTable = ({ data }) => {
                 
                         {employeeFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {employee[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {employee[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -279,7 +279,7 @@ export const BankingTable = ({ data }) => {
                          
                         {bankFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {bank[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {bank[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -314,7 +314,7 @@ export const PAYETable = ({ data }) => {
                         <TableCell>{companyGroup.company.company_name}</TableCell>
                         {payeFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -349,7 +349,7 @@ export const VATTable = ({ data }) => {
                         <TableCell>{companyGroup.company.company_name}</TableCell>
                         {vatFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -384,7 +384,7 @@ export const NITATable = ({ data }) => {
                         <TableCell>{companyGroup.company.company_name}</TableCell>
                         {nitaFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -419,7 +419,7 @@ export const HousingLevyTable = ({ data }) => {
                         <TableCell>{companyGroup.company.company_name}</TableCell>
                         {housingFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -454,7 +454,7 @@ export const TourismLevyTable = ({ data }) => {
                         <TableCell>{companyGroup.company.company_name}</TableCell>
                         {tourismFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -489,7 +489,7 @@ export const StandardLevyTable = ({ data }) => {
                         <TableCell>{companyGroup.company.company_name}</TableCell>
                         {standardLevyFields.map(field => (
                             <TableCell key={field.name} className="whitespace-nowrap">
-                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                {companyGroup.company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -525,7 +525,7 @@ export const ClientCategoryTable = ({ data }) => {
                             <TableCell>{companyGroup.company.company_name}</TableCell>
                             {fields.map(field => (
                                 <TableCell key={field.name} className="whitespace-nowrap">
-                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                                 </TableCell>
                             ))}
                         </TableRow>
@@ -561,7 +561,7 @@ export const SheriaDetailsTable = ({ data }) => {
                             <TableCell>{companyGroup.company.company_name}</TableCell>
                             {fields.map(field => (
                                 <TableCell key={field.name} className="whitespace-nowrap">
-                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                                 </TableCell>
                             ))}
                         </TableRow>
@@ -596,7 +596,7 @@ export const TaxStatusTable = ({ data }) => {
                             <TableCell>{companyGroup.company.company_name}</TableCell>
                             {fields.map(field => (
                                 <TableCell key={field.name} className="whitespace-nowrap">
-                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                                 </TableCell>
                             ))}
                         </TableRow>
@@ -631,7 +631,7 @@ export const ECitizenTable = ({ data }) => {
                             <TableCell>{companyGroup.company.company_name}</TableCell>
                             {fields.map(field => (
                                 <TableCell key={field.name} className="whitespace-nowrap">
-                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">N/A</span>}
+                                    {companyGroup.company[field.name] || <span className="text-red-500 font-medium">Missing</span>}
                                 </TableCell>
                             ))}
                         </TableRow>
