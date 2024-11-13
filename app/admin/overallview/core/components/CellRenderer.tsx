@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { DatePicker } from '@/components/ui/date-picker';
-import { ColumnDefinition } from '../core/types';
+;
+import { ColumnDefinition } from '../types';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 
 export const CellRenderer: React.FC<{
     column: ColumnDefinition;
@@ -50,7 +51,7 @@ export const CellRenderer: React.FC<{
                 );
             case 'date':
                 return (
-                    <DatePicker
+                    <DateRangePicker
                         value={currentValue}
                         onChange={handleValueChange}
                         onClose={() => setEditMode(false)}

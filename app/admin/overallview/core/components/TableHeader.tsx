@@ -1,43 +1,58 @@
-
-// /components/TableHeader.tsx
+// components/AdvancedTable/TableHeader.tsx
 import { TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { Section, Category, SubCategory } from '../core/types';
 
 export const TableHeader: React.FC<{
     structure: TableStructure;
-    onSort?: (columnId: string) => void;
-}> = ({ structure, onSort }) => {
+}> = ({ structure }) => {
     return (
         <TableHead>
-            <TableRow className="section-row">
+            {/* Section Row */}
+            <TableRow>
                 {structure.sections.map(section => (
-                    <SectionHeader
+                    <TableCell
                         key={section.id}
-                        section={section}
-                        categories={structure.categories}
-                    />
+                        colSpan={calculateSectionSpan(section, structure)}
+                    >
+                        {section.name}
+                    </TableCell>
                 ))}
             </TableRow>
 
-            <TableRow className="category-row">
+            {/* Category Row */}
+            <TableRow>
                 {structure.categories.map(category => (
-                    <CategoryHeader
+                    <TableCell
                         key={category.id}
-                        category={category}
-                        subCategories={structure.subCategories}
-                    />
+                        colSpan={calculateCategorySpan(category, structure)}
+                    >
+                        {category.name}
+                    </TableCell>
                 ))}
             </TableRow>
 
-            <TableRow className="column-row">
+            {/* Column Headers Row */}
+            <TableRow>
                 {structure.columns.map(column => (
-                    <ColumnHeader
-                        key={column.id}
-                        column={column}
-                        onSort={onSort}
-                    />
+                    <TableCell key={column.id}>
+                        {column.name}
+                    </TableCell>
                 ))}
             </TableRow>
         </TableHead>
     );
+};
+
+// Helper functions for calculating spans
+const calculateSectionSpan = (section: Section, structure: TableStructure) => {
+    return section.categories.reduce((total, categoryId) => {
+        const category = structure.categories.find(c => c.id === categoryId);
+        return total + calculateCategorySpan(category!, structure);
+    }, 0);
+};
+
+const calculateCategorySpan = (category: Category, structure: TableStructure) => {
+    return category.subCategories.reduce((total, subCategoryId) => {
+        const subCategory = structure.subCategories.find(sc => sc.id === subCategoryId);
+        return total + subCategory!.columns.length;
+    }, 0);
 };
