@@ -1,7 +1,8 @@
 // /components/TableBody.tsx
 import { TableBody as UITableBody, TableRow, TableCell } from '@/components/ui/table';
-import { useTable } from '../core/context/TableContext';
+
 import { CellRenderer } from './CellRenderer';
+import { useTable } from '../context/TableContext';
 
 export const TableBody: React.FC<{
     data: any[];
