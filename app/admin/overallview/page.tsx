@@ -758,7 +758,7 @@ const OverallView = () => {
                                                                     onClick={() => handleCompanyClick(row)}
                                                                     rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
                                                                 >
-                                                                    {value || <span className="text-red-500 font-semibold">N/A</span>}
+                                                                    {value || <span className="text-red-500 font-semibold">Missing</span>}
                                                                 </TableCell>
                                                             ) : (
                                                                 <TableCell
@@ -766,7 +766,7 @@ const OverallView = () => {
                                                                     className={`whitespace-nowrap ${sectionColor} transition-colors`}
                                                                     rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
                                                                 >
-                                                                    {value || <span className="text-red-500 font-semibold">N/A</span>}
+                                                                    {value || <span className="text-red-500 font-semibold">Missing</span>}
                                                                 </TableCell>
                                                             );
                                                         });

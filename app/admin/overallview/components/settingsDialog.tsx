@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,6 +21,7 @@ interface StructureItem {
   column_mappings: Record<string, string>;
   column_order: Record<string, number>;
   Tabs: string;
+  table_names: Record<string, string[]>;
 }
 
 // Add these helper functions
@@ -37,7 +38,6 @@ interface TableColumn {
   column_name: string;
   data_type: string;
 }
-
 interface NewStructure {
   section: string;
   subsection: string;
@@ -47,6 +47,16 @@ interface NewStructure {
   isNewTab: boolean;
   isNewSection: boolean;
   isNewSubsection: boolean;
+  table_names: string[];
+}
+
+interface SectionFields {
+  [section: string]: {
+    fields: string[];
+    subsections: {
+      [subsection: string]: string[];
+    };
+  };
 }
 
 export function SettingsDialog() {
@@ -65,7 +75,8 @@ export function SettingsDialog() {
     column_mappings: {},
     isNewTab: false,
     isNewSection: false,
-    isNewSubsection: false
+    isNewSubsection: false,
+    table_names: []
   });
   const [tables, setTables] = useState<string[]>([]);
   const [tableColumns, setTableColumns] = useState<TableColumn[]>([]); // Ensure this is an array
@@ -75,8 +86,21 @@ export function SettingsDialog() {
   const [showNewTableDialog, setShowNewTableDialog] = useState(false);
   const [newTableName, setNewTableName] = useState('');
   const [loadingTable, setLoadingTable] = useState(false);
-  const [showAddFieldDialog, setShowAddFieldDialog] = useState(false);
+  const [addFieldDialogOpen, setAddFieldDialogOpen] = useState(false);
   const [uniqueTabs, setUniqueTabs] = useState<string[]>([]); // Initialize uniqueTabs
+  const [showMultiSelectDialog, setShowMultiSelectDialog] = useState(false);
+  const [selectedTables, setSelectedTables] = useState<string[]>([]);
+  const [availableFields, setAvailableFields] = useState<{ table: string, fields: TableColumn[] }[]>([]);
+  const [selectedTableFields, setSelectedTableFields] = useState<{ [table: string]: string[] }>({});
+  const [addFieldState, setAddFieldState] = useState({
+    displayName: '',
+    selectedTables: [],
+    selectedFields: {},
+    selectedTab: 'new', // 'new' or 'existing'
+    newFieldTable: ''
+  });
+  
+  const [sectionFields, setSectionFields] = useState<SectionFields>({});
 
   useEffect(() => {
     fetchStructure();
@@ -87,9 +111,7 @@ export function SettingsDialog() {
       const { data: mappings, error } = await supabase
         .from('profile_category_table_mapping')
         .select('*')
-        .order('Tabs', { ascending: true })
-        .order('section', { ascending: true })
-        .order('subsection', { ascending: true });
+        .order('Tabs', { ascending: true });
 
       if (error) throw error;
 
@@ -98,33 +120,21 @@ export function SettingsDialog() {
         section: mapping.section,
         subsection: mapping.subsection,
         table_name: mapping.table_name,
-        column_mappings: mapping.column_mappings || {},
+        column_mappings: typeof mapping.column_mappings === 'string' ? JSON.parse(mapping.column_mappings) : mapping.column_mappings || {},
         column_order: mapping.column_order || {},
         Tabs: mapping.Tabs,
-        column_settings: mapping.column_settings || {}
+        column_settings: mapping.column_settings || {},
+        sections_subsections: typeof mapping.sections_subsections === 'string' ? JSON.parse(mapping.sections_subsections) : mapping.sections_subsections || {},
+        sections_sections: typeof mapping.sections_sections === 'string' ? JSON.parse(mapping.sections_sections) : mapping.sections_sections || {}
       }));
 
       setStructure(processedMappings);
 
-      const tabs = [...new Set(mappings.map(m => m.Tabs))];
-      setUniqueTabs(tabs); // Set uniqueTabs here
+      const uniqueTabs = [...new Set(mappings.map(m => m.Tabs))];
+      setUniqueTabs(uniqueTabs);
 
-      const sections = [...new Set(mappings.map(m => m.section))];
-      const subsections = mappings.reduce((acc, m) => {
-        if (!acc[m.section]) {
-          acc[m.section] = [];
-        }
-        if (!acc[m.section].includes(m.subsection)) {
-          acc[m.section].push(m.subsection);
-        }
-        return acc;
-      }, {});
-
-      setExistingSections(sections);
-      setExistingSubsections(subsections);
-
-      if (!selectedTab && tabs.length > 0) {
-        setSelectedTab(tabs[0]);
+      if (!selectedTab && uniqueTabs.length > 0) {
+        setSelectedTab(uniqueTabs[0]);
       }
 
     } catch (error) {
@@ -154,38 +164,55 @@ export function SettingsDialog() {
 
   const fetchTableColumns = async (tableName: string) => {
     try {
-      const { data, error } = await supabase
-        .from('profile_category_table_mapping')
-        .select('column_mappings, column_settings, column_order')
-        .eq('table_name', tableName);
+      const { data, error } = await supabase.rpc('get_table_columns_overalltable', {
+        p_table_name: tableName
+      });
 
       if (error) throw error;
-      setTableColumns(prev => ({
-        ...prev,
-        [tableName]: data
+
+      const columns = data.map(col => ({
+        column_name: col.column_name,
+        data_type: col.data_type,
+        table_name: tableName // Add table name to track source
       }));
+
+      setTableColumns(prev => [...prev, ...columns]);
     } catch (error) {
       toast.error('Failed to fetch columns');
     }
   };
-
   const fetchExistingSectionsAndSubsections = async () => {
     try {
       const { data, error } = await supabase
         .from('profile_category_table_mapping')
-        .select('section, subsection')
-        .order('section', { ascending: true });
+        .select('sections_sections, sections_subsections')
+        .order('sections_sections', { ascending: true });
 
       if (error) throw error;
 
-      const sections = [...new Set(data.map(item => item.section))];
-      const subsections = data.reduce((acc, item) => {
-        if (!acc[item.section]) {
-          acc[item.section] = [];
-        }
-        acc[item.section].push(item.subsection);
-        return acc;
-      }, {});
+      const sections = [];
+      const subsections = {};
+
+      data.forEach(item => {
+        // Parse JSON fields
+        const sectionsData = item.sections_sections ? (typeof item.sections_sections === 'string' ? JSON.parse(item.sections_sections) : item.sections_sections) : {};
+        const subsectionsData = item.sections_subsections ? (typeof item.sections_subsections === 'string' ? JSON.parse(item.sections_subsections) : item.sections_subsections) : {};
+
+        // Extract section names
+        Object.keys(sectionsData).forEach(section => {
+          if (!sections.includes(section)) {
+            sections.push(section);
+          }
+          // Initialize subsections for each section
+          if (!subsections[section]) {
+            subsections[section] = [];
+          }
+          // Add subsections
+          if (subsectionsData[section]) {
+            subsections[section].push(subsectionsData[section]);
+          }
+        });
+      });
 
       setExistingSections(sections);
       setExistingSubsections(subsections);
@@ -228,30 +255,34 @@ export function SettingsDialog() {
   const handleAddField = async () => {
     if (!selectedSection || !newField.value) return;
 
-    const columnName = toColumnName(newField.value);
-
     try {
-      const columnAdded = await handleAddColumn(selectedSection.table_name, columnName);
-      if (!columnAdded) throw new Error('Failed to add column to table');
+      const columnName = toColumnName(newField.value);
 
-      const updatedMappings = {
-        ...selectedSection.column_mappings,
-        [columnName]: newField.value
-      };
-
-      const maxOrder = Math.max(...Object.values(selectedSection.column_order), -1);
-      const updatedOrder = {
-        ...selectedSection.column_order,
-        [columnName]: maxOrder + 1
-      };
-
-      await handleUpdateSection(selectedSection.id, {
-        column_mappings: updatedMappings,
-        column_order: updatedOrder
+      // Add new column mapping
+      const { error: addError } = await supabase.rpc('add_column_mapping_overalltable', {
+        p_table_name: selectedSection.table_name,
+        p_column_name: columnName,
+        p_display_name: newField.value
       });
 
+      if (addError) throw addError;
+
+      // Refresh the table columns
+      await fetchTableColumns(selectedSection.table_name);
+
+      // Refresh the selected section to get updated mappings
+      const { data: updatedSection } = await supabase
+        .from('profile_category_table_mapping')
+        .select('*')
+        .eq('id', selectedSection.id)
+        .single();
+
+      if (updatedSection) {
+        setSelectedSection(updatedSection);
+      }
+
       setNewField({ key: '', value: '' });
-      setShowAddFieldDialog(false);
+      setAddFieldDialog(false);
       toast.success('Field added successfully');
 
     } catch (error) {
@@ -264,21 +295,96 @@ export function SettingsDialog() {
     if (!selectedSection) return;
 
     try {
-      const columnRemoved = await handleRemoveColumn(selectedSection.table_name, key);
-      if (!columnRemoved) throw new Error('Failed to remove column from table');
-
-      const updatedMappings = { ...selectedSection.column_mappings };
-      delete updatedMappings[key];
-
-      await handleUpdateSection(selectedSection.id, {
-        column_mappings: updatedMappings
+      // Delete column mapping
+      const { error: deleteError } = await supabase.rpc('delete_column_mapping_overalltable', {
+        p_table_name: selectedSection.table_name,
+        p_column_name: key
       });
+
+      if (deleteError) throw deleteError;
+
+      // Refresh the table columns
+      await fetchTableColumns(selectedSection.table_name);
+
+      // Refresh the selected section to get updated mappings
+      const { data: updatedSection } = await supabase
+        .from('profile_category_table_mapping')
+        .select('*')
+        .eq('id', selectedSection.id)
+        .single();
+
+      if (updatedSection) {
+        setSelectedSection(updatedSection);
+      }
 
       toast.success('Field removed successfully');
 
     } catch (error) {
       console.error('Error removing field:', error);
       toast.error('Failed to remove field');
+    }
+  };
+
+  const handleReorder = async (key: string, newOrder: number) => {
+    if (!selectedSection) return;
+
+    try {
+      // Update column order
+      const { error: updateError } = await supabase.rpc('update_column_order_overalltable', {
+        p_table_name: selectedSection.table_name,
+        p_column_name: key,
+        p_new_order: newOrder
+      });
+
+      if (updateError) throw updateError;
+
+      // Refresh the selected section to get updated order
+      const { data: updatedSection } = await supabase
+        .from('profile_category_table_mapping')
+        .select('*')
+        .eq('id', selectedSection.id)
+        .single();
+
+      if (updatedSection) {
+        setSelectedSection(updatedSection);
+      }
+
+      toast.success('Order updated successfully');
+
+    } catch (error) {
+      console.error('Error updating order:', error);
+      toast.error('Failed to update order');
+    }
+  };
+
+  const handleCreateTable = async (tableName: string) => {
+    setLoadingTable(true);
+    try {
+      // Create table with default mappings
+      const { error: createError } = await supabase.rpc('create_table_with_mappings_overalltable', {
+        p_table_name: tableName
+      });
+
+      if (createError) throw createError;
+
+      await fetchTables();
+      setNewTableName('');
+      setShowNewTableDialog(false);
+
+      // Set the new table as selected and fetch its columns
+      setNewStructure(prev => ({
+        ...prev,
+        table_name: tableName
+      }));
+      await fetchTableColumns(tableName);
+
+      toast.success('Table created successfully');
+
+    } catch (error) {
+      toast.error('Failed to create table');
+      console.error('Error creating table:', error);
+    } finally {
+      setLoadingTable(false);
     }
   };
 
@@ -297,97 +403,436 @@ export function SettingsDialog() {
     }
   };
 
-  const handleCreateTable = async (tableName) => {
-    setLoadingTable(true);
-    try {
-      const { error: createError } = await supabase.rpc('create_table_with_defaults', {
-        p_table_name: tableName
-      });
-
-      if (createError) throw createError;
-
-      await fetchTables();
-      setNewTableName('');
-      setShowNewTableDialog(false);
-      toast.success('Table created successfully');
-    } catch (error) {
-      toast.error('Failed to create table');
-      console.error('Error creating table:', error);
-    } finally {
-      setLoadingTable(false);
-    }
-  };
-
   const handleAddStructure = async () => {
     try {
-      if (newStructure.table_name === 'new' && newTableName) {
-        await handleCreateTable(newTableName);
-        newStructure.table_name = newTableName;
-      }
+        // Get the selected fields for each table and create column mappings
+        const finalColumnMappings = {};
+        const finalTableFields = {};
+        
+        // Process selected tables and their fields
+        selectedTables.forEach(table => {
+            const fields = selectedTableFields[table] || [];
+            fields.forEach(field => {
+                // Create the column mapping with table.field as key
+                finalColumnMappings[`${table}.${field}`] = field
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase());
+            });
 
-      const columnMappings = selectedFields.reduce((acc, field) => {
-        acc[field] = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        return acc;
-      }, {});
+            // Store fields for each table
+            finalTableFields[table] = fields;
+        });
 
-      const columnOrder = selectedFields.reduce((acc, field, index) => {
-        acc[field] = index;
-        return acc;
-      }, {});
+        // Fetch existing fields for the section/subsection
+        const { data: existingData, error: fetchExistingError } = await supabase
+            .from('profile_category_table_mapping')
+            .select('*')
+            .eq('sections_sections', JSON.stringify({ [newStructure.section]: true }));
 
-      const { error } = await supabase
-        .from('profile_category_table_mapping')
-        .insert([{
-          section: newStructure.section,
-          subsection: newStructure.subsection,
-          table_name: newStructure.table_name,
-          Tabs: newStructure.Tabs,
-          column_mappings: columnMappings,
-          column_order: columnOrder
-        }]);
+        if (fetchExistingError) throw fetchExistingError;
+
+        let existingColumnMappings = {};
+        if (existingData) {
+            existingData.forEach(item => {
+                const mappings = typeof item.column_mappings === 'string' 
+                    ? JSON.parse(item.column_mappings) 
+                    : item.column_mappings;
+                
+                // If subsection is selected, only add fields for that subsection
+                const subsections = typeof item.sections_subsections === 'string'
+                    ? JSON.parse(item.sections_subsections)
+                    : item.sections_subsections;
+                
+                if (newStructure.subsection) {
+                    if (subsections[newStructure.section] === newStructure.subsection) {
+                        existingColumnMappings = { ...existingColumnMappings, ...mappings };
+                    }
+                } else {
+                    // If only section is selected, add all subsection fields
+                    existingColumnMappings = { ...existingColumnMappings, ...mappings };
+                }
+            });
+        }
+
+        // Merge existing mappings with new ones
+        const mergedColumnMappings = { ...existingColumnMappings, ...finalColumnMappings };
+
+        // Prepare the payload with all necessary data
+        const payload = {
+            sections_sections: JSON.stringify({ [newStructure.section]: true }),
+            sections_subsections: JSON.stringify({ [newStructure.section]: newStructure.subsection }),
+            Tabs: newStructure.Tabs,
+            column_mappings: JSON.stringify(mergedColumnMappings),
+            table_names: JSON.stringify({ [newStructure.section]: newStructure.table_names }),
+            column_order: JSON.stringify(
+                Object.keys(mergedColumnMappings).reduce((acc, key, index) => {
+                    acc[key] = index + 1;
+                    return acc;
+                }, {})
+            )
+        };
+
+        const { data: existingMapping, error: fetchError } = await supabase
+            .from('profile_category_table_mapping')
+            .select('*')
+            .match({
+                sections_sections: payload.sections_sections,
+                sections_subsections: payload.sections_subsections
+            });
+
+        if (fetchError) throw fetchError;
+
+        if (existingMapping && existingMapping.length > 0) {
+            const { error: updateError } = await supabase
+                .from('profile_category_table_mapping')
+                .update(payload)
+                .eq('id', existingMapping[0].id);
+
+            if (updateError) throw updateError;
+        } else {
+            const { error: insertError } = await supabase
+                .from('profile_category_table_mapping')
+                .insert([payload]);
+
+            if (insertError) throw insertError;
+        }
+
+        await fetchStructure();
+        
+        // Reset all states
+        setNewStructure({
+            section: '',
+            subsection: '',
+            table_name: '',
+            Tabs: '',
+            column_mappings: {},
+            isNewTab: false,
+            isNewSection: false,
+            isNewSubsection: false,
+            table_names: []
+        });
+        setSelectedTables([]);
+        setSelectedTableFields({});
+        
+        toast.success('Structure updated successfully');
+
+        // Log the created structure for verification
+        console.log('Created structure:', {
+            section: newStructure.section,
+            subsection: newStructure.subsection,
+            tables: newStructure.table_names,
+            fields: finalTableFields,
+            mappings: mergedColumnMappings
+        });
+
+    } catch (error) {
+        console.error('Error updating structure:', error);
+        toast.error('Failed to update structure');
+    }
+};  const fetchFieldsForTables = async (tables: string[]) => {
+    const fieldsPromises = tables.map(async (table) => {
+      const { data, error } = await supabase.rpc('get_table_columns_overalltable', {
+        p_table_name: table
+      });
 
       if (error) throw error;
 
-      await fetchStructure();
-      setNewStructure({
-        section: '',
-        subsection: '',
-        table_name: '',
-        Tabs: '',
-        column_mappings: {},
-        isNewTab: false,
-        isNewSection: false,
-        isNewSubsection: false
-      });
-      setSelectedFields([]);
-      toast.success('Added new structure');
-    } catch (error) {
-      toast.error('Failed to add structure');
-      console.error('Error adding structure:', error);
-    }
+      return {
+        table,
+        fields: data.map(col => ({
+          column_name: col.column_name,
+          data_type: col.data_type,
+          table_name: table
+        }))
+      };
+    });
+
+    const results = await Promise.all(fieldsPromises);
+    setAvailableFields(results);
   };
 
-  const handleReorder = async (key: string, newOrder: number) => {
-    if (!selectedSection) return;
-
+  const fetchSectionFields = async (section: string) => {
     try {
-      const updatedOrder = { ...selectedSection.column_order };
-      updatedOrder[key] = newOrder;
-
-      Object.entries(updatedOrder).forEach(([k, v]) => {
-        if (k !== key && v >= newOrder) {
-          updatedOrder[k] = v + 1;
+      const { data, error } = await supabase
+        .from('profile_category_table_mapping')
+        .select('sections_sections, sections_subsections, column_mappings')
+        .eq('sections_sections', JSON.stringify({ [section]: true })); // Properly format the query
+  
+      if (error) throw error;
+  
+      const fields: string[] = [];
+      const subsectionFields: { [key: string]: string[] } = {};
+  
+      data.forEach(item => {
+        // Safely parse JSON strings
+        const columnMappings = (() => {
+          try {
+            if (typeof item.column_mappings === 'string') {
+              return JSON.parse(item.column_mappings);
+            }
+            return item.column_mappings || {};
+          } catch (e) {
+            console.warn('Error parsing column_mappings:', e);
+            return {};
+          }
+        })();
+  
+        const sectionsSubsections = (() => {
+          try {
+            if (typeof item.sections_subsections === 'string') {
+              return JSON.parse(item.sections_subsections);
+            }
+            return item.sections_subsections || {};
+          } catch (e) {
+            console.warn('Error parsing sections_subsections:', e);
+            return {};
+          }
+        })();
+  
+        // Process column mappings
+        Object.entries(columnMappings).forEach(([key, value]) => {
+          if (!fields.includes(key)) {
+            fields.push(key);
+          }
+        });
+  
+        // Process subsections
+        if (sectionsSubsections && sectionsSubsections[section]) {
+          const subsection = sectionsSubsections[section];
+          if (typeof subsection === 'string') {
+            subsectionFields[subsection] = Object.keys(columnMappings);
+          } else if (Array.isArray(subsection)) {
+            subsection.forEach(sub => {
+              subsectionFields[sub] = Object.keys(columnMappings);
+            });
+          }
         }
       });
-
-      await handleUpdateSection(selectedSection.id, {
-        column_order: updatedOrder
+  
+      setSectionFields(prev => ({
+        ...prev,
+        [section]: {
+          fields,
+          subsections: subsectionFields
+        }
+      }));
+  
+      // Log the processed data for debugging
+      console.log('Processed section fields:', {
+        section,
+        fields,
+        subsectionFields
       });
-
-      toast.success('Order updated successfully');
+  
     } catch (error) {
-      console.error('Error updating order:', error);
-      toast.error('Failed to update order');
+      console.error('Error fetching section fields:', error);
+      toast.error('Failed to fetch section fields');
+    }
+  };
+   // Add useEffect for section/subsection changes
+   useEffect(() => {
+    if (newStructure.section && !newStructure.isNewSection) {
+      fetchSectionFields(newStructure.section);
+    }
+  }, [newStructure.section]);
+
+  useEffect(() => {
+    if (newStructure.section && newStructure.subsection && !newStructure.isNewSubsection) {
+      const subsectionFields = sectionFields[newStructure.section]?.subsections[newStructure.subsection] || [];
+      setSelectedTableFields(prevFields => ({
+        ...prevFields,
+        [newStructure.section]: subsectionFields
+      }));
+    }
+  }, [newStructure.subsection, sectionFields, newStructure.section]);
+
+
+  const MultiSelectDialog = () => (
+    <Dialog open={showMultiSelectDialog} onOpenChange={setShowMultiSelectDialog}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Select Tables and Fields</DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Tables Selection */}
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium mb-2">Select Tables</h4>
+            <ScrollArea className="h-[400px]">
+              {tables.map(table => (
+                <div key={table} className="flex items-center gap-2 p-2 hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    id={`table-${table}`}
+                    checked={selectedTables.includes(table)}
+                    onChange={(e) => {
+                      const newSelection = e.target.checked
+                        ? [...selectedTables, table]
+                        : selectedTables.filter(t => t !== table);
+                      setSelectedTables(newSelection);
+                      if (newSelection.length > 0) {
+                        fetchFieldsForTables(newSelection);
+                      }
+                    }}
+                    className="h-4 w-4"
+                  />
+                  <label htmlFor={`table-${table}`}>{table}</label>
+                </div>
+              ))}
+            </ScrollArea>
+          </div>
+
+          {/* Fields Selection */}
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium mb-2">Select Fields</h4>
+            <ScrollArea className="h-[400px]">
+              {availableFields.map(({ table, fields }) => (
+                <div key={table} className="mb-4">
+                  <h5 className="font-medium text-sm text-gray-700 mb-2">{table}</h5>
+                  {fields.map(field => {
+                    const isInSection = newStructure.section && 
+                      sectionFields[newStructure.section]?.fields.includes(field.column_name);
+                    const isInSubsection = newStructure.subsection && 
+                      sectionFields[newStructure.section]?.subsections[newStructure.subsection]?.includes(field.column_name);
+                    
+                    return (
+                      <div key={`${table}-${field.column_name}`} className="flex items-center gap-2 p-2 hover:bg-gray-50">
+                        <input
+                          type="checkbox"
+                          id={`field-${table}-${field.column_name}`}
+                          checked={selectedTableFields[table]?.includes(field.column_name) || false}
+                          onChange={(e) => {
+                            setSelectedTableFields(prev => ({
+                              ...prev,
+                              [table]: e.target.checked
+                                ? [...(prev[table] || []), field.column_name]
+                                : (prev[table] || []).filter(f => f !== field.column_name)
+                            }));
+                          }}
+                          className="h-4 w-4"
+                        />
+                        <label htmlFor={`field-${table}-${field.column_name}`}>
+                          {field.column_name}
+                          {isInSection && <span className="ml-2 text-blue-500">(In Section)</span>}
+                          {isInSubsection && <span className="ml-2 text-green-500">(In Subsection)</span>}
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </ScrollArea>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button onClick={() => {
+            setNewStructure(prev => ({
+              ...prev,
+              table_names: selectedTables,
+              column_mappings: Object.entries(selectedTableFields).reduce((acc, [table, fields]) => {
+                fields.forEach(field => {
+                  acc[`${table}.${field}`] = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                });
+                return acc;
+              }, {})
+            }));
+            setShowMultiSelectDialog(false);
+          }}>
+            Apply Selection
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const handleAddNewField = async () => {
+    console.log('Adding new field:', addFieldState);
+    if (!addFieldState.displayName || !addFieldState.newFieldTable) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+  
+    try {
+      const columnName = toColumnName(addFieldState.displayName);
+      const selectedTables = [addFieldState.newFieldTable];
+  
+      console.log('Adding column mapping for:', { columnName, selectedTables });
+      // Add column mapping and create table column
+      const { error: addMappingError } = await supabase.rpc('add_column_mapping_overalltable', {
+        p_table_name: addFieldState.newFieldTable,
+        p_column_name: columnName,
+        p_display_name: addFieldState.displayName,
+        p_selected_tables: selectedTables
+      });
+  
+      if (addMappingError) throw addMappingError;
+  
+      // Refresh data
+      await fetchTableColumns(addFieldState.newFieldTable);
+      await fetchStructure();
+  
+      setAddFieldDialogOpen(false);
+      setAddFieldState({
+        displayName: '',
+        selectedTables: [],
+        selectedFields: {},
+        selectedTab: 'new',
+        newFieldTable: ''
+      });
+  
+      toast.success('New field added successfully');
+    } catch (error) {
+      console.error('Error adding new field:', error);
+      toast.error('Failed to add new field');
+    }
+  };
+  
+  const handleAddExistingFields = async () => {
+    console.log('Adding existing fields:', addFieldState.selectedFields);
+    if (Object.keys(addFieldState.selectedFields).length === 0) {
+      toast.error('Please select at least one field');
+      return;
+    }
+  
+    try {
+      // Get all selected tables
+      const selectedTables = Object.keys(addFieldState.selectedFields);
+  
+      // Process each field for selected tables
+      for (const [table, fields] of Object.entries(addFieldState.selectedFields)) {
+        console.log('Processing fields for table:', table, fields);
+        for (const field of fields) {
+          const { error } = await supabase
+            .from('profile_categories_mappings')
+            .insert([{
+              table_name: table,
+              column_name: field,
+              display_name: field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+              selected_tables: selectedTables
+            }]);
+  
+          if (error) throw error;
+        }
+      }
+  
+      // Refresh data
+      await Promise.all(selectedTables.map(table => fetchTableColumns(table)));
+      await fetchStructure();
+  
+      setAddFieldDialogOpen(false);
+      setAddFieldState({
+        displayName: '',
+        selectedTables: [],
+        selectedFields: {},
+        selectedTab: 'new',
+        newFieldTable: ''
+      });
+  
+      toast.success('Fields added successfully');
+    } catch (error) {
+      console.error('Error adding existing fields:', error);
+      toast.error('Failed to add fields');
     }
   };
 
@@ -399,16 +844,16 @@ export function SettingsDialog() {
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen} modal>
-        <DialogContent className="max-w-7xl max-h-[90vh]">
+        <DialogContent className="max-w-8xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Table Structure Settings</DialogTitle>
           </DialogHeader>
 
           <div className="grid grid-cols-12 gap-4">
             {/* Left Panel - Tabs */}
-            <Card className="col-span-2 h-[600px]">
+            <Card className="col-span-2 h-[700px]">
               <CardContent className="p-2">
-                <ScrollArea className="h-[550px]">  
+                <ScrollArea className="h-[700px]">
                   <div className="flex justify-between items-center mb-2 px-2">
                     <h3 className="font-semibold">Tabs</h3>
                     <Button variant="ghost" size="sm" onClick={() => setSelectedTab('')}>
@@ -418,9 +863,8 @@ export function SettingsDialog() {
                   {uniqueTabs.map(tab => (
                     <button
                       key={tab}
-                      className={`w-full text-left px-3 py-2 rounded transition-colors ${
-                        selectedTab === tab ? 'bg-primary text-white' : 'hover:bg-gray-100'
-                      }`}
+                      className={`w-full text-left px-3 py-2 rounded transition-colors ${selectedTab === tab ? 'bg-primary text-white' : 'hover:bg-gray-100'
+                        }`}
                       onClick={() => setSelectedTab(tab)}
                     >
                       {tab}
@@ -431,63 +875,78 @@ export function SettingsDialog() {
             </Card>
 
             {/* Middle Panel - Sections */}
-            <Card className="col-span-3 h-[600px]">
+            <Card className="col-span-3 h-[700px]">
               <CardContent className="p-2">
-                <ScrollArea className="h-[550px]">  
+                <ScrollArea className="h-[700px]">
                   <div className="flex justify-between items-center mb-2 px-2">
                     <h3 className="font-semibold">Sections</h3>
                     <Button variant="ghost" size="sm" onClick={() => setSelectedSection(null)}>
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  {structure
-                    .filter(item => item.Tabs === selectedTab)
-                    .map(item => (
+                  {existingSections
+                    .filter(section => {
+                      const sectionItems = structure.filter(item =>
+                        item.Tabs === selectedTab &&
+                        item.sections_sections &&
+                        Object.keys(item.sections_sections).includes(section)
+                      );
+                      return sectionItems.length > 0;
+                    })
+                    .map(section => (
                       <div
-                        key={item.id}
-                        className={`mb-2 p-2 rounded cursor-pointer transition-colors ${
-                          selectedSection?.id === item.id ? 'bg-primary/10' : 'hover:bg-gray-100'
-                        }`}
-                        onClick={() => setSelectedSection(item)}
+                        key={section}
+                        className={`mb-2 p-2 rounded cursor-pointer transition-colors ${selectedSection?.section === section ? 'bg-primary/10' : 'hover:bg-gray-100'
+                          }`}
+                        onClick={() => setSelectedSection({ section })}
                       >
-                        <div className="font-medium">{item.section}</div>
-                        <div className="text-sm text-gray-500">{item.subsection}</div>
+                        <div className="font-medium">{section}</div>
                       </div>
                     ))}
+
                 </ScrollArea>
               </CardContent>
             </Card>
-
             {/* Subsections Panel */}
-            <Card className="col-span-3 h-[600px]">
+            <Card className="col-span-3 h-[700px]">
               <CardContent className="p-2">
-                <ScrollArea className="h-[550px]">  
+                <ScrollArea className="h-[700px]">
                   <div className="flex justify-between items-center mb-2 px-2">
                     <h3 className="font-semibold">Subsections</h3>
                     <Button variant="ghost" size="sm" onClick={() => setSelectedSubsection(null)}>
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  {selectedSection && existingSubsections[selectedSection.section]?.map(subsection => (
-                    <div
-                      key={subsection}
-                      className={`mb-2 p-2 rounded cursor-pointer transition-colors ${
-                        selectedSubsection === subsection ? 'bg-primary/10' : 'hover:bg-gray-100'
-                      }`}
-                      onClick={() => setSelectedSubsection(subsection)}
-                    >
-                      <div className="font-medium">{subsection}</div>
-                    </div>
-                  ))}
+                  {selectedSection && structure
+                    .filter(item =>
+                      item.Tabs === selectedTab &&
+                      item.sections_sections &&
+                      item.sections_subsections &&
+                      Object.keys(item.sections_sections).includes(selectedSection.section)
+                    )
+                    .flatMap(item => {
+                      const subsections = item.sections_subsections[selectedSection.section] || [];
+                      return Array.isArray(subsections) ? subsections : [subsections];
+                    })
+                    .map(subsection => (
+                      <div
+                        key={subsection}
+                        className={`mb-2 p-2 rounded cursor-pointer transition-colors ${selectedSubsection === subsection ? 'bg-primary/10' : 'hover:bg-gray-100'
+                          }`}
+                        onClick={() => setSelectedSubsection(subsection)}
+                      >
+                        <div className="font-medium">{subsection}</div>
+                      </div>
+                    ))}
+
                 </ScrollArea>
               </CardContent>
             </Card>
-
             {/* Right Panel - Details */}
-            <Card className="col-span-4 h-[600px]">
+            <Card className="col-span-4 h-[700px]">
               <CardContent className="p-4">
-                <ScrollArea className="h-[550px]">  
-                  {selectedSection ? (
+                <ScrollArea className="h-[700px]">
+                  {selectedSubsection ? (
                     <div className="space-y-4">
                       {/* Header with Edit Button */}
                       <div className="flex justify-between items-center">
@@ -505,7 +964,7 @@ export function SettingsDialog() {
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => {/* Add delete handler */}}
+                              onClick={() => {/* Add delete handler */ }}
                             >
                               <Trash className="h-4 w-4 mr-2" />
                               Delete
@@ -518,31 +977,47 @@ export function SettingsDialog() {
                       <div className="grid gap-4">
                         <div>
                           <label className="text-sm font-medium">Section</label>
-                          <Input 
-                            value={selectedSection.section}
+                          <Input
+                            value={selectedSection?.section || ''}
                             disabled={!editing}
-                            onChange={(e) => handleUpdateSection(selectedSection.id, { section: e.target.value })}
+                            onChange={(e) => handleUpdateSection(selectedSection!.id, { section: e.target.value })}
                           />
                         </div>
                         <div>
                           <label className="text-sm font-medium">Subsection</label>
-                          <Input 
-                            value={selectedSection.subsection}
+                          <Input
+                            value={selectedSubsection || ''}
                             disabled={!editing}
-                            onChange={(e) => handleUpdateSection(selectedSection.id, { subsection: e.target.value })}
+                            onChange={(e) => handleUpdateSection(selectedSection!.id, { subsection: e.target.value })}
                           />
                         </div>
                         <div>
                           <label className="text-sm font-medium">Table Name</label>
-                          <Input 
-                            value={selectedSection.table_name}
-                            disabled={!editing}
-                            onChange={(e) => handleUpdateSection(selectedSection.id, { table_name: e.target.value })}
-                          />
-                        </div>
-                      </div>
+                          {selectedSection && selectedSubsection && structure
+                            .filter(item =>
+                              item.Tabs === selectedTab &&
+                              item.sections_sections &&
+                              Object.keys(item.sections_sections).includes(selectedSection.section) &&
+                              item.sections_subsections &&
+                              item.sections_subsections[selectedSection.section] === selectedSubsection
+                            )
+                            .map(item => {
+                              const tableNames = typeof item.table_names === 'string'
+                                ? JSON.parse(item.table_names)
+                                : item.table_names || {};
 
-                      {/* Column Mappings */}
+                              const sectionTables = tableNames[selectedSection.section] || [];
+
+                              return sectionTables.map(tableName => (
+                                <Input
+                                  key={tableName}
+                                  value={tableName || ''}
+                                  disabled={!editing}
+                                  onChange={(e) => handleUpdateSection(item.id, { table_name: e.target.value })}
+                                />
+                              ));
+                            })}
+                        </div>                      </div>                      {/* Column Mappings */}
                       <div>
                         <div className="flex justify-between items-center mb-2">
                           <h4 className="font-medium">Column Mappings</h4>
@@ -550,7 +1025,7 @@ export function SettingsDialog() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setShowAddFieldDialog(true)}
+                              onClick={() => setAddFieldDialogOpen(true)}
                             >
                               <Plus className="h-4 w-4 mr-2" />
                               Add Field
@@ -558,70 +1033,62 @@ export function SettingsDialog() {
                           )}
                         </div>
                         <div className="border rounded-lg">
-                          <div className="grid grid-cols-[60px,40px,1fr,1fr,80px] gap-2 p-2 bg-gray-50 border-b">
+                          <div className="grid grid-cols-[60px,40px,1fr,1fr,1fr,80px] gap-2 p-2 bg-gray-50 border-b">
                             <div className="text-sm font-medium text-gray-500">Order</div>
                             <div className="text-sm font-medium text-gray-500">#</div>
                             <div className="text-sm font-medium text-gray-500">Column Name</div>
                             <div className="text-sm font-medium text-gray-500">Display Name</div>
+                            <div className="text-sm font-medium text-gray-500">Table Name</div>
                             <div></div>
                           </div>
-                          <ScrollArea className="h-[300px]">
-                            {Object.entries(selectedSection.column_mappings)
-                              .sort((a, b) => {
-                                const orderA = selectedSection.column_order ? selectedSection.column_order[a[0]] : 0;
-                                const orderB = selectedSection.column_order ? selectedSection.column_order[b[0]] : 0;
-                                return (orderA || 0) - (orderB || 0);
-                              })
-                              .map(([key, value], index) => (
-                                <div 
-                                  key={key}
-                                  className="grid grid-cols-[60px,40px,1fr,1fr,80px] gap-2 p-2 border-b last:border-b-0 hover:bg-gray-50"
-                                >
-                                  <div className="flex items-center gap-1">
-                                    {editing ? (
-                                      <>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          disabled={index === 0}
-                                          onClick={() => handleReorder(key, (selectedSection.column_order[key] || index) - 1)}
-                                          className="h-6 w-6 p-0"
-                                        >
-                                          <ChevronUp className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          disabled={index === Object.keys(selectedSection.column_mappings).length - 1}
-                                          onClick={() => handleReorder(key, (selectedSection.column_order[key] || index) + 1)}
-                                          className="h-6 w-6 p-0"
-                                        >
-                                          <ChevronDown className="h-4 w-4" />
-                                        </Button>
-                                      </>
-                                    ) : (
-                                      <span className="text-sm text-gray-500">
-                                        {selectedSection.column_order[key] || index + 1}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-sm text-gray-500 text-center">{index + 1}</div>
-                                  <div className="text-sm">{key}</div>
-                                  <div className="text-sm">{value}</div>
-                                  {editing && (
-                                    <div className="flex gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleDeleteField(key)}
-                                        className="h-6 w-6"
-                                      >
-                                        <Trash className="h-4 w-4 text-red-500" />
-                                      </Button>
+
+                          <ScrollArea className="h-[300px]" orientation="both">
+                            {selectedSection && selectedSubsection && structure
+                              .filter(item =>
+                                item.Tabs === selectedTab &&
+                                item.sections_sections &&
+                                Object.keys(item.sections_sections).includes(selectedSection.section) &&
+                                item.sections_subsections &&
+                                item.sections_subsections[selectedSection.section] === selectedSubsection
+                              )
+                              .map(item => {
+                                const columnMappings = typeof item.column_mappings === 'string'
+                                  ? JSON.parse(item.column_mappings)
+                                  : item.column_mappings;
+
+                                return Object.entries(columnMappings)
+                                  .sort((a, b) => {
+                                    const orderA = item.column_order?.[a[0]] || 0;
+                                    const orderB = item.column_order?.[b[0]] || 0;
+                                    return orderA - orderB;
+                                  })
+                                  .map(([key, value], index) => (
+                                    <div
+                                      key={key}
+                                      className="grid grid-cols-[60px,40px,1fr,1fr,1fr,80px] gap-2 p-2 border-b last:border-b-0 hover:bg-gray-50"
+                                    >
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-sm text-gray-500">{index + 1}</span>
+                                      </div>
+                                      <div className="text-sm text-gray-500">{index + 1}</div>
+                                      <div className="text-sm">{key.split('.')[1]}</div>
+                                      <div className="text-sm">{value}</div>
+                                      <div className="text-sm">{key.split('.')[0]}</div>
+                                      {editing && (
+                                        <div className="flex gap-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleDeleteField(key)}
+                                            className="h-6 w-6"
+                                          >
+                                            <Trash className="h-4 w-4 text-red-500" />
+                                          </Button>
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                </div>
-                              ))}
+                                  ));
+                              })}
                           </ScrollArea>
                         </div>
                       </div>
@@ -636,7 +1103,6 @@ export function SettingsDialog() {
               </CardContent>
             </Card>
           </div>
-
           {/* Add New Structure UI */}
           <div className="border-t pt-6 mt-6">
             <h3 className="text-lg font-semibold mb-6">Add New Structure</h3>
@@ -666,9 +1132,9 @@ export function SettingsDialog() {
                     <SelectValue placeholder="Select or Create Tab" />
                   </SelectTrigger>
                   <SelectContent>
-                    {uniqueTabs.map(tab => (
-                      tab && <SelectItem key={tab} value={tab}>{tab}</SelectItem>
-                    ))}
+             {uniqueTabs.filter(tab => tab?.trim()).map(tab => (
+  <SelectItem key={tab} value={tab}>{tab}</SelectItem>
+))}
                     <SelectItem value="new" className="text-blue-600 font-medium">+ Create New Tab</SelectItem>
                   </SelectContent>
                 </Select>
@@ -713,9 +1179,9 @@ export function SettingsDialog() {
                     <SelectValue placeholder="Select or Create Section" />
                   </SelectTrigger>
                   <SelectContent>
-                    {existingSections.map(section => (
-                      <SelectItem key={section} value={section}>{section}</SelectItem>
-                    ))}
+                  {existingSections.filter(section => section?.trim()).map(section => (
+  <SelectItem key={section} value={section}>{section}</SelectItem>
+))}
                     <SelectItem value="new" className="text-blue-600 font-medium">+ Create New Section</SelectItem>
                   </SelectContent>
                 </Select>
@@ -732,9 +1198,9 @@ export function SettingsDialog() {
                   />
                 )}
               </div>
+            </div>
 
-              </div>
-              <div className="flex flex-row md:flex-row gap-4">
+            <div className="flex flex-row md:flex-row gap-4">
               {/* Subsection Selection/Creation */}
               <div className="space-y-3 w-full md:w-1/2 mb-4">
                 <label className="text-sm font-medium text-gray-700">Subsection</label>
@@ -761,9 +1227,11 @@ export function SettingsDialog() {
                       <SelectValue placeholder="Select or Create Subsection" />
                     </SelectTrigger>
                     <SelectContent>
-                      {existingSubsections[newStructure.section]?.map(subsection => (
-                        subsection && <SelectItem key={subsection} value={subsection}>{subsection}</SelectItem>
-                      ))}
+                    {(existingSubsections[newStructure.section] || [])
+  .filter(subsection => subsection?.trim())
+  .map(subsection => (
+    <SelectItem key={subsection} value={subsection}>{subsection}</SelectItem>
+))}
                       <SelectItem value="new" className="text-blue-600 font-medium">+ Create New Subsection</SelectItem>
                     </SelectContent>
                   </Select>
@@ -794,86 +1262,63 @@ export function SettingsDialog() {
 
               {/* Table Selection/Creation */}
               <div className="space-y-3 w-full md:w-1/2 mb-4">
-                <label className="text-sm font-medium text-gray-700">Table</label>
-                <Select
-                  value={newStructure.table_name}
-                  onValueChange={(value) => {
-                    if (value === 'new') {
-                      setShowNewTableDialog(true);
-                    } else {
-                      setNewStructure(prev => ({
-                        ...prev,
-                        table_name: value
-                      }));
-                      if (value) fetchTableColumns(value);
-                    }
-                  }}
+                <label className="text-sm font-medium text-gray-700">Tables and Fields</label>
+                <Button
+                  onClick={() => setShowMultiSelectDialog(true)}
+                  variant="outline"
+                  className="w-full justify-between"
                 >
-                  <SelectTrigger className="w-full bg-white">
-                    <SelectValue placeholder="Select or Create Table" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tables.map(table => (
-                      table && <SelectItem key={table} value={table}>{table}</SelectItem>
-                    ))}
-                    <SelectItem value="new" className="text-blue-600 font-medium">+ Create New Table</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              </div>
-              <div className="flex flex-row md:flex-row gap-4">
-              {/* Field Selection */}
-              <div className="space-y-3 w-full md:w-1/2 mb-4">
-                <label className="text-sm font-medium text-gray-700">Fields</label>
-                <Select
-                  multiple
-                  value={selectedFields}
-                  onValueChange={setSelectedFields}
-                >
-                  <SelectTrigger className="w-full bg-white">
-                    <SelectValue placeholder="Select Fields" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.isArray(tableColumns) && tableColumns.map(column => (
-                      <SelectItem key={column.column_name} value={column.column_name}>
-                        {column.column_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  {newStructure.table_names.length > 0
+                    ? `${newStructure.table_names.length} tables selected`
+                    : "Select Tables and Fields"}
+                  <Plus className="h-4 w-4" />
+                </Button>
 
-              {/* Preview and Add Button */}
-              <div className="pt-6 space-y-6">
-                {(newStructure.Tabs || newStructure.isNewTab) && 
-                 (newStructure.section || newStructure.isNewSection) && 
-                 (newStructure.subsection || newStructure.isNewSubsection) && 
-                 newStructure.table_name && (
-                  <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-4">
-                    <h4 className="font-medium text-gray-900">Structure Preview</h4>
-                    <div className="flex justify-between gap-4">
-                      <div className="space-y-2">
-                        <p className="text-sm"><span className="font-medium text-gray-700">Tab:</span> <span className="text-gray-600">{newStructure.Tabs}</span></p>
-                        <p className="text-sm"><span className="font-medium text-gray-700">Section:</span> <span className="text-gray-600">{newStructure.section}</span></p>
+                {/* Show selected tables and fields preview */}
+                {newStructure.table_names.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    {newStructure.table_names.map(table => (
+                      <div key={table} className="border rounded-md p-2">
+                        <h6 className="font-medium text-sm">{table}</h6>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {Object.entries(selectedTableFields[table] || {}).map(([fieldName]) => (
+                            <span key={fieldName} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                              {fieldName}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <p className="text-sm"><span className="font-medium text-gray-700">Subsection:</span> <span className="text-gray-600">{newStructure.subsection}</span></p>
-                        <p className="text-sm"><span className="font-medium text-gray-700">Table:</span> <span className="text-gray-600">{newStructure.table_name}</span></p>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 )}
+              </div>
+            </div>
+            
+            <div className="flex flex-row md:flex-row gap-4">
+              {/* Preview and Add Button */}
+              <div className="pt-6 space-y-6">
+                {(newStructure.Tabs || newStructure.isNewTab) &&
+                  (newStructure.section || newStructure.isNewSection) &&
+                  (newStructure.subsection || newStructure.isNewSubsection) &&
+                  newStructure.table_name && (
+                    <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-4">
+                      <h4 className="font-medium text-gray-900">Structure Preview</h4>
+                      <div className="flex justify-between gap-4">
+                        <div className="space-y-2">
+                          <p className="text-sm"><span className="font-medium text-gray-700">Tab:</span> <span className="text-gray-600">{newStructure.Tabs}</span></p>
+                          <p className="text-sm"><span className="font-medium text-gray-700">Section:</span> <span className="text-gray-600">{newStructure.section}</span></p>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-sm"><span className="font-medium text-gray-700">Subsection:</span> <span className="text-gray-600">{newStructure.subsection}</span></p>
+                          <p className="text-sm"><span className="font-medium text-gray-700">Table:</span> <span className="text-gray-600">{newStructure.table_name}</span></p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                 <div className="flex justify-end">
                   <Button
                     onClick={handleAddStructure}
-                    disabled={
-                      (!newStructure.Tabs && !newStructure.isNewTab) || 
-                      (!newStructure.section && !newStructure.isNewSection) || 
-                      (!newStructure.subsection && !newStructure.isNewSubsection) || 
-                      !newStructure.table_name ||
-                      loadingTable
-                    }
                     className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -917,6 +1362,135 @@ export function SettingsDialog() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={addFieldDialogOpen} onOpenChange={setAddFieldDialogOpen}>
+    <DialogContent className="max-w-4xl">
+      <DialogHeader>
+        <DialogTitle>Add Field</DialogTitle>
+      </DialogHeader>
+
+      <Tabs defaultValue="new" onValueChange={(value) => setAddFieldState(prev => ({ ...prev, selectedTab: value }))}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="new">Add New Field</TabsTrigger>
+          <TabsTrigger value="existing">Add Existing Field</TabsTrigger>
+        </TabsList>
+
+        {/* New Field Tab */}
+        <div className={addFieldState.selectedTab === 'new' ? 'space-y-4 py-4' : 'hidden'}>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Display Name</label>
+            <Input
+              value={addFieldState.displayName}
+              onChange={(e) => setAddFieldState(prev => ({ ...prev, displayName: e.target.value }))}
+              placeholder="Enter display name"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Select Table</label>
+            <Select
+              value={addFieldState.newFieldTable}
+              onValueChange={(value) => setAddFieldState(prev => ({ ...prev, newFieldTable: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a table" />
+              </SelectTrigger>
+              <SelectContent>
+              {tables.filter(table => table?.trim()).map(table => (
+  <SelectItem key={table} value={table}>
+    {table}
+  </SelectItem>
+))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Existing Fields Tab */}
+        <div className={addFieldState.selectedTab === 'existing' ? 'grid grid-cols-2 gap-4 py-4' : 'hidden'}>
+          {/* Tables Selection */}
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium mb-2">Select Tables</h4>
+            <ScrollArea className="h-[400px]">
+              {tables.map(table => (
+                <div key={table} className="flex items-center gap-2 p-2 hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    id={`field-table-${table}`}
+                    checked={addFieldState.selectedTables.includes(table)}
+                    onChange={(e) => {
+                      const newSelection = e.target.checked
+                        ? [...addFieldState.selectedTables, table]
+                        : addFieldState.selectedTables.filter(t => t !== table);
+                      setAddFieldState(prev => ({ ...prev, selectedTables: newSelection }));
+                      if (e.target.checked) {
+                        fetchFieldsForTables([table]);
+                      }
+                    }}
+                    className="h-4 w-4"
+                  />
+                  <label htmlFor={`field-table-${table}`}>{table}</label>
+                </div>
+              ))}
+            </ScrollArea>
+          </div>
+
+          {/* Fields Selection */}
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium mb-2">Select Fields</h4>
+            <ScrollArea className="h-[400px]">
+              {addFieldState.selectedTables.map(table => (
+                <div key={table} className="mb-4">
+                  <h5 className="font-medium text-sm text-gray-700 mb-2">{table}</h5>
+                  {availableFields
+                    .find(t => t.table === table)
+                    ?.fields.map(field => (
+                      <div key={`${table}-${field.column_name}`} className="flex items-center gap-2 p-2 hover:bg-gray-50">
+                        <input
+                          type="checkbox"
+                          id={`field-${table}-${field.column_name}`}
+                          checked={addFieldState.selectedFields[table]?.includes(field.column_name) || false}
+                          onChange={(e) => {
+                            setAddFieldState(prev => ({
+                              ...prev,
+                              selectedFields: {
+                                ...prev.selectedFields,
+                                [table]: e.target.checked
+                                  ? [...(prev.selectedFields[table] || []), field.column_name]
+                                  : (prev.selectedFields[table] || []).filter(f => f !== field.column_name)
+                              }
+                            }));
+                          }}
+                          className="h-4 w-4"
+                        />
+                        <label htmlFor={`field-${table}-${field.column_name}`}>{field.column_name}</label>
+                      </div>
+                    ))}
+                </div>
+              ))}
+            </ScrollArea>
+          </div>
+        </div>
+      </Tabs>
+
+      <DialogFooter>
+        <Button onClick={() => setAddFieldDialogOpen(false)} variant="outline">
+          Cancel
+        </Button>
+        <Button onClick={() => {
+          if (addFieldState.selectedTab === 'new') {
+            handleAddNewField();
+          } else {
+            handleAddExistingFields();
+          }
+        }}>
+          Add Field{addFieldState.selectedTab === 'existing' && 's'}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+
+      <MultiSelectDialog />
     </>
   );
 }

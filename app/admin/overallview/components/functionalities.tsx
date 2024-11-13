@@ -27,60 +27,143 @@ export function CompanyEditDialog({ isOpen, onClose, companyData, onSave }) {
             [fieldName]: value
         }));
     };
-
     const handleSubmit = async () => {
-        setLoading(true);
-        try {
-            const tables = [
-                'acc_portal_company_duplicate',
-                'acc_portal_clerk_users_duplicate',
-                'acc_portal_directors_duplicate',
-                'nssf_companies_duplicate',
-                'nhif_companies_duplicate2',
-                'PasswordChecker_duplicate',
-                'ecitizen_companies_duplicate',
-                'etims_companies_duplicate',
-                'acc_portal_directors_duplicate'
-            ];
-
-            for (const table of tables) {
-                const { error } = await supabase
-                    .from(table)
-                    .update(editedData)
-                    .eq('id', companyData.id);
-
-                if (error) throw error;
-            }
-
-            toast.success('Company details updated successfully');
-            onSave(editedData);
-            onClose();
-        } catch (error) {
-            console.error('Error updating company:', error);
-            toast.error('Failed to update company details');
-        } finally {
-            setLoading(false);
-        }
-    };
+      setLoading(true);
+      try {
+          // Get only changed values by comparing with original data
+          const changedValues = {};
+          Object.keys(editedData).forEach(key => {
+              if (editedData[key] !== companyData[key]) {
+                  changedValues[key] = editedData[key];
+              }
+          });
+  
+          // Map fields to their respective tables
+          const tableUpdates = {
+              acc_portal_company_duplicate: {},
+              nssf_companies_duplicate: {},
+              nhif_companies_duplicate2: {},
+              ecitizen_companies_duplicate: {},
+              etims_companies_duplicate: {}
+          };
+  
+          // Sort changed fields into their respective tables
+          Object.entries(changedValues).forEach(([field, value]) => {
+              const companyName = companyData.company_name;
+  
+              if (field.startsWith('nssf_')) {
+                  tableUpdates.nssf_companies_duplicate[field] = value;
+                  tableUpdates.nssf_companies_duplicate.company_name = companyName;
+              } else if (field.startsWith('nhif_')) {
+                  tableUpdates.nhif_companies_duplicate2[field] = value;
+                  tableUpdates.nhif_companies_duplicate2.company_name = companyName;
+              } else if (field.startsWith('etims_')) {
+                  tableUpdates.etims_companies_duplicate[field] = value;
+                  tableUpdates.etims_companies_duplicate.company_name = companyName;
+              } else if (field.startsWith('ecitizen_')) {
+                  tableUpdates.ecitizen_companies_duplicate[field] = value;
+                  tableUpdates.ecitizen_companies_duplicate.company_name = companyName;
+              } else {
+                  tableUpdates.acc_portal_company_duplicate[field] = value;
+              }
+          });
+  
+          // Execute updates
+          for (const [table, updates] of Object.entries(tableUpdates)) {
+              if (Object.keys(updates).length > 0) {
+                  const { data, error } = await supabase
+                      .from(table)
+                      .update(updates)
+                      .match({ company_name: companyData.company_name });
+  
+                  if (error) {
+                      console.error(`Error updating ${table}:`, error);
+                      throw error;
+                  }
+              }
+          }
+  
+          // Fetch updated data
+          const [
+              { data: companies },
+              { data: users },
+              { data: nssfData },
+              { data: nhifData },
+              { data: ecitizenData },
+              { data: etimsData }
+          ] = await Promise.all([
+              supabase.from('acc_portal_company_duplicate').select('*').eq('company_name', companyData.company_name),
+              supabase.from('acc_portal_clerk_users_duplicate').select('*').eq('company_name', companyData.company_name),
+              supabase.from('nssf_companies_duplicate').select('*').eq('company_name', companyData.company_name),
+              supabase.from('nhif_companies_duplicate2').select('*').eq('company_name', companyData.company_name),
+              supabase.from('ecitizen_companies_duplicate').select('*').eq('company_name', companyData.company_name),
+              supabase.from('etims_companies_duplicate').select('*').eq('company_name', companyData.company_name)
+          ]);
+  
+          // Combine updated data
+          const updatedCompanyData = {
+              ...companies?.[0],
+              ...users?.[0],
+              ...nssfData?.[0],
+              ...nhifData?.[0],
+              ...ecitizenData?.[0],
+              ...etimsData?.[0]
+          };
+  
+          toast.success('Company details updated successfully');
+          onSave(updatedCompanyData);
+          onClose();
+      } catch (error) {
+          console.error('Error updating company:', error);
+          toast.error('Failed to update company details');
+      } finally {
+          setLoading(false);
+      }
+  };
+  
 
     const renderField = (field) => {
-        const value = editedData[field.name] || '';
-        
-        return (
-            <div key={field.name} className="grid gap-2 mb-4">
-                <Label htmlFor={field.name} className="text-sm font-medium">
-                    {field.label}
-                </Label>
-                <Input
-                    id={field.name}
-                    type={field.type === 'date' ? 'date' : 'text'}
-                    value={value}
-                    onChange={(e) => handleInputChange(field.name, e.target.value)}
-                    className="w-full"
-                />
-            </div>
-        );
-    };
+      const value = editedData[field.name] || '';
+      
+      if (field.type === 'select' && field.options) {
+          return (
+              <div key={field.name} className="grid gap-2 mb-4">
+                  <Label htmlFor={field.name} className="text-sm font-medium">
+                      {field.label}
+                  </Label>
+                  <select
+                      id={field.name}
+                      value={value}
+                      onChange={(e) => handleInputChange(field.name, e.target.value)}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2"
+                  >
+                      <option value="">Select {field.label}</option>
+                      {field.options.map((option) => (
+                          <option key={option} value={option}>
+                              {option.charAt(0).toUpperCase() + option.slice(1)}
+                          </option>
+                      ))}
+                  </select>
+              </div>
+          );
+      }
+  
+      return (
+          <div key={field.name} className="grid gap-2 mb-4">
+              <Label htmlFor={field.name} className="text-sm font-medium">
+                  {field.label}
+              </Label>
+              <Input
+                  id={field.name}
+                  type={field.type === 'date' ? 'date' : 'text'}
+                  value={value}
+                  onChange={(e) => handleInputChange(field.name, e.target.value)}
+                  className="w-full"
+              />
+          </div>
+      );
+  };
+  
 
     const renderFieldsByCategory = () => {
         const categorizedFields = {};
@@ -92,19 +175,24 @@ export function CompanyEditDialog({ isOpen, onClose, companyData, onSave }) {
             categorizedFields[category].push(field);
         });
 
-        return Object.entries(categorizedFields).map(([category, fields]) => (
-            <div key={category} className="mb-6">
-                <h3 className="text-lg font-semibold mb-4 text-primary">{category}</h3>
-                <div className="grid grid-cols-2 gap-4">
-                    {fields.map(field => renderField(field))}
+        return Object.entries(categorizedFields).map(([category, fields], index, array) => (
+            <div key={category}>
+                <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-4 text-primary">{category}</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        {fields.map(field => renderField(field))}
+                    </div>
                 </div>
+                {index < array.length - 1 && (
+                    <div className="border-b border-gray-200 my-6"></div>
+                )}
             </div>
         ));
     };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogContent className="max-w-4xl max-h-[100vh]">
                 <DialogHeader>
                     <DialogTitle>Edit Company: {companyData?.company_name}</DialogTitle>
                 </DialogHeader>
@@ -113,7 +201,7 @@ export function CompanyEditDialog({ isOpen, onClose, companyData, onSave }) {
                         {renderFieldsByCategory()}
                     </div>
                 </ScrollArea>
-                <DialogFooter className="sticky bottom-0 bg-white pt-2">
+                <DialogFooter className=" bg-white pt-2">
                     <Button
                         variant="outline"
                         onClick={onClose}
