@@ -1,6 +1,6 @@
 // /components/TableFooter.tsx
 import { TableFooter as UITableFooter, TableRow, TableCell } from '@/components/ui/table';
-import { useTable } from '../core/context/TableContext';
+import { useTable } from '../context/TableContext';
 import { CalculationResult } from '../core/types';
 
 export const TableFooter: React.FC<{
