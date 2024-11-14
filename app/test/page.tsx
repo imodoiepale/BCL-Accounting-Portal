@@ -10,6 +10,19 @@ import EmailFilter from './EmailFilter';
 import EmailPopup from './EmailPopup';
 import FilterManager from './FilterManager';
 import settings from './settings.json'; // Import settings from JSON
+import { toast, Toaster } from 'react-hot-toast';
+
+
+
+interface FilterCriteria {
+  type: 'from' | 'to' | 'subject' | 'unread' | 'important' | 'bodyContent';
+  value: string | boolean;
+}
+
+interface Filter {
+  name: string;
+  criteria: FilterCriteria[];
+}
 
 const Email = ({ message, accountEmail, onClick }) => {
   const getHeader = (headers, name) => {
@@ -41,7 +54,7 @@ const Email = ({ message, accountEmail, onClick }) => {
             {getHeader(message.payload.headers, 'From').charAt(0).toUpperCase()}
           </div>
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-start mb-1">
             <div className="font-medium text-gray-900 truncate pr-2">
@@ -56,7 +69,7 @@ const Email = ({ message, accountEmail, onClick }) => {
               </Badge>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
             <span className="font-medium truncate">
               {getHeader(message.payload.headers, 'From').split('<')[0].trim()}
@@ -65,7 +78,7 @@ const Email = ({ message, accountEmail, onClick }) => {
             <Clock className="w-4 h-4 text-gray-400" />
             <span className="text-gray-400">{formatDate(message.internalDate)}</span>
           </div>
-          
+
           <div className="text-sm text-gray-500 line-clamp-2">
             {message.snippet}
           </div>
@@ -109,9 +122,9 @@ const EmailList = ({ messages, onLoadMore, hasMore, loading, onEmailClick }) => 
           );
         }
         return (
-          <Email 
-            key={`${message.accountEmail}-${message.id}`} 
-            message={message} 
+          <Email
+            key={`${message.accountEmail}-${message.id}`}
+            message={message}
             accountEmail={message.accountEmail}
             onClick={onEmailClick}
           />
@@ -156,7 +169,7 @@ export default function GmailManager() {
 
   const CLIENT_ID = '342538819907-2v86oir8ip9m4nvurqs6g4j1ohsqc2sg.apps.googleusercontent.com';
   const API_KEY = 'AIzaSyCAtdOy5Tj8Orjm4HM5LlwOl8bWEf2-81c';
-  const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
+  const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.modify';
 
   useEffect(() => {
     const loadGapiScript = document.createElement('script');
@@ -264,7 +277,7 @@ export default function GmailManager() {
         if (acc.email === email) {
           return {
             ...acc,
-            messages: nextPageToken 
+            messages: nextPageToken
               ? [...(acc.messages || []), ...messagesData]
               : messagesData
           };
@@ -282,35 +295,53 @@ export default function GmailManager() {
     await fetchMessages(selectedAccount === 'all' ? accounts[0].email : selectedAccount, pageToken);
   };
 
-  const addFilter = (newFilter) => {
+  const addFilter = (newFilter: Filter) => {
     setFilters((prev) => [...prev, newFilter]);
     setSelectedFilter(newFilter.name);
+    toast.success('Filter added successfully');
   };
 
-  const editFilter = (filterName) => {
-    const newName = prompt("Enter a new name for the filter:", filterName);
-    if (newName) {
-      setFilters((prev) => prev.map(filter => filter.name === filterName ? { ...filter, name: newName } : filter));
-      setSelectedFilter(newName);
-    }
+  const editFilter = (oldName: string, newFilter: Filter) => {
+    setFilters((prev) => prev.map(filter =>
+      filter.name === oldName ? newFilter : filter
+    ));
+    setSelectedFilter(newFilter.name);
+    toast.success('Filter updated successfully');
   };
 
-  const removeFilter = (filterName) => {
+  const removeFilter = (filterName: string) => {
     setFilters((prev) => prev.filter(filter => filter.name !== filterName));
     setSelectedFilter(filters[0]?.name || 'All');
+    toast.success('Filter removed successfully');
   };
 
   const applyFilters = (messages) => {
     const activeFilter = filters.find(filter => filter.name === selectedFilter);
     if (!activeFilter) return messages;
 
-    const { criteria } = activeFilter;
     return messages.filter((message) => {
-      const fromMatch = criteria.from ? message.payload.headers.some(header => header.name === 'From' && header.value.includes(criteria.from)) : true;
-      const subjectMatch = criteria.subject ? message.payload.headers.some(header => header.name === 'Subject' && header.value.includes(criteria.subject)) : true;
-      const unreadMatch = criteria.unread ? message.labelIds.includes('UNREAD') : true;
-      const importantMatch = criteria.important ? message.labelIds.includes('IMPORTANT') : true;
-      return fromMatch && subjectMatch && unreadMatch && importantMatch;
+      return activeFilter.criteria.every((criterion) => {
+        const getHeader = (name) => {
+          return message.payload.headers.find(header => header.name === name)?.value || '';
+        };
+
+        switch (criterion.type) {
+          case 'from':
+            return getHeader('From').toLowerCase().includes(criterion.value.toString().toLowerCase());
+          case 'to':
+            return getHeader('To').toLowerCase().includes(criterion.value.toString().toLowerCase());
+          case 'subject':
+            return getHeader('Subject').toLowerCase().includes(criterion.value.toString().toLowerCase());
+          case 'bodyContent':
+            return message.snippet.toLowerCase().includes(criterion.value.toString().toLowerCase());
+          case 'unread':
+            return criterion.value ? message.labelIds.includes('UNREAD') : true;
+          case 'important':
+            return criterion.value ? message.labelIds.includes('IMPORTANT') : true;
+          default:
+            return true;
+        }
+      });
     });
   };
 
@@ -319,11 +350,290 @@ export default function GmailManager() {
     setShowPopup(true);
   };
 
-  const handleReply = (message, replyContent) => {
-    // Implement the reply functionality using Gmail API
-    console.log('Replying to:', message);
-    console.log('Reply content:', replyContent);
+  const handleReply = async (message, replyContent) => {
+    try {
+      // Get the necessary headers from the original message
+      const getHeader = (headers, name) => {
+        return headers.find(header => header.name === name)?.value || '';
+      };
+
+      const originalFrom = getHeader(message.payload.headers, 'From');
+      const originalSubject = getHeader(message.payload.headers, 'Subject');
+      const originalMessageId = getHeader(message.payload.headers, 'Message-ID');
+      const originalReferences = getHeader(message.payload.headers, 'References');
+
+      // Construct the reply subject
+      const replySubject = originalSubject.startsWith('Re:')
+        ? originalSubject
+        : `Re: ${originalSubject}`;
+
+      // Construct the reply-to email address
+      const replyTo = originalFrom.match(/<(.+)>/)
+        ? originalFrom.match(/<(.+)>/)[1]
+        : originalFrom;
+
+      // Create the email content in MIME format
+      const emailContent = [
+        'Content-Type: text/plain; charset="UTF-8"',
+        'MIME-Version: 1.0',
+        `To: ${replyTo}`,
+        `Subject: ${replySubject}`,
+        `In-Reply-To: ${originalMessageId}`,
+        `References: ${originalReferences ? originalReferences + ' ' : ''}${originalMessageId}`,
+        '',
+        replyContent,
+        '',
+        '---Original Message---',
+        `From: ${originalFrom}`,
+        `Subject: ${originalSubject}`,
+        `${message.snippet}...`
+      ].join('\r\n');
+
+      // Encode the email content in base64URL format
+      const encodedMessage = btoa(emailContent)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      // Get the account that received the original message
+      const account = accounts.find(acc => acc.email === message.accountEmail);
+      if (!account) {
+        throw new Error('Account not found');
+      }
+
+      // Set the token for the correct account
+      gapi.client.setToken(account.token);
+
+      // Send the reply using Gmail API
+      const response = await gapi.client.gmail.users.messages.send({
+        userId: 'me',
+        resource: {
+          raw: encodedMessage,
+          threadId: message.threadId
+        }
+      });
+
+      if (response.status === 200) {
+        // Refresh messages after successful reply
+        await fetchMessages(message.accountEmail);
+
+        // Show success notification (you'll need to implement this)
+        toast.success('Reply sent to successfully!');
+      } else {
+        throw new Error('Failed to send reply');
+      }
+
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      // Show error notification (you'll need to implement this)
+      toast.error('Failed to send reply');
+    }
   };
+
+
+  const handleForward = async (message, forwardTo, forwardContent) => {
+    try {
+      // Get headers from original message
+      const getHeader = (headers, name) => {
+        return headers.find(header => header.name === name)?.value || '';
+      };
+
+      const originalFrom = getHeader(message.payload.headers, 'From');
+      const originalSubject = getHeader(message.payload.headers, 'Subject');
+      const originalDate = getHeader(message.payload.headers, 'Date');
+
+      // Construct the forward subject
+      const forwardSubject = originalSubject.startsWith('Fwd:')
+        ? originalSubject
+        : `Fwd: ${originalSubject}`;
+
+      // Function to decode base64 content
+      const decodeBase64 = (data) => {
+        const buffer = Buffer.from(data.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+        return buffer.toString('utf8');
+      };
+
+      // Function to get email body and attachments
+      const getEmailParts = (payload) => {
+        const parts = [];
+
+        const processPart = (part) => {
+          if (part.mimeType === 'text/plain' || part.mimeType === 'text/html') {
+            parts.push({
+              mimeType: part.mimeType,
+              content: part.body.data ? decodeBase64(part.body.data) : '',
+            });
+          } else if (part.parts) {
+            part.parts.forEach(processPart);
+          }
+
+          // Handle attachments
+          if (part.filename && part.body.attachmentId) {
+            parts.push({
+              mimeType: part.mimeType,
+              filename: part.filename,
+              attachmentId: part.body.attachmentId,
+            });
+          }
+        };
+
+        if (payload.parts) {
+          payload.parts.forEach(processPart);
+        } else {
+          processPart(payload);
+        }
+
+        return parts;
+      };
+
+      // Get email parts
+      const emailParts = getEmailParts(message.payload);
+
+      // Get attachments if any
+      const attachments = [];
+      for (const part of emailParts) {
+        if (part.attachmentId) {
+          try {
+            const attachment = await gapi.client.gmail.users.messages.attachments.get({
+              userId: 'me',
+              messageId: message.id,
+              id: part.attachmentId
+            });
+
+            attachments.push({
+              filename: part.filename,
+              mimeType: part.mimeType,
+              data: attachment.result.data
+            });
+          } catch (error) {
+            console.error('Error fetching attachment:', error);
+          }
+        }
+      }
+
+      // Generate boundary for multipart message
+      const boundary = `boundary_${Math.random().toString(36).substr(2)}`;
+
+      // Construct email content
+      let emailContent = [
+        'MIME-Version: 1.0',
+        `To: ${forwardTo}`,
+        `Subject: ${forwardSubject}`,
+        `Content-Type: multipart/mixed; boundary="${boundary}"`,
+        '',
+        `--${boundary}`,
+        'Content-Type: text/plain; charset="UTF-8"',
+        'Content-Transfer-Encoding: quoted-printable',
+        '',
+        forwardContent,
+        '',
+        '---------- Forwarded message ----------',
+        `From: ${originalFrom}`,
+        `Date: ${originalDate}`,
+        `Subject: ${originalSubject}`,
+        '',
+      ].join('\r\n');
+
+      // Add original message content
+      const textContent = emailParts.find(part => part.mimeType === 'text/plain')?.content || '';
+      const htmlContent = emailParts.find(part => part.mimeType === 'text/html')?.content || '';
+
+      emailContent += textContent || htmlContent;
+      emailContent += '\r\n';
+
+      // Add attachments
+      for (const attachment of attachments) {
+        emailContent += [
+          `--${boundary}`,
+          `Content-Type: ${attachment.mimeType}`,
+          `Content-Disposition: attachment; filename="${attachment.filename}"`,
+          'Content-Transfer-Encoding: base64',
+          '',
+          attachment.data,
+          ''
+        ].join('\r\n');
+      }
+
+      // Close multipart message
+      emailContent += `--${boundary}--`;
+
+      // Encode the email content in base64URL format
+      const encodedMessage = btoa(emailContent)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      // Get the account that received the original message
+      const account = accounts.find(acc => acc.email === message.accountEmail);
+      if (!account) {
+        throw new Error('Account not found');
+      }
+
+      // Set the token for the correct account
+      gapi.client.setToken(account.token);
+
+      // Send the forwarded message
+      const response = await gapi.client.gmail.users.messages.send({
+        userId: 'me',
+        resource: {
+          raw: encodedMessage
+        }
+      });
+
+      if (response.status === 200) {
+        // Refresh messages after successful forward
+        await fetchMessages(message.accountEmail);
+        showNotification('Message forwarded successfully', 'success');
+      } else {
+        throw new Error('Failed to forward message');
+      }
+
+    } catch (error) {
+      console.error('Error forwarding message:', error);
+      showNotification('Failed to forward message: ' + error.message, 'error');
+    }
+  };
+
+  // Add this utility function for notifications
+  const showNotification = (message, type = 'info') => {
+    // You can implement this using your preferred notification system
+    // For example, using a toast library or custom notification component
+    console.log(`${type.toUpperCase()}: ${message}`);
+
+    // Example implementation using alert (replace with proper UI notification)
+    alert(message);
+  };
+
+  // Add this component to your project
+  const Notification = ({ message, type, onClose }) => {
+    useEffect(() => {
+      const timer = setTimeout(onClose, 5000); // Auto-close after 5 seconds
+      return () => clearTimeout(timer);
+    }, [onClose]);
+
+    return (
+      <div className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg ${type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        } text-white`}>
+        {message}
+      </div>
+    );
+  };
+
+  // Add state for notifications in GmailManager
+  const [notification, setNotification] = useState(null);
+
+
+
+  // Add to your GmailManager return statement
+  {
+    notification && (
+      <Notification
+        message={notification.message}
+        type={notification.type}
+        onClose={() => setNotification(null)}
+      />
+    )
+  }
 
   const resetFilters = () => {
     setFilters(settings.defaultFilters);
@@ -348,10 +658,14 @@ export default function GmailManager() {
     : allMessages.filter(message => message.accountEmail === selectedAccount);
 
   // Apply custom filters
-  const finalMessages = applyFilters(filteredMessages);
+  const finalMessages = applyFilters(filteredMessages).sort((a, b) => {
+    return parseInt(b.internalDate) - parseInt(a.internalDate);
+  });
 
   return (
     <div className="min-h-screen bg-gray-100 py-8">
+      <Toaster position="top-right" />
+
       <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-gray-900 text-center mb-8">
           Gmail Manager
@@ -373,14 +687,14 @@ export default function GmailManager() {
               </SelectContent>
             </Select>
           </div>
-          
+
           <button
             onClick={addNewAccount}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
             Add Account
           </button>
-          
+
           {accounts.length > 0 && (
             <>
               <button
@@ -403,25 +717,45 @@ export default function GmailManager() {
         </div>
 
         <div className="mb-4">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {filters.map((filter) => (
               <button
                 key={filter.name}
                 onClick={() => setSelectedFilter(filter.name)}
-                className={`px-4 py-2 rounded-lg ${selectedFilter === filter.name ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}
+                className={`px-4 py-2 rounded-lg ${selectedFilter === filter.name
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  } transition-colors`}
               >
-                {filter.name}
+                <div className="flex items-center gap-2">
+                  <span>{filter.name}</span>
+                  {filter.criteria.length > 0 && (
+                    <Badge variant="secondary" className="bg-opacity-20">
+                      {filter.criteria.length}
+                    </Badge>
+                  )}
+                </div>
               </button>
             ))}
-            <button onClick={() => setShowFilterManager(true)} className="px-4 py-2 bg-blue-500 text-white rounded-lg">Manage Filters</button>
-            <button onClick={resetFilters} className="px-4 py-2 bg-red-500 text-white rounded-lg">Reset Filters</button>
+            <button
+              onClick={() => setShowFilterManager(true)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Manage Filters
+            </button>
+            <button
+              onClick={resetFilters}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+            >
+              Reset Filters
+            </button>
           </div>
         </div>
 
-        <EmailList 
-          messages={finalMessages} 
-          onLoadMore={loadMore} 
-          hasMore={hasMore} 
+        <EmailList
+          messages={finalMessages}
+          onLoadMore={loadMore}
+          hasMore={hasMore}
           loading={loading}
           onEmailClick={handleEmailClick}
         />
@@ -431,6 +765,7 @@ export default function GmailManager() {
             message={currentMessage}
             onClose={() => setShowPopup(false)}
             onReply={handleReply}
+            onForward={handleForward}
           />
         )}
 
@@ -438,7 +773,7 @@ export default function GmailManager() {
           <FilterManager
             filters={filters}
             onAddFilter={addFilter}
-            onEditFilter={editFilter}
+            onEditFilter={(oldName, newFilter) => editFilter(oldName, newFilter)}
             onRemoveFilter={removeFilter}
             onClose={() => setShowFilterManager(false)}
           />
