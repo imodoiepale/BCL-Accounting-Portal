@@ -131,7 +131,14 @@ const OverallView = () => {
         'TOT': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
         'TIMS Details': { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
         'Sheria Details': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-        'Other Details': { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' }
+        'Other Details': { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' },
+        'KRA ACC Manager': { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' },
+        'KRA Team Lead': { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
+        'KRA Sector Manager': { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
+        'Client Category': { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
+        'IMM': { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
+        'Audit': { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300' },
+        'Acc': { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' }
     };
 
     const sectionsWithSeparators = [
@@ -139,6 +146,8 @@ const OverallView = () => {
         { isSeparator: true },
         { name: 'companyDetails', fields: formFields.companyDetails.fields, label: 'Company Details' },
         { isSeparator: true },
+        // { name: 'kraDetails', fields: formFields.kraDetails.fields, label: 'KRA Details' },
+        // { isSeparator: true },
         { name: 'directorDetails', fields: formFields.directorDetails.fields, label: 'Director Details' },
         { isSeparator: true },
         { name: 'supplierDetails', fields: formFields.supplierDetails.fields, label: 'Supplier Details' },
@@ -156,6 +165,14 @@ const OverallView = () => {
 
     useEffect(() => {
         fetchAllData();
+
+        // Add event listener for data refresh
+        const handleRefresh = () => fetchAllData();
+        window.addEventListener('refreshData', handleRefresh);
+
+        return () => {
+            window.removeEventListener('refreshData', handleRefresh);
+        };
     }, []);
 
     const fetchAllData = async () => {
@@ -248,16 +265,27 @@ const OverallView = () => {
     if (loading) {
         return <div>Loading...</div>;
     }
-    const renderSeparatorCell = (sectionIndex: number, categoryIndex: number, type: string) => {
-        const uniqueKey = `separator-${type}-${sectionIndex}-${categoryIndex}-${Date.now()}`;
+    const renderSeparatorCell = (key, type = 'section', rowSpan = 1) => {
+        const separatorWidths = {
+            mini: 'w-1',      // 4px
+            category: 'w-2',  // 8px
+            section: 'w-4'    // 16px
+        };
+
+        const separatorColors = {
+            mini: 'bg-gray-100',
+            category: 'bg-gray-200',
+            section: 'bg-gray-300'
+        };
+
         return (
             <TableCell
-                key={uniqueKey}
-                className="bg-gray-200 w-4 p-0 border-x border-gray-300"
+                key={key}
+                className={`${separatorWidths[type]} ${separatorColors[type]} p-0 border-x border-gray-300`}
+                rowSpan={rowSpan}
             />
         );
     };
-
     const countMissingFields = (row) => {
         const fields = Object.keys(row).filter(key =>
             key !== 'index' &&
@@ -510,19 +538,24 @@ const OverallView = () => {
                                     <TableRow className="bg-yellow-50">
                                         <TableHead className="font-medium">Sec REF</TableHead>
                                         {processedSections.slice(1).map((section, index) => {
-                                            if (section.isSeparator) return renderSeparatorCell(`sec-ref-sep-${index}`);
+                                            if (section.isSeparator) {
+                                                return renderSeparatorCell(`sec-ref-sep-${index}`, 'section');
+                                            }
 
                                             const colSpan = section.categorizedFields?.reduce((total, cat) =>
                                                 total + (cat.isSeparator ? 1 : cat.fields.length), 0);
 
                                             return (
-                                                <TableHead
-                                                    key={`sec-ref-${section.name}`}
-                                                    colSpan={colSpan}
-                                                    className="text-center font-medium bg-yellow-50 border-b border-yellow-200"
-                                                >
-                                                    {index + 1}
-                                                </TableHead>
+                                                <>
+                                                    <TableHead
+                                                        key={`sec-ref-${section.name}`}
+                                                        colSpan={colSpan}
+                                                        className="text-center font-medium bg-yellow-50 border-b border-yellow-200"
+                                                    >
+                                                        {index + 1}
+                                                    </TableHead>
+                                                    {index < processedSections.length - 2 && renderSeparatorCell(`sec-ref-end-${index}`, 'section')}
+                                                </>
                                             );
                                         })}
                                     </TableRow>
@@ -531,7 +564,9 @@ const OverallView = () => {
                                     <TableRow>
                                         <TableHead className="font-medium bg-blue-600 text-white">Section</TableHead>
                                         {processedSections.slice(1).map((section, index) => {
-                                            if (section.isSeparator) return renderSeparatorCell(`section-sep-${index}`);
+                                            if (section.isSeparator) {
+                                                return renderSeparatorCell(`section-sep-${index}`, 'section');
+                                            }
 
                                             const colSpan = section.categorizedFields?.reduce((total, cat) =>
                                                 total + (cat.isSeparator ? 1 : cat.fields.length), 0);
@@ -539,164 +574,250 @@ const OverallView = () => {
                                             const sectionColor = sectionColors[section.name]?.main || 'bg-gray-600';
 
                                             return (
-                                                <TableHead
-                                                    key={`section-${section.name}`}
-                                                    colSpan={colSpan}
-                                                    className={`text-center text-white ${sectionColor}`}
-                                                >
-                                                    {section.label}
-                                                </TableHead>
+                                                <>
+                                                    <TableHead
+                                                        key={`section-${section.name}`}
+                                                        colSpan={colSpan}
+                                                        className={`text-center text-white ${sectionColor}`}
+                                                    >
+                                                        {section.label}
+                                                    </TableHead>
+                                                    {index < processedSections.length - 2 && renderSeparatorCell(`section-end-${index}`, 'section')}
+                                                </>
                                             );
                                         })}
                                     </TableRow>
 
                                     {/* Category Headers */}
                                     <TableRow>
-                                        <TableHead className="font-medium ">Category</TableHead>
+                                        <TableHead className="font-medium">Category</TableHead>
                                         {processedSections.slice(1).map((section, sectionIndex) => {
-                                            if (section.isSeparator) return renderSeparatorCell(`cat-sep-${sectionIndex}`);
+                                            if (section.isSeparator) {
+                                                return renderSeparatorCell(`cat-sep-${sectionIndex}`, 'section');
+                                            }
 
                                             return section.categorizedFields?.map((category, catIndex) => {
-                                                if (category.isSeparator) return renderSeparatorCell(`cat-${sectionIndex}-${catIndex}`);
+                                                if (category.isSeparator) {
+                                                    return renderSeparatorCell(`cat-${sectionIndex}-${catIndex}`, 'category');
+                                                }
 
-                                                const categoryColor = categoryColors[category.category] || { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' };
+                                                // Group fields by subCategory to calculate spans and separators
+                                                const subCategories = category.fields.reduce((acc, field) => {
+                                                    const subCat = field.subCategory || 'default';
+                                                    if (!acc[subCat]) acc[subCat] = [];
+                                                    acc[subCat].push(field);
+                                                    return acc;
+                                                }, {});
 
-                                                return (
-                                                    <TableHead
-                                                        key={`cat-${sectionIndex}-${catIndex}`}
-                                                        colSpan={category.fields.length}
-                                                        className={`text-center ${categoryColor.bg} ${categoryColor.text} ${categoryColor.border}`}
-                                                    >
-                                                        {category.category}
-                                                    </TableHead>
-                                                );
+                                                const categoryColor = categoryColors[category.category] ||
+                                                    { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' };
+
+                                                const totalFields = Object.values(subCategories).reduce((sum, fields) => sum + fields.length, 0);
+                                                const midPoint = Math.floor(totalFields / 2);
+                                                let currentCount = 0;
+
+                                                return Object.entries(subCategories).map(([subCat, fields], subIndex, subArray) => {
+                                                    const cell = (
+                                                        <>
+                                                            <TableHead
+                                                                key={`cat-${sectionIndex}-${catIndex}-${subIndex}`}
+                                                                colSpan={fields.length}
+                                                                className={`text-center align-middle ${categoryColor.bg} ${categoryColor.text} ${categoryColor.border}`}
+                                                            >
+                                                                {currentCount <= midPoint && midPoint < (currentCount + fields.length) ? category.category : ''}
+                                                            </TableHead>
+                                                            {/* Add empty separator cell if not the last subcategory */}
+                                                            {subIndex < subArray.length - 1 && (
+                                                                <TableCell
+                                                                    key={`cat-sep-${sectionIndex}-${catIndex}-${subIndex}`}
+                                                                    className={`p-0 ${categoryColor.bg} ${categoryColor.border}`}
+                                                                />
+                                                            )}
+                                                        </>
+                                                    );
+                                                    currentCount += fields.length;
+                                                    return cell;
+                                                });
                                             });
                                         })}
-                                    </TableRow>
-                                    {/* Column Reference Row */}
+                                    </TableRow>          {/* Column Reference Row */}
                                     <TableRow className="bg-yellow-50">
                                         <TableHead className="font-medium">CLM REF</TableHead>
                                         {(() => {
                                             let columnCounter = 1;
-                                            return processedSections.slice(1).map(section => {
+                                            return processedSections.slice(1).map((section, sectionIndex) => {
                                                 if (section.isSeparator) {
-                                                    return renderSeparatorCell(`col-ref-sep-${columnCounter}`);
+                                                    return renderSeparatorCell(`col-ref-sep-${sectionIndex}`, 'section');
                                                 }
-                                                return section.categorizedFields?.map(category => {
+
+                                                return section.categorizedFields?.map((category, catIndex) => {
                                                     if (category.isSeparator) {
-                                                        return renderSeparatorCell(`col-ref-cat-${columnCounter}`);
+                                                        return renderSeparatorCell(`col-ref-cat-${catIndex}`, 'category');
                                                     }
-                                                    return category.fields.map(field => (
-                                                        <TableHead
-                                                            key={`col-ref-${columnCounter}`}
-                                                            className="text-center font-medium bg-yellow-50 border-b border-yellow-200"
-                                                        >
-                                                            {columnCounter++}
-                                                        </TableHead>
+
+                                                    return category.fields.map((field, fieldIndex, fieldsArray) => (
+                                                        <>
+                                                            <TableHead
+                                                                key={`col-ref-${columnCounter}`}
+                                                                className="text-center font-medium bg-yellow-50 border-b border-yellow-200"
+                                                            >
+                                                                {columnCounter++}
+                                                            </TableHead>
+                                                            {fieldIndex < fieldsArray.length - 1 &&
+                                                                field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                                                                renderSeparatorCell(`col-ref-subcat-${sectionIndex}-${catIndex}-${fieldIndex}`, 'mini')}
+                                                        </>
                                                     ));
                                                 });
                                             });
                                         })()}
                                     </TableRow>
-
-
                                     {/* Column Headers */}
                                     <TableRow>
-                                        {processedSections.map((section, sectionIndex) => {
+                                        <TableHead className="font-medium">Field</TableHead>
+                                        {processedSections.slice(1).map((section, sectionIndex) => {
                                             if (section.isSeparator) {
-                                                return renderSeparatorCell(sectionIndex, 0, 'section');
+                                                return renderSeparatorCell(`col-sep-${sectionIndex}`, 'section');
                                             }
 
-                                            return section.categorizedFields?.map((category, categoryIndex) => {
+                                            return section.categorizedFields?.map((category, catIndex) => {
                                                 if (category.isSeparator) {
-                                                    return renderSeparatorCell(sectionIndex, categoryIndex, 'category');
+                                                    return renderSeparatorCell(`col-cat-${sectionIndex}-${catIndex}`, 'category');
                                                 }
 
-                                                return category.fields.map(field => (
-                                                    <TableHead
-                                                        key={`col-${field.name}`}
-                                                        className={`whitespace-nowrap ${sectionColors[section.name]?.sub || 'bg-gray-500'} text-white`} >
-                                                        {field.label}
-                                                    </TableHead>
+                                                return category.fields.map((field, fieldIndex, fieldsArray) => (
+                                                    <>
+                                                        <TableHead
+                                                            key={`col-${field.name}`}
+                                                            className={`whitespace-nowrap ${sectionColors[section.name]?.sub || 'bg-gray-500'} text-white`}
+                                                        >
+                                                            {field.label}
+                                                        </TableHead>
+                                                        {fieldIndex < fieldsArray.length - 1 &&
+                                                            field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                                                            renderSeparatorCell(`col-subcat-${sectionIndex}-${catIndex}-${fieldIndex}`, 'mini')}
+                                                    </>
                                                 ));
                                             });
                                         })}
                                     </TableRow>
+
                                     {/* Statistics Rows */}
                                     <TableRow className="bg-blue-50">
-
                                         <TableHead className="font-semibold text-blue-900 text-start">Total</TableHead>
-                                        {processedSections.map((section, sectionIndex) => {
-                                            if (section.isSeparator) return renderSeparatorCell(`total-sep-${sectionIndex}-${Date.now()}`);
-                                            if (sectionIndex === 0) return null;
+                                        {processedSections.slice(1).map((section, sectionIndex) => {
+                                            if (section.isSeparator) {
+                                                return renderSeparatorCell(
+                                                    `total-sec-sep-${sectionIndex}`,
+                                                    'section'
+                                                );
+                                            }
 
                                             return section.categorizedFields?.map((category, catIndex) => {
-                                                if (category.isSeparator) return renderSeparatorCell(`total-cat-sep-${sectionIndex}-${catIndex}-${Date.now()}`);
+                                                if (category.isSeparator) {
+                                                    return renderSeparatorCell(
+                                                        `total-cat-sep-${sectionIndex}-${catIndex}`,
+                                                        'category'
+                                                    );
+                                                }
 
-                                                return category.fields.map(field => {
-                                                    const stats = calculateFieldStats(field.name, data);
-                                                    return (
+                                                return category.fields.map((field, fieldIndex, fieldsArray) => (
+                                                    <>
                                                         <TableCell
                                                             key={`total-${field.name}`}
                                                             className="text-center font-medium text-blue-700"
                                                         >
-                                                            {stats.total}
+                                                            {calculateFieldStats(field.name, data).total}
                                                         </TableCell>
-                                                    );
-                                                });
+                                                        {fieldIndex < fieldsArray.length - 1 &&
+                                                            field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                                                            renderSeparatorCell(
+                                                                `total-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}`,
+                                                                'mini'
+                                                            )}
+                                                    </>
+                                                ));
                                             });
                                         })}
                                     </TableRow>
 
                                     <TableRow className="bg-green-50">
-
                                         <TableHead className="font-semibold text-green-900 text-start">Completed</TableHead>
-                                        {processedSections.map((section, sectionIndex) => {
-                                            if (section.isSeparator) return renderSeparatorCell(`completed-sep-${sectionIndex}-${Date.now()}`);
-                                            if (sectionIndex === 0) return null;
+                                        {processedSections.slice(1).map((section, sectionIndex) => {
+                                            if (section.isSeparator) {
+                                                return renderSeparatorCell(
+                                                    `completed-sec-sep-${sectionIndex}`,
+                                                    'section'
+                                                );
+                                            }
 
                                             return section.categorizedFields?.map((category, catIndex) => {
-                                                if (category.isSeparator) return renderSeparatorCell(`completed-cat-sep-${sectionIndex}-${catIndex}-${Date.now()}`);
+                                                if (category.isSeparator) {
+                                                    return renderSeparatorCell(
+                                                        `completed-cat-sep-${sectionIndex}-${catIndex}`,
+                                                        'category'
+                                                    );
+                                                }
 
-                                                return category.fields.map(field => {
-                                                    const stats = calculateFieldStats(field.name, data);
-                                                    return (
+                                                return category.fields.map((field, fieldIndex, fieldsArray) => (
+                                                    <>
                                                         <TableCell
                                                             key={`completed-${field.name}`}
                                                             className="text-center font-medium text-green-700"
                                                         >
-                                                            {stats.completed}
+                                                            {calculateFieldStats(field.name, data).completed}
                                                         </TableCell>
-                                                    );
-                                                });
+                                                        {fieldIndex < fieldsArray.length - 1 &&
+                                                            field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                                                            renderSeparatorCell(
+                                                                `completed-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}`,
+                                                                'mini'
+                                                            )}
+                                                    </>
+                                                ));
                                             });
                                         })}
                                     </TableRow>
 
                                     <TableRow className="bg-red-50">
-
                                         <TableHead className="font-semibold text-red-900 text-start">Pending</TableHead>
-                                        {processedSections.map((section, sectionIndex) => {
-                                            if (section.isSeparator) return renderSeparatorCell(`pending-sep-${sectionIndex}-${Date.now()}`);
-                                            if (sectionIndex === 0) return null;
+                                        {processedSections.slice(1).map((section, sectionIndex) => {
+                                            if (section.isSeparator) {
+                                                return renderSeparatorCell(
+                                                    `pending-sec-sep-${sectionIndex}`,
+                                                    'section'
+                                                );
+                                            }
 
                                             return section.categorizedFields?.map((category, catIndex) => {
-                                                if (category.isSeparator) return renderSeparatorCell(`pending-cat-sep-${sectionIndex}-${catIndex}-${Date.now()}`);
+                                                if (category.isSeparator) {
+                                                    return renderSeparatorCell(
+                                                        `pending-cat-sep-${sectionIndex}-${catIndex}`,
+                                                        'category'
+                                                    );
+                                                }
 
-                                                return category.fields.map(field => {
-                                                    const stats = calculateFieldStats(field.name, data);
-                                                    return (
+                                                return category.fields.map((field, fieldIndex, fieldsArray) => (
+                                                    <>
                                                         <TableCell
                                                             key={`pending-${field.name}`}
                                                             className="text-center font-medium text-red-700"
                                                         >
-                                                            {stats.pending}
+                                                            {calculateFieldStats(field.name, data).pending}
                                                         </TableCell>
-                                                    );
-                                                });
+                                                        {fieldIndex < fieldsArray.length - 1 &&
+                                                            field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                                                            renderSeparatorCell(
+                                                                `pending-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}`,
+                                                                'mini'
+                                                            )}
+                                                    </>
+                                                ));
                                             });
                                         })}
-                                    </TableRow>                                </TableHeader>
+                                    </TableRow>
+                                </TableHeader>
+
                                 <TableBody>
                                     {filteredData.map((companyGroup, groupIndex) => (
                                         companyGroup.rows.map((row, rowIndex) => (
@@ -704,6 +825,7 @@ const OverallView = () => {
                                                 key={`${groupIndex}-${rowIndex}`}
                                                 className="hover:bg-gray-50 transition-colors"
                                             >
+                                                {/* Index cell */}
                                                 {rowIndex === 0 && (
                                                     <TableCell
                                                         className="whitespace-nowrap font-medium"
@@ -712,34 +834,36 @@ const OverallView = () => {
                                                         {groupIndex + 1}
                                                     </TableCell>
                                                 )}
-                                                {/* Skip the first section (index) and start from the first separator */}
+
+                                                {/* Data cells with separators */}
                                                 {processedSections.slice(1).map((section, sectionIndex) => {
                                                     if (section.isSeparator) {
                                                         return rowIndex === 0 && renderSeparatorCell(
-                                                            `body-sep-${groupIndex}-${sectionIndex}`,
-                                                            false,
+                                                            `body-sec-sep-${groupIndex}-${sectionIndex}`,
+                                                            'section',
                                                             companyGroup.rowSpan
                                                         );
                                                     }
 
-                                                    const sectionColor = sectionColors[section.name]?.cell || 'bg-gray-50';
-
-                                                    return section.categorizedFields.map((category, categoryIndex) => {
+                                                    return section.categorizedFields?.map((category, categoryIndex) => {
                                                         if (category.isSeparator) {
                                                             return rowIndex === 0 && renderSeparatorCell(
                                                                 `body-cat-sep-${groupIndex}-${sectionIndex}-${categoryIndex}`,
-                                                                false,
+                                                                'category',
                                                                 companyGroup.rowSpan
                                                             );
                                                         }
 
-                                                        return category.fields.map(field => {
+                                                        return category.fields.map((field, fieldIndex, fieldsArray) => {
+                                                            // Skip company-specific fields for non-first rows
                                                             if (field.name.startsWith('company_') && rowIndex > 0) {
                                                                 return null;
                                                             }
 
+                                                            // Get the field value
                                                             let value = row[field.name];
 
+                                                            // Format value based on field type
                                                             if (field.type === 'boolean') {
                                                                 value = value ? 'Yes' : 'No';
                                                             } else if (field.type === 'date' && value) {
@@ -750,24 +874,42 @@ const OverallView = () => {
                                                                 }
                                                             }
 
-                                                            // Return the appropriate cell based on field name
-                                                            return field.name === 'company_name' ? (
-                                                                <TableCell
-                                                                    key={`${groupIndex}-${rowIndex}-${field.name}`}
-                                                                    className={`whitespace-nowrap ${sectionColor} transition-colors cursor-pointer hover:text-primary`}
-                                                                    onClick={() => handleCompanyClick(row)}
-                                                                    rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
-                                                                >
-                                                                    {value || <span className="text-red-500 font-semibold">Missing</span>}
-                                                                </TableCell>
-                                                            ) : (
-                                                                <TableCell
-                                                                    key={`${groupIndex}-${rowIndex}-${field.name}`}
-                                                                    className={`whitespace-nowrap ${sectionColor} transition-colors`}
-                                                                    rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
-                                                                >
-                                                                    {value || <span className="text-red-500 font-semibold">Missing</span>}
-                                                                </TableCell>
+                                                            const sectionColor = sectionColors[section.name]?.cell || 'bg-gray-50';
+
+                                                            // Add separators between subcategories
+                                                            const isSubCategoryChange = fieldIndex < fieldsArray.length - 1 &&
+                                                                field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory;
+
+                                                            return (
+                                                                <>
+                                                                    <TableCell
+                                                                        key={`${groupIndex}-${rowIndex}-${field.name}`}
+                                                                        className={`whitespace-nowrap ${sectionColor} transition-colors
+                                            ${field.name === 'company_name' ? 'cursor-pointer hover:text-primary' : ''}`}
+                                                                        onClick={field.name === 'company_name' ? () => handleCompanyClick(row) : undefined}
+                                                                        rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
+                                                                    >
+                                                                        {value || <span className="text-red-500 font-semibold">Missing</span>}
+                                                                    </TableCell>
+
+                                                                    {/* <TableCell
+    key={`${groupIndex}-${rowIndex}-${field.name}`}
+    className={`whitespace-nowrap transition-colors
+        ${field.name === 'company_name' ? 'cursor-pointer hover:text-primary' : ''}
+        ${categoryColors[field.category]?.bg || 'bg-gray-50'} 
+        ${categoryColors[field.category]?.text || 'text-gray-700'}
+        ${field.subCategory ? `border-l-2 ${categoryColors[field.category]?.border || 'border-gray-200'}` : ''}`}
+    onClick={field.name === 'company_name' ? () => handleCompanyClick(row) : undefined}
+    rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
+>
+    {value || <span className="text-red-500 font-semibold">Missing</span>}
+</TableCell> */}
+                                                                    {isSubCategoryChange && rowIndex === 0 && renderSeparatorCell(
+                                                                        `body-subcat-sep-${groupIndex}-${sectionIndex}-${categoryIndex}-${fieldIndex}`,
+                                                                        'mini',
+                                                                        companyGroup.rowSpan
+                                                                    )}
+                                                                </>
                                                             );
                                                         });
                                                     });
@@ -775,13 +917,15 @@ const OverallView = () => {
                                             </TableRow>
                                         ))
                                     ))}
+                                    {/* No results message */}
+                                    {filteredData.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={100} className="text-center py-8 text-gray-500">
+                                                No results found for your search criteria
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
                                 </TableBody>
-                                {/* Add a "No results found" message when filtered data is empty */}
-                                {filteredData.length === 0 && (
-                                    <div className="text-center py-8 text-gray-500">
-                                        No results found for your search criteria
-                                    </div>
-                                )}
                             </Table>
                             <ScrollBar orientation="horizontal" />
                         </ScrollArea>
