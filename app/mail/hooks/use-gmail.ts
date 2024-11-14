@@ -344,7 +344,7 @@ export function useGmail() {
 
       const response = await gapi.client.gmail.users.messages.list({
         userId: 'me',
-        maxResults: 50,
+        maxResults: 20,
         pageToken: nextPageToken
       })
 

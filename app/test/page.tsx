@@ -12,8 +12,6 @@ import FilterManager from './FilterManager';
 import settings from './settings.json'; // Import settings from JSON
 import { toast, Toaster } from 'react-hot-toast';
 
-
-
 interface FilterCriteria {
   type: 'from' | 'to' | 'subject' | 'unread' | 'important' | 'bodyContent';
   value: string | boolean;
@@ -47,7 +45,7 @@ const Email = ({ message, accountEmail, onClick }) => {
   const hasAttachments = message.payload.parts?.some(part => part.filename && part.filename.length > 0);
 
   return (
-    <div onClick={() => onClick(message)} className="p-4 border-b hover:bg-gray-50 transition-colors cursor-pointer group">
+    <div onClick={() => onClick(message)} className="p-4 border-b hover:bg-blue-50 transition-colors cursor-pointer group">
       <div className="flex items-start gap-4">
         <div className="flex-shrink-0">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-200 transition-colors">
@@ -622,8 +620,6 @@ export default function GmailManager() {
   // Add state for notifications in GmailManager
   const [notification, setNotification] = useState(null);
 
-
-
   // Add to your GmailManager return statement
   {
     notification && (
@@ -663,38 +659,19 @@ export default function GmailManager() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
+    <div className="min-h-screen bg-gray-100 py-8 flex">
       <Toaster position="top-right" />
 
-      <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 text-center mb-8">
-          Gmail Manager
-        </h1>
-
-        <div className="mb-6 flex items-center gap-4">
-          <div className="flex-1">
-            <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select an account" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Accounts</SelectItem>
-                {accounts.map((account) => (
-                  <SelectItem key={account.email} value={account.email}>
-                    {account.email}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
+      {/* Accounts Section */}
+      <div className="w-1/4 bg-white rounded-lg shadow p-4 mr-4">
+        <h2 className="text-lg font-bold mb-4">Accounts</h2>
+        <div className="flex flex-col gap-2">
           <button
             onClick={addNewAccount}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
             Add Account
           </button>
-
           {accounts.length > 0 && (
             <>
               <button
@@ -714,7 +691,27 @@ export default function GmailManager() {
               )}
             </>
           )}
+          <Select value={selectedAccount} onValueChange={setSelectedAccount} className="mt-4">
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select an account" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Accounts</SelectItem>
+              {accounts.map((account) => (
+                <SelectItem key={account.email} value={account.email}>
+                  {account.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+      </div>
+
+      {/* Main Content Section */}
+      <div className="w-3/4">
+        <h1 className="text-3xl font-bold text-gray-900 text-center mb-8">
+          Gmail Manager
+        </h1>
 
         <div className="mb-4">
           <div className="flex flex-wrap gap-2">
