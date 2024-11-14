@@ -41,7 +41,7 @@ export const formFields = {
             { name: 'cps_sheria_client_effective_to', label: 'Sheria To', type: 'date'  , category: 'Client Category' ,subCategory: 'Sheria-sub '},
             { name: 'cps_sheria_client_status', label: 'Sheria Client Status', type: 'select', options: ['Active', 'Inactive', 'Pending', 'Terminated'], category: 'Client Category' , subCategory: 'Sheria-sub '},
                         
-            { name: 'wh_vat_agent_suppliers', label: 'W/H VAT Agent Suppliers', type: 'text' },
+            { name: 'wh_vat_agent_suppliers', label: 'W/H VAT Agent Suppliers', options: ['YES', 'NO'],  type: 'select' },
             { name: 'wh_vat_agent_customers', label: 'W/H VAT Agent Customers', type: 'text' },
             
             // KRA Details
