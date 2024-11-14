@@ -907,6 +907,7 @@ export function SettingsDialog() {
                 </ScrollArea>
               </CardContent>
             </Card>
+
             {/* Subsections Panel */}
             <Card className="col-span-3 h-[700px]">
               <CardContent className="p-2">
@@ -942,6 +943,7 @@ export function SettingsDialog() {
                 </ScrollArea>
               </CardContent>
             </Card>
+
             {/* Right Panel - Details */}
             <Card className="col-span-4 h-[700px]">
               <CardContent className="p-4">
@@ -1017,7 +1019,10 @@ export function SettingsDialog() {
                                 />
                               ));
                             })}
-                        </div>                      </div>                      {/* Column Mappings */}
+                        </div>                      
+                        </div>                      
+                        
+                        {/* Column Mappings */}
                       <div>
                         <div className="flex justify-between items-center mb-2">
                           <h4 className="font-medium">Column Mappings</h4>
@@ -1408,7 +1413,7 @@ export function SettingsDialog() {
 
         {/* Existing Fields Tab */}
         <div className={addFieldState.selectedTab === 'existing' ? 'grid grid-cols-2 gap-4 py-4' : 'hidden'}>
-          {/* Tables Selection */}
+                {/* Tables Selection */}
           <div className="border rounded-lg p-4">
             <h4 className="font-medium mb-2">Select Tables</h4>
             <ScrollArea className="h-[400px]">
@@ -1416,20 +1421,20 @@ export function SettingsDialog() {
                 <div key={table} className="flex items-center gap-2 p-2 hover:bg-gray-50">
                   <input
                     type="checkbox"
-                    id={`field-table-${table}`}
-                    checked={addFieldState.selectedTables.includes(table)}
+                    id={`table-${table}`}
+                    checked={selectedTables.includes(table)}
                     onChange={(e) => {
                       const newSelection = e.target.checked
-                        ? [...addFieldState.selectedTables, table]
-                        : addFieldState.selectedTables.filter(t => t !== table);
-                      setAddFieldState(prev => ({ ...prev, selectedTables: newSelection }));
-                      if (e.target.checked) {
-                        fetchFieldsForTables([table]);
+                        ? [...selectedTables, table]
+                        : selectedTables.filter(t => t !== table);
+                      setSelectedTables(newSelection);
+                      if (newSelection.length > 0) {
+                        fetchFieldsForTables(newSelection);
                       }
                     }}
                     className="h-4 w-4"
                   />
-                  <label htmlFor={`field-table-${table}`}>{table}</label>
+                  <label htmlFor={`table-${table}`}>{table}</label>
                 </div>
               ))}
             </ScrollArea>
@@ -1439,33 +1444,39 @@ export function SettingsDialog() {
           <div className="border rounded-lg p-4">
             <h4 className="font-medium mb-2">Select Fields</h4>
             <ScrollArea className="h-[400px]">
-              {addFieldState.selectedTables.map(table => (
+              {availableFields.map(({ table, fields }) => (
                 <div key={table} className="mb-4">
                   <h5 className="font-medium text-sm text-gray-700 mb-2">{table}</h5>
-                  {availableFields
-                    .find(t => t.table === table)
-                    ?.fields.map(field => (
+                  {fields.map(field => {
+                    const isInSection = newStructure.section && 
+                      sectionFields[newStructure.section]?.fields.includes(field.column_name);
+                    const isInSubsection = newStructure.subsection && 
+                      sectionFields[newStructure.section]?.subsections[newStructure.subsection]?.includes(field.column_name);
+                    
+                    return (
                       <div key={`${table}-${field.column_name}`} className="flex items-center gap-2 p-2 hover:bg-gray-50">
                         <input
                           type="checkbox"
                           id={`field-${table}-${field.column_name}`}
-                          checked={addFieldState.selectedFields[table]?.includes(field.column_name) || false}
+                          checked={selectedTableFields[table]?.includes(field.column_name) || false}
                           onChange={(e) => {
-                            setAddFieldState(prev => ({
+                            setSelectedTableFields(prev => ({
                               ...prev,
-                              selectedFields: {
-                                ...prev.selectedFields,
-                                [table]: e.target.checked
-                                  ? [...(prev.selectedFields[table] || []), field.column_name]
-                                  : (prev.selectedFields[table] || []).filter(f => f !== field.column_name)
-                              }
+                              [table]: e.target.checked
+                                ? [...(prev[table] || []), field.column_name]
+                                : (prev[table] || []).filter(f => f !== field.column_name)
                             }));
                           }}
                           className="h-4 w-4"
                         />
-                        <label htmlFor={`field-${table}-${field.column_name}`}>{field.column_name}</label>
+                        <label htmlFor={`field-${table}-${field.column_name}`}>
+                          {field.column_name}
+                          {isInSection && <span className="ml-2 text-blue-500">(In Section)</span>}
+                          {isInSubsection && <span className="ml-2 text-green-500">(In Subsection)</span>}
+                        </label>
                       </div>
-                    ))}
+                    );
+                  })}
                 </div>
               ))}
             </ScrollArea>

@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { CompanyTaxTable, DirectorsTable, ComplianceTable, NSSFTable, NHIFTable, EmployeesTable, BankingTable, PAYETable, VATTable, NITATable, HousingLevyTable, TourismLevyTable, StandardLevyTable, ClientCategoryTable, SheriaDetailsTable, ECitizenTable, TaxStatusTable, CompanyGeneralTable } from './tableComponents';
+import { CompanyTaxTable, DirectorsTable, ComplianceTable, NSSFTable, NHIFTable, EmployeesTable, BankingTable, PAYETable, VATTable, NITATable, HousingLevyTable, TourismLevyTable, StandardLevyTable, ClientCategoryTable, SheriaDetailsTable, ECitizenTable, TaxStatusTable, CompanyGeneralTable } from '../components/tableComponents';
 import { Button } from '@/components/ui/button';
 import { Download, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -1298,7 +1298,7 @@ const OverallView = () => {
             console.log('Transformed Data:', transformedData);
 
             for (const data of transformedData) {
-                if (!data.mainCompany?.registration_number) {
+                if (!data.mainCompany?.company_name) {
                     console.warn('Skipping record with missing registration number:', data);
                     continue;
                 }
@@ -1307,7 +1307,7 @@ const OverallView = () => {
                     // Upsert main company data using registration_number as unique key
                     const { data: companyData, error: companyError } = await supabase
                         .from('acc_portal_company_duplicate')
-                        .upsert([data.mainCompany], { onConflict: ['registration_number'] });
+                        .upsert([data.mainCompany], { onConflict: ['company_name'] });
 
 
                     if (companyError) {
