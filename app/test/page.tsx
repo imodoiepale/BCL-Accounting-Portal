@@ -110,7 +110,7 @@ const EmailList = ({ messages, onLoadMore, hasMore, loading, onEmailClick }) => 
   }
 
   return (
-    <div className="bg-white rounded-lg shadow divide-y">
+    <div className="bg-white rounded-lg shadow divide-y overflow-y-auto max-h-[60vh]">
       {messages.map((message, index) => {
         if (index === messages.length - 1) {
           return (
@@ -164,6 +164,7 @@ export default function GmailManager() {
   const [showPopup, setShowPopup] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(null);
   const [showFilterManager, setShowFilterManager] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(''); // State for search query
 
   const CLIENT_ID = '342538819907-2v86oir8ip9m4nvurqs6g4j1ohsqc2sg.apps.googleusercontent.com';
   const API_KEY = 'AIzaSyCAtdOy5Tj8Orjm4HM5LlwOl8bWEf2-81c';
@@ -658,12 +659,24 @@ export default function GmailManager() {
     return parseInt(b.internalDate) - parseInt(a.internalDate);
   });
 
+  // Filter messages based on search query
+  const searchFilteredMessages = finalMessages.filter(message => {
+    const subject = message.payload.headers.find(header => header.name === 'Subject')?.value || '';
+    const from = message.payload.headers.find(header => header.name === 'From')?.value || '';
+    const snippet = message.snippet || '';
+    return (
+      subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      from.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      snippet.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
+
   return (
     <div className="min-h-screen bg-gray-100 py-8 flex">
       <Toaster position="top-right" />
 
       {/* Accounts Section */}
-      <div className="w-1/4 bg-white rounded-lg shadow p-4 mr-4">
+      <div className="w-1/4 sticky top-0 bg-white rounded-lg shadow p-4 mr-4">
         <h2 className="text-lg font-bold mb-4">Accounts</h2>
         <div className="flex flex-col gap-2">
           <button
@@ -709,53 +722,73 @@ export default function GmailManager() {
 
       {/* Main Content Section */}
       <div className="w-3/4">
-        <h1 className="text-3xl font-bold text-gray-900 text-center mb-8">
-          Gmail Manager
-        </h1>
+        <div className="sticky top-0 bg-white z-10 shadow">
+          <h1 className="text-3xl font-bold text-gray-900 text-center mb-8">
+            Gmail Manager
+          </h1>
 
-        <div className="mb-4">
-          <div className="flex flex-wrap gap-2">
-            {filters.map((filter) => (
-              <button
-                key={filter.name}
-                onClick={() => setSelectedFilter(filter.name)}
-                className={`px-4 py-2 rounded-lg ${selectedFilter === filter.name
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  } transition-colors`}
-              >
-                <div className="flex items-center gap-2">
-                  <span>{filter.name}</span>
-                  {filter.criteria.length > 0 && (
-                    <Badge variant="secondary" className="bg-opacity-20">
-                      {filter.criteria.length}
-                    </Badge>
-                  )}
-                </div>
-              </button>
-            ))}
+          <div className="mb-4 flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Search emails..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="border rounded-lg p-2 w-100px"
+            />
             <button
-              onClick={() => setShowFilterManager(true)}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              Manage Filters
-            </button>
-            <button
-              onClick={resetFilters}
+              onClick={() => setSearchQuery('')}
               className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
             >
-              Reset Filters
+              Clear
             </button>
+          </div>
+
+          <div className="mb-4">
+            <div className="flex flex-wrap gap-2">
+              {filters.map((filter) => (
+                <button
+                  key={filter.name}
+                  onClick={() => setSelectedFilter(filter.name)}
+                  className={`px-4 py-2 rounded-lg ${selectedFilter === filter.name
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    } transition-colors`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>{filter.name}</span>
+                    {filter.criteria.length > 0 && (
+                      <Badge variant="secondary" className="bg-opacity-20">
+                        {filter.criteria.length}
+                      </Badge>
+                    )}
+                  </div>
+                </button>
+              ))}
+              <button
+                onClick={() => setShowFilterManager(true)}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Manage Filters
+              </button>
+              <button
+                onClick={resetFilters}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Reset Filters
+              </button>
+            </div>
           </div>
         </div>
 
-        <EmailList
-          messages={finalMessages}
-          onLoadMore={loadMore}
-          hasMore={hasMore}
-          loading={loading}
-          onEmailClick={handleEmailClick}
-        />
+        <div className="overflow-y-auto max-h-[60vh]">
+          <EmailList
+            messages={searchFilteredMessages} // Use the filtered messages based on search
+            onLoadMore={loadMore}
+            hasMore={hasMore}
+            loading={loading}
+            onEmailClick={handleEmailClick}
+          />
+        </div>
 
         {showPopup && currentMessage && (
           <EmailPopup
