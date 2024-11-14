@@ -638,6 +638,88 @@ export function Mail({
     return messages.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate))
   }, [accounts, searchQuery, activeTab, customFilters])
 
+
+
+  const handleReply = async (message, replyContent) => {
+    try {
+      // Get the necessary headers from the original message
+      const getHeader = (headers, name) => {
+        return headers.find(header => header.name === name)?.value || '';
+      };
+      
+      const originalFrom = getHeader(message.payload.headers, 'From');
+      const originalSubject = getHeader(message.payload.headers, 'Subject');
+      const originalMessageId = getHeader(message.payload.headers, 'Message-ID');
+      const originalReferences = getHeader(message.payload.headers, 'References');
+      
+      // Construct the reply subject
+      const replySubject = originalSubject.startsWith('Re:') 
+        ? originalSubject 
+        : `Re: ${originalSubject}`;
+  
+      // Construct the reply-to email address
+      const replyTo = originalFrom.match(/<(.+)>/) 
+        ? originalFrom.match(/<(.+)>/)[1] 
+        : originalFrom;
+  
+      // Create the email content in MIME format
+      const emailContent = [
+        'Content-Type: text/plain; charset="UTF-8"',
+        'MIME-Version: 1.0',
+        `To: ${replyTo}`,
+        `Subject: ${replySubject}`,
+        `In-Reply-To: ${originalMessageId}`,
+        `References: ${originalReferences ? originalReferences + ' ' : ''}${originalMessageId}`,
+        '',
+        replyContent,
+        '',
+        '---Original Message---',
+        `From: ${originalFrom}`,
+        `Subject: ${originalSubject}`,
+        `${message.snippet}...`
+      ].join('\r\n');
+  
+      // Encode the email content in base64URL format
+      const encodedMessage = btoa(emailContent)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+  
+      // Get the account that received the original message
+      const account = accounts.find(acc => acc.email === message.accountEmail);
+      if (!account) {
+        throw new Error('Account not found');
+      }
+  
+      // Set the token for the correct account
+      gapi.client.setToken(account.token);
+  
+      // Send the reply using Gmail API
+      const response = await gapi.client.gmail.users.messages.send({
+        userId: 'me',
+        resource: {
+          raw: encodedMessage,
+          threadId: message.threadId
+        }
+      });
+  
+      if (response.status === 200) {
+        // Refresh messages after successful reply
+        await fetchMessages(message.accountEmail);
+        
+        // Show success notification (you'll need to implement this)
+        toast.success('Reply sent to successfully!');
+      } else {
+        throw new Error('Failed to send reply');
+      }
+  
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      // Show error notification (you'll need to implement this)
+      toast.error('Failed to send reply');
+    }
+  };
+
   const handleMailActions = {
     reply: (message: string) => {
       if (selectedMail) {
@@ -817,7 +899,7 @@ export function Mail({
         <ResizablePanel defaultSize={defaultLayout[2]} minSize={30}>
           <MailDisplay
             mail={selectedMail}
-            onReply={handleMailActions.reply}
+            handleReply={handleMailActions.handleReply}
             onForward={handleMailActions.forward}
             onDelete={handleMailActions.delete}
             onArchive={handleMailActions.archive}
