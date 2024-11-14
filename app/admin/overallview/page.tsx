@@ -19,7 +19,7 @@ import { Search, Filter, X } from 'lucide-react';
 import { groupFieldsByCategory, groupDataByCategory, calculateFieldStats, handleExport, handleFileImport, calculateTotalFields, calculatePendingFields, calculateCompletedFields } from './components/utility';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SettingsDialog } from './components/settingsDialog';
-
+import { MissingFieldsDialog, getMissingFields } from './components/missingFieldsDialog';
 
 function generateReferenceNumbers(sections) {
     let sectionCounter = 1;
@@ -85,6 +85,8 @@ const OverallView = () => {
     const { filteredData, globalFilter, handleGlobalSearch, columnVisibility, toggleColumnVisibility, sectionVisibility, toggleSectionVisibility, categoryVisibility, toggleCategoryVisibility, getVisibleColumns, resetAll } = useTableFunctionalities(data);
     const [selectedCompany, setSelectedCompany] = useState(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [selectedMissingFields, setSelectedMissingFields] = useState(null);
+    const [isMissingFieldsOpen, setIsMissingFieldsOpen] = useState(false);
 
     // Add search input
     const searchInput = (
@@ -265,6 +267,7 @@ const OverallView = () => {
     if (loading) {
         return <div>Loading...</div>;
     }
+
     const renderSeparatorCell = (key, type = 'section', rowSpan = 1) => {
         const separatorWidths = {
             mini: 'w-1',      // 4px
@@ -286,6 +289,7 @@ const OverallView = () => {
             />
         );
     };
+
     const countMissingFields = (row) => {
         const fields = Object.keys(row).filter(key =>
             key !== 'index' &&
@@ -470,8 +474,8 @@ const OverallView = () => {
         });
         setData(newData);
     };
-    return (
 
+    return (
         <Tabs defaultValue="overview" className="w-full space-y-4">
             <TabsList className="grid w-full grid-cols-10 bg-gray-100 rounded-lg p-1">
                 <TabsTrigger value="overview" className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors">Overview</TabsTrigger>
@@ -528,7 +532,6 @@ const OverallView = () => {
                     </div>
                 </div>
 
-
                 <Card>
                     <CardContent className="p-0">
                         <ScrollArea className="h-[900px] rounded-md border">
@@ -537,6 +540,7 @@ const OverallView = () => {
                                     {/* Section Reference Row */}
                                     <TableRow className="bg-yellow-50">
                                         <TableHead className="font-medium">Sec REF</TableHead>
+                                        <TableHead className="text-center font-medium bg-yellow-50 border-b border-yellow-200">0</TableHead>
                                         {processedSections.slice(1).map((section, index) => {
                                             if (section.isSeparator) {
                                                 return renderSeparatorCell(`sec-ref-sep-${index}`, 'section');
@@ -563,6 +567,7 @@ const OverallView = () => {
                                     {/* Section Headers */}
                                     <TableRow>
                                         <TableHead className="font-medium bg-blue-600 text-white">Section</TableHead>
+                                        <TableHead className="text-center text-white bg-red-600">Missing Fields</TableHead>
                                         {processedSections.slice(1).map((section, index) => {
                                             if (section.isSeparator) {
                                                 return renderSeparatorCell(`section-sep-${index}`, 'section');
@@ -591,6 +596,7 @@ const OverallView = () => {
                                     {/* Category Headers */}
                                     <TableRow>
                                         <TableHead className="font-medium">Category</TableHead>
+                                        <TableHead className="text-center bg-red-50 text-red-700">Per Row</TableHead>
                                         {processedSections.slice(1).map((section, sectionIndex) => {
                                             if (section.isSeparator) {
                                                 return renderSeparatorCell(`cat-sep-${sectionIndex}`, 'section');
@@ -640,9 +646,12 @@ const OverallView = () => {
                                                 });
                                             });
                                         })}
-                                    </TableRow>          {/* Column Reference Row */}
+                                    </TableRow>
+
+                                    {/* Column Reference Row */}
                                     <TableRow className="bg-yellow-50">
                                         <TableHead className="font-medium">CLM REF</TableHead>
+                                        <TableHead className="text-center font-medium bg-yellow-50 border-b border-yellow-200">-</TableHead>
                                         {(() => {
                                             let columnCounter = 1;
                                             return processedSections.slice(1).map((section, sectionIndex) => {
@@ -675,6 +684,7 @@ const OverallView = () => {
                                     {/* Column Headers */}
                                     <TableRow>
                                         <TableHead className="font-medium">Field</TableHead>
+                                        <TableHead className="whitespace-nowrap bg-red-500 text-white">Missing Count</TableHead>
                                         {processedSections.slice(1).map((section, sectionIndex) => {
                                             if (section.isSeparator) {
                                                 return renderSeparatorCell(`col-sep-${sectionIndex}`, 'section');
@@ -705,7 +715,9 @@ const OverallView = () => {
                                     {/* Statistics Rows */}
                                     <TableRow className="bg-blue-50">
                                         <TableHead className="font-semibold text-blue-900 text-start">Total</TableHead>
-                                        {processedSections.slice(1).map((section, sectionIndex) => {
+                                        <TableCell className="text-center font-medium text-blue-700">
+                                            {Object.values(data).reduce((sum, company) => sum + getMissingFields(company.rows[0]).length, 0)}
+                                        </TableCell> {processedSections.slice(1).map((section, sectionIndex) => {
                                             if (section.isSeparator) {
                                                 return renderSeparatorCell(
                                                     `total-sec-sep-${sectionIndex}`,
@@ -743,6 +755,7 @@ const OverallView = () => {
 
                                     <TableRow className="bg-green-50">
                                         <TableHead className="font-semibold text-green-900 text-start">Completed</TableHead>
+                                        <TableCell className="text-center font-medium text-green-700">-</TableCell>
                                         {processedSections.slice(1).map((section, sectionIndex) => {
                                             if (section.isSeparator) {
                                                 return renderSeparatorCell(
@@ -781,6 +794,7 @@ const OverallView = () => {
 
                                     <TableRow className="bg-red-50">
                                         <TableHead className="font-semibold text-red-900 text-start">Pending</TableHead>
+                                        <TableCell className="text-center font-medium text-red-700">-</TableCell>
                                         {processedSections.slice(1).map((section, sectionIndex) => {
                                             if (section.isSeparator) {
                                                 return renderSeparatorCell(
@@ -833,6 +847,30 @@ const OverallView = () => {
                                                     >
                                                         {groupIndex + 1}
                                                     </TableCell>
+                                                )}
+
+                                                {rowIndex === 0 && (
+                                                    <>
+                                                        {renderSeparatorCell(`first-separator-${groupIndex}`, 'section', companyGroup.rowSpan)}
+                                                        <TableCell
+                                                            className="whitespace-nowrap cursor-pointer hover:bg-gray-100"
+                                                            rowSpan={companyGroup.rowSpan}
+                                                            onClick={() => {
+                                                                setSelectedMissingFields({
+                                                                    ...companyGroup.company,
+                                                                    missingFields: getMissingFields(row)
+                                                                });
+                                                                setIsMissingFieldsOpen(true);
+                                                            }}
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium text-red-600">
+                                                                    {getMissingFields(row).length}
+                                                                </span>
+                                                                <span>Missing Fields</span>
+                                                            </div>
+                                                        </TableCell>
+                                                    </>
                                                 )}
 
                                                 {/* Data cells with separators */}
@@ -893,17 +931,17 @@ const OverallView = () => {
                                                                     </TableCell>
 
                                                                     {/* <TableCell
-    key={`${groupIndex}-${rowIndex}-${field.name}`}
-    className={`whitespace-nowrap transition-colors
-        ${field.name === 'company_name' ? 'cursor-pointer hover:text-primary' : ''}
-        ${categoryColors[field.category]?.bg || 'bg-gray-50'} 
-        ${categoryColors[field.category]?.text || 'text-gray-700'}
-        ${field.subCategory ? `border-l-2 ${categoryColors[field.category]?.border || 'border-gray-200'}` : ''}`}
-    onClick={field.name === 'company_name' ? () => handleCompanyClick(row) : undefined}
-    rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
->
-    {value || <span className="text-red-500 font-semibold">Missing</span>}
-</TableCell> */}
+                                                                        key={`${groupIndex}-${rowIndex}-${field.name}`}
+                                                                        className={`whitespace-nowrap transition-colors
+                                                                            ${field.name === 'company_name' ? 'cursor-pointer hover:text-primary' : ''}
+                                                                            ${categoryColors[field.category]?.bg || 'bg-gray-50'} 
+                                                                            ${categoryColors[field.category]?.text || 'text-gray-700'}
+                                                                            ${field.subCategory ? `border-l-2 ${categoryColors[field.category]?.border || 'border-gray-200'}` : ''}`}
+                                                                        onClick={field.name === 'company_name' ? () => handleCompanyClick(row) : undefined}
+                                                                        rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
+                                                                    >
+                                                                        {value || <span className="text-red-500 font-semibold">Missing</span>}
+                                                                    </TableCell> */}
                                                                     {isSubCategoryChange && rowIndex === 0 && renderSeparatorCell(
                                                                         `body-subcat-sep-${groupIndex}-${sectionIndex}-${categoryIndex}-${fieldIndex}`,
                                                                         'mini',
@@ -937,6 +975,14 @@ const OverallView = () => {
                         isOpen={isEditDialogOpen}
                         onClose={() => setIsEditDialogOpen(false)}
                         companyData={selectedCompany}
+                        onSave={handleEditSave}
+                    />
+                )}
+                {selectedMissingFields && (
+                    <MissingFieldsDialog
+                        isOpen={isMissingFieldsOpen}
+                        onClose={() => setIsMissingFieldsOpen(false)}
+                        companyData={selectedMissingFields}
                         onSave={handleEditSave}
                     />
                 )}
