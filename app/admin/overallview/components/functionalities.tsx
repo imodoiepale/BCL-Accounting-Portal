@@ -11,7 +11,7 @@ import { formFields } from '../formfields';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "sonner";
 
-export function CompanyEditDialog({ isOpen, onClose, companyData, onSave }) {
+export function CompanyEditDialog({ isOpen, onClose, companyData, onSave,references  }) {
     const [editedData, setEditedData] = useState({});
     const [loading, setLoading] = useState(false);
 
@@ -118,7 +118,7 @@ export function CompanyEditDialog({ isOpen, onClose, companyData, onSave }) {
               supabase.from('acc_portal_clerk_users_duplicate').select('*').eq('company_name', companyData.company_name),
               supabase.from('nssf_companies_duplicate').select('*').eq('company_name', companyData.company_name),
               supabase.from('nhif_companies_duplicate2').select('*').eq('company_name', companyData.company_name),
-              supabase.from('ecitizen_companies_duplicate').select('*').eq('company_name', companyData.company_name),
+              supabase.from('ecitizen_companies_duplicate').select('*').eq('name', companyData.company_name),
               supabase.from('etims_companies_duplicate').select('*').eq('company_name', companyData.company_name)
           ]);
   
@@ -147,75 +147,63 @@ export function CompanyEditDialog({ isOpen, onClose, companyData, onSave }) {
       }
   };
   
-      const renderField = (field) => {
-        const value = editedData[field.name] || '';
-      
-        if (field.type === 'select' && field.options) {
-            return (
-                <div key={field.name} className="flex flex-col gap-2 mb-4">
-                    <Label htmlFor={field.name} className="text-sm font-medium">
-                        {field.label}
-                    </Label>
-                    <select
-                        id={field.name}
-                        value={value}
-                        onChange={(e) => handleInputChange(field.name, e.target.value)}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2"
-                    >
-                        <option value="">Select {field.label}</option>
-                        {field.options.map((option) => (
-                            <option key={option} value={option}>
-                                {option.charAt(0).toUpperCase() + option.slice(1)}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            );
+  const renderField = (field, references) => {
+    const value = editedData[field.name] || '';
+    const fieldReference = references[field.name];
+
+    return (
+        <div key={field.name} className="flex flex-col gap-2 mb-4">
+            <Label htmlFor={field.name} className="text-sm font-medium flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-500">[{fieldReference}]</span>
+                {field.label}
+            </Label>
+            <Input
+                id={field.name}
+                type={field.type === 'date' ? 'date' : 'text'}
+                value={value}
+                onChange={(e) => handleInputChange(field.name, e.target.value)}
+                className="w-full"
+            />
+        </div>
+    );
+};
+
+
+const renderFieldsByCategory = () => {
+    let sectionCounter = 1;
+    let columnCounter = 1;
+
+    const categorizedFields = {};
+    formFields.companyDetails.fields.forEach(field => {
+        const category = field.category || 'General Information';
+        if (!categorizedFields[category]) {
+            categorizedFields[category] = [];
         }
-  
+        categorizedFields[category].push(field);
+    });
+
+    return Object.entries(categorizedFields).map(([category, fields], index, array) => {
+        const sectionRef = sectionCounter++;
+        
         return (
-            <div key={field.name} className="flex flex-col gap-2 mb-4">
-                <Label htmlFor={field.name} className="text-sm font-medium">
-                    {field.label}
-                </Label>
-                <Input
-                    id={field.name}
-                    type={field.type === 'date' ? 'date' : 'text'}
-                    value={field.type === 'date' ? (value && !isNaN(new Date(value).getTime()) ? new Date(value).toISOString().split('T')[0] : '') : value}
-                    onChange={(e) => handleInputChange(field.name, e.target.value)}
-                    className="w-full"
-                />
+            <div key={category} className="rounded-lg bg-gray-50 p-6">
+                <div className="mb-6">
+                    <div className="flex items-center space-x-2 mb-6">
+                        <div className="h-8 w-1 bg-primary rounded-full"></div>
+                        <h3 className="text-xl font-bold text-primary">{category}</h3>
+                    </div>
+                    <div className="grid grid-cols-4 gap-4 bg-white p-4 rounded-md shadow-sm">
+                        {fields.map(field => renderField(field, sectionRef, columnCounter++))}
+                    </div>
+                </div>
+                {index < array.length - 1 && (
+                    <div className="border-b-2 border-gray-200 my-8"></div>
+                )}
             </div>
         );
-    };  
+    });
+};
 
-      const renderFieldsByCategory = () => {
-          const categorizedFields = {};
-          formFields.companyDetails.fields.forEach(field => {
-              const category = field.category || 'General Information';
-              if (!categorizedFields[category]) {
-                  categorizedFields[category] = [];
-              }
-              categorizedFields[category].push(field);
-          });
-
-          return Object.entries(categorizedFields).map(([category, fields], index, array) => (
-              <div key={category} className="rounded-lg bg-gray-50 p-6">
-                  <div className="mb-6">
-                      <div className="flex items-center space-x-2 mb-6">
-                          <div className="h-8 w-1 bg-primary rounded-full"></div>
-                          <h3 className="text-xl font-bold text-primary">{category}</h3>
-                      </div>
-                      <div className="grid grid-cols-4 gap-4 bg-white p-4 rounded-md shadow-sm">
-                          {fields.map(field => renderField(field))}
-                      </div>
-                  </div>
-                  {index < array.length - 1 && (
-                      <div className="border-b-2 border-gray-200 my-8"></div>
-                  )}
-              </div>
-          ));
-      };
       return (
           <Dialog open={isOpen} onOpenChange={onClose}>
               <DialogContent className="max-w-[95vw] max-h-[90vh] p-8">
