@@ -1,7 +1,7 @@
 /* eslint-disable react/jsx-key */
 // @ts-nocheck
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { formFields } from './formfields';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,6 +20,7 @@ import { groupFieldsByCategory, groupDataByCategory, calculateFieldStats, handle
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SettingsDialog } from './components/settingsDialog';
 import { MissingFieldsDialog, getMissingFields } from './components/missingFieldsDialog';
+import { Input } from "@/components/ui/input";
 
 function generateReferenceNumbers(sections) {
     let sectionCounter = 1;
@@ -116,6 +117,7 @@ const OverallView = () => {
     };
     const categoryColors = {
         'General Information': { bg: 'bg-blue-100', text: 'text-slate-700', border: 'border-slate-200' },
+        'Bcl take over Details': { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
         'KRA Details': { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
         'PIN Details': { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' },
         'NSSF Details': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
@@ -143,6 +145,266 @@ const OverallView = () => {
         'Acc': { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' }
     };
 
+    const getTableInfo = (fieldName) => {
+        // Default table info
+        const defaultInfo = {
+            table: 'acc_portal_company_duplicate',
+            idColumn: 'id',
+            useCompanyName: false,
+            useId: true
+        };
+    
+        // Mapping of field prefixes to their respective tables
+        const tableMapping = {
+            'nssf_': {
+                table: 'nssf_companies_duplicate',
+                idColumn: 'company_name',
+                useCompanyName: true
+            },
+            'nhif_': {
+                table: 'nhif_companies_duplicate2',
+                idColumn: 'company_name',
+                useCompanyName: true
+            },
+            'ecitizen_': {
+                table: 'ecitizen_companies_duplicate',
+                idColumn: 'name',
+                useCompanyName: true
+            },
+            'etims_': {
+                table: 'etims_companies_duplicate',
+                idColumn: 'company_name',
+                useCompanyName: true
+            }
+        };
+    
+        // Check if field belongs to a specific table
+        for (const [prefix, info] of Object.entries(tableMapping)) {
+            if (fieldName.startsWith(prefix)) {
+                return info;
+            }
+        }
+    
+        // Return default if no specific mapping found
+        return defaultInfo;
+    };
+
+    const getTableMapping = (fieldName) => {
+        const mappings = {
+            // Company table fields
+            company_: {
+                table: 'acc_portal_company_duplicate',
+                idField: 'company_name',
+                matchField: 'company_name'
+            },
+            // NSSF fields
+            nssf_: {
+                table: 'nssf_companies_duplicate',
+                idField: 'company_name',
+                matchField: 'company_name'
+            },
+            // NHIF fields
+            nhif_: {
+                table: 'nhif_companies_duplicate2',
+                idField: 'company_name',
+                matchField: 'company_name'
+            },
+            // eCitizen fields
+            ecitizen_: {
+                table: 'ecitizen_companies_duplicate',
+                idField: 'name',
+                matchField: 'name'
+            },
+            // etims fields
+            etims_: {
+                table: 'etims_companies_duplicate',
+                idField: 'company_name',
+                matchField: 'company_name'
+            }
+        };
+
+        // Find matching prefix
+        const prefix = Object.keys(mappings).find(p => fieldName.startsWith(p));
+        return prefix ? mappings[prefix] : mappings.company_;
+    };
+
+    // Create a new EditableCell component
+    const EditableCell = ({ value: initialValue, onSave, fieldName, rowId, companyName, className, field }) => {
+        const [isEditing, setIsEditing] = useState(false);
+        const [editValue, setEditValue] = useState(initialValue);
+        const inputRef = useRef(null);
+    
+        useEffect(() => {
+            setEditValue(initialValue);
+        }, [initialValue]);
+    
+        const handleSave = async () => {
+            if (editValue !== initialValue) {
+                try {
+                    // Step 1: Check if the company exists in the first table (acc_portal_company_duplicate)
+                    const { data: companyData, error: companyError } = await supabase
+                        .from('acc_portal_company_duplicate')
+                        .select('company_name')
+                        .eq('company_name', companyName)
+                        .single(); // Fetch one record
+        
+                    if (companyError || !companyData) {
+                        console.log(`Company not found in acc_portal_company_duplicate: ${companyName}`);
+                        toast.error(`Company "${companyName}" not found.`);
+                        return;
+                    }
+        
+                    console.log(`Company found in acc_portal_company_duplicate: ${companyName}`);
+        
+                    // Step 2: List of tables to check (if needed, add more tables here)
+                    const tables = ['acc_portal_company_duplicate', 'etims_companies_duplicate', 'PasswordChecker_duplicate','nssf_companies_duplicate', 'ecitizen_companies_duplicate','nhif_companies_duplicate2']; // Add more as needed
+        
+                    let fieldFound = false;
+        
+                    // Step 3: Iterate over tables to find the field and update it
+                    for (const table of tables) {
+                        // Query the table for the company name and check for the field
+                        const { data, error } = await supabase
+                            .from(table)
+                            .select('*')
+                            .eq(table === 'ecitizen_companies_duplicate' ? 'name' : 'company_name', companyName)
+                            .single(); // Fetch one record
+        
+                        if (error || !data) {
+                            console.log(`Field ${fieldName} not found in table: ${table}`);
+                            continue; // Skip to next table if the company isn't found
+                        }
+        
+                        // Step 4: Check if the field exists in the fetched data
+                        if (data.hasOwnProperty(fieldName)) {
+                            console.log(`Field ${fieldName} found in table: ${table}`);
+                            // Update the field
+                            const { data: updateData, error: updateError } = await supabase
+                                .from(table)
+                                .update({ [fieldName]: editValue })
+                                .eq(table === 'ecitizen_companies_duplicate' ? 'name' : 'company_name', companyName);
+        
+                            if (updateError) {
+                                throw updateError;
+                            }
+        
+                            console.log(`Updated field ${fieldName} in table: ${table}`);
+                            setEditValue(editValue); // Trigger local state update after successful update
+                            fieldFound = true;
+                            onSave(editValue); // Call onSave to trigger data refresh
+                            setIsEditing(false);
+                            break; // Stop searching once the field is updated
+                        } else {
+                            console.log(`Field ${fieldName} not found in table: ${table}`);
+                        }
+                    }
+        
+                    // Step 5: If the field is not found in any of the tables
+                    if (!fieldFound) {
+                        console.log(`Field ${fieldName} not found in any table.`);
+                        toast.error(`Field "${fieldName}" not found in any table.`);
+                    }
+                } catch (error) {
+                    console.error('Error during update operation:', error);
+                    toast.error('Update failed due to an unexpected error');
+                    setEditValue(initialValue); // Reset to initial value on error
+                }
+            }
+        };
+        
+                        // Function to check if the field exists in the given table
+        const checkFieldInTable = async (table, fieldName) => {
+            // Fetch the table schema (for Supabase, you can use the `information_schema.columns` table)
+            const { data, error } = await supabase
+                .from('information_schema.columns')
+                .select('column_name')
+                .eq('table_name', table)
+                .eq('column_name', fieldName);
+        
+            if (error) {
+                console.error(`Error checking field in table ${table}:`, error);
+                return { fieldExists: false };
+            }
+        
+            return { fieldExists: data.length > 0, idField: 'company_name' }; // Assuming `company_name` is the ID field for simplicity
+        };
+        
+            
+        const handleDoubleClick = () => {
+            setIsEditing(true);
+        };
+    
+        const handleBlur = () => {
+            handleSave();
+        };
+    
+        const handleKeyDown = (e) => {
+            if (e.key === 'Enter') {
+                handleSave();
+            }
+            if (e.key === 'Escape') {
+                setEditValue(initialValue);
+                setIsEditing(false);
+            }
+        };
+    
+        const handleChange = (e) => {
+            let newValue = e.target.value;
+    
+            // Add null check when accessing field.type
+            if (field?.type === 'number') {
+                newValue = !isNaN(parseFloat(newValue)) ? parseFloat(newValue) : newValue;
+            } else if (field?.type === 'boolean') {
+                newValue = newValue.toLowerCase() === 'true' || newValue.toLowerCase() === 'yes';
+            } else if (field?.type === 'date') {
+                newValue = newValue;
+            }
+    
+            setEditValue(newValue);
+        };
+    
+        useEffect(() => {
+            if (isEditing && inputRef.current) {
+                inputRef.current.focus();
+                inputRef.current.select();
+            }
+        }, [isEditing]);
+    
+        if (isEditing) {
+            return (
+                <Input
+                    ref={inputRef}
+                    value={editValue}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    onKeyDown={handleKeyDown}
+                    className={`m-0 p-1 h-8 ${className}`}
+                    type={field.type === 'date' ? 'date' : 'text'}
+                />
+            );
+        }
+    
+        let displayValue = editValue;
+        if (field.type === 'boolean') {
+            displayValue = editValue ? 'Yes' : 'No';
+        } else if (field.type === 'date' && editValue) {
+            try {
+                displayValue = new Date(editValue).toLocaleDateString();
+            } catch (e) {
+                displayValue = editValue;
+            }
+        }
+    
+        return (
+            <div
+                onDoubleClick={handleDoubleClick}
+                className={`cursor-pointer ${className}`}
+            >
+                {displayValue || <span className="text-red-500 font-semibold">Missing</span>}
+            </div>
+        );
+    };
+    
     const sectionsWithSeparators = [
         { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
         { isSeparator: true },
@@ -540,10 +802,19 @@ const OverallView = () => {
                                     {/* Section Reference Row */}
                                     <TableRow className="bg-yellow-50">
                                         <TableHead className="font-medium">Sec REF</TableHead>
-                                        <TableHead className="text-center font-medium bg-yellow-50 border-b border-yellow-200">0</TableHead>
                                         {processedSections.slice(1).map((section, index) => {
                                             if (section.isSeparator) {
-                                                return renderSeparatorCell(`sec-ref-sep-${index}`, 'section');
+                                                return (
+                                                    <>
+                                                        {renderSeparatorCell(`sec-ref-sep-${index}`, 'section')}
+                                                        <TableHead
+                                                            className="text-center font-medium bg-yellow-50 border-b border-yellow-200"
+                                                        >
+                                                            0
+                                                        </TableHead>
+                                                        {renderSeparatorCell(`sec-ref-sep-${index}`, 'section')}
+                                                    </>
+                                                );
                                             }
 
                                             const colSpan = section.categorizedFields?.reduce((total, cat) =>
@@ -567,10 +838,15 @@ const OverallView = () => {
                                     {/* Section Headers */}
                                     <TableRow>
                                         <TableHead className="font-medium bg-blue-600 text-white">Section</TableHead>
-                                        <TableHead className="text-center text-white bg-red-600">Missing Fields</TableHead>
                                         {processedSections.slice(1).map((section, index) => {
                                             if (section.isSeparator) {
-                                                return renderSeparatorCell(`section-sep-${index}`, 'section');
+                                                return (
+                                                    <>
+                                                        {renderSeparatorCell(`section-sep-${index}`, 'section')}
+                                                        <TableHead className="text-center text-white bg-red-600">Missing Fields</TableHead>
+                                                        {renderSeparatorCell(`section-sep-${index}`, 'section')}
+                                                    </>
+                                                );
                                             }
 
                                             const colSpan = section.categorizedFields?.reduce((total, cat) =>
@@ -596,10 +872,16 @@ const OverallView = () => {
                                     {/* Category Headers */}
                                     <TableRow>
                                         <TableHead className="font-medium">Category</TableHead>
-                                        <TableHead className="text-center bg-red-50 text-red-700">Per Row</TableHead>
                                         {processedSections.slice(1).map((section, sectionIndex) => {
                                             if (section.isSeparator) {
-                                                return renderSeparatorCell(`cat-sep-${sectionIndex}`, 'section');
+                                                return (
+                                                    <>
+                                                        {renderSeparatorCell(`cat-sep-${sectionIndex}`, 'section')}
+                                                        <TableHead className="text-center bg-red-50 text-red-700">Per Row</TableHead>
+                                                        {renderSeparatorCell(`cat-sep-${sectionIndex}`, 'section')}
+                                                    </>
+
+                                                );
                                             }
 
                                             return section.categorizedFields?.map((category, catIndex) => {
@@ -651,12 +933,17 @@ const OverallView = () => {
                                     {/* Column Reference Row */}
                                     <TableRow className="bg-yellow-50">
                                         <TableHead className="font-medium">CLM REF</TableHead>
-                                        <TableHead className="text-center font-medium bg-yellow-50 border-b border-yellow-200">-</TableHead>
                                         {(() => {
                                             let columnCounter = 1;
                                             return processedSections.slice(1).map((section, sectionIndex) => {
                                                 if (section.isSeparator) {
-                                                    return renderSeparatorCell(`col-ref-sep-${sectionIndex}`, 'section');
+                                                    return (
+                                                        <>
+                                                            {renderSeparatorCell(`col-ref-sep-${sectionIndex}`, 'section')}
+                                                            <TableHead className="text-center font-medium bg-yellow-50 border-b border-yellow-200">-</TableHead>
+                                                            {renderSeparatorCell(`col-ref-sep-${sectionIndex}`, 'section')}
+                                                        </>
+                                                    )
                                                 }
 
                                                 return section.categorizedFields?.map((category, catIndex) => {
@@ -681,13 +968,19 @@ const OverallView = () => {
                                             });
                                         })()}
                                     </TableRow>
+
                                     {/* Column Headers */}
                                     <TableRow>
                                         <TableHead className="font-medium">Field</TableHead>
-                                        <TableHead className="whitespace-nowrap bg-red-500 text-white">Missing Count</TableHead>
                                         {processedSections.slice(1).map((section, sectionIndex) => {
                                             if (section.isSeparator) {
-                                                return renderSeparatorCell(`col-sep-${sectionIndex}`, 'section');
+                                                return (
+                                                    <>
+                                                        {renderSeparatorCell(`col-sep-${sectionIndex}`, 'section')}
+                                                        <TableHead className="whitespace-nowrap bg-red-500 text-white">Missing Count</TableHead>
+                                                        {renderSeparatorCell(`col-sep-${sectionIndex}`, 'section')}
+                                                    </>
+                                                )
                                             }
 
                                             return section.categorizedFields?.map((category, catIndex) => {
@@ -715,9 +1008,12 @@ const OverallView = () => {
                                     {/* Statistics Rows */}
                                     <TableRow className="bg-blue-50">
                                         <TableHead className="font-semibold text-blue-900 text-start">Total</TableHead>
+                                        {renderSeparatorCell(`total-first-separator`, 'section')}
                                         <TableCell className="text-center font-medium text-blue-700">
                                             {Object.values(data).reduce((sum, company) => sum + getMissingFields(company.rows[0]).length, 0)}
-                                        </TableCell> {processedSections.slice(1).map((section, sectionIndex) => {
+                                        </TableCell>
+
+                                        {processedSections.slice(1).map((section, sectionIndex) => {
                                             if (section.isSeparator) {
                                                 return renderSeparatorCell(
                                                     `total-sec-sep-${sectionIndex}`,
@@ -755,6 +1051,7 @@ const OverallView = () => {
 
                                     <TableRow className="bg-green-50">
                                         <TableHead className="font-semibold text-green-900 text-start">Completed</TableHead>
+                                        {renderSeparatorCell(`completed-first-separator`, 'section')}
                                         <TableCell className="text-center font-medium text-green-700">-</TableCell>
                                         {processedSections.slice(1).map((section, sectionIndex) => {
                                             if (section.isSeparator) {
@@ -794,6 +1091,7 @@ const OverallView = () => {
 
                                     <TableRow className="bg-red-50">
                                         <TableHead className="font-semibold text-red-900 text-start">Pending</TableHead>
+                                        {renderSeparatorCell(`pending-first-separator`, 'section')}
                                         <TableCell className="text-center font-medium text-red-700">-</TableCell>
                                         {processedSections.slice(1).map((section, sectionIndex) => {
                                             if (section.isSeparator) {
@@ -920,15 +1218,54 @@ const OverallView = () => {
 
                                                             return (
                                                                 <>
-                                                                    <TableCell
-                                                                        key={`${groupIndex}-${rowIndex}-${field.name}`}
-                                                                        className={`whitespace-nowrap ${sectionColor} transition-colors
-                                            ${field.name === 'company_name' ? 'cursor-pointer hover:text-primary' : ''}`}
-                                                                        onClick={field.name === 'company_name' ? () => handleCompanyClick(row) : undefined}
-                                                                        rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
-                                                                    >
-                                                                        {value || <span className="text-red-500 font-semibold">Missing</span>}
-                                                                    </TableCell>
+                                                              <TableCell
+    key={`${groupIndex}-${rowIndex}-${field.name}`}
+    className={`whitespace-nowrap ${sectionColor} transition-colors
+        ${field.name === 'company_name' ? 'cursor-pointer hover:text-primary' : ''}`}
+    onClick={field.name === 'company_name' ? () => handleCompanyClick(row) : undefined}
+    rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
+>
+    <EditableCell
+        value={value}
+        onSave={async (newValue) => {
+            try {
+                const { table, idField } = getTableMapping(field.name); // Ensure correct table mapping
+                const { error } = await supabase
+                    .from(table)
+                    .update({ [field.name]: newValue })
+                    .eq(idField, row.id);
+
+                if (error) throw error;
+
+                // Update local state
+                const newData = data.map(group => {
+                    if (group.company.id === row.id) {
+                        return {
+                            ...group,
+                            company: { ...group.company, [field.name]: newValue },
+                            rows: group.rows.map(r =>
+                                r.id === row.id ? { ...r, [field.name]: newValue } : r
+                            )
+                        };
+                    }
+                    return group;
+                });
+                setData(newData);
+
+                console.log('Updated successfully');
+            } catch (error) {
+                console.error('Error updating:', error);
+                console.error('Failed to update');
+            }
+        }}
+        fieldName={field.name}
+        rowId={row.id}
+        companyName={row.company_name}
+        className={field.name === 'company_name' ? 'hover:text-primary' : ''}
+        field={field}
+    />
+</TableCell>
+
 
                                                                     {/* <TableCell
                                                                         key={`${groupIndex}-${rowIndex}-${field.name}`}
@@ -976,6 +1313,7 @@ const OverallView = () => {
                         onClose={() => setIsEditDialogOpen(false)}
                         companyData={selectedCompany}
                         onSave={handleEditSave}
+                        references={references.columns}
                     />
                 )}
                 {selectedMissingFields && (
@@ -1087,7 +1425,6 @@ const OverallView = () => {
                     </Button>
                 </div>
                 <Tabs defaultValue="details">
-
                     {/* Rest of the directors content remains the same */}
                     {/* ... */}
                 </Tabs>
@@ -1183,11 +1520,6 @@ const OverallView = () => {
                     </Button>
                 </div>
                 <Card>
-
-
-
-
-
                     {/* Rest of the client content remains the same */}
                     {/* ... */}
                 </Card>
@@ -1204,11 +1536,6 @@ const OverallView = () => {
                     </Button>
                 </div>
                 <Card>
-
-
-
-
-
                     {/* Rest of the sheria content remains the same */}
                     {/* ... */}
                 </Card>
