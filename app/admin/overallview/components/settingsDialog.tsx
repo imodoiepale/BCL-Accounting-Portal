@@ -78,11 +78,12 @@ interface SectionFields {
 export function SettingsDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [structure, setStructure] = useState<StructureItem[]>([]);
+  const [uniqueTabs, setUniqueTabs] = useState<string[]>([]);
   const [selectedTab, setSelectedTab] = useState('');
-  const [selectedSection, setSelectedSection] = useState<StructureItem | null>(null);
-  const [selectedSubsection, setSelectedSubsection] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [newField, setNewField] = useState({ key: '', value: '' });
+  const [existingSections, setExistingSections] = useState<string[]>([]);
+  const [existingSubsections, setExistingSubsections] = useState<Record<string, string[]>>({});
+  const [selectedTables, setSelectedTables] = useState<string[]>([]);
+  const [selectedTableFields, setSelectedTableFields] = useState<{ [table: string]: string[] }>({});
   const [newStructure, setNewStructure] = useState<NewStructure>({
     section: '',
     subsection: '',
@@ -94,28 +95,26 @@ export function SettingsDialog() {
     isNewSubsection: false,
     table_names: []
   });
+  const [selectedSection, setSelectedSection] = useState<StructureItem | null>(null);
+  const [selectedSubsection, setSelectedSubsection] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [newField, setNewField] = useState({ key: '', value: '' });
   const [tables, setTables] = useState<string[]>([]);
-  const [tableColumns, setTableColumns] = useState<TableColumn[]>([]); // Ensure this is an array
+  const [tableColumns, setTableColumns] = useState<TableColumn[]>([]);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
-  const [existingSections, setExistingSections] = useState<string[]>([]);
-  const [existingSubsections, setExistingSubsections] = useState<Record<string, string[]>>({});
   const [showNewTableDialog, setShowNewTableDialog] = useState(false);
   const [newTableName, setNewTableName] = useState('');
   const [loadingTable, setLoadingTable] = useState(false);
   const [addFieldDialogOpen, setAddFieldDialogOpen] = useState(false);
-  const [uniqueTabs, setUniqueTabs] = useState<string[]>([]); // Initialize uniqueTabs
   const [showMultiSelectDialog, setShowMultiSelectDialog] = useState(false);
-  const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [availableFields, setAvailableFields] = useState<{ table: string, fields: TableColumn[] }[]>([]);
-  const [selectedTableFields, setSelectedTableFields] = useState<{ [table: string]: string[] }>({});
   const [addFieldState, setAddFieldState] = useState({
     displayName: '',
     selectedTables: [],
     selectedFields: {},
-    selectedTab: 'new', // 'new' or 'existing'
+    selectedTab: 'new',
     newFieldTable: ''
   });
-
   const [sectionFields, setSectionFields] = useState<SectionFields>({});
 
   const resetNewStructure = () => {
@@ -153,23 +152,26 @@ export function SettingsDialog() {
         section: mapping.section,
         subsection: mapping.subsection,
         table_name: mapping.table_name,
-        column_mappings: typeof mapping.column_mappings === 'string' ? JSON.parse(mapping.column_mappings) : mapping.column_mappings || {},
+        column_mappings: typeof mapping.column_mappings === 'string'
+          ? JSON.parse(mapping.column_mappings)
+          : mapping.column_mappings || {},
         column_order: mapping.column_order || {},
         Tabs: mapping.Tabs,
-        column_settings: mapping.column_settings || {},
-        sections_subsections: typeof mapping.sections_subsections === 'string' ? JSON.parse(mapping.sections_subsections) : mapping.sections_subsections || {},
-        sections_sections: typeof mapping.sections_sections === 'string' ? JSON.parse(mapping.sections_sections) : mapping.sections_sections || {}
+        sections_subsections: typeof mapping.sections_subsections === 'string'
+          ? JSON.parse(mapping.sections_subsections)
+          : mapping.sections_subsections || {},
+        sections_sections: typeof mapping.sections_sections === 'string'
+          ? JSON.parse(mapping.sections_sections)
+          : mapping.sections_sections || {}
       }));
 
       setStructure(processedMappings);
-
       const uniqueTabs = [...new Set(mappings.map(m => m.Tabs))];
       setUniqueTabs(uniqueTabs);
 
       if (!selectedTab && uniqueTabs.length > 0) {
         setSelectedTab(uniqueTabs[0]);
       }
-
     } catch (error) {
       console.error('Error fetching structure:', error);
       toast.error('Failed to fetch table structure');
@@ -590,28 +592,32 @@ export function SettingsDialog() {
 
   const handleAddStructure = async () => {
     try {
-      const finalColumnMappings = {};
-      const finalTableFields = {};
-
-      selectedTables.forEach(table => {
-        const fields = selectedTableFields[table] || [];
+      // Create column mappings from selected fields
+      const finalColumnMappings: Record<string, string> = {};
+      Object.entries(selectedTableFields).forEach(([table, fields]) => {
         fields.forEach(field => {
-          finalColumnMappings[`${table}.${field}`] = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          finalColumnMappings[`${table}.${field}`] = field
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, l => l.toUpperCase());
         });
-        finalTableFields[table] = fields;
       });
 
+      // Prepare payload
       const payload = {
         sections_sections: JSON.stringify({ [newStructure.section]: true }),
-        sections_subsections: JSON.stringify({ [newStructure.section]: newStructure.subsection }),
+        sections_subsections: JSON.stringify({
+          [newStructure.section]: newStructure.subsection
+        }),
         Tabs: newStructure.Tabs,
         column_mappings: JSON.stringify(finalColumnMappings),
-        table_names: JSON.stringify({ [newStructure.section]: newStructure.table_names }),
+        table_names: JSON.stringify({
+          [newStructure.section]: selectedTables
+        }),
         column_order: JSON.stringify(
           Object.keys(finalColumnMappings).reduce((acc, key, index) => {
             acc[key] = index + 1;
             return acc;
-          }, {})
+          }, {} as Record<string, number>)
         )
       };
 
@@ -641,14 +647,19 @@ export function SettingsDialog() {
         if (insertError) throw insertError;
       }
 
+      // Refresh structure and reset states
       await fetchStructure();
       resetNewStructure();
       toast.success('Structure updated successfully');
+
     } catch (error) {
       console.error('Error updating structure:', error);
       toast.error('Failed to update structure');
     }
   };
+
+
+
   const fetchSectionFields = async (section) => {
     try {
       const { data, error } = await supabase
@@ -860,15 +871,17 @@ export function SettingsDialog() {
 
   const handleTabSelection = (tabValue: string) => {
     if (tabValue === 'new') {
-      // Handle new tab creation
-      setNewStructure(prev => ({
-        ...prev,
-        Tabs: '',
-        isNewTab: true,
+      setNewStructure({
         section: '',
         subsection: '',
+        table_name: '',
+        Tabs: '',
+        column_mappings: {},
+        isNewTab: true,
+        isNewSection: false,
+        isNewSubsection: false,
         table_names: []
-      }));
+      });
       return;
     }
 
@@ -877,15 +890,72 @@ export function SettingsDialog() {
     // Get all data for this tab
     const tabData = structure.filter(item => item.Tabs === tabValue);
 
-    // Extract sections
-    const tabSections = tabData
-      .map(item => Object.keys(item.sections_sections || {}))
-      .flat();
+    // Extract all sections and their subsections
+    const sectionsMap = new Map<string, Set<string>>();
 
-    const uniqueSections = [...new Set(tabSections)];
+    tabData.forEach(item => {
+      if (item.sections_sections) {
+        Object.keys(item.sections_sections).forEach(section => {
+          if (!sectionsMap.has(section)) {
+            sectionsMap.set(section, new Set());
+          }
 
-    // Extract exact column mappings and table fields
-    const mappings = tabData.reduce((acc, item) => {
+          if (item.sections_subsections?.[section]) {
+            const subsections = Array.isArray(item.sections_subsections[section])
+              ? item.sections_subsections[section]
+              : [item.sections_subsections[section]];
+
+            subsections.forEach(sub => sectionsMap.get(section)?.add(sub));
+          }
+        });
+      }
+    });
+
+    // Convert to state format
+    const sections = Array.from(sectionsMap.keys());
+    const subsections = Object.fromEntries(
+      Array.from(sectionsMap.entries()).map(([section, subs]) => [
+        section,
+        Array.from(subs)
+      ])
+    );
+
+    setExistingSections(sections);
+    setExistingSubsections(subsections);
+
+    // Reset new structure with selected tab
+    setNewStructure(prev => ({
+      ...prev,
+      Tabs: tabValue,
+      isNewTab: false,
+      section: '',
+      subsection: '',
+      table_names: []
+    }));
+  };
+
+  const handleSectionSelection = (sectionValue: string) => {
+    if (sectionValue === 'new') {
+      setNewStructure(prev => ({
+        ...prev,
+        section: '',
+        subsection: '',
+        isNewSection: true,
+        isNewSubsection: false,
+        table_names: []
+      }));
+      return;
+    }
+
+    // Get existing mappings for this section
+    const sectionData = structure.filter(item =>
+      item.Tabs === newStructure.Tabs &&
+      item.sections_sections &&
+      Object.keys(item.sections_sections).includes(sectionValue)
+    );
+
+    // Extract mappings
+    const mappings = sectionData.reduce((acc, item) => {
       const columnMappings = typeof item.column_mappings === 'string'
         ? JSON.parse(item.column_mappings)
         : item.column_mappings;
@@ -900,121 +970,73 @@ export function SettingsDialog() {
         }
       });
       return acc;
-    }, {});
+    }, {} as { [table: string]: string[] });
 
-    // Set all states with exact mappings
-    setExistingSections(uniqueSections);
-    setSelectedTableFields(mappings);
-    setSelectedTables(Object.keys(mappings));
-
-    setNewStructure(prev => ({
-      ...prev,
-      Tabs: tabValue,
-      section: uniqueSections.length === 1 ? uniqueSections[0] : '',
-      isNewTab: false,
-      table_names: Object.keys(mappings)
-    }));
-
-    if (uniqueSections.length === 1) {
-      setTimeout(() => handleSectionSelection(uniqueSections[0], tabValue), 0);
-    }
-  };
-
-
-  const handleSectionSelection = (sectionValue: string, selectedTab = newStructure.Tabs) => {
-    const sectionData = structure.filter(item =>
-      item.Tabs === selectedTab &&
-      item.sections_sections &&
-      Object.keys(item.sections_sections).includes(sectionValue)
-    );
-
-    const subsections = [...new Set(sectionData
-      .map(item => item.sections_subsections?.[sectionValue] || [])
-      .flat())];
-
-    // Only include mappings for the selected section
-    const mappings = sectionData.reduce((acc, item) => {
-      const columnMappings = typeof item.column_mappings === 'string'
-        ? JSON.parse(item.column_mappings)
-        : item.column_mappings;
-
-      // Filter mappings to only include those for this section
-      const sectionMappings = Object.entries(columnMappings)
-        .filter(([key, value]) => {
-          const [table, field] = key.split('.');
-          return item.sections_sections[sectionValue];
-        });
-
-      sectionMappings.forEach(([key, value]) => {
-        const [table, field] = key.split('.');
-        if (!acc[table]) {
-          acc[table] = [];
-        }
-        if (!acc[table].includes(field)) {
-          acc[table].push(field);
-        }
-      });
-      return acc;
-    }, {});
-
-    setExistingSubsections({ [sectionValue]: subsections });
+    // Update states
     setSelectedTableFields(mappings);
     setSelectedTables(Object.keys(mappings));
 
     setNewStructure(prev => ({
       ...prev,
       section: sectionValue,
-      subsection: subsections.length === 1 ? subsections[0] : '',
       isNewSection: false,
+      subsection: '',
       table_names: Object.keys(mappings)
     }));
 
+    // If there's only one subsection, select it automatically
+    const subsections = existingSubsections[sectionValue] || [];
     if (subsections.length === 1) {
-      setTimeout(() => handleSubsectionSelection(subsections[0]), 0);
+      handleSubsectionSelection(subsections[0]);
     }
   };
 
+  // Subsection Selection Handler
   const handleSubsectionSelection = (subsectionValue: string) => {
-    const subsectionData = structure.filter(item =>
+    if (subsectionValue === 'new') {
+      setNewStructure(prev => ({
+        ...prev,
+        subsection: '',
+        isNewSubsection: true
+      }));
+      return;
+    }
+
+    // Find existing structure for this subsection
+    const existingStructure = structure.find(item =>
       item.Tabs === newStructure.Tabs &&
       item.sections_sections &&
       Object.keys(item.sections_sections).includes(newStructure.section) &&
       item.sections_subsections?.[newStructure.section] === subsectionValue
     );
 
-    // Only include mappings for the selected subsection
-    const mappings = subsectionData.reduce((acc, item) => {
-      const columnMappings = typeof item.column_mappings === 'string'
-        ? JSON.parse(item.column_mappings)
-        : item.column_mappings;
+    if (existingStructure) {
+      const columnMappings = typeof existingStructure.column_mappings === 'string'
+        ? JSON.parse(existingStructure.column_mappings)
+        : existingStructure.column_mappings;
 
-      // Filter mappings to only include those for this subsection
-      const subsectionMappings = Object.entries(columnMappings)
-        .filter(([key, value]) => {
-          return item.sections_subsections[newStructure.section] === subsectionValue;
-        });
-
-      subsectionMappings.forEach(([key, value]) => {
+      // Extract tables and fields
+      const mappings = Object.entries(columnMappings).reduce((acc, [key, value]) => {
         const [table, field] = key.split('.');
         if (!acc[table]) {
           acc[table] = [];
         }
-        if (!acc[table].includes(field)) {
-          acc[table].push(field);
-        }
-      });
-      return acc;
-    }, {});
+        acc[table].push(field);
+        return acc;
+      }, {} as { [table: string]: string[] });
 
-    setSelectedTableFields(mappings);
-    setSelectedTables(Object.keys(mappings));
+      // Pre-populate states
+      setSelectedTables(Object.keys(mappings));
+      setSelectedTableFields(mappings);
 
-    setNewStructure(prev => ({
-      ...prev,
-      subsection: subsectionValue,
-      isNewSubsection: false,
-      table_names: Object.keys(mappings)
-    }));
+      setNewStructure(prev => ({
+        ...prev,
+        subsection: subsectionValue,
+        isNewSubsection: false,
+        table_names: Object.keys(mappings),
+        column_mappings: columnMappings
+      }));
+    }
   };
 
 
