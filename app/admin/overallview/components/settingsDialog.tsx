@@ -723,6 +723,11 @@ export function SettingsDialog() {
       }
     }, [showMultiSelectDialog, selectedTables, selectedTableFields]);
 
+    useEffect(() => {
+      console.log('Selected Tables:', selectedTables);
+      console.log('Selected Fields:', selectedTableFields);
+    }, [selectedTables, selectedTableFields]);
+
     return (
       <Dialog open={showMultiSelectDialog} onOpenChange={setShowMultiSelectDialog}>
         <DialogContent className="max-w-4xl">
@@ -904,44 +909,87 @@ export function SettingsDialog() {
 
 
   const handleSectionSelection = (sectionValue: string, selectedTab = newStructure.Tabs) => {
+    // Get all data for this section
     const sectionData = structure.filter(item =>
       item.Tabs === selectedTab &&
       item.sections_sections &&
       Object.keys(item.sections_sections).includes(sectionValue)
     );
 
-    // Get subsections and auto-select if only one
+    // Extract subsections
     const subsections = [...new Set(sectionData
       .map(item => item.sections_subsections?.[sectionValue] || [])
       .flat())];
 
-    // Get table mappings for this section
-    const tableMappings = sectionData.map(item => ({
-      tables: item.table_names?.[sectionValue] || [],
-      fields: item.column_mappings || {}
-    }));
+    // Extract and merge mappings while preserving existing selections
+    const mappings = sectionData.reduce((acc, item) => {
+      const columnMappings = typeof item.column_mappings === 'string'
+        ? JSON.parse(item.column_mappings)
+        : item.column_mappings;
 
-    // Set tables and fields
-    const selectedTables = tableMappings[0]?.tables || [];
-    const fieldMappings = tableMappings.reduce((acc, mapping) => {
-      selectedTables.forEach(table => {
-        acc[table] = Object.keys(mapping.fields)
-          .filter(key => key.startsWith(`${table}.`))
-          .map(key => key.split('.')[1]);
+      Object.entries(columnMappings).forEach(([key, value]) => {
+        const [table, field] = key.split('.');
+        if (!acc[table]) {
+          acc[table] = selectedTableFields[table] || [];
+        }
+        if (!acc[table].includes(field)) {
+          acc[table].push(field);
+        }
       });
       return acc;
-    }, {});
+    }, { ...selectedTableFields });
 
+    // Set states while preserving existing selections
     setExistingSubsections({ [sectionValue]: subsections });
-    setSelectedTableFields(fieldMappings);
-    setSelectedTables(selectedTables);
+    setSelectedTableFields(mappings);
+    setSelectedTables(prev => [...new Set([...prev, ...Object.keys(mappings)])]);
 
     setNewStructure(prev => ({
       ...prev,
       section: sectionValue,
       subsection: subsections.length === 1 ? subsections[0] : '',
-      table_names: selectedTables,
-      isNewSection: false
+      isNewSection: false,
+      table_names: [...new Set([...prev.table_names, ...Object.keys(mappings)])]
+    }));
+
+    if (subsections.length === 1) {
+      setTimeout(() => handleSubsectionSelection(subsections[0]), 0);
+    }
+  };
+
+  const handleSubsectionSelection = (subsectionValue: string) => {
+    const subsectionData = structure.filter(item =>
+      item.Tabs === newStructure.Tabs &&
+      item.sections_sections &&
+      Object.keys(item.sections_sections).includes(newStructure.section) &&
+      item.sections_subsections?.[newStructure.section] === subsectionValue
+    );
+
+    const mappings = subsectionData.reduce((acc, item) => {
+      const columnMappings = typeof item.column_mappings === 'string'
+        ? JSON.parse(item.column_mappings)
+        : item.column_mappings;
+
+      Object.entries(columnMappings).forEach(([key, value]) => {
+        const [table, field] = key.split('.');
+        if (!acc[table]) {
+          acc[table] = selectedTableFields[table] || [];
+        }
+        if (!acc[table].includes(field)) {
+          acc[table].push(field);
+        }
+      });
+      return acc;
+    }, { ...selectedTableFields });
+
+    setSelectedTableFields(mappings);
+    setSelectedTables(prev => [...new Set([...prev, ...Object.keys(mappings)])]);
+
+    setNewStructure(prev => ({
+      ...prev,
+      subsection: subsectionValue,
+      isNewSubsection: false,
+      table_names: [...new Set([...prev.table_names, ...Object.keys(mappings)])]
     }));
   };
 
@@ -1075,7 +1123,7 @@ export function SettingsDialog() {
             </Card>
 
             {/* Middle Panel - Sections */}
-            <Card className="col-span-3 h-[700px]">
+            <Card className="col-span-2 h-[700px]">
               <CardContent className="p-2">
                 <ScrollArea className="h-[700px]">
                   <div className="flex justify-between items-center mb-2 px-2">
@@ -1109,7 +1157,7 @@ export function SettingsDialog() {
             </Card>
 
             {/* Subsections Panel */}
-            <Card className="col-span-3 h-[700px]">
+            <Card className="col-span-2 h-[700px]">
               <CardContent className="p-2">
                 <ScrollArea className="h-[700px]">
                   <div className="flex justify-between items-center mb-2 px-2">
@@ -1145,7 +1193,7 @@ export function SettingsDialog() {
             </Card>
 
             {/* Right Panel - Details */}
-            <Card className="col-span-4 h-[700px]">
+            <Card className="col-span-6 h-[700px]">
               <CardContent className="p-4">
                 <ScrollArea className="h-[700px]">
                   {selectedSubsection ? (
@@ -1348,7 +1396,19 @@ export function SettingsDialog() {
                 <label className="text-sm font-medium text-gray-700">Section</label>
                 <Select
                   value={newStructure.section}
-                  onValueChange={handleSectionSelection}
+                  onValueChange={(value) => {
+                    if (value === 'new') {
+                      setNewStructure(prev => ({
+                        ...prev,
+                        section: '',
+                        isNewSection: true,
+                        subsection: '',
+                        isNewSubsection: false
+                      }));
+                    } else {
+                      handleSectionSelection(value);
+                    }
+                  }}
                 >
                   <SelectTrigger className="w-full bg-white">
                     <SelectValue placeholder="Select or Create Section" />
@@ -1390,11 +1450,7 @@ export function SettingsDialog() {
                           isNewSubsection: true
                         }));
                       } else {
-                        setNewStructure(prev => ({
-                          ...prev,
-                          subsection: value,
-                          isNewSubsection: false
-                        }));
+                        handleSubsectionSelection(value);
                       }
                     }}
                   >
@@ -1438,16 +1494,17 @@ export function SettingsDialog() {
               {/* Table Selection/Creation */}
               <div className="space-y-3 w-full md:w-1/2 mb-4">
                 <label className="text-sm font-medium text-gray-700">Tables and Fields</label>
-                <Button
-                  onClick={() => setShowMultiSelectDialog(true)}
-                  variant="outline"
-                  className="w-full justify-between"
-                >
-                  {newStructure.table_names.length > 0
-                    ? `${newStructure.table_names.length} tables selected`
-                    : "Select Tables and Fields"}
-                  <Plus className="h-4 w-4" />
-                </Button>
+                  <Button
+                    onClick={() => setShowMultiSelectDialog(true)}
+                    variant="outline"
+                    className="w-full justify-between"
+                    type="button"
+                  >
+                    {selectedTables.length > 0
+                      ? `${selectedTables.length} tables selected`
+                      : "Select Tables and Fields"}
+                    <Plus className="h-4 w-4" />
+                  </Button>
 
                 {/* Show selected tables and fields preview */}
                 {newStructure.table_names.length > 0 && (
