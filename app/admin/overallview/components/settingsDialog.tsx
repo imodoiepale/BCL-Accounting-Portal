@@ -75,6 +75,83 @@ interface SectionFields {
   };
 }
 
+
+// Helper function to parse JSON safely
+const safeJSONParse = (jsonString: string, fallback: any = {}) => {
+  try {
+    return typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+  } catch (error) {
+    return fallback;
+  }
+};
+
+// Helper function to process sections and subsections
+const processStructureData = (data: any[]) => {
+  const allSections = new Set<string>();
+  const allSubsections: Record<string, Set<string>> = {};
+  const mappings: Record<string, Record<string, string[]>> = {};
+
+  data.forEach(item => {
+    const sectionsData = safeJSONParse(item.sections_sections);
+    const subsectionsData = safeJSONParse(item.sections_subsections);
+    const columnMappings = safeJSONParse(item.column_mappings);
+
+    // Process sections
+    Object.keys(sectionsData).forEach(section => {
+      allSections.add(section);
+      if (!allSubsections[section]) {
+        allSubsections[section] = new Set();
+      }
+      if (!mappings[section]) {
+        mappings[section] = {};
+      }
+    });
+
+    // Process subsections and their mappings
+    Object.entries(subsectionsData).forEach(([section, subs]) => {
+      if (!allSubsections[section]) {
+        allSubsections[section] = new Set();
+      }
+
+      const subsections = Array.isArray(subs) ? subs : [subs];
+      subsections.forEach(sub => {
+        if (sub) {
+          allSubsections[section].add(sub);
+          if (!mappings[section][sub]) {
+            mappings[section][sub] = [];
+          }
+        }
+      });
+    });
+
+    // Process column mappings
+    Object.entries(columnMappings).forEach(([key, value]) => {
+      const [table, field] = key.split('.');
+      Object.keys(sectionsData).forEach(section => {
+        const subsection = subsectionsData[section];
+        if (subsection) {
+          if (!mappings[section][subsection]) {
+            mappings[section][subsection] = [];
+          }
+          if (!mappings[section][subsection].includes(field)) {
+            mappings[section][subsection].push(field);
+          }
+        }
+      });
+    });
+  });
+
+  return {
+    sections: Array.from(allSections),
+    subsections: Object.fromEntries(
+      Object.entries(allSubsections).map(([k, v]) => [k, Array.from(v)])
+    ),
+    mappings
+  };
+};
+
+
+
 export function SettingsDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [structure, setStructure] = useState<StructureItem[]>([]);
@@ -95,6 +172,7 @@ export function SettingsDialog() {
     isNewSubsection: false,
     table_names: []
   });
+  
   const [selectedSection, setSelectedSection] = useState<StructureItem | null>(null);
   const [selectedSubsection, setSelectedSubsection] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -868,164 +946,305 @@ export function SettingsDialog() {
     );
   };
 
+  // Handle Tab Selection
+  const handleTabSelection = async (tabValue: string, isNewStructure: boolean = false) => {
+    try {
+      if (isNewStructure) {
+        // This is for Add New Structure section
+        if (tabValue === 'new') {
+          // Load ALL sections and subsections independently for new tab
+          const { data, error } = await supabase
+            .from('profile_category_table_mapping')
+            .select('*');
 
-  const handleTabSelection = (tabValue: string) => {
-    if (tabValue === 'new') {
-      setNewStructure({
+          if (error) throw error;
+
+          // Get ALL sections and subsections regardless of tab
+          const allSections = new Set<string>();
+          const allSubsections = new Set<string>();
+
+          data.forEach(item => {
+            const sectionsData = safeJSONParse(item.sections_sections, {});
+            const subsectionsData = safeJSONParse(item.sections_subsections, {});
+
+            Object.keys(sectionsData).forEach(section => allSections.add(section));
+            Object.values(subsectionsData).forEach(subs => {
+              if (Array.isArray(subs)) {
+                subs.forEach(sub => allSubsections.add(sub));
+              } else if (subs) {
+                allSubsections.add(subs as string);
+              }
+            });
+          });
+
+          setExistingSections(Array.from(allSections));
+          setExistingSubsections({
+            "all": Array.from(allSubsections)
+          });
+
+          setNewStructure({
+            section: '',
+            subsection: '',
+            table_name: '',
+            Tabs: '',
+            column_mappings: {},
+            isNewTab: true,
+            isNewSection: false,
+            isNewSubsection: false,
+            table_names: []
+          });
+        } else {
+          // Existing tab for new structure
+          setNewStructure(prev => ({
+            ...prev,
+            Tabs: tabValue,
+            isNewTab: false
+          }));
+        }
+      } else {
+        // This is for Table Structure Settings section
+        setSelectedTab(tabValue);
+        fetchExistingSectionsAndSubsections(tabValue);
+      }
+
+      setSelectedTables([]);
+      setSelectedTableFields({});
+
+    } catch (error) {
+      console.error('Error in tab selection:', error);
+      toast.error('Failed to load tab data');
+    }
+  };
+
+  const handleSectionSelection = async (sectionValue: string) => {
+    try {
+      if (sectionValue === 'new') {
+        if (newStructure.isNewTab) {
+          // For new tab, preserve existing subsections and just reset section-related states
+          setNewStructure(prev => ({
+            ...prev,
+            section: '',
+            subsection: '',
+            isNewSection: true,
+            isNewSubsection: false,
+            table_names: []
+          }));
+
+          // Clear selections but keep existing subsections
+          setSelectedTables([]);
+          setSelectedTableFields({});
+          return;
+        } else {
+          // For existing tab, handle new section creation
+          setNewStructure(prev => ({
+            ...prev,
+            section: '',
+            subsection: '',
+            isNewSection: true,
+            isNewSubsection: false,
+            table_names: []
+          }));
+
+          // Clear all selections and subsections for existing tab
+          setSelectedTables([]);
+          setSelectedTableFields({});
+          setExistingSubsections({});
+          return;
+        }
+      }
+
+      // Fetch all mapping data
+      const { data, error } = await supabase
+        .from('profile_category_table_mapping')
+        .select('*');
+
+      if (error) throw error;
+
+      if (newStructure.isNewTab) {
+        // For new tab, process ALL data to get complete set of mappings
+        const allSubsectionsSet = new Set<string>();
+        const allMappings: Record<string, string[]> = {};
+
+        data.forEach(item => {
+          // Process subsections
+          const subsectionsData = safeJSONParse(item.sections_subsections, {});
+          Object.values(subsectionsData).forEach(subs => {
+            if (Array.isArray(subs)) {
+              subs.forEach(sub => allSubsectionsSet.add(sub));
+            } else if (subs) {
+              allSubsectionsSet.add(subs as string);
+            }
+          });
+
+          // Process mappings
+          const columnMappings = safeJSONParse(item.column_mappings, {});
+          Object.entries(columnMappings).forEach(([key, value]) => {
+            const [table, field] = key.split('.');
+            if (!allMappings[table]) {
+              allMappings[table] = [];
+            }
+            if (!allMappings[table].includes(field)) {
+              allMappings[table].push(field);
+            }
+          });
+        });
+
+        // Keep all subsections available under the "all" key
+        if (!existingSubsections["all"]) {
+          setExistingSubsections(prev => ({
+            ...prev,
+            all: Array.from(allSubsectionsSet)
+          }));
+        }
+
+        setNewStructure(prev => ({
+          ...prev,
+          section: sectionValue,
+          isNewSection: false,
+          subsection: '',
+          table_names: []
+        }));
+
+        // Clear specific selections but maintain all available options
+        setSelectedTables([]);
+        setSelectedTableFields({});
+
+      } else {
+        // For existing tab, filter data for this tab and section
+        const relevantData = data.filter(item =>
+          item.Tabs === newStructure.Tabs &&
+          item.sections_sections &&
+          Object.keys(safeJSONParse(item.sections_sections)).includes(sectionValue)
+        );
+
+        // Process section-specific data
+        const sectionMappings: Record<string, string[]> = {};
+        const sectionSubsections = new Set<string>();
+
+        relevantData.forEach(item => {
+          // Process subsections for this section
+          const subsectionsData = safeJSONParse(item.sections_subsections, {});
+          const sectionSubs = subsectionsData[sectionValue] || [];
+          if (Array.isArray(sectionSubs)) {
+            sectionSubs.forEach(sub => sectionSubsections.add(sub));
+          } else if (sectionSubs) {
+            sectionSubsections.add(sectionSubs as string);
+          }
+
+          // Process mappings
+          const columnMappings = safeJSONParse(item.column_mappings, {});
+          Object.entries(columnMappings).forEach(([key, value]) => {
+            const [table, field] = key.split('.');
+            if (!sectionMappings[table]) {
+              sectionMappings[table] = [];
+            }
+            if (!sectionMappings[table].includes(field)) {
+              sectionMappings[table].push(field);
+            }
+          });
+        });
+
+        // Update states for existing tab
+        setExistingSubsections({
+          [sectionValue]: Array.from(sectionSubsections)
+        });
+
+        setSelectedTables(Object.keys(sectionMappings));
+        setSelectedTableFields(sectionMappings);
+
+        setNewStructure(prev => ({
+          ...prev,
+          section: sectionValue,
+          isNewSection: false,
+          subsection: '',
+          table_names: Object.keys(sectionMappings)
+        }));
+      }
+
+      // Log for debugging
+      console.log('Section selection completed:', {
+        isNewTab: newStructure.isNewTab,
+        selectedSection: sectionValue,
+        availableSubsections: existingSubsections,
+        selectedTables,
+        selectedTableFields
+      });
+
+    } catch (error) {
+      console.error('Error in section selection:', error);
+      toast.error('Failed to load section data');
+
+      // Reset states on error
+      setNewStructure(prev => ({
+        ...prev,
         section: '',
         subsection: '',
-        table_name: '',
-        Tabs: '',
-        column_mappings: {},
-        isNewTab: true,
         isNewSection: false,
         isNewSubsection: false,
         table_names: []
-      });
-      return;
+      }));
+      setSelectedTables([]);
+      setSelectedTableFields({});
     }
+  };
 
-    setSelectedTab(tabValue);
-
-    // Get all data for this tab
-    const tabData = structure.filter(item => item.Tabs === tabValue);
-
-    // Extract all sections and their subsections
-    const sectionsMap = new Map<string, Set<string>>();
-
-    tabData.forEach(item => {
-      if (item.sections_sections) {
-        Object.keys(item.sections_sections).forEach(section => {
-          if (!sectionsMap.has(section)) {
-            sectionsMap.set(section, new Set());
-          }
-
-          if (item.sections_subsections?.[section]) {
-            const subsections = Array.isArray(item.sections_subsections[section])
-              ? item.sections_subsections[section]
-              : [item.sections_subsections[section]];
-
-            subsections.forEach(sub => sectionsMap.get(section)?.add(sub));
-          }
-        });
+  // Handle Subsection Selection
+  const handleSubsectionSelection = async (subsectionValue: string) => {
+    try {
+      if (subsectionValue === 'new') {
+        setNewStructure(prev => ({
+          ...prev,
+          subsection: '',
+          isNewSubsection: true
+        }));
+        return;
       }
-    });
 
-    // Convert to state format
-    const sections = Array.from(sectionsMap.keys());
-    const subsections = Object.fromEntries(
-      Array.from(sectionsMap.entries()).map(([section, subs]) => [
-        section,
-        Array.from(subs)
-      ])
-    );
+      let mappingsToUse = {};
 
-    setExistingSections(sections);
-    setExistingSubsections(subsections);
+      if (newStructure.isNewTab) {
+        // For new tab, get all mappings for this section/subsection combination
+        const { data, error } = await supabase
+          .from('profile_category_table_mapping')
+          .select('*');
 
-    // Reset new structure with selected tab
-    setNewStructure(prev => ({
-      ...prev,
-      Tabs: tabValue,
-      isNewTab: false,
-      section: '',
-      subsection: '',
-      table_names: []
-    }));
-  };
+        if (error) throw error;
 
-  const handleSectionSelection = (sectionValue: string) => {
-    if (sectionValue === 'new') {
-      setNewStructure(prev => ({
-        ...prev,
-        section: '',
-        subsection: '',
-        isNewSection: true,
-        isNewSubsection: false,
-        table_names: []
-      }));
-      return;
-    }
+        const relevantStructure = data.find(item => {
+          const sections = safeJSONParse(item.sections_sections);
+          const subsections = safeJSONParse(item.sections_subsections);
+          return Object.keys(sections).includes(newStructure.section) &&
+            subsections[newStructure.section] === subsectionValue;
+        });
 
-    // Get existing mappings for this section
-    const sectionData = structure.filter(item =>
-      item.Tabs === newStructure.Tabs &&
-      item.sections_sections &&
-      Object.keys(item.sections_sections).includes(sectionValue)
-    );
-
-    // Extract mappings
-    const mappings = sectionData.reduce((acc, item) => {
-      const columnMappings = typeof item.column_mappings === 'string'
-        ? JSON.parse(item.column_mappings)
-        : item.column_mappings;
-
-      Object.entries(columnMappings).forEach(([key, value]) => {
-        const [table, field] = key.split('.');
-        if (!acc[table]) {
-          acc[table] = [];
+        if (relevantStructure) {
+          mappingsToUse = safeJSONParse(relevantStructure.column_mappings);
         }
-        if (!acc[table].includes(field)) {
-          acc[table].push(field);
+      } else {
+        // For existing tab, get mappings only from this tab
+        const existingStructure = structure.find(item =>
+          item.Tabs === newStructure.Tabs &&
+          item.sections_sections &&
+          Object.keys(safeJSONParse(item.sections_sections)).includes(newStructure.section) &&
+          safeJSONParse(item.sections_subsections)[newStructure.section] === subsectionValue
+        );
+
+        if (existingStructure) {
+          mappingsToUse = safeJSONParse(existingStructure.column_mappings);
         }
-      });
-      return acc;
-    }, {} as { [table: string]: string[] });
-
-    // Update states
-    setSelectedTableFields(mappings);
-    setSelectedTables(Object.keys(mappings));
-
-    setNewStructure(prev => ({
-      ...prev,
-      section: sectionValue,
-      isNewSection: false,
-      subsection: '',
-      table_names: Object.keys(mappings)
-    }));
-
-    // If there's only one subsection, select it automatically
-    const subsections = existingSubsections[sectionValue] || [];
-    if (subsections.length === 1) {
-      handleSubsectionSelection(subsections[0]);
-    }
-  };
-
-  // Subsection Selection Handler
-  const handleSubsectionSelection = (subsectionValue: string) => {
-    if (subsectionValue === 'new') {
-      setNewStructure(prev => ({
-        ...prev,
-        subsection: '',
-        isNewSubsection: true
-      }));
-      return;
-    }
-
-    // Find existing structure for this subsection
-    const existingStructure = structure.find(item =>
-      item.Tabs === newStructure.Tabs &&
-      item.sections_sections &&
-      Object.keys(item.sections_sections).includes(newStructure.section) &&
-      item.sections_subsections?.[newStructure.section] === subsectionValue
-    );
-
-    if (existingStructure) {
-      const columnMappings = typeof existingStructure.column_mappings === 'string'
-        ? JSON.parse(existingStructure.column_mappings)
-        : existingStructure.column_mappings;
+      }
 
       // Extract tables and fields
-      const mappings = Object.entries(columnMappings).reduce((acc, [key, value]) => {
+      const mappings = Object.entries(mappingsToUse).reduce((acc, [key, value]) => {
         const [table, field] = key.split('.');
         if (!acc[table]) {
           acc[table] = [];
         }
         acc[table].push(field);
         return acc;
-      }, {} as { [table: string]: string[] });
+      }, {} as Record<string, string[]>);
 
-      // Pre-populate states
+      // Update states
       setSelectedTables(Object.keys(mappings));
       setSelectedTableFields(mappings);
 
@@ -1034,11 +1253,14 @@ export function SettingsDialog() {
         subsection: subsectionValue,
         isNewSubsection: false,
         table_names: Object.keys(mappings),
-        column_mappings: columnMappings
+        column_mappings: mappingsToUse
       }));
+
+    } catch (error) {
+      console.error('Error in subsection selection:', error);
+      toast.error('Failed to load subsection data');
     }
   };
-
 
   const handleAddNewField = async () => {
     console.log('Adding new field:', addFieldState);
@@ -1159,7 +1381,7 @@ export function SettingsDialog() {
                       key={tab}
                       className={`w-full text-left px-3 py-2 rounded transition-colors ${selectedTab === tab ? 'bg-primary text-white' : 'hover:bg-gray-100'
                         }`}
-                      onClick={() => setSelectedTab(tab)}
+                      onClick={() => handleTabSelection(tab, false)}
                     >
                       {tab}
                     </button>
@@ -1411,7 +1633,7 @@ export function SettingsDialog() {
                 <label className="text-sm font-medium text-gray-700">Tab</label>
                 <Select
                   value={newStructure.Tabs}
-                  onValueChange={handleTabSelection}
+                  onValueChange={(value) => handleTabSelection(value, true)} 
                 >
                   <SelectTrigger className="w-full bg-white">
                     <SelectValue placeholder="Select or Create Tab" />
@@ -1505,12 +1727,20 @@ export function SettingsDialog() {
                       <SelectValue placeholder="Select or Create Subsection" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(existingSubsections[newStructure.section] || [])
+                      {/* This is the key change - when in new tab mode, always show all subsections */}
+                      {(newStructure.isNewTab
+                        ? existingSubsections["all"] || []  // Show ALL subsections for new tab
+                        : existingSubsections[newStructure.section] || []  // Show section-specific subsections for existing tab
+                      )
                         .filter(subsection => subsection?.trim())
                         .map(subsection => (
-                          <SelectItem key={subsection} value={subsection}>{subsection}</SelectItem>
+                          <SelectItem key={subsection} value={subsection}>
+                            {subsection}
+                          </SelectItem>
                         ))}
-                      <SelectItem value="new" className="text-blue-600 font-medium">+ Create New Subsection</SelectItem>
+                      <SelectItem value="new" className="text-blue-600 font-medium">
+                        + Create New Subsection
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 ) : (
