@@ -150,15 +150,14 @@ export function SettingsDialog() {
 
       const processedMappings = mappings.map(mapping => ({
         id: mapping.id,
-        section: mapping.section,
-        subsection: mapping.subsection,
+        section: mapping.sections_sections ? JSON.parse(mapping.sections_sections) : {},
+        subsection: mapping.sections_subsections ? JSON.parse(mapping.sections_subsections) : {},
         table_name: mapping.table_name,
-        column_mappings: typeof mapping.column_mappings === 'string' ? JSON.parse(mapping.column_mappings) : mapping.column_mappings || {},
-        column_order: mapping.column_order || {},
+        column_mappings: mapping.column_mappings ? JSON.parse(mapping.column_mappings) : {},
+        column_order: mapping.column_order ? JSON.parse(mapping.column_order) : {},
         Tabs: mapping.Tabs,
         column_settings: mapping.column_settings || {},
-        sections_subsections: typeof mapping.sections_subsections === 'string' ? JSON.parse(mapping.sections_subsections) : mapping.sections_subsections || {},
-        sections_sections: typeof mapping.sections_sections === 'string' ? JSON.parse(mapping.sections_sections) : mapping.sections_sections || {}
+        table_names: mapping.table_names ? JSON.parse(mapping.table_names) : {},
       }));
 
       setStructure(processedMappings);
@@ -589,66 +588,66 @@ export function SettingsDialog() {
   // };
 
   const handleAddStructure = async () => {
-  try {
-    const finalColumnMappings = {};
-    const finalTableFields = {};
+    try {
+      const finalColumnMappings = {};
+      const finalTableFields = {};
 
-    selectedTables.forEach(table => {
-      const fields = selectedTableFields[table] || [];
-      fields.forEach(field => {
-        finalColumnMappings[`${table}.${field}`] = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      });
-      finalTableFields[table] = fields;
-    });
-
-    const payload = {
-      sections_sections: JSON.stringify({ [newStructure.section]: true }),
-      sections_subsections: JSON.stringify({ [newStructure.section]: newStructure.subsection }),
-      Tabs: newStructure.Tabs,
-      column_mappings: JSON.stringify(finalColumnMappings),
-      table_names: JSON.stringify({ [newStructure.section]: newStructure.table_names }),
-      column_order: JSON.stringify(
-        Object.keys(finalColumnMappings).reduce((acc, key, index) => {
-          acc[key] = index + 1;
-          return acc;
-        }, {})
-      )
-    };
-
-    // Check for existing mapping
-    const { data: existingMapping, error: fetchError } = await supabase
-      .from('profile_category_table_mapping')
-      .select('*')
-      .match({
-        sections_sections: payload.sections_sections,
-        sections_subsections: payload.sections_subsections
+      selectedTables.forEach(table => {
+        const fields = selectedTableFields[table] || [];
+        fields.forEach(field => {
+          finalColumnMappings[`${table}.${field}`] = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        });
+        finalTableFields[table] = fields;
       });
 
-    if (fetchError) throw fetchError;
+      const payload = {
+        sections_sections: JSON.stringify({ [newStructure.section]: true }),
+        sections_subsections: JSON.stringify({ [newStructure.section]: newStructure.subsection }),
+        Tabs: newStructure.Tabs,
+        column_mappings: JSON.stringify(finalColumnMappings),
+        table_names: JSON.stringify({ [newStructure.section]: newStructure.table_names }),
+        column_order: JSON.stringify(
+          Object.keys(finalColumnMappings).reduce((acc, key, index) => {
+            acc[key] = index + 1;
+            return acc;
+          }, {})
+        )
+      };
 
-    if (existingMapping && existingMapping.length > 0) {
-      const { error: updateError } = await supabase
+      // Check for existing mapping
+      const { data: existingMapping, error: fetchError } = await supabase
         .from('profile_category_table_mapping')
-        .update(payload)
-        .eq('id', existingMapping[0].id);
+        .select('*')
+        .match({
+          sections_sections: payload.sections_sections,
+          sections_subsections: payload.sections_subsections
+        });
 
-      if (updateError) throw updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from('profile_category_table_mapping')
-        .insert([payload]);
+      if (fetchError) throw fetchError;
 
-      if (insertError) throw insertError;
+      if (existingMapping && existingMapping.length > 0) {
+        const { error: updateError } = await supabase
+          .from('profile_category_table_mapping')
+          .update(payload)
+          .eq('id', existingMapping[0].id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('profile_category_table_mapping')
+          .insert([payload]);
+
+        if (insertError) throw insertError;
+      }
+
+      await fetchStructure();
+      resetNewStructure();
+      toast.success('Structure updated successfully');
+    } catch (error) {
+      console.error('Error updating structure:', error);
+      toast.error('Failed to update structure');
     }
-
-    await fetchStructure();
-    resetNewStructure();
-    toast.success('Structure updated successfully');
-  } catch (error) {
-    console.error('Error updating structure:', error);
-    toast.error('Failed to update structure');
-  }
-};
+  };
   const fetchSectionFields = async (section) => {
     try {
       const { data, error } = await supabase
@@ -712,239 +711,117 @@ export function SettingsDialog() {
   }, [newStructure.subsection, sectionFields, newStructure.section]);
 
 
-  const MultiSelectDialog = () => {
-    const [tempSelectedTables, setTempSelectedTables] = useState<string[]>(selectedTables);
-    const [tempSelectedFields, setTempSelectedFields] = useState<{ [table: string]: string[] }>(selectedTableFields);
+  const MultiSelectDialog = () => (
+    <Dialog open={showMultiSelectDialog} onOpenChange={setShowMultiSelectDialog}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Select Tables and Fields</DialogTitle>
+        </DialogHeader>
 
-    useEffect(() => {
-      if (showMultiSelectDialog) {
-        setTempSelectedTables(selectedTables);
-        setTempSelectedFields(selectedTableFields);
-      }
-    }, [showMultiSelectDialog, selectedTables, selectedTableFields]);
-
-    return (
-      <Dialog open={showMultiSelectDialog} onOpenChange={setShowMultiSelectDialog}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Select Tables and Fields</DialogTitle>
-          </DialogHeader>
-
-          <div className="grid grid-cols-2 gap-4">
-            {/* Tables Selection */}
-            <div className="border rounded-lg p-4 bg-white shadow-sm">
-              <h4 className="font-medium mb-4 text-lg text-gray-800">Select Tables</h4>
-              <ScrollArea className="h-[400px]">
-                {tables.map(table => (
+        <div className="grid grid-cols-2 gap-4">
+          {/* Tables Selection */}
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium mb-2">Select Tables</h4>
+            <ScrollArea className="h-[400px]">
+              {tables.length > 0 ? (
+                tables.map(table => (
                   <div key={table} className="flex items-center gap-2 p-2 hover:bg-gray-50">
                     <input
                       type="checkbox"
-                      id={`multiselect-table-${table}`}
-                      checked={tempSelectedTables.includes(table)}
+                      id={`table-${table}`}
+                      checked={selectedTables.includes(table)}
                       onChange={(e) => {
-                        setTempSelectedTables(prev =>
-                          e.target.checked
-                            ? [...prev, table]
-                            : prev.filter(t => t !== table)
-                        );
-                        if (!e.target.checked) {
-                          setTempSelectedFields(prev => {
-                            const { [table]: _, ...rest } = prev;
-                            return rest;
-                          });
-                        }
+                        const newSelection = e.target.checked
+                          ? [...selectedTables, table]
+                          : selectedTables.filter(t => t !== table);
+                        setSelectedTables(newSelection);
                       }}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      className="h-4 w-4"
                     />
-                    <label
-                      htmlFor={`multiselect-table-${table}`}
-                      className="text-sm text-gray-700 hover:text-gray-900 cursor-pointer flex-1"
-                    >
-                      {table.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </label>
+                    <label htmlFor={`table-${table}`}>{table.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</label>
                   </div>
-                ))}
-              </ScrollArea>
-            </div>
-
-            {/* Fields Selection */}
-            <div className="border rounded-lg p-4 bg-white shadow-sm">
-              <h4 className="font-medium mb-4 text-lg text-gray-800">Select Fields</h4>
-              <ScrollArea className="h-[400px]">
-                {tempSelectedTables.map((tableName, index) => {
-                  const tableFields = tableColumns.filter(col => col.table_name === tableName);
-                  return (
-                    <div key={tableName}>
-                      <div className="bg-gray-50 p-3 rounded-t-lg border-b-2 border-primary/20">
-                        <h5 className="font-lg text-black">
-                          {tableName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </h5>
-                      </div>
-                      <div className="p-2 mb-4 border-x border-b rounded-b-lg">
-                        {tableFields.map(field => (
-                          <div
-                            key={`${tableName}-${field.column_name}`}
-                            className="flex items-center gap-3 p-2.5 hover:bg-gray-50 border-b last:border-b-0 transition-colors"
-                          >
-                            <input
-                              type="checkbox"
-                              id={`multiselect-field-${tableName}-${field.column_name}`}
-                              checked={tempSelectedFields[tableName]?.includes(field.column_name) || false}
-                              onChange={(e) => {
-                                setTempSelectedFields(prev => ({
-                                  ...prev,
-                                  [tableName]: e.target.checked
-                                    ? [...(prev[tableName] || []), field.column_name]
-                                    : (prev[tableName] || []).filter(f => f !== field.column_name)
-                                }));
-                              }}
-                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                            />
-                            <label
-                              htmlFor={`multiselect-field-${tableName}-${field.column_name}`}
-                              className="text-sm text-gray-700 hover:text-gray-900 cursor-pointer flex-1"
-                            >
-                              {field.column_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                              <span className="ml-2 text-xs text-gray-500">({field.data_type})</span>
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                      {index < tempSelectedTables.length - 1 && (
-                        <div className="h-4 border-l-2 border-r-2 border-dashed border-gray-200 mx-4" />
-                      )}
-                    </div>
-                  );
-                })}
-              </ScrollArea>
-            </div>
+                ))
+              ) : (
+                <div className="p-4 text-center text-gray-500">
+                  No tables available
+                </div>
+              )}
+            </ScrollArea>
           </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowMultiSelectDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                setSelectedTables(tempSelectedTables);
-                setSelectedTableFields(tempSelectedFields);
-                setNewStructure(prev => ({
-                  ...prev,
-                  table_names: tempSelectedTables,
-                  column_mappings: Object.entries(tempSelectedFields).reduce((acc, [table, fields]) => {
-                    fields.forEach(field => {
-                      acc[`${table}.${field}`] = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    });
-                    return acc;
-                  }, {})
-                }));
-                setShowMultiSelectDialog(false);
-              }}
-            >
-              Apply Selection
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  };
+          {/* Fields Selection */}
+          <div className="border rounded-lg p-4 bg-white shadow-sm">
+            <h4 className="font-medium mb-4 text-lg text-gray-800">Select Fields</h4>
+            <ScrollArea className="h-[400px]">
+              {selectedTables.map((tableName, index) => {
+                const tableFields = tableColumns.filter(col => col.table_name === tableName);
+                return (
+                  <div key={tableName}>
+                    <div className="bg-gray-50 p-3 rounded-t-lg border-b-2 border-primary/20">
+                      <h5 className="font-lg text-black">{tableName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h5>
+                    </div>
+                    <div className="p-2 mb-4 border-x border-b rounded-b-lg">
+                      {tableFields.map(field => (
+                        <div
+                          key={`${tableName}-${field.column_name}`}
+                          className="flex items-center gap-3 p-2.5 hover:bg-gray-50 border-b last:border-b-0 transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            id={`field-${tableName}-${field.column_name}`}
+                            checked={selectedTableFields[tableName]?.includes(field.column_name) || false}
+                            onChange={(e) => {
+                              e.stopPropagation(); // Prevent event bubbling
+                              setSelectedTableFields(prev => ({
+                                ...prev,
+                                [tableName]: e.target.checked
+                                  ? [...(prev[tableName] || []), field.column_name]
+                                  : (prev[tableName] || []).filter(f => f !== field.column_name)
+                              }));
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                          <label
+                            htmlFor={`field-${tableName}-${field.column_name}`}
+                            className="text-sm text-gray-700 hover:text-gray-900 cursor-pointer flex-1"
+                          >
+                            {field.column_name}
+                            <span className="ml-2 text-xs text-gray-500">({field.data_type})</span>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    {index < selectedTables.length - 1 && (
+                      <div className="h-4 border-l-2 border-r-2 border-dashed border-gray-200 mx-4" />
+                    )}
+                  </div>
+                );
+              })}
+            </ScrollArea>
+          </div>
 
+        </div>
 
-  const handleTabSelection = (tabValue: string) => {
-    setSelectedTab(tabValue);
-
-    // Get all data for this tab
-    const tabData = structure.filter(item => item.Tabs === tabValue);
-
-    // Extract sections
-    const tabSections = tabData
-      .map(item => Object.keys(item.sections_sections || {}))
-      .flat();
-
-    const uniqueSections = [...new Set(tabSections)];
-
-    // Extract exact column mappings and table fields
-    const mappings = tabData.reduce((acc, item) => {
-      const columnMappings = typeof item.column_mappings === 'string'
-        ? JSON.parse(item.column_mappings)
-        : item.column_mappings;
-
-      Object.entries(columnMappings).forEach(([key, value]) => {
-        const [table, field] = key.split('.');
-        if (!acc[table]) {
-          acc[table] = [];
-        }
-        if (!acc[table].includes(field)) {
-          acc[table].push(field);
-        }
-      });
-      return acc;
-    }, {});
-
-    // Set all states with exact mappings
-    setExistingSections(uniqueSections);
-    setSelectedTableFields(mappings);
-    setSelectedTables(Object.keys(mappings));
-
-    setNewStructure(prev => ({
-      ...prev,
-      Tabs: tabValue,
-      section: uniqueSections.length === 1 ? uniqueSections[0] : '',
-      isNewTab: false,
-      table_names: Object.keys(mappings)
-    }));
-
-    if (uniqueSections.length === 1) {
-      setTimeout(() => handleSectionSelection(uniqueSections[0], tabValue), 0);
-    }
-  };
-
-
-  const handleSectionSelection = (sectionValue: string, selectedTab = newStructure.Tabs) => {
-    const sectionData = structure.filter(item =>
-      item.Tabs === selectedTab &&
-      item.sections_sections &&
-      Object.keys(item.sections_sections).includes(sectionValue)
-    );
-
-    // Get subsections and auto-select if only one
-    const subsections = [...new Set(sectionData
-      .map(item => item.sections_subsections?.[sectionValue] || [])
-      .flat())];
-
-    // Get table mappings for this section
-    const tableMappings = sectionData.map(item => ({
-      tables: item.table_names?.[sectionValue] || [],
-      fields: item.column_mappings || {}
-    }));
-
-    // Set tables and fields
-    const selectedTables = tableMappings[0]?.tables || [];
-    const fieldMappings = tableMappings.reduce((acc, mapping) => {
-      selectedTables.forEach(table => {
-        acc[table] = Object.keys(mapping.fields)
-          .filter(key => key.startsWith(`${table}.`))
-          .map(key => key.split('.')[1]);
-      });
-      return acc;
-    }, {});
-
-    setExistingSubsections({ [sectionValue]: subsections });
-    setSelectedTableFields(fieldMappings);
-    setSelectedTables(selectedTables);
-
-    setNewStructure(prev => ({
-      ...prev,
-      section: sectionValue,
-      subsection: subsections.length === 1 ? subsections[0] : '',
-      table_names: selectedTables,
-      isNewSection: false
-    }));
-  };
-
+        <DialogFooter>
+          <Button onClick={() => {
+            setNewStructure(prev => ({
+              ...prev,
+              table_names: selectedTables,
+              column_mappings: Object.entries(selectedTableFields).reduce((acc, [table, fields]) => {
+                fields.forEach(field => {
+                  acc[`${table}.${field}`] = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                });
+                return acc;
+              }, {})
+            }));
+            setShowMultiSelectDialog(false);
+          }}>
+            Apply Selection
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 
   const handleAddNewField = async () => {
     console.log('Adding new field:', addFieldState);
@@ -1084,23 +961,21 @@ export function SettingsDialog() {
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  {existingSections
-                    .filter(section => {
-                      const sectionItems = structure.filter(item =>
-                        item.Tabs === selectedTab &&
-                        item.sections_sections &&
-                        Object.keys(item.sections_sections).includes(section)
-                      );
-                      return sectionItems.length > 0;
+                  {existingSections.map(section => (
+                    <div key={section} className={`mb-2 p-2 rounded cursor-pointer transition-colors ${selectedSection?.section === section ? 'bg-primary/10' : 'hover:bg-gray-100'}`} onClick={() => setSelectedSection({ section })}>
+                      <div className="font-medium">{section}</div>
+                    </div>
+                  ))}
+
+                  {selectedSection && structure
+                    .filter(item => item.Tabs === selectedTab && item.section[section])
+                    .flatMap(item => {
+                      const subsections = item.subsection[selectedSection.section] || [];
+                      return Array.isArray(subsections) ? subsections : [subsections];
                     })
-                    .map(section => (
-                      <div
-                        key={section}
-                        className={`mb-2 p-2 rounded cursor-pointer transition-colors ${selectedSection?.section === section ? 'bg-primary/10' : 'hover:bg-gray-100'
-                          }`}
-                        onClick={() => setSelectedSection({ section })}
-                      >
-                        <div className="font-medium">{section}</div>
+                    .map(subsection => (
+                      <div key={subsection} className={`mb-2 p-2 rounded cursor-pointer transition-colors ${selectedSubsection === subsection ? 'bg-primary/10' : 'hover:bg-gray-100'}`} onClick={() => setSelectedSubsection(subsection)}>
+                        <div className="font-medium">{subsection}</div>
                       </div>
                     ))}
 
@@ -1317,7 +1192,21 @@ export function SettingsDialog() {
                 <label className="text-sm font-medium text-gray-700">Tab</label>
                 <Select
                   value={newStructure.Tabs}
-                  onValueChange={handleTabSelection}
+                  onValueChange={(value) => {
+                    if (value === 'new') {
+                      setNewStructure(prev => ({
+                        ...prev,
+                        Tabs: '',
+                        isNewTab: true
+                      }));
+                    } else {
+                      setNewStructure(prev => ({
+                        ...prev,
+                        Tabs: value,
+                        isNewTab: false
+                      }));
+                    }
+                  }}
                 >
                   <SelectTrigger className="w-full bg-white">
                     <SelectValue placeholder="Select or Create Tab" />
@@ -1348,7 +1237,23 @@ export function SettingsDialog() {
                 <label className="text-sm font-medium text-gray-700">Section</label>
                 <Select
                   value={newStructure.section}
-                  onValueChange={handleSectionSelection}
+                  onValueChange={(value) => {
+                    if (value === 'new') {
+                      setNewStructure(prev => ({
+                        ...prev,
+                        section: '',
+                        isNewSection: true,
+                        subsection: '',
+                        isNewSubsection: false
+                      }));
+                    } else {
+                      setNewStructure(prev => ({
+                        ...prev,
+                        section: value,
+                        isNewSection: false
+                      }));
+                    }
+                  }}
                 >
                   <SelectTrigger className="w-full bg-white">
                     <SelectValue placeholder="Select or Create Section" />
@@ -1612,40 +1517,41 @@ export function SettingsDialog() {
               <div className="border rounded-lg p-4">
                 <h4 className="font-medium mb-2">Select Fields</h4>
                 <ScrollArea className="h-[400px]">
-                  {selectedTables.map((tableName) => {
-                    const tableFields = tableColumns.filter(col => col.table_name === tableName);
-                    return (
-                      <div key={tableName}>
-                        <div className="bg-gray-50 p-3 rounded-t-lg border-b-2 border-primary/20">
-                          <h5 className="font-lg text-black">{tableName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h5>
-                        </div>
-                        <div className="p-2 mb-4 border-x border-b rounded-b-lg">
-                          {tableFields.map(field => (
-                            <div key={`${tableName}-${field.column_name}`} className="flex items-center gap-2 p-2 hover:bg-gray-50">
-                              <input
-                                type="checkbox"
-                                id={`field-${tableName}-${field.column_name}`}
-                                checked={selectedTableFields[tableName]?.includes(field.column_name) || false}
-                                onChange={(e) => {
-                                  setSelectedTableFields(prev => ({
-                                    ...prev,
-                                    [tableName]: e.target.checked
-                                      ? [...(prev[tableName] || []), field.column_name]
-                                      : (prev[tableName] || []).filter(f => f !== field.column_name)
-                                  }));
-                                }}
-                                className="h-4 w-4"
-                              />
-                              <label htmlFor={`field-${tableName}-${field.column_name}`}>
-                                {field.column_name}
-                                <span className="ml-2 text-xs text-gray-500">({field.data_type})</span>
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {availableFields.map(({ table, fields }) => (
+                    <div key={table} className="mb-4">
+                      <h5 className="font-medium text-sm text-gray-700 mb-2">{table}</h5>
+                      {fields.map(field => {
+                        const isInSection = newStructure.section &&
+                          sectionFields[newStructure.section]?.fields.includes(field.column_name);
+                        const isInSubsection = newStructure.subsection &&
+                          sectionFields[newStructure.section]?.subsections[newStructure.subsection]?.includes(field.column_name);
+
+                        return (
+                          <div key={`${table}-${field.column_name}`} className="flex items-center gap-2 p-2 hover:bg-gray-50">
+                            <input
+                              type="checkbox"
+                              id={`field-${table}-${field.column_name}`}
+                              checked={selectedTableFields[table]?.includes(field.column_name) || false}
+                              onChange={(e) => {
+                                setSelectedTableFields(prev => ({
+                                  ...prev,
+                                  [table]: e.target.checked
+                                    ? [...(prev[table] || []), field.column_name]
+                                    : (prev[table] || []).filter(f => f !== field.column_name)
+                                }));
+                              }}
+                              className="h-4 w-4"
+                            />
+                            <label htmlFor={`field-${table}-${field.column_name}`}>
+                              {field.column_name}
+                              {isInSection && <span className="ml-2 text-blue-500">(In Section)</span>}
+                              {isInSubsection && <span className="ml-2 text-green-500">(In Subsection)</span>}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </ScrollArea>
               </div>
             </div>
