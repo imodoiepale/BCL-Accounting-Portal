@@ -167,11 +167,13 @@ export default function GmailManager() {
   const [currentMessage, setCurrentMessage] = useState(null);
   const [showFilterManager, setShowFilterManager] = useState(false);
   const [searchQuery, setSearchQuery] = useState(''); // State for search query
+  const [isGapiInitialized, setIsGapiInitialized] = useState(false);
+
 
   const CLIENT_ID = '342538819907-2v86oir8ip9m4nvurqs6g4j1ohsqc2sg.apps.googleusercontent.com';
   const API_KEY = 'AIzaSyCAtdOy5Tj8Orjm4HM5LlwOl8bWEf2-81c';
   const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.modify';
-  const CLIENT_SECRET = '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'; 
+  const CLIENT_SECRET = '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'; 
 
 
   useEffect(() => {
@@ -197,55 +199,106 @@ export default function GmailManager() {
       apiKey: API_KEY,
       discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest'],
     });
+    setIsGapiInitialized(true);
   };
-
-  const initGsi = () => {
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: SCOPES,
-      callback: handleTokenResponse,
-      redirect_uri: window.location.origin,
-      access_type: 'offline',
-      prompt: 'consent',
-      include_granted_scopes: true,
-    });
-    setTokenClient(client);
-  };
-
-  const addNewAccount = () => {
-    if (tokenClient) {
-      // Force new consent screen
-      google.accounts.oauth2.revoke(gapi.client.getToken()?.access_token || '', () => {
-        tokenClient.requestAccessToken({
-          prompt: 'consent',
-          access_type: 'offline'
-        });
-      });
-    }
-  };
-
-
-  const saveAccountToDatabase = async (email, token) => {
-    try {
-      const { data, error } = await supabase
-        .from('acc_portal_email_accounts')
-        .upsert({
-          email: email,
-          access_token: token.access_token,
-          refresh_token: token.refresh_token,
-          expiry_date: token.expires_at,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'email'
-        });
   
-      if (error) throw error;
-      return data;
+  const initGsi = () => {
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: handleTokenResponse,
+        redirect_uri: window.location.origin,
+        access_type: 'offline',
+        prompt: 'consent',
+        include_granted_scopes: true,
+      });
+      setTokenClient(client);
     } catch (error) {
-      console.error('Error saving account to database:', error);
-      toast.error('Failed to save account');
+      console.error('Error initializing GSI:', error);
     }
   };
+  
+  // Update useEffect
+  useEffect(() => {
+    const loadScripts = async () => {
+      try {
+        const loadGapiScript = document.createElement('script');
+        loadGapiScript.src = 'https://apis.google.com/js/api.js';
+        loadGapiScript.onload = initGapi;
+        document.body.appendChild(loadGapiScript);
+  
+        const loadGsiScript = document.createElement('script');
+        loadGsiScript.src = 'https://accounts.google.com/gsi/client';
+        loadGsiScript.onload = initGsi;
+        document.body.appendChild(loadGsiScript);
+  
+        return () => {
+          document.body.removeChild(loadGapiScript);
+          document.body.removeChild(loadGsiScript);
+        };
+      } catch (error) {
+        console.error('Error loading scripts:', error);
+      }
+    };
+  
+    loadScripts();
+  }, []);
+
+  const addNewAccount = async () => {
+    try {
+      if (!tokenClient) {
+        console.log('Initializing token client...');
+        initGsi();
+        // Wait a bit to ensure tokenClient is set
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+  
+      if (tokenClient) {
+        const currentToken = gapi.client.getToken();
+        if (currentToken?.access_token) {
+          google.accounts.oauth2.revoke(currentToken.access_token, () => {
+            tokenClient.requestAccessToken({
+              prompt: 'consent',
+              access_type: 'offline'
+            });
+          });
+        } else {
+          tokenClient.requestAccessToken({
+            prompt: 'consent',
+            access_type: 'offline'
+          });
+        }
+      } else {
+        throw new Error('Token client not initialized');
+      }
+    } catch (error) {
+      console.error('Error in addNewAccount:', error);
+      toast.error('Failed to start authorization. Please try again.');
+    }
+  };
+
+  // const saveAccountToDatabase = async (email, token) => {
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from('acc_portal_email_accounts')
+  //       .upsert({
+  //         email: email,
+  //         access_token: token.access_token,
+  //         refresh_token: token.refresh_token,
+  //         expiry_date: token.expires_at,
+  //         updated_at: new Date().toISOString()
+  //       }, {
+  //         onConflict: 'email'
+  //       });
+  
+  //     if (error) throw error;
+  //     return data;
+  //   } catch (error) {
+  //     console.error('Error saving account to database:', error);
+  //     toast.error('Failed to save account');
+  //   }
+  // };
 
 
   const loadAccountsFromDatabase = async () => {
@@ -299,17 +352,12 @@ export default function GmailManager() {
   
   const refreshAccessToken = async (refreshToken) => {
     try {
-      const response = await fetch('https://oauth2.googleapis.com/token', {
+      const response = await fetch('/api/auth/google/refresh', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({
-          client_id: CLIENT_ID,
-          client_secret: CLIENT_SECRET,
-          refresh_token: refreshToken,
-          grant_type: 'refresh_token'
-        }),
+        body: JSON.stringify({ refresh_token: refreshToken }),
       });
   
       const data = await response.json();
@@ -317,7 +365,7 @@ export default function GmailManager() {
       if (data.access_token) {
         return {
           access_token: data.access_token,
-          refresh_token: refreshToken, // Keep the existing refresh token
+          refresh_token: refreshToken,
           expires_at: new Date(Date.now() + (data.expires_in * 1000)).toISOString()
         };
       }
@@ -336,84 +384,219 @@ export default function GmailManager() {
     }
   
     try {
-      // Exchange the authorization code for tokens with client secret
-      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      console.log('Initial response:', response);
+  
+      // Case 1: Direct access token response from Google
+      if (response.access_token) {
+        try {
+          // Set the tokens for API calls
+          gapi.client.setToken({
+            access_token: response.access_token,
+            refresh_token: response.refresh_token,
+            expires_in: response.expires_in,
+            scope: response.scope
+          });
+  
+          const userInfo = await gapi.client.gmail.users.getProfile({ userId: 'me' });
+          const email = userInfo.result.emailAddress;
+  
+          if (!accounts.find(acc => acc.email === email)) {
+            // Prepare token data
+            const tokenData = {
+              access_token: response.access_token,
+              expires_at: new Date(Date.now() + (response.expires_in * 1000)).toISOString()
+            };
+  
+            // If no refresh token, try to get one
+            if (!response.refresh_token) {
+              console.log('No refresh token, initiating reauthorization...');
+              await revokeAndReauthorize();
+              return;
+            }
+  
+            tokenData.refresh_token = response.refresh_token;
+  
+            // Save to database
+            await saveAccountToDatabase(email, tokenData);
+  
+            // Add to local state
+            const newAccount = {
+              email,
+              token: tokenData
+            };
+  
+            setAccounts(prev => [...prev, newAccount]);
+            setSelectedAccount(email);
+            await fetchMessages(email);
+            toast.success('Account added successfully');
+          } else {
+            toast.info('Account already exists');
+          }
+          return;
+        } catch (error) {
+          console.error('Error processing direct token:', error);
+          throw error;
+        }
+      }
+  
+      // Case 2: Authorization code flow
+      if (!response.code) {
+        throw new Error('No authorization code or token received');
+      }
+  
+      const tokenResponse = await fetch('/api/auth/google/token', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({
-          client_id: CLIENT_ID,
-          client_secret: CLIENT_SECRET,
-          code: response.code,
-          grant_type: 'authorization_code',
-          redirect_uri: window.location.origin,
-        }),
+        body: JSON.stringify({ code: response.code }),
       });
   
-      const tokens = await tokenResponse.json();
-  
-      if (!tokens.refresh_token) {
-        console.error('No refresh token received');
-        toast.error('Failed to get refresh token. Please revoke access and try again.');
+      let tokens;
+      try {
+        const responseText = await tokenResponse.text();
+        console.log('Raw token response:', responseText);
+        tokens = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse token response:', e);
+        toast.error('Invalid token response');
         return;
       }
   
-      // Set the tokens for API calls
-      gapi.client.setToken({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_in: tokens.expires_in
-      });
+      if (!tokenResponse.ok) {
+        throw new Error(`Token exchange failed: ${tokens.error || 'Unknown error'}`);
+      }
   
-      const userInfo = await gapi.client.gmail.users.getProfile({ userId: 'me' });
-      const email = userInfo.result.emailAddress;
+      if (tokens.error) {
+        console.error('Token error:', tokens);
+        toast.error(tokens.error_description || tokens.error);
+        return;
+      }
   
-      if (!accounts.find(acc => acc.email === email)) {
-        // Save to database
-        await saveAccountToDatabase(email, {
+      if (!tokens.refresh_token) {
+        console.log('No refresh token from exchange, initiating reauthorization...');
+        await revokeAndReauthorize();
+        return;
+      }
+  
+      try {
+        // Set the tokens for API calls
+        gapi.client.setToken({
           access_token: tokens.access_token,
           refresh_token: tokens.refresh_token,
-          expires_at: new Date(Date.now() + (tokens.expires_in * 1000)).toISOString()
+          expires_in: tokens.expires_in
         });
   
-        const newAccount = {
-          email,
-          token: {
+        const userInfo = await gapi.client.gmail.users.getProfile({ userId: 'me' });
+        const email = userInfo.result.emailAddress;
+  
+        if (!accounts.find(acc => acc.email === email)) {
+          const tokenData = {
             access_token: tokens.access_token,
             refresh_token: tokens.refresh_token,
             expires_at: new Date(Date.now() + (tokens.expires_in * 1000)).toISOString()
-          }
-        };
+          };
   
-        setAccounts(prev => [...prev, newAccount]);
-        setSelectedAccount(email);
-        await fetchMessages(email);
-        toast.success('Account added successfully');
+          // Save to database
+          await saveAccountToDatabase(email, tokenData);
+  
+          // Add to local state
+          const newAccount = {
+            email,
+            token: tokenData
+          };
+  
+          setAccounts(prev => [...prev, newAccount]);
+          setSelectedAccount(email);
+          await fetchMessages(email);
+          toast.success('Account added successfully');
+        } else {
+          toast.info('Account already exists');
+        }
+      } catch (error) {
+        console.error('Error processing exchanged token:', error);
+        throw error;
+      }
+  
+    } catch (error) {
+      console.error('Error in token handling:', error);
+      toast.error(error.message || 'Failed to add account');
+    }
+  };
+ 
+  const revokeAndReauthorize = async () => {
+    try {
+      const currentToken = gapi.client.getToken();
+      if (currentToken?.access_token) {
+        await fetch(`https://oauth2.googleapis.com/revoke?token=${currentToken.access_token}`, {
+          method: 'POST'
+        });
+        gapi.client.setToken(null);
+      }
+  
+      if (!tokenClient) {
+        console.log('Reinitializing token client...');
+        initGsi(); // Reinitialize if needed
+      }
+  
+      // Wait a bit to ensure tokenClient is set
+      await new Promise(resolve => setTimeout(resolve, 1000));
+  
+      if (tokenClient) {
+        tokenClient.requestAccessToken({
+          prompt: 'consent',
+          access_type: 'offline'
+        });
+      } else {
+        throw new Error('Token client not initialized');
       }
     } catch (error) {
-      console.error('Error in token exchange:', error);
-      toast.error('Failed to add account');
+      console.error('Error in revoke and reauthorize:', error);
+      toast.error('Failed to reauthorize. Please try again.');
     }
   };
   
+  
+  const saveAccountToDatabase = async (email: string, tokenData: {
+    access_token: string;
+    refresh_token?: string;
+    expires_at: string;
+  }) => {
+    try {
+      const { data, error } = await supabase
+        .from('acc_portal_email_accounts')
+        .upsert({
+          email,
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          expiry_date: tokenData.expires_at,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'email'
+        });
+  
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error saving account to database:', error);
+      throw error;
+    }
+  };
 
   const revokeAccess = async (email) => {
     try {
       const account = accounts.find(acc => acc.email === email);
       if (account?.token?.access_token) {
-        await fetch(`https://oauth2.googleapis.com/revoke?token=${account.token.access_token}`, {
-          method: 'POST'
+        await fetch('/api/auth/google/revoke', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: account.token.access_token }),
         });
       }
       
-      // Remove from database
-      const { error } = await supabase
-        .from('acc_portal_email_accounts')
-        .delete()
-        .eq('email', email);
-  
-      if (error) throw error;
+      await clearTokenStorage(email);
       
       setAccounts(prev => prev.filter(acc => acc.email !== email));
       setSelectedAccount(accounts[0]?.email || 'all');
