@@ -1328,6 +1328,8 @@ const OverallView = () => {
                         companyData={selectedCompany}
                         onSave={handleEditSave}
                         references={references.columns}
+                        processedSections={processedSections} 
+                        renderSeparatorCell={renderSeparatorCell} 
                     />
                 )}
                 {selectedMissingFields && (
