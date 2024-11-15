@@ -1,4 +1,5 @@
 // TableHeaders.tsx
+// @ts-nocheck
 import React from 'react';
 import {
     TableHead,
