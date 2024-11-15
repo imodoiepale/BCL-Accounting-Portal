@@ -75,14 +75,92 @@ interface SectionFields {
   };
 }
 
+
+// Helper function to parse JSON safely
+const safeJSONParse = (jsonString: string, fallback: any = {}) => {
+  try {
+    return typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+  } catch (error) {
+    return fallback;
+  }
+};
+
+// Helper function to process sections and subsections
+const processStructureData = (data: any[]) => {
+  const allSections = new Set<string>();
+  const allSubsections: Record<string, Set<string>> = {};
+  const mappings: Record<string, Record<string, string[]>> = {};
+
+  data.forEach(item => {
+    const sectionsData = safeJSONParse(item.sections_sections);
+    const subsectionsData = safeJSONParse(item.sections_subsections);
+    const columnMappings = safeJSONParse(item.column_mappings);
+
+    // Process sections
+    Object.keys(sectionsData).forEach(section => {
+      allSections.add(section);
+      if (!allSubsections[section]) {
+        allSubsections[section] = new Set();
+      }
+      if (!mappings[section]) {
+        mappings[section] = {};
+      }
+    });
+
+    // Process subsections and their mappings
+    Object.entries(subsectionsData).forEach(([section, subs]) => {
+      if (!allSubsections[section]) {
+        allSubsections[section] = new Set();
+      }
+
+      const subsections = Array.isArray(subs) ? subs : [subs];
+      subsections.forEach(sub => {
+        if (sub) {
+          allSubsections[section].add(sub);
+          if (!mappings[section][sub]) {
+            mappings[section][sub] = [];
+          }
+        }
+      });
+    });
+
+    // Process column mappings
+    Object.entries(columnMappings).forEach(([key, value]) => {
+      const [table, field] = key.split('.');
+      Object.keys(sectionsData).forEach(section => {
+        const subsection = subsectionsData[section];
+        if (subsection) {
+          if (!mappings[section][subsection]) {
+            mappings[section][subsection] = [];
+          }
+          if (!mappings[section][subsection].includes(field)) {
+            mappings[section][subsection].push(field);
+          }
+        }
+      });
+    });
+  });
+
+  return {
+    sections: Array.from(allSections),
+    subsections: Object.fromEntries(
+      Object.entries(allSubsections).map(([k, v]) => [k, Array.from(v)])
+    ),
+    mappings
+  };
+};
+
+
+
 export function SettingsDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [structure, setStructure] = useState<StructureItem[]>([]);
+  const [uniqueTabs, setUniqueTabs] = useState<string[]>([]);
   const [selectedTab, setSelectedTab] = useState('');
-  const [selectedSection, setSelectedSection] = useState<StructureItem | null>(null);
-  const [selectedSubsection, setSelectedSubsection] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [newField, setNewField] = useState({ key: '', value: '' });
+  const [existingSections, setExistingSections] = useState<string[]>([]);
+  const [existingSubsections, setExistingSubsections] = useState<Record<string, string[]>>({});
+  const [selectedTables, setSelectedTables] = useState<string[]>([]);
+  const [selectedTableFields, setSelectedTableFields] = useState<{ [table: string]: string[] }>({});
   const [newStructure, setNewStructure] = useState<NewStructure>({
     section: '',
     subsection: '',
@@ -94,28 +172,27 @@ export function SettingsDialog() {
     isNewSubsection: false,
     table_names: []
   });
+  
+  const [selectedSection, setSelectedSection] = useState<StructureItem | null>(null);
+  const [selectedSubsection, setSelectedSubsection] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [newField, setNewField] = useState({ key: '', value: '' });
   const [tables, setTables] = useState<string[]>([]);
-  const [tableColumns, setTableColumns] = useState<TableColumn[]>([]); // Ensure this is an array
+  const [tableColumns, setTableColumns] = useState<TableColumn[]>([]);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
-  const [existingSections, setExistingSections] = useState<string[]>([]);
-  const [existingSubsections, setExistingSubsections] = useState<Record<string, string[]>>({});
   const [showNewTableDialog, setShowNewTableDialog] = useState(false);
   const [newTableName, setNewTableName] = useState('');
   const [loadingTable, setLoadingTable] = useState(false);
   const [addFieldDialogOpen, setAddFieldDialogOpen] = useState(false);
-  const [uniqueTabs, setUniqueTabs] = useState<string[]>([]); // Initialize uniqueTabs
   const [showMultiSelectDialog, setShowMultiSelectDialog] = useState(false);
-  const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [availableFields, setAvailableFields] = useState<{ table: string, fields: TableColumn[] }[]>([]);
-  const [selectedTableFields, setSelectedTableFields] = useState<{ [table: string]: string[] }>({});
   const [addFieldState, setAddFieldState] = useState({
     displayName: '',
     selectedTables: [],
     selectedFields: {},
-    selectedTab: 'new', // 'new' or 'existing'
+    selectedTab: 'new',
     newFieldTable: ''
   });
-
   const [sectionFields, setSectionFields] = useState<SectionFields>({});
 
   const resetNewStructure = () => {
@@ -153,23 +230,26 @@ export function SettingsDialog() {
         section: mapping.section,
         subsection: mapping.subsection,
         table_name: mapping.table_name,
-        column_mappings: typeof mapping.column_mappings === 'string' ? JSON.parse(mapping.column_mappings) : mapping.column_mappings || {},
+        column_mappings: typeof mapping.column_mappings === 'string'
+          ? JSON.parse(mapping.column_mappings)
+          : mapping.column_mappings || {},
         column_order: mapping.column_order || {},
         Tabs: mapping.Tabs,
-        column_settings: mapping.column_settings || {},
-        sections_subsections: typeof mapping.sections_subsections === 'string' ? JSON.parse(mapping.sections_subsections) : mapping.sections_subsections || {},
-        sections_sections: typeof mapping.sections_sections === 'string' ? JSON.parse(mapping.sections_sections) : mapping.sections_sections || {}
+        sections_subsections: typeof mapping.sections_subsections === 'string'
+          ? JSON.parse(mapping.sections_subsections)
+          : mapping.sections_subsections || {},
+        sections_sections: typeof mapping.sections_sections === 'string'
+          ? JSON.parse(mapping.sections_sections)
+          : mapping.sections_sections || {}
       }));
 
       setStructure(processedMappings);
-
       const uniqueTabs = [...new Set(mappings.map(m => m.Tabs))];
       setUniqueTabs(uniqueTabs);
 
       if (!selectedTab && uniqueTabs.length > 0) {
         setSelectedTab(uniqueTabs[0]);
       }
-
     } catch (error) {
       console.error('Error fetching structure:', error);
       toast.error('Failed to fetch table structure');
@@ -589,66 +669,75 @@ export function SettingsDialog() {
   // };
 
   const handleAddStructure = async () => {
-  try {
-    const finalColumnMappings = {};
-    const finalTableFields = {};
-
-    selectedTables.forEach(table => {
-      const fields = selectedTableFields[table] || [];
-      fields.forEach(field => {
-        finalColumnMappings[`${table}.${field}`] = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      });
-      finalTableFields[table] = fields;
-    });
-
-    const payload = {
-      sections_sections: JSON.stringify({ [newStructure.section]: true }),
-      sections_subsections: JSON.stringify({ [newStructure.section]: newStructure.subsection }),
-      Tabs: newStructure.Tabs,
-      column_mappings: JSON.stringify(finalColumnMappings),
-      table_names: JSON.stringify({ [newStructure.section]: newStructure.table_names }),
-      column_order: JSON.stringify(
-        Object.keys(finalColumnMappings).reduce((acc, key, index) => {
-          acc[key] = index + 1;
-          return acc;
-        }, {})
-      )
-    };
-
-    // Check for existing mapping
-    const { data: existingMapping, error: fetchError } = await supabase
-      .from('profile_category_table_mapping')
-      .select('*')
-      .match({
-        sections_sections: payload.sections_sections,
-        sections_subsections: payload.sections_subsections
+    try {
+      // Create column mappings from selected fields
+      const finalColumnMappings: Record<string, string> = {};
+      Object.entries(selectedTableFields).forEach(([table, fields]) => {
+        fields.forEach(field => {
+          finalColumnMappings[`${table}.${field}`] = field
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, l => l.toUpperCase());
+        });
       });
 
-    if (fetchError) throw fetchError;
+      // Prepare payload
+      const payload = {
+        sections_sections: JSON.stringify({ [newStructure.section]: true }),
+        sections_subsections: JSON.stringify({
+          [newStructure.section]: newStructure.subsection
+        }),
+        Tabs: newStructure.Tabs,
+        column_mappings: JSON.stringify(finalColumnMappings),
+        table_names: JSON.stringify({
+          [newStructure.section]: selectedTables
+        }),
+        column_order: JSON.stringify(
+          Object.keys(finalColumnMappings).reduce((acc, key, index) => {
+            acc[key] = index + 1;
+            return acc;
+          }, {} as Record<string, number>)
+        )
+      };
 
-    if (existingMapping && existingMapping.length > 0) {
-      const { error: updateError } = await supabase
+      // Check for existing mapping
+      const { data: existingMapping, error: fetchError } = await supabase
         .from('profile_category_table_mapping')
-        .update(payload)
-        .eq('id', existingMapping[0].id);
+        .select('*')
+        .match({
+          sections_sections: payload.sections_sections,
+          sections_subsections: payload.sections_subsections
+        });
 
-      if (updateError) throw updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from('profile_category_table_mapping')
-        .insert([payload]);
+      if (fetchError) throw fetchError;
 
-      if (insertError) throw insertError;
+      if (existingMapping && existingMapping.length > 0) {
+        const { error: updateError } = await supabase
+          .from('profile_category_table_mapping')
+          .update(payload)
+          .eq('id', existingMapping[0].id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('profile_category_table_mapping')
+          .insert([payload]);
+
+        if (insertError) throw insertError;
+      }
+
+      // Refresh structure and reset states
+      await fetchStructure();
+      resetNewStructure();
+      toast.success('Structure updated successfully');
+
+    } catch (error) {
+      console.error('Error updating structure:', error);
+      toast.error('Failed to update structure');
     }
+  };
 
-    await fetchStructure();
-    resetNewStructure();
-    toast.success('Structure updated successfully');
-  } catch (error) {
-    console.error('Error updating structure:', error);
-    toast.error('Failed to update structure');
-  }
-};
+
+
   const fetchSectionFields = async (section) => {
     try {
       const { data, error } = await supabase
@@ -722,6 +811,11 @@ export function SettingsDialog() {
         setTempSelectedFields(selectedTableFields);
       }
     }, [showMultiSelectDialog, selectedTables, selectedTableFields]);
+
+    useEffect(() => {
+      console.log('Selected Tables:', selectedTables);
+      console.log('Selected Fields:', selectedTableFields);
+    }, [selectedTables, selectedTableFields]);
 
     return (
       <Dialog open={showMultiSelectDialog} onOpenChange={setShowMultiSelectDialog}>
@@ -852,99 +946,321 @@ export function SettingsDialog() {
     );
   };
 
+  // Handle Tab Selection
+  const handleTabSelection = async (tabValue: string, isNewStructure: boolean = false) => {
+    try {
+      if (isNewStructure) {
+        // This is for Add New Structure section
+        if (tabValue === 'new') {
+          // Load ALL sections and subsections independently for new tab
+          const { data, error } = await supabase
+            .from('profile_category_table_mapping')
+            .select('*');
 
-  const handleTabSelection = (tabValue: string) => {
-    setSelectedTab(tabValue);
+          if (error) throw error;
 
-    // Get all data for this tab
-    const tabData = structure.filter(item => item.Tabs === tabValue);
+          // Get ALL sections and subsections regardless of tab
+          const allSections = new Set<string>();
+          const allSubsections = new Set<string>();
 
-    // Extract sections
-    const tabSections = tabData
-      .map(item => Object.keys(item.sections_sections || {}))
-      .flat();
+          data.forEach(item => {
+            const sectionsData = safeJSONParse(item.sections_sections, {});
+            const subsectionsData = safeJSONParse(item.sections_subsections, {});
 
-    const uniqueSections = [...new Set(tabSections)];
+            Object.keys(sectionsData).forEach(section => allSections.add(section));
+            Object.values(subsectionsData).forEach(subs => {
+              if (Array.isArray(subs)) {
+                subs.forEach(sub => allSubsections.add(sub));
+              } else if (subs) {
+                allSubsections.add(subs as string);
+              }
+            });
+          });
 
-    // Extract exact column mappings and table fields
-    const mappings = tabData.reduce((acc, item) => {
-      const columnMappings = typeof item.column_mappings === 'string'
-        ? JSON.parse(item.column_mappings)
-        : item.column_mappings;
+          setExistingSections(Array.from(allSections));
+          setExistingSubsections({
+            "all": Array.from(allSubsections)
+          });
 
-      Object.entries(columnMappings).forEach(([key, value]) => {
+          setNewStructure({
+            section: '',
+            subsection: '',
+            table_name: '',
+            Tabs: '',
+            column_mappings: {},
+            isNewTab: true,
+            isNewSection: false,
+            isNewSubsection: false,
+            table_names: []
+          });
+        } else {
+          // Existing tab for new structure
+          setNewStructure(prev => ({
+            ...prev,
+            Tabs: tabValue,
+            isNewTab: false
+          }));
+        }
+      } else {
+        // This is for Table Structure Settings section
+        setSelectedTab(tabValue);
+        fetchExistingSectionsAndSubsections(tabValue);
+      }
+
+      setSelectedTables([]);
+      setSelectedTableFields({});
+
+    } catch (error) {
+      console.error('Error in tab selection:', error);
+      toast.error('Failed to load tab data');
+    }
+  };
+
+  const handleSectionSelection = async (sectionValue: string) => {
+    try {
+      if (sectionValue === 'new') {
+        if (newStructure.isNewTab) {
+          // For new tab, preserve existing subsections and just reset section-related states
+          setNewStructure(prev => ({
+            ...prev,
+            section: '',
+            subsection: '',
+            isNewSection: true,
+            isNewSubsection: false,
+            table_names: []
+          }));
+
+          // Clear selections but keep existing subsections
+          setSelectedTables([]);
+          setSelectedTableFields({});
+          return;
+        } else {
+          // For existing tab, handle new section creation
+          setNewStructure(prev => ({
+            ...prev,
+            section: '',
+            subsection: '',
+            isNewSection: true,
+            isNewSubsection: false,
+            table_names: []
+          }));
+
+          // Clear all selections and subsections for existing tab
+          setSelectedTables([]);
+          setSelectedTableFields({});
+          setExistingSubsections({});
+          return;
+        }
+      }
+
+      // Fetch all mapping data
+      const { data, error } = await supabase
+        .from('profile_category_table_mapping')
+        .select('*');
+
+      if (error) throw error;
+
+      if (newStructure.isNewTab) {
+        // For new tab, process ALL data to get complete set of mappings
+        const allSubsectionsSet = new Set<string>();
+        const allMappings: Record<string, string[]> = {};
+
+        data.forEach(item => {
+          // Process subsections
+          const subsectionsData = safeJSONParse(item.sections_subsections, {});
+          Object.values(subsectionsData).forEach(subs => {
+            if (Array.isArray(subs)) {
+              subs.forEach(sub => allSubsectionsSet.add(sub));
+            } else if (subs) {
+              allSubsectionsSet.add(subs as string);
+            }
+          });
+
+          // Process mappings
+          const columnMappings = safeJSONParse(item.column_mappings, {});
+          Object.entries(columnMappings).forEach(([key, value]) => {
+            const [table, field] = key.split('.');
+            if (!allMappings[table]) {
+              allMappings[table] = [];
+            }
+            if (!allMappings[table].includes(field)) {
+              allMappings[table].push(field);
+            }
+          });
+        });
+
+        // Keep all subsections available under the "all" key
+        if (!existingSubsections["all"]) {
+          setExistingSubsections(prev => ({
+            ...prev,
+            all: Array.from(allSubsectionsSet)
+          }));
+        }
+
+        setNewStructure(prev => ({
+          ...prev,
+          section: sectionValue,
+          isNewSection: false,
+          subsection: '',
+          table_names: []
+        }));
+
+        // Clear specific selections but maintain all available options
+        setSelectedTables([]);
+        setSelectedTableFields({});
+
+      } else {
+        // For existing tab, filter data for this tab and section
+        const relevantData = data.filter(item =>
+          item.Tabs === newStructure.Tabs &&
+          item.sections_sections &&
+          Object.keys(safeJSONParse(item.sections_sections)).includes(sectionValue)
+        );
+
+        // Process section-specific data
+        const sectionMappings: Record<string, string[]> = {};
+        const sectionSubsections = new Set<string>();
+
+        relevantData.forEach(item => {
+          // Process subsections for this section
+          const subsectionsData = safeJSONParse(item.sections_subsections, {});
+          const sectionSubs = subsectionsData[sectionValue] || [];
+          if (Array.isArray(sectionSubs)) {
+            sectionSubs.forEach(sub => sectionSubsections.add(sub));
+          } else if (sectionSubs) {
+            sectionSubsections.add(sectionSubs as string);
+          }
+
+          // Process mappings
+          const columnMappings = safeJSONParse(item.column_mappings, {});
+          Object.entries(columnMappings).forEach(([key, value]) => {
+            const [table, field] = key.split('.');
+            if (!sectionMappings[table]) {
+              sectionMappings[table] = [];
+            }
+            if (!sectionMappings[table].includes(field)) {
+              sectionMappings[table].push(field);
+            }
+          });
+        });
+
+        // Update states for existing tab
+        setExistingSubsections({
+          [sectionValue]: Array.from(sectionSubsections)
+        });
+
+        setSelectedTables(Object.keys(sectionMappings));
+        setSelectedTableFields(sectionMappings);
+
+        setNewStructure(prev => ({
+          ...prev,
+          section: sectionValue,
+          isNewSection: false,
+          subsection: '',
+          table_names: Object.keys(sectionMappings)
+        }));
+      }
+
+      // Log for debugging
+      console.log('Section selection completed:', {
+        isNewTab: newStructure.isNewTab,
+        selectedSection: sectionValue,
+        availableSubsections: existingSubsections,
+        selectedTables,
+        selectedTableFields
+      });
+
+    } catch (error) {
+      console.error('Error in section selection:', error);
+      toast.error('Failed to load section data');
+
+      // Reset states on error
+      setNewStructure(prev => ({
+        ...prev,
+        section: '',
+        subsection: '',
+        isNewSection: false,
+        isNewSubsection: false,
+        table_names: []
+      }));
+      setSelectedTables([]);
+      setSelectedTableFields({});
+    }
+  };
+
+  // Handle Subsection Selection
+  const handleSubsectionSelection = async (subsectionValue: string) => {
+    try {
+      if (subsectionValue === 'new') {
+        setNewStructure(prev => ({
+          ...prev,
+          subsection: '',
+          isNewSubsection: true
+        }));
+        return;
+      }
+
+      let mappingsToUse = {};
+
+      if (newStructure.isNewTab) {
+        // For new tab, get all mappings for this section/subsection combination
+        const { data, error } = await supabase
+          .from('profile_category_table_mapping')
+          .select('*');
+
+        if (error) throw error;
+
+        const relevantStructure = data.find(item => {
+          const sections = safeJSONParse(item.sections_sections);
+          const subsections = safeJSONParse(item.sections_subsections);
+          return Object.keys(sections).includes(newStructure.section) &&
+            subsections[newStructure.section] === subsectionValue;
+        });
+
+        if (relevantStructure) {
+          mappingsToUse = safeJSONParse(relevantStructure.column_mappings);
+        }
+      } else {
+        // For existing tab, get mappings only from this tab
+        const existingStructure = structure.find(item =>
+          item.Tabs === newStructure.Tabs &&
+          item.sections_sections &&
+          Object.keys(safeJSONParse(item.sections_sections)).includes(newStructure.section) &&
+          safeJSONParse(item.sections_subsections)[newStructure.section] === subsectionValue
+        );
+
+        if (existingStructure) {
+          mappingsToUse = safeJSONParse(existingStructure.column_mappings);
+        }
+      }
+
+      // Extract tables and fields
+      const mappings = Object.entries(mappingsToUse).reduce((acc, [key, value]) => {
         const [table, field] = key.split('.');
         if (!acc[table]) {
           acc[table] = [];
         }
-        if (!acc[table].includes(field)) {
-          acc[table].push(field);
-        }
-      });
-      return acc;
-    }, {});
+        acc[table].push(field);
+        return acc;
+      }, {} as Record<string, string[]>);
 
-    // Set all states with exact mappings
-    setExistingSections(uniqueSections);
-    setSelectedTableFields(mappings);
-    setSelectedTables(Object.keys(mappings));
+      // Update states
+      setSelectedTables(Object.keys(mappings));
+      setSelectedTableFields(mappings);
 
-    setNewStructure(prev => ({
-      ...prev,
-      Tabs: tabValue,
-      section: uniqueSections.length === 1 ? uniqueSections[0] : '',
-      isNewTab: false,
-      table_names: Object.keys(mappings)
-    }));
+      setNewStructure(prev => ({
+        ...prev,
+        subsection: subsectionValue,
+        isNewSubsection: false,
+        table_names: Object.keys(mappings),
+        column_mappings: mappingsToUse
+      }));
 
-    if (uniqueSections.length === 1) {
-      setTimeout(() => handleSectionSelection(uniqueSections[0], tabValue), 0);
+    } catch (error) {
+      console.error('Error in subsection selection:', error);
+      toast.error('Failed to load subsection data');
     }
   };
-
-
-  const handleSectionSelection = (sectionValue: string, selectedTab = newStructure.Tabs) => {
-    const sectionData = structure.filter(item =>
-      item.Tabs === selectedTab &&
-      item.sections_sections &&
-      Object.keys(item.sections_sections).includes(sectionValue)
-    );
-
-    // Get subsections and auto-select if only one
-    const subsections = [...new Set(sectionData
-      .map(item => item.sections_subsections?.[sectionValue] || [])
-      .flat())];
-
-    // Get table mappings for this section
-    const tableMappings = sectionData.map(item => ({
-      tables: item.table_names?.[sectionValue] || [],
-      fields: item.column_mappings || {}
-    }));
-
-    // Set tables and fields
-    const selectedTables = tableMappings[0]?.tables || [];
-    const fieldMappings = tableMappings.reduce((acc, mapping) => {
-      selectedTables.forEach(table => {
-        acc[table] = Object.keys(mapping.fields)
-          .filter(key => key.startsWith(`${table}.`))
-          .map(key => key.split('.')[1]);
-      });
-      return acc;
-    }, {});
-
-    setExistingSubsections({ [sectionValue]: subsections });
-    setSelectedTableFields(fieldMappings);
-    setSelectedTables(selectedTables);
-
-    setNewStructure(prev => ({
-      ...prev,
-      section: sectionValue,
-      subsection: subsections.length === 1 ? subsections[0] : '',
-      table_names: selectedTables,
-      isNewSection: false
-    }));
-  };
-
 
   const handleAddNewField = async () => {
     console.log('Adding new field:', addFieldState);
@@ -1065,7 +1381,7 @@ export function SettingsDialog() {
                       key={tab}
                       className={`w-full text-left px-3 py-2 rounded transition-colors ${selectedTab === tab ? 'bg-primary text-white' : 'hover:bg-gray-100'
                         }`}
-                      onClick={() => setSelectedTab(tab)}
+                      onClick={() => handleTabSelection(tab, false)}
                     >
                       {tab}
                     </button>
@@ -1075,7 +1391,7 @@ export function SettingsDialog() {
             </Card>
 
             {/* Middle Panel - Sections */}
-            <Card className="col-span-3 h-[700px]">
+            <Card className="col-span-2 h-[700px]">
               <CardContent className="p-2">
                 <ScrollArea className="h-[700px]">
                   <div className="flex justify-between items-center mb-2 px-2">
@@ -1109,7 +1425,7 @@ export function SettingsDialog() {
             </Card>
 
             {/* Subsections Panel */}
-            <Card className="col-span-3 h-[700px]">
+            <Card className="col-span-2 h-[700px]">
               <CardContent className="p-2">
                 <ScrollArea className="h-[700px]">
                   <div className="flex justify-between items-center mb-2 px-2">
@@ -1145,7 +1461,7 @@ export function SettingsDialog() {
             </Card>
 
             {/* Right Panel - Details */}
-            <Card className="col-span-4 h-[700px]">
+            <Card className="col-span-6 h-[700px]">
               <CardContent className="p-4">
                 <ScrollArea className="h-[700px]">
                   {selectedSubsection ? (
@@ -1317,7 +1633,7 @@ export function SettingsDialog() {
                 <label className="text-sm font-medium text-gray-700">Tab</label>
                 <Select
                   value={newStructure.Tabs}
-                  onValueChange={handleTabSelection}
+                  onValueChange={(value) => handleTabSelection(value, true)} 
                 >
                   <SelectTrigger className="w-full bg-white">
                     <SelectValue placeholder="Select or Create Tab" />
@@ -1330,6 +1646,7 @@ export function SettingsDialog() {
                   </SelectContent>
                 </Select>
 
+                {/* Add this input field for new tab */}
                 {newStructure.isNewTab && (
                   <Input
                     placeholder="Enter new tab name"
@@ -1348,7 +1665,19 @@ export function SettingsDialog() {
                 <label className="text-sm font-medium text-gray-700">Section</label>
                 <Select
                   value={newStructure.section}
-                  onValueChange={handleSectionSelection}
+                  onValueChange={(value) => {
+                    if (value === 'new') {
+                      setNewStructure(prev => ({
+                        ...prev,
+                        section: '',
+                        isNewSection: true,
+                        subsection: '',
+                        isNewSubsection: false
+                      }));
+                    } else {
+                      handleSectionSelection(value);
+                    }
+                  }}
                 >
                   <SelectTrigger className="w-full bg-white">
                     <SelectValue placeholder="Select or Create Section" />
@@ -1390,11 +1719,7 @@ export function SettingsDialog() {
                           isNewSubsection: true
                         }));
                       } else {
-                        setNewStructure(prev => ({
-                          ...prev,
-                          subsection: value,
-                          isNewSubsection: false
-                        }));
+                        handleSubsectionSelection(value);
                       }
                     }}
                   >
@@ -1402,12 +1727,20 @@ export function SettingsDialog() {
                       <SelectValue placeholder="Select or Create Subsection" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(existingSubsections[newStructure.section] || [])
+                      {/* This is the key change - when in new tab mode, always show all subsections */}
+                      {(newStructure.isNewTab
+                        ? existingSubsections["all"] || []  // Show ALL subsections for new tab
+                        : existingSubsections[newStructure.section] || []  // Show section-specific subsections for existing tab
+                      )
                         .filter(subsection => subsection?.trim())
                         .map(subsection => (
-                          <SelectItem key={subsection} value={subsection}>{subsection}</SelectItem>
+                          <SelectItem key={subsection} value={subsection}>
+                            {subsection}
+                          </SelectItem>
                         ))}
-                      <SelectItem value="new" className="text-blue-600 font-medium">+ Create New Subsection</SelectItem>
+                      <SelectItem value="new" className="text-blue-600 font-medium">
+                        + Create New Subsection
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 ) : (
@@ -1442,9 +1775,10 @@ export function SettingsDialog() {
                   onClick={() => setShowMultiSelectDialog(true)}
                   variant="outline"
                   className="w-full justify-between"
+                  type="button"
                 >
-                  {newStructure.table_names.length > 0
-                    ? `${newStructure.table_names.length} tables selected`
+                  {selectedTables.length > 0
+                    ? `${selectedTables.length} tables selected`
                     : "Select Tables and Fields"}
                   <Plus className="h-4 w-4" />
                 </Button>
