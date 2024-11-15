@@ -150,22 +150,44 @@ export function SettingsDialog() {
 
   const fetchTables = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profile_category_table_mapping')
-        .select('table_name')
-        .order('table_name', { ascending: true });
+      const { data: tablesData, error: tablesError } = await supabase.rpc('get_all_tables');
+      if (tablesError) throw tablesError;
 
-      if (error) throw error;
-      setTables([...new Set(data.map(t => t.table_name))]);
+      const tableNames = tablesData.map(t => t.table_name);
+      setTables(tableNames);
+
+      const columnsPromises = tableNames.map(async (tableName) => {
+        const { data: columns, error: columnsError } = await supabase.rpc('get_table_columns', {
+          input_table_name: tableName
+        });
+
+        if (columnsError) throw columnsError;
+
+        return {
+          table_name: tableName,
+          columns: columns.map(col => ({
+            ...col,
+            table_name: tableName
+          }))
+        };
+      });
+
+      const allTableColumns = await Promise.all(columnsPromises);
+      const flattenedColumns = allTableColumns.reduce((acc, table) => {
+        return [...acc, ...table.columns];
+      }, []);
+
+      // console.log('Tables with columns:', allTableColumns);
+      setTableColumns(flattenedColumns);
     } catch (error) {
-      toast.error('Failed to fetch tables');
+      toast.error('Failed to fetch tables and columns');
     }
   };
 
   const fetchTableColumns = async (tableName: string) => {
     try {
-      const { data, error } = await supabase.rpc('get_table_columns_overalltable', {
-        p_table_name: tableName
+      const { data, error } = await supabase.rpc('get_table_columns', {
+        input_table_name: tableName
       });
 
       if (error) throw error;
@@ -181,6 +203,26 @@ export function SettingsDialog() {
       toast.error('Failed to fetch columns');
     }
   };
+
+  // const fetchTableColumns = async (tableName: string) => {
+  //   try {
+  //     const { data, error } = await supabase.rpc('get_table_columns_overalltable', {
+  //       p_table_name: tableName
+  //     });
+
+  //     if (error) throw error;
+
+  //     const columns = data.map(col => ({
+  //       column_name: col.column_name,
+  //       data_type: col.data_type,
+  //       table_name: tableName // Add table name to track source
+  //     }));
+
+  //     setTableColumns(prev => [...prev, ...columns]);
+  //   } catch (error) {
+  //     toast.error('Failed to fetch columns');
+  //   }
+  // };
   const fetchExistingSectionsAndSubsections = async () => {
     try {
       const { data, error } = await supabase
@@ -529,27 +571,8 @@ export function SettingsDialog() {
         console.error('Error updating structure:', error);
         toast.error('Failed to update structure');
     }
-};  const fetchFieldsForTables = async (tables: string[]) => {
-    const fieldsPromises = tables.map(async (table) => {
-      const { data, error } = await supabase.rpc('get_table_columns_overalltable', {
-        p_table_name: table
-      });
-
-      if (error) throw error;
-
-      return {
-        table,
-        fields: data.map(col => ({
-          column_name: col.column_name,
-          data_type: col.data_type,
-          table_name: table
-        }))
-      };
-    });
-
-    const results = await Promise.all(fieldsPromises);
-    setAvailableFields(results);
   };
+
 
   const fetchSectionFields = async (section: string) => {
     try {
@@ -659,70 +682,83 @@ export function SettingsDialog() {
           <div className="border rounded-lg p-4">
             <h4 className="font-medium mb-2">Select Tables</h4>
             <ScrollArea className="h-[400px]">
-              {tables.map(table => (
-                <div key={table} className="flex items-center gap-2 p-2 hover:bg-gray-50">
-                  <input
-                    type="checkbox"
-                    id={`table-${table}`}
-                    checked={selectedTables.includes(table)}
-                    onChange={(e) => {
-                      const newSelection = e.target.checked
-                        ? [...selectedTables, table]
-                        : selectedTables.filter(t => t !== table);
-                      setSelectedTables(newSelection);
-                      if (newSelection.length > 0) {
-                        fetchFieldsForTables(newSelection);
-                      }
-                    }}
-                    className="h-4 w-4"
-                  />
-                  <label htmlFor={`table-${table}`}>{table}</label>
+              {tables.length > 0 ? (
+                tables.map(table => (
+                  <div key={table} className="flex items-center gap-2 p-2 hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      id={`table-${table}`}
+                      checked={selectedTables.includes(table)}
+                      onChange={(e) => {
+                        const newSelection = e.target.checked
+                          ? [...selectedTables, table]
+                          : selectedTables.filter(t => t !== table);
+                        setSelectedTables(newSelection);
+                      }}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor={`table-${table}`}>{table.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</label>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-center text-gray-500">
+                  No tables available
                 </div>
-              ))}
+              )}
             </ScrollArea>
           </div>
 
           {/* Fields Selection */}
-          <div className="border rounded-lg p-4">
-            <h4 className="font-medium mb-2">Select Fields</h4>
+          <div className="border rounded-lg p-4 bg-white shadow-sm">
+            <h4 className="font-medium mb-4 text-lg text-gray-800">Select Fields</h4>
             <ScrollArea className="h-[400px]">
-              {availableFields.map(({ table, fields }) => (
-                <div key={table} className="mb-4">
-                  <h5 className="font-medium text-sm text-gray-700 mb-2">{table}</h5>
-                  {fields.map(field => {
-                    const isInSection = newStructure.section && 
-                      sectionFields[newStructure.section]?.fields.includes(field.column_name);
-                    const isInSubsection = newStructure.subsection && 
-                      sectionFields[newStructure.section]?.subsections[newStructure.subsection]?.includes(field.column_name);
-                    
-                    return (
-                      <div key={`${table}-${field.column_name}`} className="flex items-center gap-2 p-2 hover:bg-gray-50">
-                        <input
-                          type="checkbox"
-                          id={`field-${table}-${field.column_name}`}
-                          checked={selectedTableFields[table]?.includes(field.column_name) || false}
-                          onChange={(e) => {
-                            setSelectedTableFields(prev => ({
-                              ...prev,
-                              [table]: e.target.checked
-                                ? [...(prev[table] || []), field.column_name]
-                                : (prev[table] || []).filter(f => f !== field.column_name)
-                            }));
-                          }}
-                          className="h-4 w-4"
-                        />
-                        <label htmlFor={`field-${table}-${field.column_name}`}>
-                          {field.column_name}
-                          {isInSection && <span className="ml-2 text-blue-500">(In Section)</span>}
-                          {isInSubsection && <span className="ml-2 text-green-500">(In Subsection)</span>}
-                        </label>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+              {selectedTables.map((tableName, index) => {
+                const tableFields = tableColumns.filter(col => col.table_name === tableName);
+                return (
+                  <div key={tableName}>
+                    <div className="bg-gray-50 p-3 rounded-t-lg border-b-2 border-primary/20">
+                      <h5 className="font-lg text-black">{tableName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h5>
+                    </div>
+                    <div className="p-2 mb-4 border-x border-b rounded-b-lg">
+                      {tableFields.map(field => (
+                        <div
+                          key={`${tableName}-${field.column_name}`}
+                          className="flex items-center gap-3 p-2.5 hover:bg-gray-50 border-b last:border-b-0 transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            id={`field-${tableName}-${field.column_name}`}
+                            checked={selectedTableFields[tableName]?.includes(field.column_name) || false}
+                            onChange={(e) => {
+                              e.stopPropagation(); // Prevent event bubbling
+                              setSelectedTableFields(prev => ({
+                                ...prev,
+                                [tableName]: e.target.checked
+                                  ? [...(prev[tableName] || []), field.column_name]
+                                  : (prev[tableName] || []).filter(f => f !== field.column_name)
+                              }));
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                          <label
+                            htmlFor={`field-${tableName}-${field.column_name}`}
+                            className="text-sm text-gray-700 hover:text-gray-900 cursor-pointer flex-1"
+                          >
+                            {field.column_name}
+                            <span className="ml-2 text-xs text-gray-500">({field.data_type})</span>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    {index < selectedTables.length - 1 && (
+                      <div className="h-4 border-l-2 border-r-2 border-dashed border-gray-200 mx-4" />
+                    )}
+                  </div>
+                );
+              })}
             </ScrollArea>
           </div>
+
         </div>
 
         <DialogFooter>
@@ -1286,9 +1322,9 @@ export function SettingsDialog() {
                       <div key={table} className="border rounded-md p-2">
                         <h6 className="font-medium text-sm">{table}</h6>
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {Object.entries(selectedTableFields[table] || {}).map(([fieldName]) => (
+                          {selectedTableFields[table]?.map(fieldName => (
                             <span key={fieldName} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                              {fieldName}
+                              {fieldName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                             </span>
                           ))}
                         </div>
@@ -1428,9 +1464,7 @@ export function SettingsDialog() {
                         ? [...selectedTables, table]
                         : selectedTables.filter(t => t !== table);
                       setSelectedTables(newSelection);
-                      if (newSelection.length > 0) {
-                        fetchFieldsForTables(newSelection);
-                      }
+                      
                     }}
                     className="h-4 w-4"
                   />
