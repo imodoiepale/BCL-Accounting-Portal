@@ -1,50 +1,17 @@
-// @ts-nocheck
-"use client";
-import React, { useEffect, useState } from "react";
+  "use client"
+  import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import DataTableWithDocuments from "./DataTableWithDocuments"; // Ensure the path is correct
-import { supabase } from '@/lib/supabaseClient';
+import CompanyDocs from "./documenttable";
 
+const DataTableWithDocuments = ({ category }: { category: string }) => {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium">{category} Documents</h3>
+      <CompanyDocs />
+    </div>
+  );
+};
 export default function KYCDocuments() {
-  const [documents, setDocuments] = useState([]);
-  const [filteredDocs, setFilteredDocs] = useState({ kraDocs: [], sheriaDocs: [] });
-  const [directorsDocs, setDirectorsDocs] = useState([]);
-
-  useEffect(() => {
-    const loadDocuments = async () => {
-      const { data, error } = await supabase
-        .from('acc_portal_kyc')
-        .select('*');
-
-      if (error) {
-        console.error('Error fetching documents:', error);
-        return;
-      }
-
-      setDocuments(data);
-      const kraDocs = data.filter(doc => doc.subcategory === 'kra-docs');
-      const sheriaDocs = data.filter(doc => doc.subcategory === 'sheria-docs');
-      setFilteredDocs({ kraDocs, sheriaDocs });
-    };
-
-    const loadDirectorsDocuments = async () => {
-      const { data, error } = await supabase
-        .from('acc_portal_kyc')
-        .select('*')
-        .eq('department', 'Directors'); // Filter by department "Directors"
-
-      if (error) {
-        console.error('Error fetching directors documents:', error);
-        return;
-      }
-
-      setDirectorsDocs(data); // Set the filtered documents for directors
-    };
-
-    loadDocuments();
-    loadDirectorsDocuments();
-  }, []);
-
   return (
     <div className="p-4 w-full">
       <h1 className="text-xl font-bold mb-4">KYC Documents</h1>
@@ -67,38 +34,49 @@ export default function KYCDocuments() {
               <TabsTrigger value="sheria">Sheria Documents</TabsTrigger>
             </TabsList>
             <TabsContent value="kra">
-              <DataTableWithDocuments category="KRA" showDirectors={false} documents={filteredDocs.kraDocs} />
+              <DataTableWithDocuments category="KRA" />
             </TabsContent>
             <TabsContent value="sheria">
-              <DataTableWithDocuments category="Sheria" showDirectors={false} documents={filteredDocs.sheriaDocs} />
+              <DataTableWithDocuments category="Sheria" />
             </TabsContent>
           </Tabs>
         </TabsContent>
 
         <TabsContent value="directors-docs">
-          <DataTableWithDocuments category="Directors" showDirectors={true} documents={directorsDocs} />
+          <DataTableWithDocuments category="Directors" />
         </TabsContent>
 
         <TabsContent value="suppliers-docs">
-          <DataTableWithDocuments category="Suppliers" showDirectors={true} documents={[]} />
+          <Tabs defaultValue="trading-suppliers">
+            <TabsList className="mb-4">
+              <TabsTrigger value="trading-suppliers">Trading Suppliers - Documents</TabsTrigger>
+              <TabsTrigger value="monthly-service-vendors">Monthly Service Vendors - Documents</TabsTrigger>
+            </TabsList>
+            <TabsContent value="trading-suppliers">
+              <DataTableWithDocuments category="Trading Suppliers" />
+            </TabsContent>
+            <TabsContent value="monthly-service-vendors">
+              <DataTableWithDocuments category="Monthly Service Vendors" />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="banks-docs">
-          <DataTableWithDocuments category="Banks" showDirectors={true} documents={[]} />
+          <DataTableWithDocuments category="Banks" />
         </TabsContent>
 
         <TabsContent value="employee-docs">
-          <DataTableWithDocuments category="Employees" showDirectors={true} documents={[]} />
+          <DataTableWithDocuments category="Employees" />
         </TabsContent>
 
         <TabsContent value="insurance-docs">
-          <DataTableWithDocuments category="Insurance" showDirectors={false} documents={[]} />
+          <DataTableWithDocuments category="Insurance" />
         </TabsContent>
 
         <TabsContent value="deposits-docs">
-          <DataTableWithDocuments category="Deposits" showDirectors={false} documents={[]} />
+          <DataTableWithDocuments category="Deposits" />
         </TabsContent>
-        
+
         <TabsContent value="fixed-assets-docs">
           <Tabs defaultValue="computer-equipment">
             <TabsList className="mb-4">
@@ -109,19 +87,19 @@ export default function KYCDocuments() {
               <TabsTrigger value="motor-vehicles">Motor Vehicles - 25 %</TabsTrigger>
             </TabsList>
             <TabsContent value="computer-equipment">
-              <DataTableWithDocuments category="Computer Equipment" showDirectors={false} documents={[]} />
+              <DataTableWithDocuments category="Computer Equipment" />
             </TabsContent>
             <TabsContent value="furniture-fitting">
-              <DataTableWithDocuments category="Furniture Fitting" showDirectors={false} documents={[]} />
+              <DataTableWithDocuments category="Furniture Fitting" />
             </TabsContent>
             <TabsContent value="land-building">
-              <DataTableWithDocuments category="Land Building" showDirectors={false} documents={[]} />
+              <DataTableWithDocuments category="Land Building" />
             </TabsContent>
             <TabsContent value="plant-equipment">
-              <DataTableWithDocuments category="Plant Equipment" showDirectors={false} documents={[]} />
+              <DataTableWithDocuments category="Plant Equipment" />
             </TabsContent>
             <TabsContent value="motor-vehicles">
-              <DataTableWithDocuments category="Motor Vehicles" showDirectors={false} documents={[]} />
+              <DataTableWithDocuments category="Motor Vehicles" />
             </TabsContent>
           </Tabs>
         </TabsContent>
