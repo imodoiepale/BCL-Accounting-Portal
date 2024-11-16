@@ -25,6 +25,7 @@ const adminNavItems = [
   { href: "/admin", icon: LayoutDashboardIcon, label: "Admin Dashboard" },
   { href: "/mail", icon: Mail, label: "Mail" },
   { href: "/admin/registry", icon: User2Icon, label: "Registry" },
+  { href: "/admin/companies", icon: User2Icon, label: "Companies" },
   { href: "/admin/documents", icon: FileIcon, label: "Document Management" },
   { href: "/admin/reports", icon: FileIcon, label: "Report Management" },
   { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings" },
