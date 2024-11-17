@@ -36,9 +36,12 @@ const sanitizeSupplierData = (data) => {
 
 interface SupplierListProp {
   selectedUserId: string;
+  type: string;
 }
 
-export function SupplierList({ type }, { selectedUserId }: SupplierListProp) {
+
+  export function SupplierList({ type, selectedUserId }: SupplierListProp & { type: string }) {
+
   const { user } = useUser();
   const [suppliers, setSuppliers] = useState([]);
   const [newSupplier, setNewSupplier] = useState({
