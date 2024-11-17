@@ -12,6 +12,7 @@ import {
   Mail,
   SettingsIcon,
   User2Icon,
+  UserPlusIcon,
   VoicemailIcon
 } from "lucide-react"
 import Link from "next/link"
@@ -25,11 +26,14 @@ const adminNavItems = [
   { href: "/admin", icon: LayoutDashboardIcon, label: "Admin Dashboard" },
   { href: "/mail", icon: Mail, label: "Mail" },
   { href: "/admin/registry", icon: User2Icon, label: "Registry" },
+  { href: "/admin/overallview", icon: LayoutDashboardIcon, label: "Overall TableView" },  
+  { href: "/admin/documents/kyc", icon: FileIcon, label: "Kyc Documents" },
+  { href: "/admin/documents/monthly", icon: FileIcon, label: "Monthly Documents" },
   { href: "/admin/companies", icon: User2Icon, label: "Companies" },
   { href: "/admin/documents", icon: FileIcon, label: "Document Management" },
   { href: "/admin/reports", icon: FileIcon, label: "Report Management" },
   { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings" },
-]
+  { href: "/admin/onboarding", icon: UserPlusIcon, label: "Onboarding" },]
 
 const userNavItems = [
   { href: "/", icon: LayoutDashboardIcon, label: "Dashboard" },

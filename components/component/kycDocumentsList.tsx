@@ -49,7 +49,7 @@ const FileViewer = ({ url, onClose }) => {
         <DialogHeader>
           <DialogTitle>Document Viewer</DialogTitle>
         </DialogHeader>
-        <iframe src={url} style={{ width: '100%', height: '80vh' }} />
+        <iframe src={url} className="w-full h-[80vh]" title="Document Viewer" />
       </DialogContent>
     </Dialog>
   )
@@ -73,9 +73,9 @@ export function KYCDocumentsList({ category, subcategory }) {
     if (user) {
       fetchDocuments()
     }
-  }, [user, category, subcategory])
+  }, [user, category, subcategory, fetchDocuments])
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     const { data: baseDocuments, error: baseError } = await supabase
       .from('acc_portal_kyc')
       .select('*')
@@ -110,7 +110,7 @@ export function KYCDocumentsList({ category, subcategory }) {
     });
 
     setDocuments(mergedDocuments);
-  }
+  })
 
   const handleInputChange = (e) => {
     const { id, value, type, checked } = e.target;
@@ -376,30 +376,38 @@ export function KYCDocumentsList({ category, subcategory }) {
                   />
                 </div>
                 <div className="flex items-center">
-                  <input
-                    id="noExpiryDate"
-                    type="checkbox"
+                  <input 
+                    id="noExpiryDateUpload" 
+                    type="checkbox" 
                     checked={noExpiryDate}
                     onChange={handleInputChange}
                     className="mr-2"
+                    aria-label="No Expiry Date"
                   />
-                  <Label htmlFor="noExpiryDate">No Expiry Date</Label>
+                  <Label htmlFor="noExpiryDateUpload">No Expiry Date</Label>
                 </div>
                 {!noExpiryDate && (
                   <div>
                     <Label htmlFor="expiry_date">Expiry Date</Label>
-                    <Input
-                      id="expiry_date"
-                      type="date"
-                      value={editingDocument?.expiry_date || ''}
-                      onChange={handleInputChange}
-                      required
+                    <Input 
+                      id="expiry_date" 
+                      type="date" 
+                      value={editingDocument?.expiry_date || ''} 
+                      onChange={handleInputChange} 
+                      required 
+                      aria-label="Expiry Date"
                     />
                   </div>
                 )}
                 <div>
                   <Label htmlFor="file">Upload Document</Label>
-                  <Input id="file" type="file" onChange={handleFileChange} required />
+                  <Input 
+                    id="file" 
+                    type="file" 
+                    onChange={handleFileChange} 
+                    required 
+                    aria-label="Upload Document"
+                  />
                 </div>
               </div>
               <div className="flex justify-end mt-4">
@@ -442,8 +450,9 @@ export function KYCDocumentsList({ category, subcategory }) {
                     checked={noExpiryDate}
                     onChange={handleInputChange}
                     className="mr-2"
+                    aria-label="No Expiry Date"
                   />
-                  <Label htmlFor="noExpiryDate">No Expiry Date</Label>
+                  <Label htmlFor="noExpiryDateEdit">No Expiry Date</Label>
                 </div>
                 {!noExpiryDate && (
                   <div>

@@ -5,7 +5,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/component/sidebar";
 import { Navbar } from '@/components/component/navbar';
-import { Toaster } from "react-hot-toast"
+import { Toaster } from 'sonner'; 
+// import { Toaster } from "react-hot-toast"
 import { usePathname } from 'next/navigation';
 
 const inter = Inter({ subsets: ["latin"] });
@@ -37,7 +38,7 @@ export default function RootLayout({
   // Regular app layout
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="en" suppressHydrationWarning>
         <body className={inter.className}>
           <div className="flex h-screen overflow-hidden">
             <div className="flex-shrink-0">
@@ -48,7 +49,7 @@ export default function RootLayout({
               <main className="flex-grow overflow-auto">
                 <div className="min-w-[640px] p-4">
                   {children}
-                  <Toaster position="top-right" />
+                  <Toaster />
                 </div>
               </main>
             </div>

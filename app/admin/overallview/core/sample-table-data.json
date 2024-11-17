@@ -1,0 +1,72 @@
+{
+    "id": "name",
+    "header": "Name",
+    "field": "personal.name",
+    "type": "text"
+},
+{
+    "id": "email",
+    "header": "Email",
+    "field": "personal.email",
+    "type": "text"
+},
+{
+    "id": "phone",
+    "header": "Phone",
+    "field": "personal.phone",
+    "type": "text"
+}
+]
+},
+{
+"id": "professional",
+"name": "Professional Details",
+"columns": [
+{
+    "id": "title",
+    "header": "Title",
+    "field": "professional.title",
+    "type": "text"
+},
+{
+    "id": "department",
+    "header": "Department",
+    "field": "professional.department",
+    "type": "text"
+},
+{
+    "id": "experience",
+    "header": "Years of Experience",
+    "field": "professional.yearsOfExperience",
+    "type": "number"
+}
+]
+},
+{
+"id": "performance",
+"name": "Performance Metrics",
+"columns": [
+{
+    "id": "rating",
+    "header": "Rating",
+    "field": "performance.rating",
+    "type": "number"
+},
+{
+    "id": "projects",
+    "header": "Projects",
+    "field": "performance.projects",
+    "type": "number"
+},
+{
+    "id": "completion",
+    "header": "Completion Rate",
+    "field": "performance.completionRate",
+    "type": "number"
+}
+]
+}
+]
+}
+}
+}
