@@ -26,6 +26,14 @@ export default function DocsTable() {
   const [companies, setCompanies] = useState([]); // State for companies
   const [isLoading, setIsLoading] = useState(false); // Loading state for fetching companies
 
+  const documents = [
+    { id: 1, name: 'Certificate of Incorporation' },
+    { id: 2, name: 'KRA PIN Certificate' },
+    { id: 3, name: 'Business Permit' },
+    { id: 4, name: 'Tax Compliance' }
+  ];
+
+  
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
     file: null,
@@ -57,7 +65,7 @@ export default function DocsTable() {
       const { data: companiesData, error } = await supabase
         .from('acc_portal_company')
         .select('*')
-        .order('company_name');
+        .order('company_name', { ascending: true });
 
       if (error) throw error;
 
