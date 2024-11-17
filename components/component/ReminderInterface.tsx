@@ -1,7 +1,6 @@
 // @ts-nocheck
  "use client"
 
-tsxCopy// components/EmailReminderInterface.tsx
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 

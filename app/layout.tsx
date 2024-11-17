@@ -1,23 +1,41 @@
+"use client"
+
 import { ClerkProvider } from '@clerk/nextjs'
-import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/component/sidebar";
 import { Navbar } from '@/components/component/navbar';
 import { Toaster } from 'sonner'; 
+// import { Toaster } from "react-hot-toast"
+import { usePathname } from 'next/navigation';
 
 const inter = Inter({ subsets: ["latin"] });
-
-export const metadata: Metadata = {
-  title: "BCL Client Portal",
-  description: "BCL Client Portal",
-};
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const pathname = usePathname();
+  
+  // Check if current path starts with /mail/policy-terms
+  const isPolicyPage = pathname?.startsWith('/mail/policy-terms');
+
+  // If it's a policy/terms page, render without the main app layout
+  if (isPolicyPage) {
+    return (
+      <ClerkProvider>
+        <html lang="en">
+          <body className={inter.className}>
+            {children}
+            <Toaster position="top-right" />
+          </body>
+        </html>
+      </ClerkProvider>
+    );
+  }
+
+  // Regular app layout
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>

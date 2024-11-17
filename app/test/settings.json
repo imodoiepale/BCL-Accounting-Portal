@@ -1,0 +1,26 @@
+{
+  "defaultFilters": [
+    {
+      "name": "All",
+      "criteria": []
+    },
+    {
+      "name": "Unread",
+      "criteria": [
+        {
+          "type": "unread",
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "Important",
+      "criteria": [
+        {
+          "type": "important",
+          "value": true
+        }
+      ]
+    }
+  ]
+}

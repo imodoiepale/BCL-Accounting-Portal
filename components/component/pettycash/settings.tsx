@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 // @ts-nocheck
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Pencil, Trash2, Download } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -19,13 +19,24 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { format } from "date-fns";
+import { createClient } from '@supabase/supabase-js';
 import { Calendar as CalendarIcon } from "lucide-react";
+import { useAuth, useUser } from '@clerk/clerk-react';
+import ExpenseCategoryManager from './ExpenseCategoryManager';
+
+const supabaseUrl = 'https://zyszsqgdlrpnunkegipk.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5c3pzcWdkbHJwbnVua2VnaXBrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwODMyNzg5NCwiZXhwIjoyMDIzOTAzODk0fQ.7ICIGCpKqPMxaSLiSZ5MNMWRPqrTr5pHprM0lBaNing';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export function PettyCashSettings({ settings, setSettings, accountsToReplenish, handleReplenishAll, handleReplenishAccount, handleExportToExcel }) {
+  const { userId } = useAuth();
+  const { user } = useUser();
   const [currentSettingsTab, setCurrentSettingsTab] = useState('accounts');
   const [editingCategory, setEditingCategory] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [addCategoryDialogOpen, setAddCategoryDialogOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState({ expense: "", subcategories: "" });  
 
   const handleSettingChange = (section, key, value) => {
     setSettings(prevSettings => ({
@@ -72,15 +83,32 @@ export function PettyCashSettings({ settings, setSettings, accountsToReplenish, 
     }));
   };
 
-  const handleAddCategory = () => {
-    setSettings(prevSettings => ({
-      ...prevSettings,
-      categories: [
-        ...prevSettings.categories,
-        { type: 'Expense', name: '' },
-      ],
-    }));
+  const handleAddCategory = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_pettycash_expense_categories')
+      .insert({
+        expense_category: newCategory.expense,
+        subcategories: newCategory.subcategories,
+        userid: userId // Assuming you have access to the user's ID
+      });
+
+    if (error) {
+      console.error('Error adding category:', error);
+    } else {
+      setNewCategory({ expense: "", subcategories: "" });     
+      fetchExpenseCategories();
+    }
   };
+
+  
+  const fetchExpenseCategories = async () => {
+    const { data, error } = await supabase
+      .from('acc_portal_pettycash_expense_categories')
+      .select('*')
+      .eq('userid', userId);
+    if (data) setSettings(prevSettings => ({ ...prevSettings, categories: data }));
+  };
+
 
   const handleEditCategory = (category) => {
     setEditingCategory(category);
@@ -410,102 +438,8 @@ export function PettyCashSettings({ settings, setSettings, accountsToReplenish, 
                     </Card>
                 </TabsContent>
                 
-                  <TabsContent value="expense categories" className="space-y-4">
-                    <Card className="p-4">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-sm font-medium">Expense Categories</h3>
-                        <Button onClick={handleAddCategory} className="h-8 text-xs">Add Category</Button>
-                      </div>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">Type</TableHead>
-                            <TableHead className="text-xs">Name</TableHead>
-                            <TableHead className="text-xs w-24">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {settings.categories.map((category, index) => (
-                            <TableRow key={index}>
-                              <TableCell className="py-2">{category.type}</TableCell>
-                              <TableCell className="py-2">{category.name}</TableCell>
-                              <TableCell className="py-2">
-                                <div className="flex space-x-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEditCategory(category)}
-                                    className="h-7 w-7 p-0"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => handleDeleteCategory(category)}
-                                    className="h-7 w-7 p-0"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </Card>
-
-                     {/* Edit Category Dialog */}
-                    <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Edit Category</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-type" className="text-right">
-                              Type
-                            </Label>
-                            <Input
-                              id="edit-type"
-                              value={editingCategory?.type || ''}
-                              onChange={(e) => setEditingCategory({ ...editingCategory, type: e.target.value })}
-                              className="col-span-3"
-                            />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-name" className="text-right">
-                              Name
-                            </Label>
-                            <Input
-                              id="edit-name"
-                              value={editingCategory?.name || ''}
-                              onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
-                              className="col-span-3"
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button type="submit" onClick={handleSaveEdit}>Save changes</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-
-                    {/* Delete Category Dialog */}
-                    <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Delete Category</DialogTitle>
-                        </DialogHeader>
-                        <div className="py-4">
-                          <p>Are you sure you want to delete the category "{editingCategory?.name}"?</p>
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
-                          <Button variant="destructive" onClick={handleConfirmDelete}>Delete</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                  <TabsContent value="expense categories" className="">
+                    <ExpenseCategoryManager/>
                   </TabsContent>
                 </ScrollArea>
           </div>

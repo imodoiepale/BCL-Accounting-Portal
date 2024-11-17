@@ -1,5 +1,6 @@
+// @ts-nocheck
 // CategoryFilter.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Select,
     SelectContent,
@@ -7,8 +8,23 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { EXPENSE_CATEGORIES } from './expenseCategories';
+import { toast } from "@/components/ui/use-toast";
+import { PettyCashService } from './PettyCashService';
+
+interface Subcategory {
+    name: string;
+    description?: string;
+}
+
+interface ExpenseCategory {
+    id: string;
+    expense_category: string;
+    subcategories: Subcategory[];  // Array of subcategory objects
+    description?: string;
+    created_at: string;
+    updated_at: string;
+    is_active: boolean;
+}
 
 interface CategoryFilterProps {
     selectedCategory: string;
@@ -25,21 +41,50 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
     onSubcategoryChange,
     className
 }) => {
-    const currentCategory = EXPENSE_CATEGORIES.find(cat => cat.code === selectedCategory);
+    const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const categories = await PettyCashService.fetchExpenseCategories();
+                console.log('Fetched categories:', categories);
+                setExpenseCategories(categories.filter(cat => cat.is_active));
+            } catch (error) {
+                console.error('Error fetching expense categories:', error);
+                toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: "Failed to load expense categories"
+                });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchCategories();
+    }, []);
+
+    const currentCategory = expenseCategories.find(cat => cat.expense_category === selectedCategory);
+
+    if (isLoading) {
+        return <div className="flex items-center gap-4">Loading categories...</div>;
+    }
 
     return (
         <div className={`flex items-center gap-4 ${className}`}>
             <div className="flex flex-col gap-1.5">
-                {/* <Label className="text-xs">Category</Label> */}
                 <Select value={selectedCategory} onValueChange={onCategoryChange}>
                     <SelectTrigger className="h-8 w-[200px]">
                         <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="ALL">All Categories</SelectItem>
-                        {EXPENSE_CATEGORIES.map((category) => (
-                            <SelectItem key={category.code} value={category.code}>
-                                {category.name}
+                        {expenseCategories.map((category) => (
+                            <SelectItem
+                                key={category.id}
+                                value={category.expense_category}
+                            >
+                                {category.expense_category}
                             </SelectItem>
                         ))}
                     </SelectContent>
@@ -47,7 +92,6 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             </div>
 
             <div className="flex flex-col gap-1.5">
-                {/* <Label className="text-xs">Subcategory</Label> */}
                 <Select
                     value={selectedSubcategory}
                     onValueChange={onSubcategoryChange}
@@ -59,7 +103,10 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
                     <SelectContent>
                         <SelectItem value="ALL">All Subcategories</SelectItem>
                         {currentCategory?.subcategories.map((subcategory) => (
-                            <SelectItem key={subcategory.code} value={subcategory.code}>
+                            <SelectItem
+                                key={subcategory.name}
+                                value={subcategory.name}
+                            >
                                 {subcategory.name}
                             </SelectItem>
                         ))}
