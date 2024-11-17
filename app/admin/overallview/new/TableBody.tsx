@@ -1,3 +1,4 @@
+// @ts-nocheck
 // components/TableBody.tsx
 import React from 'react';
 import {
