@@ -241,11 +241,11 @@ const OverallView = () => {
         const [isEditing, setIsEditing] = useState(false);
         const [editValue, setEditValue] = useState(initialValue);
         const inputRef = useRef(null);
-    
+
         useEffect(() => {
             setEditValue(initialValue);
         }, [initialValue]);
-    
+
         const handleSave = async () => {
             if (editValue !== initialValue) {
                 try {
@@ -255,20 +255,20 @@ const OverallView = () => {
                         .select('company_name')
                         .eq('company_name', companyName)
                         .single(); // Fetch one record
-    
+
                     if (companyError || !companyData) {
                         console.log(`Company not found in acc_portal_company_duplicate: ${companyName}`);
                         toast.error(`Company "${companyName}" not found.`);
                         return;
                     }
-    
+
                     console.log(`Company found in acc_portal_company_duplicate: ${companyName}`);
-    
+
                     // List of tables to check
-                    const tables = ['acc_portal_company_duplicate', 'etims_companies_duplicate', 'PasswordChecker_duplicate', 'nssf_companies_duplicate', 'ecitizen_companies_duplicate', 'nhif_companies_duplicate2']; 
-    
+                    const tables = ['acc_portal_company_duplicate', 'etims_companies_duplicate', 'PasswordChecker_duplicate', 'nssf_companies_duplicate', 'ecitizen_companies_duplicate', 'nhif_companies_duplicate2'];
+
                     let fieldFound = false;
-    
+
                     // Iterate over tables to find the field and update it
                     for (const table of tables) {
                         // Query the table for the company name and check for the field
@@ -277,12 +277,12 @@ const OverallView = () => {
                             .select('*')
                             .eq(table === 'ecitizen_companies_duplicate' ? 'name' : 'company_name', companyName)
                             .single(); // Fetch one record
-    
+
                         if (error || !data) {
                             console.log(`Field ${fieldName} not found in table: ${table}`);
                             continue; // Skip to next table if the company isn't found
                         }
-    
+
                         // Check if the field exists in the fetched data
                         if (data.hasOwnProperty(fieldName)) {
                             console.log(`Field ${fieldName} found in table: ${table}`);
@@ -291,11 +291,11 @@ const OverallView = () => {
                                 .from(table)
                                 .update({ [fieldName]: editValue })
                                 .eq(table === 'ecitizen_companies_duplicate' ? 'name' : 'company_name', companyName);
-    
+
                             if (updateError) {
                                 throw updateError;
                             }
-    
+
                             console.log(`Updated field ${fieldName} in table: ${table}`);
                             setEditValue(editValue); // Trigger local state update after successful update
                             fieldFound = true;
@@ -306,7 +306,7 @@ const OverallView = () => {
                             console.log(`Field ${fieldName} not found in table: ${table}`);
                         }
                     }
-    
+
                     // If the field is not found in any of the tables
                     if (!fieldFound) {
                         console.log(`Field ${fieldName} not found in any table.`);
@@ -319,15 +319,15 @@ const OverallView = () => {
                 }
             }
         };
-    
+
         const handleDoubleClick = () => {
             setIsEditing(true);
         };
-    
+
         const handleBlur = () => {
             handleSave();
         };
-    
+
         const handleKeyDown = (e) => {
             if (e.key === 'Enter') {
                 handleSave();
@@ -337,10 +337,10 @@ const OverallView = () => {
                 setIsEditing(false);
             }
         };
-    
+
         const handleChange = (e) => {
             let newValue = e.target.value;
-    
+
             // Add null check when accessing field.type
             if (field?.type === 'number') {
                 newValue = !isNaN(parseFloat(newValue)) ? parseFloat(newValue) : newValue;
@@ -351,10 +351,10 @@ const OverallView = () => {
             } else if (field?.type === 'select') {
                 newValue = e.target.value; // Handle select value change
             }
-    
+
             setEditValue(newValue);
         };
-    
+
         useEffect(() => {
             if (isEditing && inputRef.current) {
                 inputRef.current.focus();
@@ -363,7 +363,7 @@ const OverallView = () => {
                 }
             }
         }, [isEditing]);
-    
+
         if (isEditing) {
             if (field.type === 'select') {
                 return (
@@ -396,7 +396,7 @@ const OverallView = () => {
                 );
             }
         }
-    
+
         let displayValue = editValue;
         if (field.type === 'boolean') {
             displayValue = editValue ? 'Yes' : 'No';
@@ -407,7 +407,7 @@ const OverallView = () => {
                 displayValue = editValue;
             }
         }
-    
+
         return (
             <div
                 onDoubleClick={handleDoubleClick}
@@ -417,21 +417,21 @@ const OverallView = () => {
             </div>
         );
     };
-    
+
     const sectionsWithSeparators = [
         { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
         { isSeparator: true },
-        { name: 'companyDetails', fields: formFields.companyDetails.fields, label: 'Company Details' },
-        { isSeparator: true },
+        { name: 'companyDetails', fields: formFields.companyDetails.fields, label: 'Company Details' }
+        // { isSeparator: true },
         // { name: 'kraDetails', fields: formFields.kraDetails.fields, label: 'KRA Details' },
         // { isSeparator: true },
-        { name: 'directorDetails', fields: formFields.directorDetails.fields, label: 'Director Details' },
-        { isSeparator: true },
-        { name: 'supplierDetails', fields: formFields.supplierDetails.fields, label: 'Supplier Details' },
-        { isSeparator: true },
-        { name: 'bankDetails', fields: formFields.bankDetails.fields, label: 'Bank Details' },
-        { isSeparator: true },
-        { name: 'employeeDetails', fields: formFields.employeeDetails.fields, label: 'Employee Details' }
+        // { name: 'directorDetails', fields: formFields.directorDetails.fields, label: 'Director Details' },
+        // { isSeparator: true },
+        // { name: 'supplierDetails', fields: formFields.supplierDetails.fields, label: 'Supplier Details' },
+        // { isSeparator: true },
+        // { name: 'bankDetails', fields: formFields.bankDetails.fields, label: 'Bank Details' },
+        // { isSeparator: true },
+        // { name: 'employeeDetails', fields: formFields.employeeDetails.fields, label: 'Employee Details' }
     ];
 
     const allFieldsWithSeparators = sectionsWithSeparators.flatMap(section =>
@@ -781,13 +781,10 @@ const OverallView = () => {
                                 />
                                 <Search className="h-4 w-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                             </div>
-
-
                         </div>
 
                         {/* Import/Export buttons */}
                         <div className="flex gap-2">
-
                             <SettingsDialog />
                             <Button
                                 onClick={() => setIsImportDialogOpen(true)}
@@ -1328,8 +1325,8 @@ const OverallView = () => {
                         companyData={selectedCompany}
                         onSave={handleEditSave}
                         references={references.columns}
-                        processedSections={processedSections} 
-                        renderSeparatorCell={renderSeparatorCell} 
+                        processedSections={processedSections}
+                        renderSeparatorCell={renderSeparatorCell}
                     />
                 )}
                 {selectedMissingFields && (
