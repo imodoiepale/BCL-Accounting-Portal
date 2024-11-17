@@ -25,14 +25,15 @@ const CompanySidebar = ({ onCompanySelect, showAllCompanies, onToggleView }) => 
       const { data: clerkUsers, error: clerkError } = await supabase
         .from('acc_portal_clerk_users')
         .select('*')
-        .order('username');
+        .order('username', { ascending: true });
 
       if (clerkError) throw clerkError;
 
       // Fetch company names if they exist
       const { data: companies, error: companiesError } = await supabase
         .from('acc_portal_company')
-        .select('*');
+        .select('*')
+        .order('company_name', { ascending: true });
 
       if (companiesError) throw companiesError;
 
@@ -69,33 +70,40 @@ const CompanySidebar = ({ onCompanySelect, showAllCompanies, onToggleView }) => 
 // Add this function to fetch all companies with their details
 const fetchAllCompaniesData = async () => {
   try {
-    // First fetch companies
     const { data: companies, error: companiesError } = await supabase
       .from('acc_portal_company')
-      .select('*');
+      .select('*')
+      .order('company_name', { ascending: true });
 
     if (companiesError) throw companiesError;
 
-    // Then fetch clerk users
     const { data: clerkUsers, error: usersError } = await supabase
       .from('acc_portal_clerk_users')
-      .select('*');
+      .select('*')
+      .order('username', { ascending: true });
 
     if (usersError) throw usersError;
 
-    // Combine the data
-    const combinedData = companies.map(company => ({
-      ...company,
-      clerk_user: clerkUsers.find(user => user.userid === company.userid)
-    }));
+    // Sort combined data by company name
+    const combinedData = companies
+      .map(company => ({
+        ...company,
+        clerk_user: clerkUsers.find(user => user.userid === company.userid)
+      }))
+      .sort((a, b) => {
+        // Primary sort by company name
+        const nameCompare = a.company_name.localeCompare(b.company_name);
+        // Secondary sort by registration date if names are equal
+        return nameCompare !== 0 ? nameCompare : 
+          new Date(a.date_established).getTime() - new Date(b.date_established).getTime();
+      });
 
     setAllCompaniesData(combinedData);
-    onCompanySelect(combinedData); // Pass the combined data up
+    onCompanySelect(combinedData);
   } catch (error) {
     console.error('Error fetching all companies:', error);
   }
 };
-
 // Modify the onToggleView handler
 const handleToggleView = async () => {
   if (!showAllCompanies) {

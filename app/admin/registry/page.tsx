@@ -33,17 +33,18 @@ const Page = () => {
     const fetchData = async () => {
       const { data: companiesData } = await supabase
         .from('acc_portal_company')
-        .select('*');
+        .select('*')
+        .order('company_name', { ascending: true });
       const { data: usersData } = await supabase
         .from('acc_portal_clerk_users')
-        .select('*');
+        .select('*')
+        .order('username', { ascending: true });
       
       setCompanies(companiesData || []);
       setUsers(usersData || []);
     };
     fetchData();
   }, []);
-
   return (
     <div className="flex flex-col lg:flex-row p-6 bg-gray-100 min-h-screen">
       <CompanySidebar
