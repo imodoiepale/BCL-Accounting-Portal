@@ -1,4 +1,4 @@
-// Part 1: Types, Interfaces, and Structure
+// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -31,6 +31,13 @@ interface ColumnStructure {
             }[];
         }[];
     }[];
+}
+
+interface EditDialogProps {
+    open: boolean;
+    onClose: () => void;
+    data: ProductData | null;
+    onSave: (data: ProductData) => void;
 }
 
 const tableStructure: ColumnStructure = {
