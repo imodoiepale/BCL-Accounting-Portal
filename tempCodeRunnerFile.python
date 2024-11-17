@@ -1,0 +1,17 @@
+# Accept input from user
+number = int(input("Enter a number: "))
+
+# Initialize product variable
+product = 1
+
+# Convert number to positive if negative
+num = abs(number)
+
+# Calculate product of digits
+while num > 0:
+    digit = num % 10  # Get last digit
+    product *= digit  # Multiply digit with product
+    num //= 10       # Remove last digit
+
+# Display result
+print(f"Product of digits in {number} is: {product}")
