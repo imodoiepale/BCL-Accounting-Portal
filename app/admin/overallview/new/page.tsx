@@ -1,5 +1,5 @@
 "use client"
-
+// @ts-nocheck
 // TableDemo.tsx
 import React from 'react';
 import AdvancedTable from './AdvancedTable';

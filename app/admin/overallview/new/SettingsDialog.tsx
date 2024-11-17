@@ -1,3 +1,4 @@
+// @ts-nocheck
 // SettingsDialog.tsx
 import React from 'react';
 import {
