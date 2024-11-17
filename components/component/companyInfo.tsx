@@ -13,8 +13,13 @@ import { Building2, Users, Mail, Phone, Globe, MapPin, CreditCard, FileText, Cal
 import { useAuth, useUser } from '@clerk/nextjs';
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
+import { usePathname } from 'next/navigation';
+interface CompanyInfoProps {
+  selectedUserId: string;
+}
 
-export function CompanyInfoTab() {
+export function CompanyInfoTab({ selectedUserId }: CompanyInfoProps) {
+  const { user } = useUser();
   const { userId } = useAuth();
   const [companyData, setCompanyData] = useState(null);
   const [directors, setDirectors] = useState([]);
@@ -22,48 +27,51 @@ export function CompanyInfoTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({});
-  const [dialogMode, setDialogMode] = useState<'edit' | 'missing'>('missing');
+const pathname = usePathname();
+
+  const [dialogMode, setDialogMode] = useState<'edit' | 'missing'>('edit');
 
   useEffect(() => {
-    fetchCompanyData();
     fetchDirectors();
   }, []);
 
-  const fetchCompanyData = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('acc_portal_company')
-        .select('*')
-        .single()
-        .eq("userid", userId)
+  const userIdentifier = selectedUserId || userId;
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          setCompanyData({});
-          checkMissingFields({});
-        } else {
-          throw error;
-        }
-      } else {
-        setCompanyData(data || {});
-        checkMissingFields(data || {});
+  useEffect(() => {
+    const fetchCompanyData = async () => {
+      if (!userIdentifier) return;
+
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('acc_portal_company')
+          .select('*')
+          .eq('userid', userIdentifier);
+
+        if (error) throw error;
+        // If no data, set empty object to trigger missing fields
+        setCompanyData(data?.[0] || {});
+        checkMissingFields(data?.[0] || {});
+      } catch (error) {
+        console.error('Error fetching company data:', error);
+        // Set empty object to show missing fields card
+        setCompanyData({});
+        checkMissingFields({});
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching company data:', error);
-      setCompanyData({});
-      checkMissingFields({});
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+
+    fetchCompanyData();
+  }, [userIdentifier]);
+
 
   const fetchDirectors = async () => {
     try {
       const { data, error } = await supabase
         .from('acc_portal_directors')
         .select('*')
-        .eq("userid", userId)
+        .eq("userid", userIdentifier)
 
       if (error) throw error;
       setDirectors(data || []);
@@ -101,24 +109,32 @@ export function CompanyInfoTab() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-
+  
     try {
-      const { id, ...companyDataWithoutId } = companyData;
-      const { id: formDataId, ...formDataWithoutId } = formData;
-
+      // Filter out empty values from formData
+      const validFormData = Object.fromEntries(
+        Object.entries(formData).filter(([_, value]) => value !== '')
+      );
+  
+      // Only update fields that have changed
       const { data, error } = await supabase
         .from('acc_portal_company')
         .upsert(
-          { ...companyDataWithoutId, ...formDataWithoutId, userid: userId },
-          { onConflict: 'userid' }
+          { 
+            ...validFormData,
+            userid: userIdentifier 
+          },
+          { 
+            onConflict: 'userid',
+            ignoreDuplicates: false 
+          }
         )
-        .select()
-        .single();
-
+        .select();
+  
       if (error) throw error;
-
-      setCompanyData(data);
-      checkMissingFields(data);
+  
+      setCompanyData(prev => ({ ...prev, ...validFormData }));
+      checkMissingFields({ ...companyData, ...validFormData });
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error updating company data:', error);
@@ -211,13 +227,70 @@ export function CompanyInfoTab() {
         <Card className="bg-yellow-200 border border-red-600">
           <CardContent className="flex justify-between items-center p-4">
             <p className="text-yellow-800 font-extrabold text-md">Some company information is missing.</p>
-            <Button
-              variant="outline"
-              className='animate-bounce'
-              onClick={() => handleOpenDialog('missing')}
-            >
-              Add Missing Info
-            </Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className='animate-bounce'>Add Missing Info</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[1225px]">
+                <DialogHeader>
+                  <DialogTitle>Add Missing Information</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4 grid grid-cols-4 gap-4 capitalize">
+                  {missingFields.map((field) => (
+                    <div key={field} className={`space-y-2 ${field === 'description' ? 'col-span-4' : ''}`}>
+                      <Label htmlFor={field}>{field.replace(/_/g, ' ')}</Label>
+                      {field === 'company_type' ? (
+                        <Select
+                          onValueChange={(value) => handleInputChange(field, value)}
+                          value={formData[field]}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select company type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Private Limited Company">Private Limited Company</SelectItem>
+                            <SelectItem value="Public Limited Company">Public Limited Company</SelectItem>
+                            <SelectItem value="Sole Proprietorship">Sole Proprietorship</SelectItem>
+                            <SelectItem value="Partnership">Partnership</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : field === 'industry' ? (
+                        <Select
+                          onValueChange={(value) => handleInputChange(field, value)}
+                          value={formData[field]}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select industry" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Information Technology">Information Technology</SelectItem>
+                            <SelectItem value="Finance">Finance</SelectItem>
+                            <SelectItem value="Healthcare">Healthcare</SelectItem>
+                            <SelectItem value="Manufacturing">Manufacturing</SelectItem>
+                            <SelectItem value="Retail">Retail</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : field === 'description' ? (
+                        <Textarea
+                          id={field}
+                          value={formData[field]}
+                          onChange={(e) => handleInputChange(field, e.target.value)}
+                          rows={4}
+                        />
+                      ) : (
+                        <Input
+                          id={field}
+                          type={field === 'date_established' ? 'date' : 'text'}
+                          value={formData[field]}
+                          onChange={(e) => handleInputChange(field, e.target.value)}
+                        />
+                      )}
+                    </div>
+                  ))}
+                  <Button type="submit" className="w-full col-span-4">Submit</Button>
+                </form>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
       )}
@@ -301,26 +374,26 @@ export function CompanyInfoTab() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-            <li className="flex items-center">
-              <Globe className="mr-2" />
-              {companyData?.website ? (
-                <Link href={`https://${companyData?.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                  {companyData?.website}
-                </Link>
-              ) : (
-                <span className="text-red-500">Missing Website</span>
-              )}
-            </li>
-            <li className="flex items-center">
-              <Mail className="mr-2" />
-              {companyData?.email ? (
-                <Link href={`mailto:${companyData?.email}`} className="text-blue-500 hover:underline">
-                  {companyData?.email}
-                </Link>
-              ) : (
-                <span className="text-red-500">Missing Email</span>
-              )}
-            </li>
+              <li className="flex items-center">
+                <Globe className="mr-2" />
+                {companyData?.website ? (
+                  <Link href={`https://${companyData?.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                    {companyData?.website}
+                  </Link>
+                ) : (
+                  <span className="text-red-500">Missing Website</span>
+                )}
+              </li>
+              <li className="flex items-center">
+                <Mail className="mr-2" />
+                {companyData?.email ? (
+                  <Link href={`mailto:${companyData?.email}`} className="text-blue-500 hover:underline">
+                    {companyData?.email}
+                  </Link>
+                ) : (
+                  <span className="text-red-500">Missing Email</span>
+                )}
+              </li>
               <li className="flex items-center">
                 <Phone className="mr-2" />
                 {companyData?.phone || <span className="text-red-500">Missing Phone</span>}
