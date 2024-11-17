@@ -208,6 +208,7 @@ interface ProductData {
 
 const sampleData: ProductData[] = [
     {
+        companyName: "Company A",
         manufacturingData: {
             specifications: {
                 index: 1,
@@ -258,6 +259,7 @@ const sampleData: ProductData[] = [
         }
     },
     {
+        companyName: "Company B",
         manufacturingData: {
             specifications: {
                 index: 2,
