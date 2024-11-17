@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RefreshCwIcon, Search } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import { PettyCashService } from './PettyCashService';
 import { TableActions } from './TableActions';
@@ -61,18 +61,18 @@ const UserDialog: React.FC<UserDialogProps> = ({
   branches
 }) => {
   const initialFormData = {
-    id: '',
+    id: '', // Ensure id is included
     name: '',
     email: '',
     role: 'user',
-    branch_id: undefined, // Changed from emformFields pty string to undefined
+    branch_id: undefined,
     default_currency: 'KES',
     cash_balance: 0,
     credit_balance: 0,
     mpesa_balance: 0,
     created_date: new Date().toISOString(),
     is_verified: false
-  };
+};
 
   const [formData, setFormData] = useState(mode === 'create' ? initialFormData : user);
 
@@ -120,7 +120,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
 
   const formFields = [
     { name: 'name', label: 'Name', type: 'text', required: true },
-    { name: 'email', label: 'Email', type: 'email'},
+    { name: 'email', label: 'Email', type: 'email' },
     {
       name: 'role',
       label: 'Role',
@@ -279,22 +279,22 @@ export function UsersTab() {
 
 
   const flattenUserData = (userData: any) => {
-  if (!userData) return null;
-  
-  return {
-    name: userData.name,
-    email: userData.email,
-    role: userData.role,
-    branch_id: userData.branch_id,
-    default_currency: userData.default_currency,
-    cash_balance: userData.cash_balance || 0,
-    credit_balance: userData.credit_balance || 0,
-    mpesa_balance: userData.mpesa_balance || 0,
-    created_date: userData.created_date,
-    is_verified: userData.is_verified || false,
-    acc_portal_pettycash_branches: userData.acc_portal_pettycash_branches
+    if (!userData) return null;
+
+    return {
+      name: userData.name,
+      email: userData.email,
+      role: userData.role,
+      branch_id: userData.branch_id,
+      default_currency: userData.default_currency,
+      cash_balance: userData.cash_balance || 0,
+      credit_balance: userData.credit_balance || 0,
+      mpesa_balance: userData.mpesa_balance || 0,
+      created_date: userData.created_date,
+      is_verified: userData.is_verified || false,
+      acc_portal_pettycash_branches: userData.acc_portal_pettycash_branches
+    };
   };
-};
 
 
   useEffect(() => {
@@ -306,6 +306,7 @@ export function UsersTab() {
       isOpen: true,
       mode: 'create',
       user: {
+        id: crypto.randomUUID(),
         name: '',
         email: '',
         role: 'user',
@@ -322,42 +323,44 @@ export function UsersTab() {
 
   const handleEditUser = (user: User) => {
     setDialogState({
-      isOpen: true,
-      mode: 'edit',
-      user: {
-        ...user,
-        branch_id: user.branch_id || '' // Ensure branch_id is set properly
-      }
-    });
-  };
-
-  const handleSaveUser = async (userData: User) => {
-    try {
-      if (dialogState.mode === 'create') {
-        // Create new user record
-        const result = await PettyCashService.createUserRecord(userId, {
-          ...userData,
-          branch_id: userData.branch_id // This should be branch_name from selected branch
-        });
-        if (result) {
-          toast.success('User created successfully');
-          fetchData();
+        isOpen: true,
+        mode: 'edit',
+        user: {
+            ...user,
+            branch_id: user.branch_id || '' // Ensure branch_id is set properly
         }
+    });
+};
+
+const handleSaveUser = async (userData: User) => {
+  try {
+      if (dialogState.mode === 'create') {
+          // Create new user record
+          const result = await PettyCashService.createUserRecord(userId, {
+              ...userData,
+              branch_id: userData.branch_id // This should be branch_name from selected branch
+          });
+          if (result) {
+              toast.success('User created successfully');
+              fetchData();
+          }
       } else {
-        // Update existing user
-        await PettyCashService.updateUserRecord(userId, userData.email, {
-          ...userData,
-          branch_id: userData.branch_id // This should be branch_name from selected branch
-        });
-        toast.success('User updated successfully');
-        fetchData();
+          // Update existing user
+          await PettyCashService.updateUserRecord(userId, userData.id, {
+              ...userData,
+              branch_id: userData.branch_id // This should be branch_name from selected branch
+          });
+          toast.success('User updated successfully');
+          fetchData();
       }
+
       setDialogState({ isOpen: false, mode: 'create', user: null });
-    } catch (error) {
+  } catch (error) {
       console.error('Error saving user:', error);
       toast.error(dialogState.mode === 'create' ? 'Failed to create user' : 'Failed to update user');
-    }
-  };
+  }
+};
+
   const handleDeleteUser = async (user: User) => {
     try {
       await PettyCashService.deleteUserRecord(userId, user.email);
@@ -450,7 +453,7 @@ export function UsersTab() {
 
   return (
     <div className="flex w-full bg-gray-100">
-      <Toaster position="top-right" />
+
       <main className="flex-1 p-4 w-full">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-4">

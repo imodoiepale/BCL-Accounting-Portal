@@ -10,16 +10,20 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RefreshCwIcon, Search, FilterIcon, Download, RotateCcw, Loader2 } from 'lucide-react';
+import { RefreshCwIcon, Search, FilterIcon, Download, RotateCcw, Loader2, Eye, Check } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { PettyCashService } from './PettyCashService';
 import { TableActions } from './TableActions';
 import { CategoryFilter } from './CategoryFilter';
 import { EXPENSE_CATEGORIES, getCategoryName, getSubcategoryName } from './expenseCategories';
-import EditEntryForm from './EditEntryForm';
+import EditEntryForm from './EntryForm';
+
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+
 import {
   Sheet,
   SheetContent,
@@ -28,13 +32,14 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import PettyCashEntryForm from './EntryForm';
 
 
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('en-KE', {
     style: 'currency',
     currency: 'KES',
-    minimumFractionDigits: 2
+    minimumFractionDigits: 0
   }).format(amount);
 };
 
@@ -55,6 +60,22 @@ interface PettyCashEntry {
   receipt_url: string | null;
   is_verified: boolean;
   created_at: string;
+  supplier_name: string;
+  supplier_pin: string;
+  purchase_type: string;
+  paid_via: string;
+  petty_cash_account: string;
+  bill_upload_url: string;
+  payment_proof_url: string;
+}
+
+interface ExpenseCategory {
+  category_code: string;
+  expense_category: string;
+  subcategories: {
+    subcategory_code: string;
+    expense_subcategory: string;
+  }[];
 }
 
 interface EntryDialogProps {
@@ -63,236 +84,71 @@ interface EntryDialogProps {
   entry: PettyCashEntry | null;
   onSave: (entry: PettyCashEntry) => Promise<void>;
   mode: 'create' | 'edit';
+  userId: string;
+  fetchEntries: () => Promise<void>;
 }
+
+const formFields = [
+  { name: 'invoice_date', label: 'Invoice Date', type: 'date', required: true },
+  { name: 'branch_id', label: 'Branch', type: 'select', required: true },
+  { name: 'user_id', label: 'User', type: 'select', required: true },
+  { name: 'account_type', label: 'Account Type', type: 'select', required: true },
+  { name: 'petty_cash_account', label: 'Petty Cash Account', type: 'text', required: true },
+  { name: 'supplier_name', label: 'Supplier Name', type: 'text', required: true },
+  { name: 'supplier_pin', label: 'Supplier PIN/ID', type: 'text', required: true },
+  {
+    name: 'purchase_type', label: 'Trading Type', type: 'select', required: true,
+    options: [
+      { value: 'goods', label: 'Goods' },
+      { value: 'services', label: 'Services' },
+      { value: 'assets', label: 'Assets' }
+    ]
+  },
+  { name: 'amount', label: 'Amount', type: 'number', required: true },
+  { name: 'description', label: 'Description', type: 'text', required: true },
+  { name: 'paid_via', label: 'Paid Via/By', type: 'text', required: true },
+  { name: 'checked_by', label: 'Checked By', type: 'text' },
+  { name: 'approved_by', label: 'Approved By', type: 'text' },
+  { name: 'receipt_url', label: 'Bill/PCV Upload', type: 'file', accept: 'image/*' },
+  { name: 'payment_proof_url', label: 'Payment Proof', type: 'file', accept: 'image/*' }
+];
+
+
 
 const EntryDialog: React.FC<EntryDialogProps> = ({
   isOpen,
   onClose,
   entry,
   onSave,
-  mode
+  mode,
+  userId,
+  fetchEntries
 }) => {
-
-  const { userId } = useAuth();
-  const [formData, setFormData] = useState<PettyCashEntry | null>(entry);
-  const [selectedCategory, setSelectedCategory] = useState(entry?.category_code || '');
-  const [selectedSubcategory, setSelectedSubcategory] = useState(entry?.subcategory_code || '');
-  const [fileUpload, setFileUpload] = useState<File | null>(null);
-  const[branches, setBranches] = useState([]);
-  const [users, setUsers] = useState([]);
-  useEffect(() => {
-    setFormData(entry);
-    setSelectedCategory(entry?.category_code || '');
-    setSelectedSubcategory(entry?.subcategory_code || '');
-  }, [entry]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [branchesData, usersData] = await Promise.all([
-          PettyCashService.fetchRecords('acc_portal_pettycash_branches', userId),
-          PettyCashService.fetchRecords('acc_portal_pettycash_users', userId)
-        ]);
-
-        setBranches(branchesData);
-        setUsers(usersData);
-      } catch (error) {
-        toast.error('Failed to fetch data');
-      }
-    };
-
-    fetchData();
-  }, [userId]);
-
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData) return;
-
-    try {
-      const updatedEntry = {
-        ...formData,
-        category_code: selectedCategory,
-        subcategory_code: selectedSubcategory
-      };
-
-      if (fileUpload) {
-        // Handle file upload here
-        const uploadPath = `receipts/${formData.id}/${fileUpload.name}`;
-        const receiptUrl = await PettyCashService.uploadReceipt(fileUpload, uploadPath);
-        updatedEntry.receipt_url = receiptUrl;
-      }
-
-      await onSave(updatedEntry);
-      onClose();
-    } catch (error) {
-      toast.error('Failed to save entry');
-      console.error('Error saving entry:', error);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type } = e.target;
-    setFormData(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        [name]: type === 'number' ? parseFloat(value) : value
-      };
-    });
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">
+          <DialogTitle>
             {mode === 'create' ? 'Add New Entry' : 'Edit Entry'}
           </DialogTitle>
         </DialogHeader>
-
-        <div className="grid grid-cols-2 gap-4">
-          {/* Left Column */}
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="amount">Amount (KES)</Label>
-              <AmountInput
-                value={formData?.amount || ''}
-                onChange={handleInputChange}
-                className="h-9"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="account_type">Account Type</Label>
-              <Select
-                value={formData?.account_type || ''}
-                onValueChange={(value) => handleInputChange({
-                  target: { name: 'account_type', value }
-                })}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Select Account Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="mpesa">M-Pesa</SelectItem>
-                  <SelectItem value="bank">Bank Transfer</SelectItem>
-                  <SelectItem value="credit_card">Credit Card</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="branch">Branch</Label>
-              <Select
-                value={formData?.branch_id || ''}
-                onValueChange={(value) => handleInputChange({
-                  target: { name: 'branch_id', value }
-                })}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Select Branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map(branch => (
-                    <SelectItem key={branch.id} value={branch.id.toString()}>
-                      {branch.branch_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="user">User</Label>
-              <Select
-                value={formData?.user_id || ''}
-                onValueChange={(value) => handleInputChange({
-                  target: { name: 'user_id', value }
-                })}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Select User" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map(user => (
-                    <SelectItem key={user.id} value={user.id.toString()}>
-                      {user.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-
-            <CategoryFilter
-              selectedCategory={selectedCategory}
-              selectedSubcategory={selectedSubcategory}
-              onCategoryChange={setSelectedCategory}
-              onSubcategoryChange={setSelectedSubcategory}
-            />
-          </div>
-
-          {/* Right Column */}
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="invoice_date">Invoice Date</Label>
-              <Input
-                type="date"
-                value={formData?.invoice_date || ''}
-                onChange={handleInputChange}
-                className="h-9"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="description">Description</Label>
-              <Input
-                value={formData?.description || ''}
-                onChange={handleInputChange}
-                className="h-9"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="receipt">Receipt</Label>
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setFileUpload(e.target.files?.[0] || null)}
-                className="h-9"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Receipt Preview */}
-        {formData?.receipt_url && (
-          <div className="mt-4">
-            <Label>Current Receipt</Label>
-            <div className="relative h-[200px] mt-2 bg-gray-50 rounded-lg overflow-hidden">
-              <Image
-                src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${formData.receipt_url}`}
-                alt="Receipt preview"
-                fill
-                style={{ objectFit: 'contain' }}
-              />
-            </div>
-          </div>
-        )}
-
-        <DialogFooter className="mt-6">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" className="bg-blue-600 text-white">
-            {mode === 'create' ? 'Create Entry' : 'Save Changes'}
-          </Button>
-        </DialogFooter>
+        <PettyCashEntryForm
+          mode={mode}
+          initialData={entry}
+          onSubmit={async (data) => {
+            await onSave(data);
+          }}
+          onClose={onClose}
+          userId={userId}
+          onSuccess={fetchEntries} // Pass the fetchEntries function
+        />
       </DialogContent>
     </Dialog>
-
   );
 };
+
+
+
 export function TransactionsTab() {
   const { userId } = useAuth();
   const [entries, setEntries] = useState<PettyCashEntry[]>([]);
@@ -304,6 +160,7 @@ export function TransactionsTab() {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedSubcategory, setSelectedSubcategory] = useState('ALL');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const [newPettyCash, setNewPettyCash] = useState<NewPettyCashEntry>({
     invoice_date: '',
@@ -321,95 +178,21 @@ export function TransactionsTab() {
     updated_at: new Date().toISOString()
   });
 
-  const formFields = [
-    {
-      id: 'invoice_date',
-      label: 'Invoice Date',
-      type: 'date',
-      required: true
-    },
-    {
-      id: 'branch_id',
-      label: 'Branch',
-      type: 'select',
-      placeholder: 'Select Branch',
-      required: true,
-      options: branches.map(branch => ({
-        value: branch.id.toString(),
-        label: branch.branch_name
-      }))
-    },
-    {
-      id: 'user_id',
-      label: 'User',
-      type: 'select',
-      placeholder: 'Select User',
-      required: true,
-      options: users.map(user => ({
-        value: user.id.toString(),
-        label: user.name
-      }))
-    },
-    {
-      id: 'account_type',
-      label: 'Account Type',
-      type: 'select',
-      placeholder: 'Select Account Type',
-      required: true,
-      options: [
-        { value: 'cash', label: 'Cash' },
-        { value: 'mpesa', label: 'M-Pesa' },
-        { value: 'credit_card', label: 'Credit Card' },
-        { value: 'debit_card', label: 'Debit Card' }
-      ]
-    },
-    {
-      id: 'category_code',
-      label: 'Expense Category',
-      type: 'select',
-      placeholder: 'Select Expense Category',
-      required: true,
-      options: EXPENSE_CATEGORIES.map(category => ({
-        value: category.code,
-        label: category.name
-      }))
-    },
-    {
-      id: 'amount',
-      label: 'Amount',
-      type: 'number',
-      required: true,
-      placeholder: '0.00'
-    },
-    {
-      id: 'description',
-      label: 'Description',
-      type: 'text',
-      required: true,
-      placeholder: 'Enter description'
-    },
-    {
-      id: 'checked_by',
-      label: 'Checked By',
-      type: 'text',
-      required: false,
-      placeholder: 'Enter name'
-    },
-    {
-      id: 'approved_by',
-      label: 'Approved By',
-      type: 'text',
-      required: false,
-      placeholder: 'Enter name'
-    },
-    {
-      id: 'receipt_url',
-      label: 'Receipt Image',
-      type: 'file',
-      accept: 'image/*',
-      required: false
-    }
-  ];
+  const [paymentProofPreview, setPaymentProofPreview] = useState<{
+    isOpen: boolean;
+    url: string | null;
+  }>({
+    isOpen: false,
+    url: null
+  });
+
+  const [suppliers, setSuppliers] = useState([]);
+  const [openSupplier, setOpenSupplier] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [isNewSupplier, setIsNewSupplier] = useState(false);
+  const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
+
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -454,7 +237,7 @@ export function TransactionsTab() {
       const data = await PettyCashService.fetchRecords('acc_portal_pettycash_entries', userId);
       setEntries(data);
     } catch (error) {
-      toast.error('Failed to fetch entries');
+     // toast.error('Failed to fetch entries');
     } finally {
       setIsLoading(false);
     }
@@ -462,6 +245,11 @@ export function TransactionsTab() {
 
   useEffect(() => {
     fetchEntries();
+    const fetchSuppliers = async () => {
+      const suppliersData = await PettyCashService.fetchRecords('acc_portal_pettycash_suppliers', userId);
+      setSuppliers(suppliersData);
+    };
+    fetchSuppliers();
   }, [userId]);
 
   const handleCreateEntry = () => {
@@ -484,34 +272,34 @@ export function TransactionsTab() {
     try {
       if (dialogState.mode === 'create') {
         await PettyCashService.createRecord('acc_portal_pettycash_entries', entry, userId);
-        toast.success('Entry created successfully');
+       // toast.success('Entry created successfully');
       } else {
         await PettyCashService.updateRecord('acc_portal_pettycash_entries', entry.id, entry);
-        toast.success('Entry updated successfully');
+       // toast.success('Entry updated successfully');
       }
       fetchEntries();
     } catch (error) {
-      toast.error('Failed to save entry');
+     // toast.error('Failed to save entry');
     }
   };
 
   const handleDeleteEntry = async (entry: PettyCashEntry) => {
     try {
       await PettyCashService.deleteRecord('acc_portal_pettycash_entries', entry.id);
-      toast.success('Entry deleted successfully');
+     // toast.success('Entry deleted successfully');
       fetchEntries();
     } catch (error) {
-      toast.error('Failed to delete entry');
+     // toast.error('Failed to delete entry');
     }
   };
 
   const handleVerifyEntry = async (entry: PettyCashEntry) => {
     try {
       await PettyCashService.verifyRecord('acc_portal_pettycash_entries', entry.id);
-      toast.success('Entry verified successfully');
+     // toast.success('Entry verified successfully');
       fetchEntries();
     } catch (error) {
-      toast.error('Failed to verify entry');
+     // toast.error('Failed to verify entry');
     }
   };
 
@@ -522,10 +310,10 @@ export function TransactionsTab() {
         category_code: updatedEntry.category_code === 'ALL' ? '' : updatedEntry.category_code,
         subcategory_code: updatedEntry.subcategory_code === 'ALL' ? '' : updatedEntry.subcategory_code
       });
-      toast.success('Entry updated successfully');
+     // toast.success('Entry updated successfully');
       fetchEntries();
     } catch (error) {
-      toast.error('Failed to update entry');
+     // toast.error('Failed to update entry');
       console.error('Error updating entry:', error);
     }
   };
@@ -540,45 +328,66 @@ export function TransactionsTab() {
     }
   };
 
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const categories = await PettyCashService.fetchExpenseCategories();
+        setExpenseCategories(categories);
+      } catch (error) {
+        console.error('Error fetching expense categories:', error);
+       // toast.error('Failed to load expense categories');
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
   const handleSubmit = async () => {
     try {
+      // If it's a new supplier, create supplier record first
+      if (isNewSupplier) {
+        const supplierData = {
+          supplierName: newPettyCash.supplier_name,
+          pin: newPettyCash.supplier_pin,
+          // Add other required supplier fields
+          supplierType: 'Individual',
+          mobile: '',  // You might want to add these fields to your form
+          email: '',   // You might want to add these fields to your form
+        };
+
+        await PettyCashService.createRecord('acc_portal_pettycash_suppliers', supplierData, userId);
+      }
+
       let receiptUrl = null;
+      let paymentProofUrl = null;
+
+      // Handle receipt upload
       if (newPettyCash.receipt_url instanceof File) {
         const uploadPath = `receipts/${Date.now()}_${newPettyCash.receipt_url.name}`;
         receiptUrl = await PettyCashService.uploadReceipt(newPettyCash.receipt_url, uploadPath);
       }
 
+      // Handle payment proof upload
+      if (newPettyCash.payment_proof_url instanceof File) {
+        const uploadPath = `payment_proofs/${Date.now()}_${newPettyCash.payment_proof_url.name}`;
+        paymentProofUrl = await PettyCashService.uploadReceipt(newPettyCash.payment_proof_url, uploadPath);
+      }
+
       const entryData = {
         ...newPettyCash,
         receipt_url: receiptUrl,
+        payment_proof_url: paymentProofUrl,
         userid: userId
       };
 
       await PettyCashService.createRecord('acc_portal_pettycash_entries', entryData, userId);
-      toast.success('Entry created successfully');
+     // toast.success('Entry created successfully');
       setIsSheetOpen(false);
-      setNewPettyCash({
-        id: '',
-        amount: '',
-        invoice_number: '',
-        invoice_date: '',
-        description: '',
-        category_code: '',
-        subcategory_code: '',
-        payment_type: '',
-        branch_id: '',
-        user_id: '',
-        checked_by: '',
-        approved_by: '',
-        account_type: '',
-        receipt_url: null,
-        created_at: new Date().toISOString(),
-        is_verified: false
-      });
+      resetForm();
       fetchEntries();
     } catch (error) {
       console.error('Error creating entry:', error);
-      toast.error('Failed to create entry');
+     // toast.error('Failed to create entry');
     }
   };
 
@@ -597,74 +406,129 @@ export function TransactionsTab() {
     {
       header: '#',
       width: '40px',
-      cell: (_: any, index: number) => index + 1
+      cell: (_: any, index: number) => <div className="font-bold text-center">{index + 1}</div>
     },
     {
       header: 'Date',
       width: '100px',
       cell: (entry: PettyCashEntry) => format(new Date(entry.invoice_date), 'dd/MM/yyyy')
     },
+    // {
+    //   header: 'Branch',
+    //   width: '40px',
+    //   cell: (entry: PettyCashEntry) => <div className="text-center">{entry.branch_name || '-'}</div>
+    // },
+    {
+      header: <div className="">User</div>,
+      width: '150px',
+      cell: (entry: PettyCashEntry) => <div className="text-nowrap ">{entry.user_name || '-'}</div>
+    },
     {
       header: <div className="text-center">Account Type</div>,
       width: '120px',
       cell: (entry: PettyCashEntry) => (
-        <span className="capitalize">
+        <div className="capitalize text-center">
           {entry.account_type?.replace('_', ' ') || '-'}
-        </span>
+        </div>
       )
+    },
+    {
+      header: <div className="text-center">Account No.</div>,
+      width: '120px',
+      cell: (entry: PettyCashEntry) => entry.petty_cash_account || '-'
+    },
+    {
+      header: 'Supplier Name',
+      width: '150px',
+      cell: (entry: PettyCashEntry) => entry.supplier_name || '-'
+    },
+    {
+      header: 'Supplier PIN/ID',
+      width: '120px',
+      cell: (entry: PettyCashEntry) => entry.supplier_pin || '-'
+    },
+    {
+      header: 'Purchase Type',
+      width: '120px',
+      cell: (entry: PettyCashEntry) => (
+        <div className="capitalize">
+          {entry.purchase_type ? entry.purchase_type.charAt(0).toUpperCase() + entry.purchase_type.slice(1) : '-'}
+        </div>
+      )
+    },
+    {
+      header: 'Category',
+      width: '150px',
+      cell: (entry) => entry.expense_category || '-'
+    },
+    {
+      header: 'Subcategory',
+      width: '150px',
+      cell: (entry) => entry.subcategory || '-'
     },
     {
       header: 'Amount',
       width: '120px',
       cell: (entry: PettyCashEntry) => formatCurrency(entry.amount)
     },
-    {
-      header: 'Branch',
-      width: '150px',
-      cell: (entry: PettyCashEntry) => entry.branch_name || '-'
-    },
-    {
-      header: 'User',
-      width: '200px',
-      cell: (entry: PettyCashEntry) => entry.user_name || '-'
-    },
+
+
     {
       header: 'Description',
-      width: '200px',
-      cell: (entry: PettyCashEntry) => entry.description
+      width: '50px',
+      cell: (entry: PettyCashEntry) => {
+
+        return (
+          <div
+            className={`transition-all duration-300 cursor-pointer relative ${isExpanded ? 'w-[300px]' : 'w-[200px]'}`}
+            onClick={() => setIsExpanded(!isExpanded)}
+            title={entry.description}
+          >
+            <span className={`block  ${isExpanded ? 'max-w-[300px]' : 'max-w-[200px]'}`}>
+              {entry.description.split(/[\s,]+/).slice(0, 7).join(' ')}
+              {/* {entry.description.split(/[\s,]+/).length > 7? '...' : ''} */}
+            </span>
+          </div>
+        );
+      }
     },
+
+    // {
+    //   header: <div className="text-center"> Paid Via/By</div>,
+    //   width: '120px',
+    //   cell: (entry: PettyCashEntry) => entry.checked_by || '-'
+    // },
+    // {
+    //   header: <div className="text-center"> Approved By</div>,
+    //   width: '120px',
+    //   cell: (entry: PettyCashEntry) => entry.approved_by || '-'
+    // },
+
     {
-      header: 'Category',
-      width: '150px',
-      cell: (entry: PettyCashEntry) => getCategoryName(entry.category_code)
-    },
-    {
-      header: 'Subcategory',
-      width: '150px',
-      cell: (entry: PettyCashEntry) => getSubcategoryName(entry.category_code, entry.subcategory_code)
-    },
-    {
-      header: <div className="text-center"> Checked By</div>,
+      header: 'Paid Via/By',
       width: '120px',
       cell: (entry: PettyCashEntry) => entry.checked_by || '-'
     },
     {
-      header: <div className="text-center"> Approved By</div>,
-      width: '120px',
-      cell: (entry: PettyCashEntry) => entry.approved_by || '-'
-    },
-    {
-      header: 'Receipt',
+      header: 'Payment Proof',
+      width: '100px',
+      cell: (entry: PettyCashEntry) => entry.payment_proof_url ? (
+        <Button
+          className="h-6 px-1.5 text-[11px] bg-blue-500 flex text-white items-center gap-0.5"
+          onClick={() => handleViewPaymentProof(entry)}
+        >
+          <Eye size={12} /> View
+        </Button>) : <div className="flex justify-center"><span className="text-red-500 font-bold text-center">Missing</span></div>
+    }, {
+      header: 'Bill/PCV Upload',
       width: '100px',
       cell: (entry: PettyCashEntry) => entry.receipt_url ? (
         <Button
-          variant="link"
-          className="h-8 px-2 text-xs"
+          className="h-6 px-1.5 text-[11px] bg-blue-500 flex text-white items-center gap-0.5"
           onClick={() => handleViewReceipt(entry)}
         >
-          View Receipt
-        </Button>
-      ) : <div className="flex justify-center"><span className="text-red-500 font-bold text-center">No Receipt</span></div>
+          <Eye size={12} /> View
+        </Button>) : <div className="flex justify-center"><span className="text-red-500 font-bold text-center">Missing</span></div>
     },
     {
       header: 'Status',
@@ -672,7 +536,7 @@ export function TransactionsTab() {
       cell: (entry: PettyCashEntry) => (
         <span className={`px-2 py-1 rounded-full text-xs ${entry.approved_by ? 'bg-green-100 text-green-800' :
           entry.checked_by ? 'bg-yellow-100 text-yellow-800' :
-            'bg-gray-100 text-gray-800'
+            'bg-red-100 text-red-800'
           }`}>
           {entry.approved_by ? 'Approved' :
             entry.checked_by ? 'Checked' :
@@ -701,8 +565,8 @@ export function TransactionsTab() {
   ];
   const EditForm = ({ entry, onClose, onSubmit }) => {
     const [editedEntry, setEditedEntry] = useState(entry);
-    const [selectedCategory, setSelectedCategory] = useState(entry?.category_code || 'ALL');
-    const [selectedSubcategory, setSelectedSubcategory] = useState(entry?.subcategory_code || 'ALL');
+    const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+    const [selectedSubcategory, setSelectedSubcategory] = useState<string>("ALL");
 
     const handleSubmit = async (e) => {
       e.preventDefault();
@@ -778,9 +642,182 @@ export function TransactionsTab() {
     );
   };
 
+  const handleViewPaymentProof = (entry: PettyCashEntry) => {
+    if (entry.payment_proof_url) {
+      setPaymentProofPreview({
+        isOpen: true,
+        url: entry.payment_proof_url
+      });
+    }
+  };
+
+  const SupplierSelection = () => (
+    <div className="grid gap-4">
+      <div className="space-y-2">
+        <Label>Select Supplier Type</Label>
+        <Select
+          onValueChange={(value) => {
+            setIsNewSupplier(value === 'new');
+            setSelectedSupplier(null);
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose supplier type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="existing">Existing Supplier</SelectItem>
+            <SelectItem value="new">New Supplier</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {!isNewSupplier ? (
+        <div className="space-y-2">
+          <Label>Search Existing Supplier</Label>
+          <Popover open={openSupplier} onOpenChange={setOpenSupplier}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={openSupplier}
+                className="w-full justify-between"
+              >
+                {selectedSupplier ? selectedSupplier.supplierName : "Select supplier..."}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[400px] p-0">
+              <Command>
+                <CommandInput placeholder="Search suppliers..." />
+                <CommandEmpty>No supplier found.</CommandEmpty>
+                <CommandGroup>
+                  <ScrollArea className="h-72">
+                    {suppliers.map((supplier) => (
+                      <CommandItem
+                        key={supplier.id}
+                        onSelect={() => {
+                          setSelectedSupplier(supplier);
+                          setOpenSupplier(false);
+                          // Update form data with supplier details
+                          setNewPettyCash(prev => ({
+                            ...prev,
+                            supplier_name: supplier.supplierName,
+                            supplier_pin: supplier.pin
+                          }));
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedSupplier?.id === supplier.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {supplier.supplierName}
+                      </CommandItem>
+                    ))}
+                  </ScrollArea>
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      ) : (
+        // New supplier form fields
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Supplier Name</Label>
+            <Input
+              value={newPettyCash.supplier_name}
+              onChange={(e) => handleInputChange('supplier_name', e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Supplier PIN</Label>
+            <Input
+              value={newPettyCash.supplier_pin}
+              onChange={(e) => handleInputChange('supplier_pin', e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const PaymentProofPreviewDialog = () => (
+    <Dialog
+      open={paymentProofPreview.isOpen}
+      onOpenChange={(open) => setPaymentProofPreview(prev => ({ ...prev, isOpen: open }))}
+    >
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+        <DialogHeader className="p-4 border-b">
+          <DialogTitle>Payment Proof Preview</DialogTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPaymentProofPreview(prev => ({
+                ...prev,
+                rotation: ((prev.rotation || 0) + 90) % 360
+              }))}
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Rotate
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const response = await fetch(
+                    `https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${paymentProofPreview.url}`
+                  );
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = `payment-proof-${paymentProofPreview.url}`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  window.URL.revokeObjectURL(url);
+                } catch (error) {
+                  console.error('Download failed:', error);
+                }
+              }}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+          </div>
+        </DialogHeader>
+        {paymentProofPreview.url && (
+          <div className="relative w-full h-[calc(90vh-100px)] bg-gray-50 group">
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 animate-pulse">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+            <Image
+              src={`https://zyszsqgdlrpnunkegipk.supabase.co/storage/v1/object/public/Accounting-Portal/${paymentProofPreview.url}`}
+              alt="Payment Proof"
+              fill
+              className="transition-transform duration-300 ease-in-out hover:scale-150 cursor-zoom-in"
+              style={{
+                objectFit: 'contain',
+                transform: `rotate(${paymentProofPreview.rotation || 0}deg)`,
+                transition: 'transform 0.3s ease-in-out'
+              }}
+              priority
+              onLoadingComplete={(image) => {
+                image.classList.remove('opacity-0');
+                image.classList.add('opacity-100');
+              }}
+            />
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
     <div className="flex w-full bg-gray-100">
-      <Toaster position="top-right" />
       <main className="flex-1 p-4 w-full">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-4">
@@ -820,9 +857,9 @@ export function TransactionsTab() {
         </div>
 
         <Card className="overflow-hidden">
-          <ScrollArea className="h-[calc(100vh-200px)]">
+          <ScrollArea className="h-[calc(100vh-370px)]">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 bg-blue-800 z-10">
                 <TableRow className="bg-blue-600 hover:bg-blue-600">
                   {columnDefinitions.map((col, index) => (
                     <TableHead
@@ -842,7 +879,10 @@ export function TransactionsTab() {
                       colSpan={columnDefinitions.length}
                       className="h-32 text-center"
                     >
-                      Loading entries...
+                      <div className="flex flex-col items-center justify-center">
+                        <RefreshCwIcon className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+                        <span className="text-sm text-gray-500">Loading entries...</span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : filteredEntries.length === 0 ? (
@@ -851,7 +891,25 @@ export function TransactionsTab() {
                       colSpan={columnDefinitions.length}
                       className="h-32 text-center"
                     >
-                      No entries found
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="rounded-full bg-gray-100 p-3 mb-2">
+                          <Search className="h-6 w-6 text-gray-400" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">No Entries Found</span>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {searchQuery
+                            ? 'No entries match your search criteria'
+                            : 'Get started by adding your first entry'}
+                        </p>
+                        {!searchQuery && (
+                          <Button
+                            onClick={handleCreateEntry}
+                            className="mt-3 bg-blue-600 text-white"
+                          >
+                            Add New Entry
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -944,6 +1002,7 @@ export function TransactionsTab() {
             )}
           </DialogContent>
         </Dialog>
+        <PaymentProofPreviewDialog />
 
         {/* Update the EntryDialog SheetContent to be wider */}
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
@@ -1033,8 +1092,9 @@ export function TransactionsTab() {
           entry={dialogState.entry}
           onSave={handleSaveEntry}
           mode={dialogState.mode}
+          userId={userId}
+          fetchEntries={fetchEntries}
         />
-
       </main>
     </div>
   );
@@ -1051,7 +1111,7 @@ const ReceiptPreview: React.FC<{ url: string }> = ({ url }) => {
         className="h-8 px-2 text-xs"
         onClick={() => setIsOpen(true)}
       >
-        View Receipt
+        Receipt
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

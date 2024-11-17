@@ -1,17 +1,21 @@
-// types/account.ts
+//@ts-nocheck
 
 export interface AccountData {
-    accountUser: string[];           // Multiple users can be assigned
-    pettyCashType: ('Cash' | 'Mpesa' | 'Card')[];  // Multiple types can be selected
+    id: string;  // Add unique ID
+    accountUser: string[];
+    pettyCashType: ('Cash' | 'Mpesa' | 'Card')[];
     accountNumber: string;
     accountType: 'Corporate' | 'Personal';
     minFloatBalance: number;
     minFloatAlert: number;
     maxOpeningFloat: number;
     approvedLimitAmount: number;
-    startDate: string;              // ISO date string
-    endDate: string | null;         // ISO date string, null if no end date
-    status: 'Active' | 'Inactive';  // Calculated based on end date
+    startDate: string;
+    endDate: string | null;
+    status: 'Active' | 'Inactive';
+    created_at: string;
+    updated_at?: string;
+    is_verified?: boolean;
 }
 
 export interface Account {
@@ -32,7 +36,7 @@ export const ACCOUNT_TYPES = [
     { value: 'Corporate', label: 'Corporate' },
     { value: 'Personal', label: 'Personal' }
 ] as const;
-
+// 
 export const DEFAULT_ACCOUNT_DATA: AccountData = {
     accountUser: [],
     pettyCashType: [],

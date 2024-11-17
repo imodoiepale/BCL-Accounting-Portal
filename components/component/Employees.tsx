@@ -15,7 +15,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon, UploadIcon, DownloadIcon } from 'lucide-react'
 import { useUser } from '@clerk/clerk-react'
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { PencilIcon, TrashIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -441,7 +441,6 @@ employee_enddate: '',
             <ChevronRightIcon className="w-4 h-4" />
           </Button>
         </div>
-        <Toaster />
       </main>
     </div>
   )
