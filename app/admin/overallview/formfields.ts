@@ -2,11 +2,8 @@ export const formFields = {
     companyDetails: {
         fields: [
             { name: 'company_name', label: 'Company Name', type: 'text', required: true },
-            // { name: 'description', label: 'Description', type: 'text' },
-            { name: 'company_type', label: 'Company Type', type: 'select', options: ['LTD', 'SOLE PROPRIERTORSHIP', 'PARTNERSHIP'] },
-            // { name: 'company_status', label: 'Company Status', type: 'select', options: ['ACTIVE', 'INACTIVE', 'DORMANT', 'FRESH REG'] },         
+            { name: 'company_type', label: 'Company Type', type: 'select', options: ['LTD', 'SOLE PROPRIERTORSHIP', 'PARTNERSHIP'] },        
             { name: 'registration_number', label: 'Registration Number', type: 'text' },
-            // { name: 'date_established', label: 'Date Established', type: 'date' },
             { name: 'company_registered_date', label: 'Company Registered Date', type: 'date', category: 'Bcl take over Details', },
             { name: 'company_takeover_date', label: 'Company Take Over Date', type: 'date', category: 'Bcl take over Details', },
             { name: 'backlog_posted_date', label: 'Back Log Posted W.E.F', type: 'date', category: 'Bcl take over Details', },
@@ -15,7 +12,6 @@ export const formFields = {
             { name: 'industry', label: 'Industry', type: 'text' },
             { name: 'employees', label: 'Employees', type: 'number' },
             { name: 'annual_revenue', label: 'Annual Revenue', type: 'number' },
-            // { name: 'fiscal_year', label: 'Fiscal Year', type: 'text' },
             { name: 'website', label: 'Website', type: 'url' },
             { name: 'current_communication_email', label: 'Current Communication Email', type: 'email' },
             { name: 'phone', label: 'Phone', type: 'tel' },
