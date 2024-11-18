@@ -18,7 +18,7 @@ import { useTableFunctionalities, CompanyEditDialog } from './components/functio
 import { Search, Filter, X } from 'lucide-react';
 import { groupFieldsByCategory, groupDataByCategory, calculateFieldStats, handleExport, handleFileImport, calculateTotalFields, calculatePendingFields, calculateCompletedFields } from './components/utility';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { SettingsDialog } from './components/settingsDialog';
+import { SettingsDialog } from './components/overview/Dialogs/settingsDialog';
 import { MissingFieldsDialog, getMissingFields } from './components/missingFieldsDialog';
 import { Input } from "@/components/ui/input";
 
