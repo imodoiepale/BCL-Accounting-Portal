@@ -202,13 +202,13 @@ const OverallView = () => {
         { isSeparator: true },
         // { name: 'kraDetails', fields: formFields.kraDetails.fields, label: 'KRA Details' },
         // { isSeparator: true },
-        { name: 'directorDetails', fields: formFields.directorDetails.fields, label: 'Director Details' },
-        { isSeparator: true },
-        { name: 'supplierDetails', fields: formFields.supplierDetails.fields, label: 'Supplier Details' },
-        { isSeparator: true },
-        { name: 'bankDetails', fields: formFields.bankDetails.fields, label: 'Bank Details' },
-        { isSeparator: true },
-        { name: 'employeeDetails', fields: formFields.employeeDetails.fields, label: 'Employee Details' }
+        // { name: 'directorDetails', fields: formFields.directorDetails.fields, label: 'Director Details' },
+        // { isSeparator: true },
+        // { name: 'supplierDetails', fields: formFields.supplierDetails.fields, label: 'Supplier Details' },
+        // { isSeparator: true },
+        // { name: 'bankDetails', fields: formFields.bankDetails.fields, label: 'Bank Details' },
+        // { isSeparator: true },
+        // { name: 'employeeDetails', fields: formFields.employeeDetails.fields, label: 'Employee Details' }
     ];
 
     const allFieldsWithSeparators = sectionsWithSeparators.flatMap(section =>
