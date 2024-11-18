@@ -148,6 +148,11 @@ const AdvancedTable: React.FC = () => {
     // Enhanced export function
     const handleExport = async () => {
         try {
+            if (!data || data.length === 0) {
+                console.error('No data to export');
+                return;
+            }
+
             const headers = Object.entries(data[0] || {}).map(([key]) => key);
             const csvData = [
                 headers.join(','),
