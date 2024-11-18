@@ -19,17 +19,6 @@ type SortField = 'company' | 'issueDate' | 'expiryDate' | 'daysLeft' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 const DocumentManagement = () => {
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
-  const [sortField, setSortField] = useState<SortField>('company');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [uploadData, setUploadData] = useState({
-    issueDate: '',
-    expiryDate: '',
-    file: null as File | null,
-  });
-
   const companies: Company[] = [
     { id: 1, name: 'Company A' },
     { id: 2, name: 'Company B' },
@@ -44,6 +33,36 @@ const DocumentManagement = () => {
     id: i + 1,
     name: `Document ${i + 1}`,
   }));
+
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [sortField, setSortField] = useState<SortField>('company');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [uploadData, setUploadData] = useState({
+    issueDate: '',
+    expiryDate: '',
+    file: null as File | null,
+  });
+
+  // State to manage visibility of documents and their sub-columns
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const initialVisibility = {};
+    documents.forEach(doc => {
+      initialVisibility[doc.id] = {
+        visible: true,
+        subColumns: {
+          upload: true,
+          issueDate: true,
+          expiryDate: true,
+          daysLeft: true,
+          status: true,
+        },
+      };
+    });
+    return initialVisibility;
+  });
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -172,6 +191,73 @@ const DocumentManagement = () => {
       </div>
     </div>
   );
+
+  const SettingsModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-4xl relative">
+        <button 
+          onClick={() => setShowSettingsModal(false)}
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+          aria-label="Close"
+          title="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      
+        <h2 className="text-xl font-semibold mb-4">Settings</h2>
+        <div className="grid grid-cols-2 gap-6">
+          {documents.map(doc => (
+            <div key={doc.id} className="border p-4 rounded-lg">
+              <div className="flex items-center mb-2">
+                <input 
+                  type="checkbox" 
+                  checked={visibleColumns[doc.id].visible}
+                  onChange={() => {
+                    setVisibleColumns(prev => ({
+                      ...prev,
+                      [doc.id]: {
+                        ...prev[doc.id],
+                        visible: !prev[doc.id].visible,
+                      },
+                    }));
+                  }}
+                  className="mr-2"
+                />
+                <label className="text-sm font-medium text-gray-700">{doc.name}</label>
+              </div>
+              {visibleColumns[doc.id].visible && (
+                <div className="space-y-2">
+                  {Object.keys(visibleColumns[doc.id].subColumns).map(subColumn => (
+                    <div key={subColumn} className="flex items-center">
+                      <input 
+                        type="checkbox" 
+                        checked={visibleColumns[doc.id].subColumns[subColumn]}
+                        onChange={() => {
+                          setVisibleColumns(prev => ({
+                            ...prev,
+                            [doc.id]: {
+                              ...prev[doc.id],
+                              subColumns: {
+                                ...prev[doc.id].subColumns,
+                                [subColumn]: !prev[doc.id].subColumns[subColumn],
+                              },
+                            },
+                          }));
+                        }}
+                        className="mr-2"
+                      />
+                      <label className="text-sm font-medium text-gray-700 capitalize">{subColumn}</label>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="w-full p-6 bg-white rounded-lg shadow-sm">
       <div className="flex justify-between items-center mb-6">
@@ -188,7 +274,10 @@ const DocumentManagement = () => {
             <FileDown className="w-5 h-5" />
             Export
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700">
+          <button 
+            onClick={() => setShowSettingsModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700"
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -216,52 +305,66 @@ const DocumentManagement = () => {
                 </th>
                 <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Summary</th>
                 {documents.map(doc => (
-                  <th key={`doc-${doc.id}`} className="p-3 border-2 border-gray-300 font-semibold text-gray-700 text-center bg-blue-50" colSpan={5}>
-                    {doc.name}
-                  </th>
+                  visibleColumns[doc.id].visible && (
+                    <th key={`doc-${doc.id}`} className="p-3 border-2 border-gray-300 font-semibold text-gray-700 text-center bg-blue-50" colSpan={5}>
+                      {doc.name}
+                    </th>
+                  )
                 ))}
               </tr>
               <tr className="bg-gray-50">
                 {documents.map(doc => (
-                  <React.Fragment key={`doc-columns-${doc.id}`}>
-                    <th className="p-3 border-2 border-gray-300 font-medium text-gray-600">Upload</th>
-                    <th 
-                      className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort('issueDate')}
-                    >
-                      <div className="flex items-center justify-between">
-                        Issue Date
-                        <SortIcon field="issueDate" />
-                      </div>
-                    </th>
-                    <th 
-                      className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort('expiryDate')}
-                    >
-                      <div className="flex items-center justify-between">
-                        Expiry Date
-                        <SortIcon field="expiryDate" />
-                      </div>
-                    </th>
-                    <th 
-                      className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort('daysLeft')}
-                    >
-                      <div className="flex items-center justify-between">
-                        Days Left
-                        <SortIcon field="daysLeft" />
-                      </div>
-                    </th>
-                    <th 
-                      className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort('status')}
-                    >
-                      <div className="flex items-center justify-between">
-                        Status
-                        <SortIcon field="status" />
-                      </div>
-                    </th>
-                  </React.Fragment>
+                  visibleColumns[doc.id].visible && (
+                    <React.Fragment key={`doc-columns-${doc.id}`}>
+                      {visibleColumns[doc.id].subColumns.upload && (
+                        <th className="p-3 border-2 border-gray-300 font-medium text-gray-600">Upload</th>
+                      )}
+                      {visibleColumns[doc.id].subColumns.issueDate && (
+                        <th 
+                          className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('issueDate')}
+                        >
+                          <div className="flex items-center justify-between">
+                            Issue Date
+                            <SortIcon field="issueDate" />
+                          </div>
+                        </th>
+                      )}
+                      {visibleColumns[doc.id].subColumns.expiryDate && (
+                        <th 
+                          className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('expiryDate')}
+                        >
+                          <div className="flex items-center justify-between">
+                            Expiry Date
+                            <SortIcon field="expiryDate" />
+                          </div>
+                        </th>
+                      )}
+                      {visibleColumns[doc.id].subColumns.daysLeft && (
+                        <th 
+                          className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('daysLeft')}
+                        >
+                          <div className="flex items-center justify-between">
+                            Days Left
+                            <SortIcon field="daysLeft" />
+                          </div>
+                        </th>
+                      )}
+                      {visibleColumns[doc.id].subColumns.status && (
+                        <th 
+                          className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('status')}
+                        >
+                          <div className="flex items-center justify-between">
+                            Status
+                            <SortIcon field="status" />
+                          </div>
+                        </th>
+                      )}
+                    </React.Fragment>
+                  )
                 ))}
               </tr>
             </thead>
@@ -272,31 +375,55 @@ const DocumentManagement = () => {
                 <td className="p-3 border-2 border-gray-300" rowSpan={3}></td>
                 <td className="p-3 border-2 border-gray-300 font-semibold text-blue-600">Total</td>
                 {documents.map(doc => (
-                  <React.Fragment key={`total-${doc.id}`}>
-                    <td className="p-3 border-2 border-gray-300 text-center font-medium">4</td>
-                    <td className="p-3 border-2 border-gray-300 text-center text-gray-400" colSpan={3}>-</td>
-                    <td className="p-3 border-2 border-gray-300 text-center font-medium">4</td>
-                  </React.Fragment>
+                  visibleColumns[doc.id].visible && (
+                    <React.Fragment key={`total-${doc.id}`}>
+                      {visibleColumns[doc.id].subColumns.upload && (
+                        <td className="p-3 border-2 border-gray-300 text-center font-medium">4</td>
+                      )}
+                      {visibleColumns[doc.id].subColumns.issueDate && (
+                        <td className="p-3 border-2 border-gray-300 text-center text-gray-400" colSpan={3}>-</td>
+                      )}
+                      {visibleColumns[doc.id].subColumns.status && (
+                        <td className="p-3 border-2 border-gray-300 text-center font-medium">4</td>
+                      )}
+                    </React.Fragment>
+                  )
                 ))}
               </tr>
               <tr className="bg-gray-50">
                 <td className="p-3 border-2 border-gray-300 font-semibold text-orange-600">Pending</td>
                 {documents.map(doc => (
-                  <React.Fragment key={`pending-${doc.id}`}>
-                    <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
-                    <td className="p-3 border-2 border-gray-300 text-center text-gray-400" colSpan={3}>-</td>
-                    <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
-                  </React.Fragment>
+                  visibleColumns[doc.id].visible && (
+                    <React.Fragment key={`pending-${doc.id}`}>
+                      {visibleColumns[doc.id].subColumns.upload && (
+                        <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
+                      )}
+                      {visibleColumns[doc.id].subColumns.issueDate && (
+                        <td className="p-3 border-2 border-gray-300 text-center text-gray-400" colSpan={3}>-</td>
+                      )}
+                      {visibleColumns[doc.id].subColumns.status && (
+                        <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
+                      )}
+                    </React.Fragment>
+                  )
                 ))}
               </tr>
               <tr className="bg-gray-50">
                 <td className="p-3 border-2 border-gray-300 font-semibold text-green-600">Complete</td>
                 {documents.map(doc => (
-                  <React.Fragment key={`complete-${doc.id}`}>
-                    <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
-                    <td className="p-3 border-2 border-gray-300 text-center text-gray-400" colSpan={3}>-</td>
-                    <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
-                  </React.Fragment>
+                  visibleColumns[doc.id].visible && (
+                    <React.Fragment key={`complete-${doc.id}`}>
+                      {visibleColumns[doc.id].subColumns.upload && (
+                        <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
+                      )}
+                      {visibleColumns[doc.id].subColumns.issueDate && (
+                        <td className="p-3 border-2 border-gray-300 text-center text-gray-400" colSpan={3}>-</td>
+                      )}
+                      {visibleColumns[doc.id].subColumns.status && (
+                        <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
+                      )}
+                    </React.Fragment>
+                  )
                 ))}
               </tr>
               
@@ -315,38 +442,50 @@ const DocumentManagement = () => {
                     <td className="p-3 border-2 border-gray-300 font-medium">{company.name}</td>
                     <td className="p-3 border-2 border-gray-300"></td>
                     {documents.map((doc) => (
-                      <React.Fragment key={`${company.id}-${doc.id}`}>
-                        <td className="p-3 border-2 border-gray-300 text-center">
-                          <button 
-                            onClick={() => {
-                              setSelectedCompany(company);
-                              setSelectedDocument(doc);
-                              setShowUploadModal(true);
-                            }}
-                            className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100"
-                          >
-                            Upload
-                          </button>
-                        </td>
-                        <td className="p-3 border-2 border-gray-300 text-center text-gray-600">
-                          {format(date, 'MM/dd/yyyy')}
-                        </td>
-                        <td className="p-3 border-2 border-gray-300 text-center text-gray-600">
-                          {format(expiryDate, 'MM/dd/yyyy')}
-                        </td>
-                        <td className="p-3 border-2 border-gray-300 text-center font-medium">
-                          {differenceInDays(expiryDate, new Date())}
-                        </td>
-                        <td className="p-3 border-2 border-gray-300 text-center">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            company.id % 3 === 0 ? 'bg-green-100 text-green-700' :
-                            company.id % 3 === 1 ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-red-100 text-red-700'
-                          }`}>
-                            {company.id % 3 === 0 ? 'Complete' : company.id % 3 === 1 ? 'Pending' : 'Expired'}
-                          </span>
-                        </td>
-                      </React.Fragment>
+                      visibleColumns[doc.id].visible && (
+                        <React.Fragment key={`${company.id}-${doc.id}`}>
+                          {visibleColumns[doc.id].subColumns.upload && (
+                            <td className="p-3 border-2 border-gray-300 text-center">
+                              <button 
+                                onClick={() => {
+                                  setSelectedCompany(company);
+                                  setSelectedDocument(doc);
+                                  setShowUploadModal(true);
+                                }}
+                                className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100"
+                              >
+                                Upload
+                              </button>
+                            </td>
+                          )}
+                          {visibleColumns[doc.id].subColumns.issueDate && (
+                            <td className="p-3 border-2 border-gray-300 text-center text-gray-600">
+                              {format(date, 'MM/dd/yyyy')}
+                            </td>
+                          )}
+                          {visibleColumns[doc.id].subColumns.expiryDate && (
+                            <td className="p-3 border-2 border-gray-300 text-center text-gray-600">
+                              {format(expiryDate, 'MM/dd/yyyy')}
+                            </td>
+                          )}
+                          {visibleColumns[doc.id].subColumns.daysLeft && (
+                            <td className="p-3 border-2 border-gray-300 text-center font-medium">
+                              {differenceInDays(expiryDate, new Date())}
+                            </td>
+                          )}
+                          {visibleColumns[doc.id].subColumns.status && (
+                            <td className="p-3 border-2 border-gray-300 text-center">
+                              <span className={`px-2 py-1 rounded-full text-xs ${
+                                company.id % 3 === 0 ? 'bg-green-100 text-green-700' :
+                                company.id % 3 === 1 ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                {company.id % 3 === 0 ? 'Complete' : company.id % 3 === 1 ? 'Pending' : 'Expired'}
+                              </span>
+                            </td>
+                          )}
+                        </React.Fragment>
+                      )
                     ))}
                   </tr>
                 );
@@ -356,6 +495,7 @@ const DocumentManagement = () => {
         </div>
       </div>      
       {showUploadModal && <UploadModal />}
+      {showSettingsModal && <SettingsModal />}
     </div>
   );
 };
