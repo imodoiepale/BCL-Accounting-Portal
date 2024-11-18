@@ -152,7 +152,7 @@ const processStructureData = (data: any[]) => {
 
 
 
-export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStructureChange }) {
+export function SettingsDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [structure, setStructure] = useState<StructureItem[]>([]);
   const [uniqueTabs, setUniqueTabs] = useState<string[]>([]);
@@ -599,7 +599,6 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
 
       // Refresh structure and reset states
       await fetchStructure();
-      await onStructureChange();
       resetNewStructure();
       toast.success('Structure updated successfully');
 

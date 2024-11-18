@@ -92,10 +92,26 @@ const OverallView = () => {
     const [selectedMissingFields, setSelectedMissingFields] = useState(null);
     const [isMissingFieldsOpen, setIsMissingFieldsOpen] = useState(false);
     const { sectionColors } = TableComponents;
-    const [mainTabs, setMainTabs] = useState([]);
-    const [mainSections, setMainSections] = useState({});
-    const [mainSubsections, setMainSubsections] = useState({});
+    const [pageStructure, setPageStructure] = useState<any[]>([]);
 
+    // Add search input
+    const searchInput = (
+        <input
+            type="text"
+            value={globalFilter}
+            onChange={(e) => handleGlobalSearch(e.target.value)}
+            placeholder="Search all columns..."
+            className="px-3 py-2 border rounded"
+        />
+    );
+
+    const visibilityControls = (
+        <div className="flex gap-4 mb-4">
+            <Button onClick={resetAll}>Reset All</Button>
+            {/* Add more visibility toggle buttons as needed */}
+        </div>
+    );
+    // Update color styles
 
     const getTableInfo = (fieldName) => {
         // Default table info
@@ -202,9 +218,56 @@ const OverallView = () => {
             : section.fields
     );
 
+
+
+    useEffect(() => {
+        const fetchStructure = async () => {
+            const { data, error } = await supabase
+                .from('profile_category_table_mapping')
+                .select('*')
+                .order('Tabs', { ascending: true });
+    
+            if (data) {
+                const processedData = data.reduce((acc, item) => {
+                    const tab = item.Tabs;
+                    if (!acc[tab]) {
+                        acc[tab] = {
+                            sections: {},
+                            data: []
+                        };
+                    }
+                    
+                    const sections = JSON.parse(item.sections_sections);
+                    const subsections = JSON.parse(item.sections_subsections);
+                    const columnMappings = JSON.parse(item.column_mappings);
+                    const tableNames = JSON.parse(item.table_names);
+    
+                    Object.keys(sections).forEach(section => {
+                        if (!acc[tab].sections[section]) {
+                            acc[tab].sections[section] = [];
+                        }
+                        acc[tab].sections[section].push({
+                            subsection: subsections[section],
+                            columnMappings,
+                            tableNames: tableNames[section]
+                        });
+                    });
+    
+                    acc[tab].data.push(item);
+                    return acc;
+                }, {});
+    
+                setPageStructure(processedData);
+            }
+        };
+    
+        fetchStructure();
+    }, []);
+   
+
     useEffect(() => {
         fetchAllData();
-        fetchMainStructure();
+
         // Add event listener for data refresh
         const handleRefresh = () => fetchAllData();
         window.addEventListener('refreshData', handleRefresh);
@@ -301,120 +364,6 @@ const OverallView = () => {
         }
     };
 
-    const fetchMainStructure = async () => {
-        try {
-            const { data: mappings, error } = await supabase
-                .from('profile_category_table_mapping')
-                .select('*')
-                .order('Tabs', { ascending: true });
-
-            if (error) throw error;
-
-            const tabs = [...new Set(mappings.map(m => m.Tabs))];
-            const sections = {};
-            const subsections = {};
-
-            mappings.forEach(mapping => {
-                const sectionsData = typeof mapping.sections_sections === 'string'
-                    ? JSON.parse(mapping.sections_sections)
-                    : mapping.sections_sections;
-                const subsectionsData = typeof mapping.sections_subsections === 'string'
-                    ? JSON.parse(mapping.sections_subsections)
-                    : mapping.sections_subsections;
-
-                if (sectionsData) {
-                    Object.keys(sectionsData).forEach(section => {
-                        if (!sections[mapping.Tabs]) {
-                            sections[mapping.Tabs] = new Set();
-                        }
-                        sections[mapping.Tabs].add(section);
-
-                        if (subsectionsData && subsectionsData[section]) {
-                            if (!subsections[section]) {
-                                subsections[section] = new Set();
-                            }
-                            if (Array.isArray(subsectionsData[section])) {
-                                subsectionsData[section].forEach(sub => subsections[section].add(sub));
-                            } else {
-                                subsections[section].add(subsectionsData[section]);
-                            }
-                        }
-                    });
-                }
-            });
-
-            setMainTabs(tabs);
-            setMainSections(Object.fromEntries(
-                Object.entries(sections).map(([k, v]) => [k, Array.from(v)])
-            ));
-            setMainSubsections(Object.fromEntries(
-                Object.entries(subsections).map(([k, v]) => [k, Array.from(v)])
-            ));
-
-            return mappings;
-        } catch (error) {
-            console.error('Error fetching structure:', error);
-            toast.error('Failed to fetch structure');
-            return [];
-        }
-    };
-
-    useEffect(() => {
-        const fetchFieldsForSection = async (section, subsection) => {
-            try {
-              const { data, error } = await supabase
-                .from('profile_category_table_mapping')
-                .select('*')
-                .match({
-                  sections_sections: JSON.stringify({[section]: true}),
-                  sections_subsections: JSON.stringify({[section]: subsection})
-                });
-          
-              if (error) throw error;
-          
-              // Return fields in array format
-              return data.reduce((acc, mapping) => {
-                const columnMappings = safeJSONParse(mapping.column_mappings);
-                const fields = Object.entries(columnMappings).map(([key, label]) => ({
-                  name: key.split('.')[1], 
-                  label,
-                  table: key.split('.')[0],
-                  category: subsection
-                }));
-          
-                return {
-                  ...acc,
-                  [subsection]: fields || [] // Ensure fields is an array
-                };
-              }, {});
-              
-            } catch (error) {
-              console.error('Error fetching fields:', error);
-              return {};
-            }
-          };
-          const updateFormFields = async () => {
-            const fields = {};
-            
-            for (const [tab, sections] of Object.entries(mainSections)) {
-              for (const section of sections) {
-                const subsections = mainSubsections[section] || [];
-                for (const subsection of subsections) {
-                  const sectionFields = await fetchFieldsForSection(section, subsection);
-                  Object.assign(fields, sectionFields);
-                }
-              }
-            }
-      
-            setFormFields(fields);
-          };
-      
-          updateFormFields();
-        }, [mainSections, mainSubsections]);
-      
-
-    // Then update the processedSections creation:
-
     if (loading) {
         return <div>Loading...</div>;
     }
@@ -499,19 +448,27 @@ const OverallView = () => {
 
     const columnStats = calculateColumnStatistics();
 
-    const processedSections = generateReferenceNumbers([
-        { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
-        { isSeparator: true },
-        {
-          name: 'allFields',
-          label: 'All Fields',
-          categorizedFields: Object.entries(formFields || {}).map(([category, fields]) => ({
-            category,
-            fields: Array.isArray(fields) ? fields : [], // Ensure fields is an array
-            colSpan: Array.isArray(fields) ? fields.length : 0
-          }))
+    const processedSections = generateReferenceNumbers(sectionsWithSeparators.map(section => {
+        if (section.isSeparator) return section;
+
+        // Group fields by category for company details
+        if (section.name === 'companyDetails') {
+            return {
+                ...section,
+                categorizedFields: groupFieldsByCategory(section.fields)
+            };
         }
-      ]);
+
+        // For other sections, treat all fields as 'General' category
+        return {
+            ...section,
+            categorizedFields: [{
+                category: 'General',
+                fields: section.fields,
+                colSpan: section.fields.length
+            }]
+        };
+    }));
 
     // Calculate section and column references
     const generateReferences = () => {
@@ -563,88 +520,53 @@ const OverallView = () => {
     };
 
     return (
-
-        <>
-                <div className="flex gap-2">
-            <SettingsDialog
-                mainTabs={mainTabs}
-                mainSections={mainSections}
-                mainSubsections={mainSubsections}
-                onStructureChange={fetchMainStructure}
-            />
-
-            <Button
-                onClick={() => setIsImportDialogOpen(true)}
-                className="flex items-center gap-2"
-            >
-                <Upload className="h-4 w-4" />
-                Import
-            </Button>
-            <Button
-                onClick={() => handleExport(data, processedSections)}
-                className="flex items-center gap-2"
-            >
-                <Download className="h-4 w-4" />
-                Export
-            </Button>
-
-            </div>
-
-            <Tabs defaultValue="overview" className="w-full space-y-4">
-                <TabsList className="grid w-full grid-cols-10 bg-gray-100 rounded-lg p-1">
-                    {mainTabs.map(tab => (
-                        <TabsTrigger
-                            key={tab}
-                            value={tab}
-                            className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
-                        >
-                            {tab}
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
-
-                {mainTabs.map(tab => (
-                    <TabsContent key={tab} value={tab}>
-                        {mainSections[tab]?.map(section => {
-                            const subsections = mainSubsections[section] || [];
-
-                            return subsections.map(subsection => {
-                                // Create processed sections for this section/subsection
-                                const sectionData = {
-                                    name: section,
-                                    label: section,
-                                    fields: [], // Get fields from your formFields mapping
-                                    categorizedFields: [] // Group fields by category
-                                };
-
-                                const processedSections = generateReferenceNumbers([
-                                    { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
-                                    { isSeparator: true },
-                                    sectionData
-                                ]);
-
-                                return (
-                                    <div key={`${section}-${subsection}`}>
-                                        <h3 className="text-lg font-semibold mb-4">{subsection}</h3>
-                                        <Table
-                                            data={data}
-                                            handleCompanyClick={handleCompanyClick}
-                                            onMissingFieldsClick={(company) => {
-                                                setSelectedMissingFields({
-                                                    ...company,
-                                                    missingFields: getMissingFields(company)
-                                                });
-                                                setIsMissingFieldsOpen(true);
-                                            }}
-                                            processedSections={processedSections}
-                                        />
-                                    </div>
-                                );
-                            });
-                        })}
-                    </TabsContent>
+<>
+        <div className="flex gap-2">
+        <SettingsDialog />
+        <Button
+            onClick={() => setIsImportDialogOpen(true)}
+            className="flex items-center gap-2"
+        >
+            <Upload className="h-4 w-4" />
+            Import
+        </Button>
+        <Button
+            onClick={() => handleExport(data, processedSections)}
+            className="flex items-center gap-2"
+        >
+            <Download className="h-4 w-4" />
+            Export
+        </Button>
+    </div>
+    <Tabs defaultValue="Company Details" className="w-full">
+        <TabsList className="w-full justify-start border-b">
+            {Object.keys(pageStructure).map(tab => (
+                <TabsTrigger key={tab} value={tab} className="px-4 py-2">
+                    {tab}
+                </TabsTrigger>
+            ))}
+        </TabsList>
+        
+        {Object.entries(pageStructure).map(([tab, { sections, data }]) => (
+            <TabsContent key={tab} value={tab} className="mt-4">
+                {Object.entries(sections).map(([sectionName, sectionData]) => (
+                    <Table 
+                        key={sectionName}
+                        data={filteredData}
+                        structure={{
+                            section: sectionName,
+                            subsections: sectionData,
+                            columnMappings: sectionData[0].columnMappings,
+                            tableNames: sectionData[0].tableNames
+                        }}
+                        processedSections={processedSections}
+                        handleCompanyClick={handleCompanyClick}
+                        // onMissingFieldsClick={handleMissingFieldsClick}
+                    />
                 ))}
-            </Tabs>
+            </TabsContent>
+        ))}
+    </Tabs>
         </>
     );
 };

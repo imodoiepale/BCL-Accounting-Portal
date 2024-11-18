@@ -40,6 +40,7 @@ interface Subsection {
   tables: string[];
 }
 
+
 // Add these helper functions
 const toColumnName = (displayName: string) => {
   return displayName
@@ -152,7 +153,7 @@ const processStructureData = (data: any[]) => {
 
 
 
-export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStructureChange }) {
+export function SettingsDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [structure, setStructure] = useState<StructureItem[]>([]);
   const [uniqueTabs, setUniqueTabs] = useState<string[]>([]);
@@ -216,6 +217,7 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
     fetchStructure();
   }, []);
 
+
   const fetchStructure = async () => {
     try {
       const { data: mappings, error } = await supabase
@@ -244,6 +246,11 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
       }));
 
       setStructure(processedMappings);
+             // Emit event to update main page structure
+             const structureUpdatedEvent = new CustomEvent('structureUpdated', {
+              detail: { structure: processedMappings }
+          });
+          window.dispatchEvent(structureUpdatedEvent);
       const uniqueTabs = [...new Set(mappings.map(m => m.Tabs))];
       setUniqueTabs(uniqueTabs);
 
@@ -597,9 +604,18 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
         if (insertError) throw insertError;
       }
 
+      const tabCreatedEvent = new CustomEvent('tabCreated', {
+        detail: {
+            tabName: newStructure.Tabs,
+            section: newStructure.section,
+            subsection: newStructure.subsection,
+            mappings: finalColumnMappings
+        }
+    });
+    window.dispatchEvent(tabCreatedEvent);
+    
       // Refresh structure and reset states
       await fetchStructure();
-      await onStructureChange();
       resetNewStructure();
       toast.success('Structure updated successfully');
 
@@ -608,8 +624,6 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
       toast.error('Failed to update structure');
     }
   };
-
-
 
   const fetchSectionFields = async (section) => {
     try {
