@@ -24,22 +24,22 @@ export const formFields = {
             { name: 'acc_client', label: 'Accounting Client ', type: 'select', options: ['YES', 'NO'], category: 'Client Category', subCategory: 'Acc ' },
             { name: 'acc_client_effective_from', label: 'Acc W.E.F', type: 'date', category: 'Client Category', subCategory: 'Acc ' },
             { name: 'acc_client_effective_to', label: 'Acc To', type: 'date', category: 'Client Category', subCategory: 'Acc ' },
-            { name: 'acc_client_status', label: 'Acc Client Status', type: 'select', options: ['Active', 'Inactive', 'Pending', 'Terminated'], category: 'Client Category', subCategory: 'Acc ' },
+            { name: 'acc_client_status', label: 'Acc Client Status', type: 'select', options: ['Active', 'Inactive'], category: 'Client Category', subCategory: 'Acc ' },
 
             { name: 'audit_tax_client', label: 'Audit Client', type: 'select', options: ['YES', 'NO'], category: 'Client Category', subCategory: 'Audit ' },
             { name: 'audit_tax_client_effective_from', label: 'Audit W.E.F', type: 'date', category: 'Client Category', subCategory: 'Audit ' },
             { name: 'audit_tax_client_effective_to', label: 'Audit To', type: 'date', category: 'Client Category', subCategory: 'Audit ' },
-            { name: 'audit_tax_client_status', label: 'Audit Client Status', type: 'select', options: ['Active', 'Inactive', 'Pending', 'Terminated'], category: 'Client Category', subCategory: 'Audit ' },
+            { name: 'audit_tax_client_status', label: 'Audit Client Status', type: 'select', options: ['Active', 'Inactive'], category: 'Client Category', subCategory: 'Audit ' },
 
             { name: 'imm_client', label: 'IMM Client', type: 'select', options: ['YES', 'NO'], category: 'Client Category', subCategory: 'IMM ' },
             { name: 'imm_client_effective_from', label: 'IMM W.E.F', type: 'date', category: 'Client Category', subCategory: 'IMM ' },
             { name: 'imm_client_effective_to', label: 'IMM To', type: 'date', category: 'Client Category', subCategory: 'IMM ' },
-            { name: 'imm_client_status', label: 'IMM Client Status', type: 'select', options: ['Active', 'Inactive', 'Pending', 'Terminated'], category: 'Client Category', subCategory: 'IMM ' },
+            { name: 'imm_client_status', label: 'IMM Client Status', type: 'select', options: ['Active', 'Inactive'], category: 'Client Category', subCategory: 'IMM ' },
 
             { name: 'cps_sheria_client', label: 'Sheria Client', type: 'select', options: ['YES', 'NO'], category: 'Client Category', subCategory: 'Sheria-sub ' },
             { name: 'cps_sheria_client_effective_from', label: 'Sheria W.E.F', type: 'date', category: 'Client Category', subCategory: 'Sheria-sub ' },
             { name: 'cps_sheria_client_effective_to', label: 'Sheria To', type: 'date', category: 'Client Category', subCategory: 'Sheria-sub ' },
-            { name: 'cps_sheria_client_status', label: 'Sheria Client Status', type: 'select', options: ['Active', 'Inactive', 'Pending', 'Terminated'], category: 'Client Category', subCategory: 'Sheria-sub ' },
+            { name: 'cps_sheria_client_status', label: 'Sheria Client Status', type: 'select', options: ['Active', 'Inactive'], category: 'Client Category', subCategory: 'Sheria-sub ' },
 
             { name: 'wh_vat_agent_suppliers', label: 'W/H VAT Agent Suppliers', options: ['YES', 'NO'], type: 'select' },
             { name: 'wh_vat_agent_customers', label: 'W/H VAT Agent Customers', type: 'text' },

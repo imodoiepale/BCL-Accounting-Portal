@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formFields } from '../formfields';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "sonner";
-import { renderSeparatorCell } from './overview/TableComponents';
+import { renderSeparatorCell } from './overview/TableComponents copy';
 
 export function CompanyEditDialog({ isOpen, onClose, companyData, onSave ,processedSections }) {
     const [editedData, setEditedData] = useState({});
