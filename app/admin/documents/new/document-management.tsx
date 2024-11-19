@@ -473,19 +473,32 @@ const DocumentManagement = () => {
             <table className="w-full text-sm border-collapse min-w-[1500px]">
               <thead className="sticky top-0 bg-white">
                 <tr className="bg-gray-100">
-                  <th className="p-3 border border-gray-300 font-semibold text-gray-700 sticky left-0 bg-gray-100 z-10" rowSpan={2}>#</th>
                   <th
-                    className="p-3 border border-gray-300 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 sticky left-[50px] bg-gray-100 z-10"
+                    className="p-3 border border-gray-300 font-semibold text-gray-700 sticky left-0 bg-gray-100 z-20"
+                    rowSpan={2}
+                  >
+                    #
+                  </th>
+                  <th
+                    className="p-3 border border-gray-300 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 sticky left-[50px] bg-gray-100 z-20"
                     rowSpan={2}
                     onClick={() => handleSort('company')}
                   >
                     <div className="flex items-center justify-between">
                       Company
+                      <span className="relative group">
+                        <span className="ml-1 text-xs text-gray-500">({companies.length})</span>
+                        <span className="absolute left-0 w-auto p-2 m-2 min-w-max rounded-md shadow-md text-white bg-gray-800 text-xs font-bold transition-opacity duration-300 opacity-0 group-hover:opacity-100">
+                          {`${companies.length} total companies`}
+                        </span>
+                      </span>
                       <SortIcon field="company" />
                     </div>
                   </th>
-                  <th className="p-3 border border-gray-300 font-semibold text-gray-700" rowSpan={2}>Summary</th>
-                  {documents.map(doc => (
+                  <th className="p-3 border border-gray-300 font-semibold text-gray-700" rowSpan={2}>
+                    Summary
+                  </th>
+                  {documents.map((doc) => (
                     visibleColumns[doc.id]?.visible && (
                       <th
                         key={`doc-${doc.id}`}
@@ -498,7 +511,7 @@ const DocumentManagement = () => {
                   ))}
                 </tr>
                 <tr className="bg-gray-50">
-                  {documents.map(doc => (
+                  {documents.map((doc) => (
                     visibleColumns[doc.id]?.visible && (
                       <React.Fragment key={`cols-${doc.id}`}>
                         {visibleColumns[doc.id]?.subColumns.upload && (
@@ -591,8 +604,8 @@ const DocumentManagement = () => {
                   ))}
                 </tr>
                 
-{/* Pending Stats Row */}
-<tr className="bg-gray-50">
+                {/* Pending Stats Row */}
+                <tr className="bg-gray-50">
                   <td className="p-3 border border-gray-300 font-semibold text-orange-600">Missing</td>
                   {documentStats.map((stat, index) => (
                     <React.Fragment key={`pending-${index}`}>
@@ -663,7 +676,9 @@ const DocumentManagement = () => {
                     </td>
                     <td className="p-3 border border-gray-300 font-medium sticky left-[50px] bg-inherit z-10">
                       <div className="relative group">
-                        <span>{company.company_name}</span>
+                        <span>
+                          {company.company_name.split(' ')[0]}
+                        </span>
                         <span className="absolute left-0 w-auto p-2 m-2 min-w-max rounded-md shadow-md text-white bg-gray-800 text-xs font-bold transition-opacity duration-300 opacity-0 group-hover:opacity-100">
                           {company.company_name}
                         </span>
