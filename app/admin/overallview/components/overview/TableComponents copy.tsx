@@ -584,7 +584,7 @@ ${field.name === 'company_name' ? 'cursor-pointer hover:text-primary' : ''}`}
 
 
 // Main Table component
-export const  Table: React.FC<TableProps> = ({ data, handleCompanyClick, processedSections , onMissingFieldsClick }) => {
+export const Table: React.FC<TableProps> = ({ data, handleCompanyClick, processedSections , onMissingFieldsClick }) => {
   return (
     <Card>
       <CardContent className="p-0">
