@@ -1,7 +1,7 @@
 /* eslint-disable react/jsx-key */
 // @ts-nocheck
 "use client";
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useReducer } from 'react';
 import { formFields } from './formfields';
 import { supabase } from '@/lib/supabaseClient';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,6 +24,54 @@ import { Input } from "@/components/ui/input";
 import { EditableCell } from './components/overview/EditableCell';
 import { ImportDialog } from './components/overview/Dialogs/ImportDialog';
 import { renderSeparatorCell, Table, TableComponents } from './components/overview/TableComponents';
+
+
+const safeJSONParse = (jsonString, defaultValue = {}) => {
+    try {
+        return jsonString ? JSON.parse(jsonString) : defaultValue;
+    } catch {
+        return defaultValue;
+    }
+};
+
+// Initial state type and reducer
+interface OverallViewState {
+    mainTabs: string[];
+    mainSections: Record<string, string[]>;
+    mainSubsections: Record<string, string[]>;
+    formFields: Record<string, any>;
+    data: any[];
+    loading: boolean;
+}
+
+const initialState: OverallViewState = {
+    mainTabs: [],
+    mainSections: {},
+    mainSubsections: {},
+    formFields: {},
+    data: [],
+    loading: true
+};
+
+
+function reducer(state: OverallViewState, action: any): OverallViewState {
+    switch (action.type) {
+        case 'SET_MAIN_TABS':
+            return { ...state, mainTabs: action.payload };
+        case 'SET_MAIN_SECTIONS':
+            return { ...state, mainSections: action.payload };
+        case 'SET_MAIN_SUBSECTIONS':
+            return { ...state, mainSubsections: action.payload };
+        case 'SET_FORM_FIELDS':
+            return { ...state, formFields: action.payload };
+        case 'SET_DATA':
+            return { ...state, data: action.payload, loading: false };
+        case 'SET_LOADING':
+            return { ...state, loading: action.payload };
+        default:
+            return state;
+    }
+}
 
 function generateReferenceNumbers(sections) {
     let sectionCounter = 1;
@@ -82,11 +130,11 @@ function generateReferenceNumbers(sections) {
     });
 }
 
-const OverallView = () => {
+const OverallView: React.FC = () => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [state, dispatch] = useReducer(reducer, initialState);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-    const { filteredData, globalFilter, handleGlobalSearchSearch, columnVisibility, toggleColumnVisibility, sectionVisibility, toggleSectionVisibility, categoryVisibility, toggleCategoryVisibility, getVisibleColumns, resetAll } = useTableFunctionalities(data);
     const [selectedCompany, setSelectedCompany] = useState(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [selectedMissingFields, setSelectedMissingFields] = useState(null);
@@ -96,8 +144,8 @@ const OverallView = () => {
     const [mainSections, setMainSections] = useState({});
     const [mainSubsections, setMainSubsections] = useState({});
 
-    const [sections, setSections] = useState([]);
-    const [processedSections, setProcessedSections] = useState([]);
+    
+
 
     const getTableInfo = (fieldName) => {
         // Default table info
@@ -204,99 +252,7 @@ const OverallView = () => {
             : section.fields
     );
 
-
-      const fetchSectionsAndFields = async () => {
-        try {
-            const { data: mappings, error } = await supabase
-                .from('profile_category_table_mapping')
-                .select('*')
-                .order('Tabs', { ascending: true });
-
-            if (error) throw error;
-
-            // Process mappings to get unique sections and their fields
-            const processedData = mappings.reduce((acc, mapping) => {
-                const sectionsData = typeof mapping.sections_sections === 'string'
-                    ? JSON.parse(mapping.sections_sections)
-                    : mapping.sections_sections;
-
-                const columnMappings = typeof mapping.column_mappings === 'string'
-                    ? JSON.parse(mapping.column_mappings)
-                    : mapping.column_mappings;
-
-                Object.keys(sectionsData).forEach(section => {
-                    if (!acc[section]) {
-                        acc[section] = {
-                            name: section,
-                            label: section,
-                            fields: [],
-                            categorizedFields: []
-                        };
-                    }
-
-                    // Process fields from column mappings
-                    Object.entries(columnMappings).forEach(([key, label]) => {
-                        const [table, field] = key.split('.');
-                        acc[section].fields.push({
-                            name: field,
-                            label: label,
-                            table: table
-                        });
-                    });
-                });
-
-                return acc;
-            }, {});
-
-            // Convert to array and add separators
-            const sectionsWithSeparators = [
-                { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
-                { isSeparator: true },
-                ...Object.values(processedData).flatMap(section => [
-                    section,
-                    { isSeparator: true }
-                ])
-            ];
-
-            setSections(sectionsWithSeparators);
-
-            // Generate processed sections with reference numbers
-            const processed = generateReferenceNumbers([
-                { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
-                { isSeparator: true },
-                ...Object.values(processedData).map(section => ({
-                    name: section.name,
-                    label: section.label,
-                    categorizedFields: section.fields.reduce((acc, field) => {
-                        const category = field.table;
-                        const existingCategory = acc.find(cat => cat.category === category);
-                        
-                        if (existingCategory) {
-                            existingCategory.fields.push(field);
-                        } else {
-                            acc.push({
-                                category,
-                                fields: [field],
-                                colSpan: 1
-                            });
-                        }
-                        
-                        return acc;
-                    }, [])
-                }))
-            ]);
-
-            setProcessedSections(processed);
-
-        } catch (error) {
-            console.error('Error fetching sections:', error);
-            toast.error('Failed to fetch sections');
-        }
-    };
-
-
     useEffect(() => {
-        fetchSectionsAndFields();
         fetchAllData();
         fetchMainStructure();
         // Add event listener for data refresh
@@ -395,7 +351,7 @@ const OverallView = () => {
         }
     };
 
-    const fetchMainStructure = async () => {
+    const fetchMainStructure = useCallback(async () => {
         try {
             const { data: mappings, error } = await supabase
                 .from('profile_category_table_mapping')
@@ -407,66 +363,45 @@ const OverallView = () => {
             const tabs = [...new Set(mappings.map(m => m.Tabs))];
             const sections = {};
             const subsections = {};
-            const fields = {};
 
             mappings.forEach(mapping => {
-                const sectionsData = typeof mapping.sections_sections === 'string'
-                    ? JSON.parse(mapping.sections_sections)
-                    : mapping.sections_sections;
-                const subsectionsData = typeof mapping.sections_subsections === 'string'
-                    ? JSON.parse(mapping.sections_subsections)
-                    : mapping.sections_subsections;
-                const columnMappings = typeof mapping.column_mappings === 'string'
-                    ? JSON.parse(mapping.column_mappings)
-                    : mapping.column_mappings;
+                const sectionsData = safeJSONParse(mapping.sections_sections);
+                const subsectionsData = safeJSONParse(mapping.sections_subsections);
 
-                if (sectionsData) {
-                    Object.keys(sectionsData).forEach(section => {
-                        // Process sections
-                        if (!sections[mapping.Tabs]) {
-                            sections[mapping.Tabs] = new Set();
+                Object.keys(sectionsData).forEach(section => {
+                    if (!sections[mapping.Tabs]) {
+                        sections[mapping.Tabs] = new Set();
+                    }
+                    sections[mapping.Tabs].add(section);
+
+                    if (subsectionsData[section]) {
+                        if (!subsections[section]) {
+                            subsections[section] = new Set();
                         }
-                        sections[mapping.Tabs].add(section);
-
-                        // Process subsections
-                        if (subsectionsData && subsectionsData[section]) {
-                            if (!subsections[section]) {
-                                subsections[section] = new Set();
-                            }
-                            const subs = Array.isArray(subsectionsData[section])
-                                ? subsectionsData[section]
-                                : [subsectionsData[section]];
-                            subs.forEach(sub => {
-                                subsections[section].add(sub);
-
-                                // Process fields for each subsection
-                                if (columnMappings) {
-                                    if (!fields[sub]) {
-                                        fields[sub] = [];
-                                    }
-                                    Object.entries(columnMappings).forEach(([key, label]) => {
-                                        fields[sub].push({
-                                            name: key.split('.')[1],
-                                            label,
-                                            table: key.split('.')[0],
-                                            category: sub
-                                        });
-                                    });
-                                }
-                            });
-                        }
-                    });
-                }
+                        const subs = Array.isArray(subsectionsData[section])
+                            ? subsectionsData[section]
+                            : [subsectionsData[section]];
+                        subs.forEach(sub => subsections[section].add(sub));
+                    }
+                });
             });
 
-            setMainTabs(tabs);
-            setMainSections(Object.fromEntries(
-                Object.entries(sections).map(([k, v]) => [k, Array.from(v)])
-            ));
-            setMainSubsections(Object.fromEntries(
-                Object.entries(subsections).map(([k, v]) => [k, Array.from(v)])
-            ));
-            setFormFields(fields);
+            dispatch({
+                type: 'SET_MAIN_TABS',
+                payload: tabs
+            });
+            dispatch({
+                type: 'SET_MAIN_SECTIONS',
+                payload: Object.fromEntries(
+                    Object.entries(sections).map(([k, v]) => [k, Array.from(v)])
+                )
+            });
+            dispatch({
+                type: 'SET_MAIN_SUBSECTIONS',
+                payload: Object.fromEntries(
+                    Object.entries(subsections).map(([k, v]) => [k, Array.from(v)])
+                )
+            });
 
             return mappings;
         } catch (error) {
@@ -474,9 +409,10 @@ const OverallView = () => {
             toast.error('Failed to fetch structure');
             return [];
         }
-    };
+    }, []);
+
     useEffect(() => {
-        const fetchFieldsForSection = async (section, subsection) => {
+        const fetchFieldsForSection = useCallback(async (section: string, subsection: string) => {
             try {
                 const { data, error } = await supabase
                     .from('profile_category_table_mapping')
@@ -488,7 +424,6 @@ const OverallView = () => {
 
                 if (error) throw error;
 
-                // Return fields in array format
                 return data.reduce((acc, mapping) => {
                     const columnMappings = safeJSONParse(mapping.column_mappings);
                     const fields = Object.entries(columnMappings).map(([key, label]) => ({
@@ -500,16 +435,20 @@ const OverallView = () => {
 
                     return {
                         ...acc,
-                        [subsection]: fields || [] // Ensure fields is an array
+                        [subsection]: fields || []
                     };
                 }, {});
-
             } catch (error) {
                 console.error('Error fetching fields:', error);
                 return {};
             }
-        };
+        }, []);
+
+
         const updateFormFields = async () => {
+            // Ensure mainSections and mainSubsections are not empty
+            if (Object.keys(mainSections).length === 0) return;
+
             const fields = {};
 
             for (const [tab, sections] of Object.entries(mainSections)) {
@@ -527,7 +466,6 @@ const OverallView = () => {
 
         updateFormFields();
     }, [mainSections, mainSubsections]);
-
 
     // Then update the processedSections creation:
 
@@ -615,19 +553,19 @@ const OverallView = () => {
 
     const columnStats = calculateColumnStatistics();
 
-    // const processedSections = generateReferenceNumbers([
-    //     { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
-    //     { isSeparator: true },
-    //     {
-    //         name: 'allFields',
-    //         label: 'All Fields',
-    //         categorizedFields: Object.entries(formFields || {}).map(([category, fields]) => ({
-    //             category,
-    //             fields: Array.isArray(fields) ? fields : [], // Ensure fields is an array
-    //             colSpan: Array.isArray(fields) ? fields.length : 0
-    //         }))
-    //     }
-    // ]);
+    const processedSections = generateReferenceNumbers([
+        { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
+        { isSeparator: true },
+        {
+          name: 'allFields',
+          label: 'All Fields',
+          categorizedFields: Object.entries(formFields || {}).map(([category, fields]) => ({
+            category,
+            fields: Array.isArray(fields) ? fields : [], // Ensure fields is an array
+            colSpan: Array.isArray(fields) ? fields.length : 0
+          }))
+        }
+      ]);
 
     // Calculate section and column references
     const generateReferences = () => {
@@ -677,85 +615,36 @@ const OverallView = () => {
         });
         setData(newData);
     };
-    // const processStructureForTable = (sections, subsections) => {
-    //     // Start with index and missing fields sections
-    //     const processedSections = [
-    //         { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
-    //         { isSeparator: true },
-    //         {
-    //             name: 'missingFields',
-    //             label: 'Missing Fields',
-    //             categorizedFields: [
-    //                 {
-    //                     category: 'Missing',
-    //                     fields: [{ name: 'missing_fields', label: 'Missing Fields' }]
-    //                 }
-    //             ]
-    //         },
-    //         { isSeparator: true },
-    //         {
-    //             name: 'companyDetails',
-    //             label: 'Company Information',
-    //             categorizedFields: [
-    //                 {
-    //                     category: 'General Information',
-    //                     fields: [{ name: 'company_name', label: 'Company Name' }]
-    //                 }
-    //             ]
-    //         }
-    //     ];
 
-    //     // Process each section and its subsections
-    //     Object.entries(sections).forEach(([tab, sectionList]) => {
-    //         sectionList.forEach(section => {
-    //             // Skip if it's the company details section since we already added it
-    //             if (section === 'companyDetails') return;
-
-    //             // Add separator before each new section
-    //             processedSections.push({ isSeparator: true });
-
-    //             const sectionSubsections = subsections[section] || [];
-    //             const categorizedFields = sectionSubsections.map(subsection => ({
-    //                 category: subsection,
-    //                 fields: [] // Empty fields array as company name is already added
-    //             }));
-
-    //             processedSections.push({
-    //                 name: section,
-    //                 label: section,
-    //                 categorizedFields: categorizedFields
-    //             });
-    //         });
-    //     });
-
-    //     return processedSections;
-    // };
     return (
+
         <>
-            <div className="flex gap-2">
-                <SettingsDialog
-                    mainTabs={mainTabs}
-                    mainSections={mainSections}
-                    mainSubsections={mainSubsections}
-                    onStructureChange={fetchMainStructure}
-                />
-                <Button
-                    onClick={() => setIsImportDialogOpen(true)}
-                    className="flex items-center gap-2"
-                >
-                    <Upload className="h-4 w-4" />
-                    Import
-                </Button>
-                <Button
-                    onClick={() => handleExport(data, processedSections)}
-                    className="flex items-center gap-2"
-                >
-                    <Download className="h-4 w-4" />
-                    Export
-                </Button>
+                <div className="flex gap-2">
+            <SettingsDialog
+                mainTabs={mainTabs}
+                mainSections={mainSections}
+                mainSubsections={mainSubsections}
+                onStructureChange={fetchMainStructure}
+            />
+
+            <Button
+                onClick={() => setIsImportDialogOpen(true)}
+                className="flex items-center gap-2"
+            >
+                <Upload className="h-4 w-4" />
+                Import
+            </Button>
+            <Button
+                onClick={() => handleExport(data, processedSections)}
+                className="flex items-center gap-2"
+            >
+                <Download className="h-4 w-4" />
+                Export
+            </Button>
+
             </div>
 
-            <Tabs defaultValue={mainTabs[0]} className="w-full space-y-4">
+            <Tabs defaultValue="overview" className="w-full space-y-4">
                 <TabsList className="grid w-full grid-cols-10 bg-gray-100 rounded-lg p-1">
                     {mainTabs.map(tab => (
                         <TabsTrigger
@@ -768,60 +657,52 @@ const OverallView = () => {
                     ))}
                 </TabsList>
 
-                {mainTabs.map(tab => {
-                    return (
-                        <TabsContent key={tab} value={tab}>
-                            <ScrollArea className="w-full h-[calc(100vh-200px)]" type="scroll">
-                                <div className="min-w-max"> {/* Ensures horizontal scrolling */}
-                                    <Table
-                                        data={data}
-                                        handleCompanyClick={handleCompanyClick}
-                                        onMissingFieldsClick={(company) => {
-                                            setSelectedMissingFields({
-                                                ...company,
-                                                missingFields: getMissingFields(company)
-                                            });
-                                            setIsMissingFieldsOpen(true);
-                                        }}
-                                        processedSections={processedSections}
-                                        tab={tab}
-                                        sections={mainSections[tab]}
-                                        subsections={mainSubsections}
-                                    />
-                                </div>
-                                <ScrollBar orientation="horizontal" />
-                            </ScrollArea>
-                        </TabsContent>
-                    );
-                })}
+                {mainTabs.map(tab => (
+                    <TabsContent key={tab} value={tab}>
+                        {mainSections[tab]?.map(section => {
+                            const subsections = mainSubsections[section] || [];
+
+                            return subsections.map(subsection => {
+                                // Create processed sections for this section/subsection
+                                const sectionData = {
+                                    name: section,
+                                    label: section,
+                                    fields: [], // Get fields from your formFields mapping
+                                    categorizedFields: [] // Group fields by category
+                                };
+
+                                const processedSections = generateReferenceNumbers([
+                                    { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
+                                    { isSeparator: true },
+                                    sectionData
+                                ]);
+
+                                return (
+                                    <div key={`${section}-${subsection}`}>
+                                        <h3 className="text-lg font-semibold mb-4">{subsection}</h3>
+                                        <Table
+                                            data={data}
+                                            handleCompanyClick={handleCompanyClick}
+                                            onMissingFieldsClick={(company) => {
+                                                setSelectedMissingFields({
+                                                    ...company,
+                                                    missingFields: getMissingFields(company)
+                                                });
+                                                setIsMissingFieldsOpen(true);
+                                            }}
+                                            processedSections={processedSections}
+                                        />
+                                    </div>
+                                );
+                            });
+                        })}
+                    </TabsContent>
+                ))}
             </Tabs>
-
-            {/* Dialogs */}
-            {isImportDialogOpen && (
-                <ImportDialog
-                    open={isImportDialogOpen}
-                    onOpenChange={setIsImportDialogOpen}
-                />
-            )}
-
-            {isEditDialogOpen && selectedCompany && (
-                <CompanyEditDialog
-                    company={selectedCompany}
-                    open={isEditDialogOpen}
-                    onOpenChange={setIsEditDialogOpen}
-                    onSave={handleEditSave}
-                />
-            )}
-
-            {isMissingFieldsOpen && selectedMissingFields && (
-                <MissingFieldsDialog
-                    company={selectedMissingFields}
-                    open={isMissingFieldsOpen}
-                    onOpenChange={setIsMissingFieldsOpen}
-                />
-            )}
         </>
     );
 };
 
 export default OverallView;
+
+
