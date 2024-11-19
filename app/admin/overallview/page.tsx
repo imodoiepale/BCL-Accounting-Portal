@@ -561,7 +561,59 @@ const OverallView = () => {
         });
         setData(newData);
     };
-
+    const processStructureForTable = (sections, subsections) => {
+        // Start with index and missing fields sections
+        const processedSections = [
+          { name: 'index', fields: [{ name: 'index', label: '#' }], label: '#' },
+          { isSeparator: true },
+          {
+            name: 'missingFields',
+            label: 'Missing Fields',
+            categorizedFields: [
+              {
+                category: 'Missing',
+                fields: [{ name: 'missing_fields', label: 'Missing Fields' }]
+              }
+            ]
+          },
+          { isSeparator: true },
+          {
+            name: 'companyDetails',
+            label: 'Company Information',
+            categorizedFields: [
+              {
+                category: 'General Information',
+                fields: [{ name: 'company_name', label: 'Company Name' }]
+              }
+            ]
+          }
+        ];
+      
+        // Process each section and its subsections
+        Object.entries(sections).forEach(([tab, sectionList]) => {
+          sectionList.forEach(section => {
+            // Skip if it's the company details section since we already added it
+            if (section === 'companyDetails') return;
+            
+            // Add separator before each new section
+            processedSections.push({ isSeparator: true });
+            
+            const sectionSubsections = subsections[section] || [];
+            const categorizedFields = sectionSubsections.map(subsection => ({
+              category: subsection,
+              fields: [] // Empty fields array as company name is already added
+            }));
+      
+            processedSections.push({
+              name: section,
+              label: section,
+              categorizedFields: categorizedFields
+            });
+          });
+        });
+      
+        return processedSections;
+      };
     return (
 
         <>
