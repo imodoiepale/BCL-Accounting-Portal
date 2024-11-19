@@ -20,7 +20,7 @@ import { InsurancePolicy } from "@/components/component/InsurancePolicy";
 import { KYCDocumentsList } from "@/components/component/kycDocumentsList";
 import { DirectorsDocumentsList } from "@/components/component/DirectorsDocumentsList";
 import { supabase } from '@/lib/supabaseClient';
-import DirectorsDocs from '../documents/new/directors';
+import DirectorsDocs from '../documents/company-kyc/directors';
 
 // import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';

@@ -745,7 +745,7 @@ const DocumentManagement = () => {
                                 );
                                 return upload?.expiry_date ? 
                                   format(new Date(upload.expiry_date), 'dd/MM/yyyy') : 
-                                  '-';
+                                  '?';
                               })()}
                             </td>
                           )}
