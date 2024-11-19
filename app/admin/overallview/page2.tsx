@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 /* eslint-disable react/jsx-key */
 // @ts-nocheck
 "use client";
@@ -26,7 +27,7 @@ import { ImportDialog } from './components/overview/Dialogs/ImportDialog';
 import { renderSeparatorCell, Table, TableComponents } from './components/overview/TableComponents';
 
 
-onst safeJSONParse = (jsonString, defaultValue = {}) => {
+const safeJSONParse = (jsonString, defaultValue = {}) => {
     try {
         return jsonString ? JSON.parse(jsonString) : defaultValue;
     } catch {

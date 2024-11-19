@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Plus, Trash, Settings, Edit2, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "sonner";
@@ -172,7 +172,7 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
     isNewSubsection: false,
     table_names: []
   });
-  
+
   const [selectedSection, setSelectedSection] = useState<StructureItem | null>(null);
   const [selectedSubsection, setSelectedSubsection] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -194,7 +194,27 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
     newFieldTable: ''
   });
   const [sectionFields, setSectionFields] = useState<SectionFields>({});
-
+  const resetAddFieldState = () => {
+    setAddFieldState({
+      displayName: '',
+      selectedTables: [],
+      selectedFields: {},
+      selectedTab: 'new',
+      newFieldTable: '',
+      hasDropdown: 'no',
+      dropdownOptions: []
+    });
+  };
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [editFieldDialogOpen, setEditFieldDialogOpen] = useState(false);
+const [editingField, setEditingField] = useState({
+  key: '',
+  displayName: '',
+  tableName: '',
+  columnName: '',
+  dropdownOptions: [] as string[],
+  hasDropdown: 'no' as 'yes' | 'no'
+});
   const resetNewStructure = () => {
     setNewStructure({
       section: '',
@@ -211,7 +231,6 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
     setSelectedTableFields({});
   };
 
-  const [tabs, setTabs] = useState<Tab[]>([]);
   useEffect(() => {
     fetchStructure();
   }, []);
@@ -240,7 +259,10 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
           : mapping.sections_subsections || {},
         sections_sections: typeof mapping.sections_sections === 'string'
           ? JSON.parse(mapping.sections_sections)
-          : mapping.sections_sections || {}
+          : mapping.sections_sections || {},
+        field_dropdowns: typeof mapping.field_dropdowns === 'string'
+          ? JSON.parse(mapping.field_dropdowns)
+          : mapping.field_dropdowns || {}
       }));
 
       setStructure(processedMappings);
@@ -296,6 +318,7 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
       toast.error('Failed to fetch tables and columns');
     }
   };
+
   const fetchTableColumns = async (tableName: string) => {
     try {
       const { data, error } = await supabase.rpc('get_table_columns', {
@@ -358,37 +381,6 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
     }
   };
 
-  const handleAddColumn = async (tableName: string, columnName: string) => {
-    try {
-      const { error } = await supabase.rpc('add_column_to_table', {
-        p_table_name: tableName,
-        p_column_name: columnName,
-        p_data_type: 'text'
-      });
-
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error('Error adding column:', error);
-      return false;
-    }
-  };
-
-  const handleRemoveColumn = async (tableName: string, columnName: string) => {
-    try {
-      const { error } = await supabase.rpc('remove_column_from_table', {
-        p_table_name: tableName,
-        p_column_name: columnName
-      });
-
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error('Error removing column:', error);
-      return false;
-    }
-  };
-
   const handleAddField = async () => {
     if (!selectedSection || !newField.value) return;
 
@@ -427,6 +419,36 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
       toast.error('Failed to add field');
     }
   };
+
+  const handleEditField = async (key: string) => {
+    const currentStructure = structure.find(item =>
+      item.Tabs === selectedTab &&
+      item.sections_sections &&
+      Object.keys(item.sections_sections).includes(selectedSection.section) &&
+      item.sections_subsections &&
+      item.sections_subsections[selectedSection.section] === selectedSubsection
+    );
+  
+    if (!currentStructure) return;
+  
+    const columnMappings = typeof currentStructure.column_mappings === 'string'
+      ? JSON.parse(currentStructure.column_mappings)
+      : currentStructure.column_mappings;
+  
+    const dropdowns = currentStructure.field_dropdowns || {};
+    const [tableName, columnName] = key.split('.');
+    
+    setEditingField({
+      key,
+      displayName: columnMappings[key],
+      tableName,
+      columnName,
+      dropdownOptions: dropdowns[key] || [],
+      hasDropdown: dropdowns[key]?.length > 0 ? 'yes' : 'no'
+    });
+  
+    setEditFieldDialogOpen(true);
+  };  
 
   const handleDeleteField = async (key: string) => {
     if (!selectedSection) return;
@@ -542,80 +564,58 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
 
   const handleAddStructure = async () => {
     try {
-      // Create column mappings from selected fields
-      const finalColumnMappings: Record<string, string> = {};
-      Object.entries(selectedTableFields).forEach(([table, fields]) => {
-        fields.forEach(field => {
-          finalColumnMappings[`${table}.${field}`] = field
-            .replace(/_/g, ' ')
-            .replace(/\b\w/g, l => l.toUpperCase());
-        });
-      });
-
-      // Prepare payload
       const payload = {
         sections_sections: JSON.stringify({ [newStructure.section]: true }),
         sections_subsections: JSON.stringify({
-          [newStructure.section]: newStructure.subsection
+          [newStructure.section]: newStructure.subsections
         }),
         Tabs: newStructure.Tabs,
-        column_mappings: JSON.stringify(finalColumnMappings),
+        column_mappings: JSON.stringify(newStructure.column_mappings),
         table_names: JSON.stringify({
           [newStructure.section]: selectedTables
         }),
         column_order: JSON.stringify(
-          Object.keys(finalColumnMappings).reduce((acc, key, index) => {
+          Object.keys(newStructure.column_mappings).reduce((acc, key, index) => {
             acc[key] = index + 1;
             return acc;
-          }, {} as Record<string, number>)
+          }, {})
         )
       };
 
-      // Check for existing mapping
-      const { data: existingMapping, error: fetchError } = await supabase
+      const { error } = await supabase
         .from('profile_category_table_mapping')
-        .select('*')
-        .match({
-          sections_sections: payload.sections_sections,
-          sections_subsections: payload.sections_subsections
-        });
+        .insert([payload]);
 
-      if (fetchError) throw fetchError;
+      if (error) throw error;
 
-      if (existingMapping && existingMapping.length > 0) {
-        const { error: updateError } = await supabase
-          .from('profile_category_table_mapping')
-          .update(payload)
-          .eq('id', existingMapping[0].id);
-
-        if (updateError) throw updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from('profile_category_table_mapping')
-          .insert([payload]);
-
-        if (insertError) throw insertError;
-      }
-
-      // Refresh structure and reset states
       await fetchStructure();
       await onStructureChange();
       resetNewStructure();
-      toast.success('Structure updated successfully');
+      toast.success('Structure added successfully');
 
     } catch (error) {
-      console.error('Error updating structure:', error);
-      toast.error('Failed to update structure');
+      console.error('Error adding structure:', error);
+      toast.error('Failed to add structure');
     }
   };
 
-
+  const processColumnMappings = (mappings: Record<string, string>) => {
+    const result: Record<string, string[]> = {};
+    Object.keys(mappings).forEach(key => {
+      const [table, field] = key.split('.');
+      if (!result[table]) {
+        result[table] = [];
+      }
+      result[table].push(field);
+    });
+    return result;
+  };
 
   const fetchSectionFields = async (section) => {
     try {
       const { data, error } = await supabase
         .from('profile_category_table_mapping')
-        .select('sections_sections, sections_subsections, column_mappings')
+        .select('sections_sections, sections_subsections, column_mappings, field_dropdowns')
         .eq('sections_sections', JSON.stringify({ [section]: true }));
 
       if (error) throw error;
@@ -689,6 +689,7 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
       console.log('Selected Tables:', selectedTables);
       console.log('Selected Fields:', selectedTableFields);
     }, [selectedTables, selectedTableFields]);
+
 
     return (
       <Dialog open={showMultiSelectDialog} onOpenChange={setShowMultiSelectDialog}>
@@ -892,172 +893,64 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
   const handleSectionSelection = async (sectionValue: string) => {
     try {
       if (sectionValue === 'new') {
-        if (newStructure.isNewTab) {
-          // For new tab, preserve existing subsections and just reset section-related states
-          setNewStructure(prev => ({
-            ...prev,
-            section: '',
-            subsection: '',
-            isNewSection: true,
-            isNewSubsection: false,
-            table_names: []
-          }));
-
-          // Clear selections but keep existing subsections
-          setSelectedTables([]);
-          setSelectedTableFields({});
-          return;
-        } else {
-          // For existing tab, handle new section creation
-          setNewStructure(prev => ({
-            ...prev,
-            section: '',
-            subsection: '',
-            isNewSection: true,
-            isNewSubsection: false,
-            table_names: []
-          }));
-
-          // Clear all selections and subsections for existing tab
-          setSelectedTables([]);
-          setSelectedTableFields({});
-          setExistingSubsections({});
-          return;
-        }
+        setNewStructure(prev => ({
+          ...prev,
+          section: '',
+          isNewSection: true
+        }));
+        return;
       }
 
-      // Fetch all mapping data
+      // Fetch all data associated with this section regardless of tab
       const { data, error } = await supabase
         .from('profile_category_table_mapping')
-        .select('*');
+        .select('*')
+        .filter('sections_sections', 'cs', `{"${sectionValue}": true}`);
 
       if (error) throw error;
 
-      if (newStructure.isNewTab) {
-        // For new tab, process ALL data to get complete set of mappings
-        const allSubsectionsSet = new Set<string>();
-        const allMappings: Record<string, string[]> = {};
+      // Process all subsections, tables and mappings for this section
+      const allSubsections = new Set();
+      const allTables = new Set();
+      const allMappings = {};
 
-        data.forEach(item => {
-          // Process subsections
-          const subsectionsData = safeJSONParse(item.sections_subsections, {});
-          Object.values(subsectionsData).forEach(subs => {
-            if (Array.isArray(subs)) {
-              subs.forEach(sub => allSubsectionsSet.add(sub));
-            } else if (subs) {
-              allSubsectionsSet.add(subs as string);
-            }
-          });
-
-          // Process mappings
-          const columnMappings = safeJSONParse(item.column_mappings, {});
-          Object.entries(columnMappings).forEach(([key, value]) => {
-            const [table, field] = key.split('.');
-            if (!allMappings[table]) {
-              allMappings[table] = [];
-            }
-            if (!allMappings[table].includes(field)) {
-              allMappings[table].push(field);
-            }
-          });
-        });
-
-        // Keep all subsections available under the "all" key
-        if (!existingSubsections["all"]) {
-          setExistingSubsections(prev => ({
-            ...prev,
-            all: Array.from(allSubsectionsSet)
-          }));
+      data.forEach(item => {
+        // Get subsections
+        const subsectionsData = safeJSONParse(item.sections_subsections, {});
+        if (subsectionsData[sectionValue]) {
+          if (Array.isArray(subsectionsData[sectionValue])) {
+            subsectionsData[sectionValue].forEach(sub => allSubsections.add(sub));
+          } else {
+            allSubsections.add(subsectionsData[sectionValue]);
+          }
         }
 
-        setNewStructure(prev => ({
-          ...prev,
-          section: sectionValue,
-          isNewSection: false,
-          subsection: '',
-          table_names: []
-        }));
+        // Get tables
+        const tableNames = safeJSONParse(item.table_names, {})[sectionValue] || [];
+        tableNames.forEach(table => allTables.add(table));
 
-        // Clear specific selections but maintain all available options
-        setSelectedTables([]);
-        setSelectedTableFields({});
-
-      } else {
-        // For existing tab, filter data for this tab and section
-        const relevantData = data.filter(item =>
-          item.Tabs === newStructure.Tabs &&
-          item.sections_sections &&
-          Object.keys(safeJSONParse(item.sections_sections)).includes(sectionValue)
-        );
-
-        // Process section-specific data
-        const sectionMappings: Record<string, string[]> = {};
-        const sectionSubsections = new Set<string>();
-
-        relevantData.forEach(item => {
-          // Process subsections for this section
-          const subsectionsData = safeJSONParse(item.sections_subsections, {});
-          const sectionSubs = subsectionsData[sectionValue] || [];
-          if (Array.isArray(sectionSubs)) {
-            sectionSubs.forEach(sub => sectionSubsections.add(sub));
-          } else if (sectionSubs) {
-            sectionSubsections.add(sectionSubs as string);
-          }
-
-          // Process mappings
-          const columnMappings = safeJSONParse(item.column_mappings, {});
-          Object.entries(columnMappings).forEach(([key, value]) => {
-            const [table, field] = key.split('.');
-            if (!sectionMappings[table]) {
-              sectionMappings[table] = [];
-            }
-            if (!sectionMappings[table].includes(field)) {
-              sectionMappings[table].push(field);
-            }
-          });
-        });
-
-        // Update states for existing tab
-        setExistingSubsections({
-          [sectionValue]: Array.from(sectionSubsections)
-        });
-
-        setSelectedTables(Object.keys(sectionMappings));
-        setSelectedTableFields(sectionMappings);
-
-        setNewStructure(prev => ({
-          ...prev,
-          section: sectionValue,
-          isNewSection: false,
-          subsection: '',
-          table_names: Object.keys(sectionMappings)
-        }));
-      }
-
-      // Log for debugging
-      console.log('Section selection completed:', {
-        isNewTab: newStructure.isNewTab,
-        selectedSection: sectionValue,
-        availableSubsections: existingSubsections,
-        selectedTables,
-        selectedTableFields
+        // Get column mappings
+        const columnMappings = safeJSONParse(item.column_mappings, {});
+        Object.assign(allMappings, columnMappings);
       });
 
-    } catch (error) {
-      console.error('Error in section selection:', error);
-      toast.error('Failed to load section data');
-
-      // Reset states on error
+      // Update state with all found data
       setNewStructure(prev => ({
         ...prev,
-        section: '',
-        subsection: '',
+        section: sectionValue,
         isNewSection: false,
-        isNewSubsection: false,
-        table_names: []
+        subsections: Array.from(allSubsections),
+        table_names: Array.from(allTables),
+        column_mappings: allMappings
       }));
-      setSelectedTables([]);
-      setSelectedTableFields({});
+
+      // Update preview data
+      setSelectedTables(Array.from(allTables));
+      setSelectedTableFields(processColumnMappings(allMappings));
+
+    } catch (error) {
+      console.error('Error fetching section data:', error);
+      toast.error('Failed to load section data');
     }
   };
 
@@ -1134,46 +1027,101 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
       toast.error('Failed to load subsection data');
     }
   };
-
   const handleAddNewField = async () => {
-    console.log('Adding new field:', addFieldState);
     if (!addFieldState.displayName || !addFieldState.newFieldTable) {
       toast.error('Please fill in all fields');
       return;
     }
 
     try {
-      const columnName = toColumnName(addFieldState.displayName);
-      const selectedTables = [addFieldState.newFieldTable];
-
-      console.log('Adding column mapping for:', { columnName, selectedTables });
-      // Add column mapping and create table column
-      const { error: addMappingError } = await supabase.rpc('add_column_mapping_overalltable', {
-        p_table_name: addFieldState.newFieldTable,
-        p_column_name: columnName,
-        p_display_name: addFieldState.displayName,
-        p_selected_tables: selectedTables
+      console.log('Starting handleAddNewField with state:', {
+        selectedTab,
+        selectedSection,
+        selectedSubsection,
+        addFieldState
       });
 
-      if (addMappingError) throw addMappingError;
+      // First, find matching tab
+      const { data: tabMatches, error: tabError } = await supabase
+        .from('profile_category_table_mapping')
+        .select('*')
+        .eq('Tabs', selectedTab);
 
-      // Refresh data
-      await fetchTableColumns(addFieldState.newFieldTable);
-      await fetchStructure();
+      console.log('Tab matches:', tabMatches);
+      if (tabError) throw tabError;
 
-      setAddFieldDialogOpen(false);
-      setAddFieldState({
-        displayName: '',
-        selectedTables: [],
-        selectedFields: {},
-        selectedTab: 'new',
-        newFieldTable: ''
+      // From tab matches, find matching section
+      const sectionMatches = tabMatches.filter(record => {
+        const sectionData = JSON.parse(record.sections_sections || '{}');
+        return sectionData[selectedSection.section] === true;
       });
 
-      toast.success('New field added successfully');
+      console.log('Section matches:', sectionMatches);
+
+      // From section matches, find matching subsection
+      const subsectionMatches = sectionMatches.filter(record => {
+        const subsectionData = JSON.parse(record.sections_subsections || '{}');
+        return subsectionData[selectedSection.section] === selectedSubsection;
+      });
+
+      console.log('Subsection matches:', subsectionMatches);
+
+      if (subsectionMatches.length > 0) {
+        const matchingRecord = subsectionMatches[0];
+        const columnName = toColumnName(addFieldState.displayName);
+
+
+        const existingTableNames = typeof matchingRecord.table_names === 'string'
+          ? JSON.parse(matchingRecord.table_names)
+          : matchingRecord.table_names || {};
+
+        const sectionTableNames = existingTableNames[selectedSection.section] || [];
+        const updatedTableNames = {
+          ...existingTableNames,
+          [selectedSection.section]: sectionTableNames.includes(addFieldState.newFieldTable)
+            ? sectionTableNames
+            : [...sectionTableNames, addFieldState.newFieldTable]
+        };
+
+        // Prepare the new column mapping
+        const updatedColumnMappings = {
+          ...(typeof matchingRecord.column_mappings === 'string'
+            ? JSON.parse(matchingRecord.column_mappings)
+            : matchingRecord.column_mappings || {}),
+          [`${addFieldState.newFieldTable}.${columnName}`]: addFieldState.displayName
+        };
+
+        // Prepare the dropdown options if they exist
+        const updatedDropdowns = addFieldState.hasDropdown === 'yes' ? {
+          ...(matchingRecord.field_dropdowns || {}),
+          [`${addFieldState.newFieldTable}.${columnName}`]: addFieldState.dropdownOptions
+        } : matchingRecord.field_dropdowns;
+
+        // Update the matching record
+        const { error: updateError } = await supabase
+          .from('profile_category_table_mapping')
+          .update({
+            column_mappings: updatedColumnMappings,
+            field_dropdowns: updatedDropdowns,
+            table_names: updatedTableNames,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', matchingRecord.id);
+
+        if (updateError) throw updateError;
+
+        await fetchTableColumns(addFieldState.newFieldTable);
+        await fetchStructure();
+        setAddFieldDialogOpen(false);
+        resetAddFieldState();
+        toast.success('Field added successfully');
+      } else {
+        toast.error('No matching structure found');
+      }
+
     } catch (error) {
-      console.error('Error adding new field:', error);
-      toast.error('Failed to add new field');
+      console.error('Error in handleAddNewField:', error);
+      toast.error('Failed to add field');
     }
   };
 
@@ -1222,6 +1170,189 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
     } catch (error) {
       console.error('Error adding existing fields:', error);
       toast.error('Failed to add fields');
+    }
+  };
+  const handleNewStructureTabSelection = async (tabValue: string) => {
+    try {
+      if (tabValue === 'new') {
+        const { data, error } = await supabase
+          .from('profile_category_table_mapping')
+          .select('*');
+
+        if (error) throw error;
+
+        const allSections = new Set<string>();
+        data.forEach(item => {
+          const sectionsData = safeJSONParse(item.sections_sections, {});
+          Object.keys(sectionsData).forEach(section => allSections.add(section));
+        });
+
+        setExistingSections(Array.from(allSections));
+        setNewStructure(prev => ({
+          ...prev,
+          Tabs: '',
+          isNewTab: true
+        }));
+      } else {
+        setNewStructure(prev => ({
+          ...prev,
+          Tabs: tabValue,
+          isNewTab: false
+        }));
+      }
+    } catch (error) {
+      console.error('Error in new structure tab selection:', error);
+      toast.error('Failed to load tab data');
+    }
+  };
+  const EditFieldDialog = () => (
+    <Dialog open={editFieldDialogOpen} onOpenChange={setEditFieldDialogOpen}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Edit Field</DialogTitle>
+        </DialogHeader>
+  
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Table Name</label>
+              <Input value={editingField.tableName} disabled />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Column Name</label>
+              <Input value={editingField.columnName} disabled />
+            </div>
+          </div>
+  
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Display Name</label>
+            <Input 
+              value={editingField.displayName}
+              onChange={(e) => setEditingField(prev => ({
+                ...prev,
+                displayName: e.target.value
+              }))}
+            />
+          </div>
+  
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Has Dropdown Options?</label>
+            <Select
+              value={editingField.hasDropdown}
+              onValueChange={(value: 'yes' | 'no') => setEditingField(prev => ({
+                ...prev,
+                hasDropdown: value,
+                dropdownOptions: value === 'no' ? [] : prev.dropdownOptions
+              }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">Yes</SelectItem>
+                <SelectItem value="no">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+  
+          {editingField.hasDropdown === 'yes' && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Dropdown Options</label>
+              <div className="space-y-2">
+                {editingField.dropdownOptions.map((option, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      value={option}
+                      onChange={(e) => {
+                        const newOptions = [...editingField.dropdownOptions];
+                        newOptions[index] = e.target.value;
+                        setEditingField(prev => ({
+                          ...prev,
+                          dropdownOptions: newOptions
+                        }));
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        setEditingField(prev => ({
+                          ...prev,
+                          dropdownOptions: prev.dropdownOptions.filter((_, i) => i !== index)
+                        }));
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditingField(prev => ({
+                      ...prev,
+                      dropdownOptions: [...prev.dropdownOptions, '']
+                    }));
+                  }}
+                >
+                  Add Option
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+  
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setEditFieldDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSaveFieldEdit}>
+            Save Changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+  
+  // Add the save handler:
+  const handleSaveFieldEdit = async () => {
+    try {
+      const currentStructure = structure.find(item =>
+        item.Tabs === selectedTab &&
+        item.sections_sections &&
+        Object.keys(item.sections_sections).includes(selectedSection.section) &&
+        item.sections_subsections &&
+        item.sections_subsections[selectedSection.section] === selectedSubsection
+      );
+  
+      if (!currentStructure) return;
+  
+      const updatedColumnMappings = {
+        ...currentStructure.column_mappings,
+        [editingField.key]: editingField.displayName
+      };
+  
+      const updatedDropdowns = {
+        ...currentStructure.field_dropdowns,
+        [editingField.key]: editingField.hasDropdown === 'yes' ? editingField.dropdownOptions : []
+      };
+  
+      const { error } = await supabase
+        .from('profile_category_table_mapping')
+        .update({
+          column_mappings: updatedColumnMappings,
+          field_dropdowns: updatedDropdowns
+        })
+        .eq('id', currentStructure.id);
+  
+      if (error) throw error;
+  
+      await fetchStructure();
+      setEditFieldDialogOpen(false);
+      toast.success('Field updated successfully');
+    } catch (error) {
+      console.error('Error updating field:', error);
+      toast.error('Failed to update field');
     }
   };
 
@@ -1427,15 +1558,15 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
                           )}
                         </div>
                         <div className="border rounded-lg">
-                          <div className="grid grid-cols-[60px,40px,1fr,1fr,1fr,80px] gap-2 p-2 bg-gray-50 border-b">
+                          <div className="grid grid-cols-[60px,40px,1fr,1fr,1fr,1fr,120px] gap-2 p-2 bg-gray-50 border-b">
                             <div className="text-sm font-medium text-gray-500">Order</div>
                             <div className="text-sm font-medium text-gray-500">#</div>
                             <div className="text-sm font-medium text-gray-500">Column Name</div>
                             <div className="text-sm font-medium text-gray-500">Display Name</div>
                             <div className="text-sm font-medium text-gray-500">Table Name</div>
-                            <div></div>
+                            <div className="text-sm font-medium text-gray-500">Dropdown Options</div>
+                            <div className="text-sm font-medium text-gray-500">Actions</div>
                           </div>
-
                           <ScrollArea className="h-[300px]" orientation="both">
                             {selectedSection && selectedSubsection && structure
                               .filter(item =>
@@ -1450,6 +1581,8 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
                                   ? JSON.parse(item.column_mappings)
                                   : item.column_mappings;
 
+                                const dropdowns = item.field_dropdowns || {};
+
                                 return Object.entries(columnMappings)
                                   .sort((a, b) => {
                                     const orderA = item.column_order?.[a[0]] || 0;
@@ -1457,10 +1590,7 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
                                     return orderA - orderB;
                                   })
                                   .map(([key, value], index) => (
-                                    <div
-                                      key={key}
-                                      className="grid grid-cols-[60px,40px,1fr,1fr,1fr,80px] gap-2 p-2 border-b last:border-b-0 hover:bg-gray-50"
-                                    >
+                                    <div key={key} className="grid grid-cols-[60px,40px,1fr,1fr,1fr,1fr,120px] gap-2 p-2 border-b last:border-b-0 hover:bg-gray-50">
                                       <div className="flex items-center gap-1">
                                         <span className="text-sm text-gray-500">{index + 1}</span>
                                       </div>
@@ -1468,21 +1598,39 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
                                       <div className="text-sm">{key.split('.')[1]}</div>
                                       <div className="text-sm">{value}</div>
                                       <div className="text-sm">{key.split('.')[0]}</div>
-                                      {editing && (
-                                        <div className="flex gap-1">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleDeleteField(key)}
-                                            className="h-6 w-6"
-                                          >
-                                            <Trash className="h-4 w-4 text-red-500" />
-                                          </Button>
-                                        </div>
-                                      )}
+                                      <div className="text-sm">
+                                        {dropdowns[key] && (
+                                          <div className="flex flex-wrap gap-1">
+                                            {dropdowns[key].map((option, idx) => (
+                                              <div key={idx} className="text-xs py-1 px-2 bg-gray-50 rounded-md border">
+                                                {option}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleEditField(key)}
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Edit2 className="h-4 w-4 text-blue-500" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleDeleteField(key)}
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Trash className="h-4 w-4 text-red-500" />
+                                        </Button>
+                                      </div>
                                     </div>
                                   ));
                               })}
+                            <ScrollBar orientation="horizontal" />
                           </ScrollArea>
                         </div>
                       </div>
@@ -1506,7 +1654,7 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
                 <label className="text-sm font-medium text-gray-700">Tab</label>
                 <Select
                   value={newStructure.Tabs}
-                  onValueChange={(value) => handleTabSelection(value, true)} 
+                  onValueChange={(value) => handleTabSelection(value, true)}
                 >
                   <SelectTrigger className="w-full bg-white">
                     <SelectValue placeholder="Select or Create Tab" />
@@ -1680,23 +1828,56 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
               {/* Preview and Add Button */}
               <div className="pt-6 space-y-6">
                 {(newStructure.Tabs || newStructure.isNewTab) &&
-                  (newStructure.section || newStructure.isNewSection) &&
-                  (newStructure.subsection || newStructure.isNewSubsection) &&
-                  newStructure.table_name && (
+                  (newStructure.section || newStructure.isNewSection) && (
                     <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-4">
                       <h4 className="font-medium text-gray-900">Structure Preview</h4>
-                      <div className="flex justify-between gap-4">
-                        <div className="space-y-2">
-                          <p className="text-sm"><span className="font-medium text-gray-700">Tab:</span> <span className="text-gray-600">{newStructure.Tabs}</span></p>
-                          <p className="text-sm"><span className="font-medium text-gray-700">Section:</span> <span className="text-gray-600">{newStructure.section}</span></p>
+                      <div className="flex flex-col gap-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <p className="text-sm">
+                              <span className="font-medium text-gray-700">Tab:</span>
+                              <span className="text-gray-600">{newStructure.Tabs || 'New Tab'}</span>
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium text-gray-700">Section:</span>
+                              <span className="text-gray-600">{newStructure.section}</span>
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-sm">
+                              <span className="font-medium text-gray-700">Subsections:</span>
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {newStructure.subsections?.map(sub => (
+                                <span key={sub} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                  {sub}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         </div>
+
                         <div className="space-y-2">
-                          <p className="text-sm"><span className="font-medium text-gray-700">Subsection:</span> <span className="text-gray-600">{newStructure.subsection}</span></p>
-                          <p className="text-sm"><span className="font-medium text-gray-700">Table:</span> <span className="text-gray-600">{newStructure.table_name}</span></p>
+                          <p className="text-sm font-medium text-gray-700">Tables and Fields:</p>
+                          <div className="space-y-2">
+                            {selectedTables.map(table => (
+                              <div key={table} className="border rounded-md p-2 bg-white">
+                                <h6 className="font-medium text-sm">{table}</h6>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {selectedTableFields[table]?.map(fieldName => (
+                                    <span key={fieldName} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                      {fieldName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
                   )}
+
 
                 <div className="flex justify-end">
                   <Button
@@ -1767,6 +1948,62 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
                   placeholder="Enter display name"
                 />
               </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Has Dropdown Options?</label>
+                <Select
+                  value={addFieldState.hasDropdown}
+                  onValueChange={(value) => setAddFieldState(prev => ({ ...prev, hasDropdown: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select yes/no" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="yes">Yes</SelectItem>
+                    <SelectItem value="no">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {addFieldState.hasDropdown === 'yes' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Dropdown Options</label>
+                  <div className="space-y-2">
+                    {addFieldState.dropdownOptions?.map((option, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          value={option}
+                          onChange={(e) => {
+                            const newOptions = [...(addFieldState.dropdownOptions || [])];
+                            newOptions[index] = e.target.value;
+                            setAddFieldState(prev => ({ ...prev, dropdownOptions: newOptions }));
+                          }}
+                          placeholder="Enter option"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            const newOptions = addFieldState.dropdownOptions?.filter((_, i) => i !== index);
+                            setAddFieldState(prev => ({ ...prev, dropdownOptions: newOptions }));
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const newOptions = [...(addFieldState.dropdownOptions || []), ''];
+                        setAddFieldState(prev => ({ ...prev, dropdownOptions: newOptions }));
+                      }}
+                    >
+                      Add Option
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Select Table</label>
@@ -1874,8 +2111,8 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       <MultiSelectDialog />
+      <EditFieldDialog />
     </>
   );
 }
