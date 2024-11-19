@@ -301,7 +301,8 @@ const DocumentManagement = () => {
   };
 
   // Main render
-  return (
+  // Main render
+return (
     <div className="w-full p-6 bg-white rounded-lg shadow-sm">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-800">Company KYC Documents</h1>
@@ -331,7 +332,7 @@ const DocumentManagement = () => {
           </button>
         </div>
       </div>
-
+  
       <div className="mb-4">
         <div className="flex space-x-4">
           {['All', 'KRA', 'Sheria'].map(tab => (
@@ -357,9 +358,9 @@ const DocumentManagement = () => {
             <table className="w-full text-sm border-collapse min-w-[1500px]">
               <thead className="sticky top-0 bg-white">
                 <tr className="bg-gray-100">
-                  <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>#</th>
+                  <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700 sticky left-0 bg-white z-10" rowSpan={2}>#</th>
                   <th
-                    className="p-3 border-2 border-gray-300 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200"
+                    className="p-3 border-2 border-gray-300 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 sticky left-[50px] bg-white z-10"
                     rowSpan={2}
                     onClick={() => handleSort('company')}
                   >
@@ -443,8 +444,8 @@ const DocumentManagement = () => {
               <tbody>
                 {/* Stats rows */}
                 <tr className="bg-gray-50">
-                  <td className="p-3 border-2 border-gray-300 font-medium bg-gray-100" rowSpan={3}>Stats</td>
-                  <td className="p-3 border-2 border-gray-300" rowSpan={3}></td>
+                  <td className="p-3 border-2 border-gray-300 font-medium bg-gray-100 sticky left-0 bg-white z-10" rowSpan={3}>Stats</td>
+                  <td className="p-3 border-2 border-gray-300 sticky left-[50px] bg-white z-10" rowSpan={3}></td>
                   <td className="p-3 border-2 border-gray-300 font-semibold text-blue-600">Total</td>
                   {documentStats.map((stat, index) => (
                     <React.Fragment key={`total-${index}`}>
@@ -522,12 +523,12 @@ const DocumentManagement = () => {
                     </React.Fragment>
                   ))}
                 </tr>
-
+  
                 {/* Company rows */}
                 {getSortedCompanies().map((company, index) => (
                   <tr key={company.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="p-3 border-2 border-gray-300 font-medium">{company.id}</td>
-                    <td className="p-3 border-2 border-gray-300 font-medium">{company.company_name}</td>
+                    <td className="p-3 border-2 border-gray-300 font-medium sticky left-0 bg-white z-10">{company.id}</td>
+                    <td className="p-3 border-2 border-gray-300 font-medium sticky left-[50px] bg-white z-10">{company.company_name}</td>
                     <td className="p-3 border-2 border-gray-300"></td>
                     {documents.map((doc) => (
                       visibleColumns[doc.id]?.visible && (
@@ -597,7 +598,7 @@ const DocumentManagement = () => {
           </div>
         </div>
       )}
-
+  
       {showUploadModal && (
         <UploadModal
           selectedCompany={selectedCompany}
