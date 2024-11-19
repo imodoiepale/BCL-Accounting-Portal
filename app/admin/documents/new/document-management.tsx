@@ -302,6 +302,7 @@ const DocumentManagement = () => {
 
   // Main render
   // Main render
+// Main render
 return (
     <div className="w-full p-6 bg-white rounded-lg shadow-sm">
       <div className="flex justify-between items-center mb-6">
@@ -528,7 +529,14 @@ return (
                 {getSortedCompanies().map((company, index) => (
                   <tr key={company.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="p-3 border-2 border-gray-300 font-medium sticky left-0 bg-white z-10">{company.id}</td>
-                    <td className="p-3 border-2 border-gray-300 font-medium sticky left-[50px] bg-white z-10">{company.company_name}</td>
+                    <td className="p-3 border-2 border-gray-300 font-medium sticky left-[50px] bg-white z-10">
+                      <div className="relative group">
+                        <span>{company.company_name.split(' ')[0]}</span>
+                        <span className="absolute left-0 w-auto p-2 m-2 min-w-max rounded-md shadow-md text-white bg-gray-800 text-xs font-bold transition-opacity duration-300 opacity-0 group-hover:opacity-100">
+                          {company.company_name}
+                        </span>
+                      </div>
+                    </td>
                     <td className="p-3 border-2 border-gray-300"></td>
                     {documents.map((doc) => (
                       visibleColumns[doc.id]?.visible && (
