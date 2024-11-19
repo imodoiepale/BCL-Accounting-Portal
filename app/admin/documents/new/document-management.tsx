@@ -1,4 +1,4 @@
-// DocumentManagement.tsx
+
 // @ts-nocheck
 'use client';
 
@@ -8,7 +8,8 @@ import { format, differenceInDays } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { toast, Toaster } from 'react-hot-toast';
-import { UploadModal, SettingsModal } from './fileuploadpopup'; // Import the modals
+import { UploadModal } from './UploadModal'; // Import the modals
+import { SettingsModal } from './SettingsModal';
 
 interface Company {
   id: number;
@@ -23,6 +24,7 @@ interface Document {
   name: string;
   department: string;
   subcategory: string;
+  document_type: string;
   issue_date?: string;
   expiry_date?: string;
   validity_days?: string;
@@ -107,11 +109,21 @@ const DocumentManagement = () => {
       return data || [];
     }
   });
+
   // State for column visibility
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const initialVisibility = {};
     documents.forEach(doc => {
-      initialVisibility[doc.id] = {
+      (initialVisibility as Record<string, {
+        visible: boolean;
+        subColumns: {
+          upload: boolean;
+          issueDate: boolean;
+          expiryDate: boolean;
+          daysLeft: boolean;
+          status: boolean;
+        };
+      }>)[doc.id] = {
         visible: true,
         subColumns: {
           upload: true,
@@ -121,8 +133,7 @@ const DocumentManagement = () => {
           status: true,
         },
       };
-    });
-    return initialVisibility;
+    });    return initialVisibility;
   });
 
   // Update visible columns when documents change
@@ -131,8 +142,8 @@ const DocumentManagement = () => {
       setVisibleColumns(prev => {
         const newVisibility = { ...prev };
         documents.forEach(doc => {
-          if (!newVisibility[doc.id]) {
-            newVisibility[doc.id] = {
+          if (!(doc.id in newVisibility)) {
+            (newVisibility as any)[doc.id] = {
               visible: true,
               subColumns: {
                 upload: true,
@@ -144,8 +155,7 @@ const DocumentManagement = () => {
             };
           }
         });
-        return newVisibility;
-      });
+        return newVisibility;      });
     }
   }, [documents]);
 
@@ -226,13 +236,27 @@ const DocumentManagement = () => {
       toast.error('Please fill in all required fields');
       return;
     }
-
+  
+    // Validate issue date
+    if (!uploadData.issueDate) {
+      toast.error('Issue Date is required');
+      return;
+    }
+  
+    // Handle expiry date based on document type
+    const expiryDate = selectedDocument.document_type === 'renewal' ? uploadData.expiryDate : null;
+  
+    if (selectedDocument.document_type === 'renewal' && !expiryDate) {
+      toast.error('Expiry Date is required for renewal documents');
+      return;
+    }
+  
     await uploadMutation.mutateAsync({
       companyId: selectedCompany.id,
       documentId: selectedDocument.id,
       file: uploadData.file,
       issueDate: uploadData.issueDate,
-      expiryDate: uploadData.expiryDate
+      expiryDate: expiryDate
     });
   };
 
@@ -251,7 +275,7 @@ const DocumentManagement = () => {
   };
 
   // Calculate stats
-  const calculateStats = (documents) => {
+  const calculateStats = (documents: any[]) => {
     const stats = documents.map(doc => {
       const total = companies.length; // Assuming each company should have a document
       const pending = companies.filter(company => {
@@ -346,14 +370,17 @@ const DocumentManagement = () => {
                   </th>
                   <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Summary</th>
                   {documents.map(doc => (
-                    visibleColumns[doc.id]?.visible && (
-                      <th
-                        key={`doc-${doc.id}`}
-                        className="p-3 border-2 border-gray-300 font-semibold text-gray-700 text-center bg-blue-50"
-                        colSpan={Object.values(visibleColumns[doc.id]?.subColumns || {}).filter(Boolean).length}
-                      >
-                        {doc.name}
-                      </th>
+                    visibleColumns[doc.id as keyof typeof visibleColumns]?.visible && (
+                      <React.Fragment key={`doc-${doc.id}`}>
+                        {visibleColumns[doc.id as keyof typeof visibleColumns] && (
+                          <th
+                            className="p-3 border-2 border-gray-300 font-semibold text-gray-700 text-center bg-blue-50"
+                            colSpan={Object.values(visibleColumns[doc.id as keyof typeof visibleColumns]?.subColumns || {}).filter(Boolean).length}
+                          >
+                            {doc.name}
+                          </th>
+                        )}
+                      </React.Fragment>
                     )
                   ))}
                 </tr>
@@ -545,17 +572,17 @@ const DocumentManagement = () => {
                               <span className={`px-2 py-1 rounded-full text-xs ${
                                 !doc.expiry_date || isNaN(new Date(doc.expiry_date).getTime()) ? 'bg-yellow-100 text-yellow-700' :
                                 differenceInDays(new Date(doc.expiry_date), new Date()) > 30 ?
-                                  'bg-green-100 text-green-700' :
+                                'bg-green-100 text-green-700' :
                                 differenceInDays(new Date(doc.expiry_date), new Date()) < 0 ?
-                                  'bg-red-100 text-red-700' :
-                                  'bg-yellow-100 text-yellow-700'
+                                'bg-red-100 text-red-700' :
+                                'bg-yellow-100 text-yellow-700'
                               }`}>
                                 {!doc.expiry_date || isNaN(new Date(doc.expiry_date).getTime()) ? 'Pending' :
                                   differenceInDays(new Date(doc.expiry_date), new Date()) > 30 ?
-                                    'Valid' :
+                                  'Valid' :
                                   differenceInDays(new Date(doc.expiry_date), new Date()) < 0 ?
-                                    'Expired' :
-                                    'Expiring Soon'
+                                  'Expired' :
+                                  'Expiring Soon'
                                 }
                               </span>
                             </td>
