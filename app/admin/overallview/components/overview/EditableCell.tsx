@@ -26,65 +26,93 @@ export const EditableCell = ({
     const handleSave = async () => {
         if (editValue !== initialValue) {
             try {
-                // Check if the company exists in the first table (acc_portal_company_duplicate)
+                const today = new Date();
+                let changedValues = { [fieldName]: editValue };
+    
+                // Handle different effective_to dates and their corresponding status updates
+                const effectiveDateFields = {
+                    'acc_client_effective_to': {
+                        status: 'acc_client_status',
+                        flag: 'acc_client'
+                    },
+                    'audit_tax_client_effective_to': {
+                        status: 'audit_tax_client_status',
+                        flag: 'audit_tax_client'
+                    },
+                    'imm_client_effective_to': {
+                        status: 'imm_client_status',
+                        flag: 'imm_client'
+                    },
+                    'cps_sheria_client_effective_to': {
+                        status: 'cps_sheria_client_status',
+                        flag: 'cps_sheria_client'
+                    }
+                };
+    
+                if (fieldName in effectiveDateFields) {
+                    const effectiveDate = new Date(editValue);
+                    const { status, flag } = effectiveDateFields[fieldName];
+                    changedValues[status] = effectiveDate > today ? 'Active' : 'Inactive';
+                    changedValues[flag] = effectiveDate > today ? 'Yes' : 'No';
+                }
+    
                 const { data: companyData, error: companyError } = await supabase
                     .from('acc_portal_company_duplicate')
                     .select('company_name')
                     .eq('company_name', companyName)
-                    .single(); // Fetch one record
-
+                    .single();
+    
                 if (companyError || !companyData) {
                     console.log(`Company not found in acc_portal_company_duplicate: ${companyName}`);
                     toast.error(`Company "${companyName}" not found.`);
                     return;
                 }
-
+    
                 console.log(`Company found in acc_portal_company_duplicate: ${companyName}`);
-
-                // List of tables to check
-                const tables = ['acc_portal_company_duplicate', 'etims_companies_duplicate', 'PasswordChecker_duplicate', 'nssf_companies_duplicate', 'ecitizen_companies_duplicate', 'nhif_companies_duplicate2']; 
-
+    
+                const tables = [
+                    'acc_portal_company_duplicate',
+                    'etims_companies_duplicate',
+                    'PasswordChecker_duplicate',
+                    'nssf_companies_duplicate',
+                    'ecitizen_companies_duplicate',
+                    'nhif_companies_duplicate2'
+                ];
+    
                 let fieldFound = false;
-
-                // Iterate over tables to find the field and update it
+    
                 for (const table of tables) {
-                    // Query the table for the company name and check for the field
                     const { data, error } = await supabase
                         .from(table)
                         .select('*')
                         .eq(table === 'ecitizen_companies_duplicate' ? 'name' : 'company_name', companyName)
-                        .single(); // Fetch one record
-
+                        .single();
+    
                     if (error || !data) {
                         console.log(`Field ${fieldName} not found in table: ${table}`);
-                        continue; // Skip to next table if the company isn't found
+                        continue;
                     }
-
-                    // Check if the field exists in the fetched data
+    
                     if (data.hasOwnProperty(fieldName)) {
                         console.log(`Field ${fieldName} found in table: ${table}`);
-                        // Update the field
-                        const { data: updateData, error: updateError } = await supabase
+                        const { error: updateError } = await supabase
                             .from(table)
-                            .update({ [fieldName]: editValue })
+                            .update(changedValues)
                             .eq(table === 'ecitizen_companies_duplicate' ? 'name' : 'company_name', companyName);
-
+    
                         if (updateError) {
                             throw updateError;
                         }
-
+    
                         console.log(`Updated field ${fieldName} in table: ${table}`);
-                        setEditValue(editValue); // Update local state after successful save
+                        setEditValue(editValue);
                         fieldFound = true;
-                        onSave(editValue); // Call onSave first to trigger data refresh
+                        onSave(editValue);
                         setIsEditing(false);
-                        break; // Stop searching once the field is updated
-                    } else {
-                        console.log(`Field ${fieldName} not found in table: ${table}`);
+                        break;
                     }
                 }
-
-                // If the field is not found in any of the tables
+    
                 if (!fieldFound) {
                     console.log(`Field ${fieldName} not found in any table.`);
                     toast.error(`Field "${fieldName}" not found in any table.`);
@@ -92,12 +120,13 @@ export const EditableCell = ({
             } catch (error) {
                 console.error('Error during update operation:', error);
                 toast.error('Update failed due to an unexpected error');
-                setEditValue(initialValue); // Reset to initial value on error
+                setEditValue(initialValue);
             }
         } else {
-            setIsEditing(false); // Close editing mode even if value hasn't changed
+            setIsEditing(false);
         }
     };
+    
 
     const handleDoubleClick = () => {
         setIsEditing(true);
