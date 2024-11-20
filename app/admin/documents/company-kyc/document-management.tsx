@@ -128,6 +128,7 @@ const DocumentManagement = () => {
     expiryDate: '',
     file: null as File | null,
   });
+
   // Fetch Companies
   const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<Company[]>({
     queryKey: ['companies', searchTerm],
@@ -144,34 +145,27 @@ const DocumentManagement = () => {
   });
 
   // Fetch Documents
-  // Fetch Documents
-const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Document[]>({
-  queryKey: ['documents', activeTab],
-  queryFn: async () => {
-    let query = supabase.from('acc_portal_kyc').select('*');
+  const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Document[]>({
+    queryKey: ['documents', activeTab],
+    queryFn: async () => {
+      let query = supabase.from('acc_portal_kyc').select('*');
   
-    if (activeTab === 'KRA') {
-      query = query
-        .eq('department', 'KRA')
-        .eq('subcategory', 'kra-docs');
-    } else if (activeTab === 'Sheria') {
-      query = query
-        .eq('department', 'Sheria House')
-        .eq('subcategory', 'sheria-docs');
-    }
+      if (activeTab === 'KRA') {
+        query = query
+          .eq('department', 'KRA')
+          .eq('subcategory', 'kra-docs');
+      } else if (activeTab === 'Sheria') {
+        query = query
+          .eq('department', 'Sheria House')  // Changed from 'Sheria' to 'Sheria House'
+          .eq('subcategory', 'sheria-docs');
+      }
   
-    const { data, error } = await query;
-    
-    console.log('Active Tab:', activeTab);
-    console.log('Query Results:', data);
-    if (error) console.error('Query Error:', error);
-    
-    if (error) throw error;
-    return data || [];
-  
-  },
-  staleTime: 1000 * 60 * 5,
-});
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
 
   // Fetch Uploads
   const { data: uploads = [] } = useQuery<Upload[]>({
@@ -351,6 +345,17 @@ const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Documen
       });
     }
   }, [documents]);
+
+  // Calculate missing documents for each company
+  const calculateMissingDocuments = (companyId) => {
+    return documents.reduce((missingCount, doc) => {
+      const hasUpload = uploads.some(
+        (upload) => upload.kyc_document_id === doc.id && upload.userid === companyId.toString()
+      );
+      return hasUpload ? missingCount : missingCount + 1;
+    }, 0);
+  };
+
   // Handlers
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -505,6 +510,9 @@ const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Documen
                   <th className="p-3 border border-gray-300 font-semibold text-gray-700" rowSpan={2}>
                     Summary
                   </th>
+                  <th className="p-3 border border-gray-300 font-semibold text-gray-700" rowSpan={2}>
+                    Missing Documents
+                  </th>
                   {documents.map((doc) => (
                     visibleColumns[doc.id]?.visible && (
                       <th
@@ -582,6 +590,7 @@ const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Documen
                   <td className="p-3 border border-gray-300 font-medium sticky left-0 bg-gray-50 z-10" rowSpan={3}>Stats</td>
                   <td className="p-3 border border-gray-300 sticky left-[50px] bg-gray-50 z-10" rowSpan={3}></td>
                   <td className="p-3 border border-gray-300 font-semibold text-blue-600">Total</td>
+                  <td className="p-3 border border-gray-300 text-center font-medium">-</td>
                   {documentStats.map((stat, index) => (
                     <React.Fragment key={`stats-${index}`}>
                       {visibleColumns[documents[index].id]?.visible && (
@@ -614,6 +623,7 @@ const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Documen
                 {/* Pending Stats Row */}
                 <tr className="bg-gray-50">
                   <td className="p-3 border border-gray-300 font-semibold text-orange-600">Missing</td>
+                  <td className="p-3 border border-gray-300 text-center font-medium">-</td>
                   {documentStats.map((stat, index) => (
                     <React.Fragment key={`pending-${index}`}>
                       {visibleColumns[documents[index].id]?.visible && (
@@ -646,6 +656,7 @@ const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Documen
                 {/* Complete Stats Row */}
                 <tr className="bg-gray-50">
                   <td className="p-3 border border-gray-300 font-semibold text-green-600">Complete</td>
+                  <td className="p-3 border border-gray-300 text-center font-medium">-</td>
                   {documentStats.map((stat, index) => (
                     <React.Fragment key={`complete-${index}`}>
                       {visibleColumns[documents[index].id]?.visible && (
@@ -692,6 +703,9 @@ const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Documen
                       </div>
                     </td>
                     <td className="p-3 border border-gray-300"></td>
+                    <td className="p-3 border border-gray-300 text-center font-medium">
+                      {calculateMissingDocuments(company.id)}
+                    </td>
                     
                     {documents.map((doc) => (
                       visibleColumns[doc.id]?.visible && (
@@ -880,8 +894,6 @@ const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Documen
           setShowSettingsModal={setShowSettingsModal}
         />
       )}
-
-      
     </div>
   );
 };
