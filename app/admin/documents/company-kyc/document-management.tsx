@@ -38,7 +38,7 @@ interface Upload {
   expiry_date?: Date;
 }
 
-type SortField = 'company' | 'issueDate' | 'expiryDate' | 'daysLeft' | 'status';
+type SortField = 'company' | 'issueDate' | 'expiryDate' | 'daysLeft' | 'status' | '#';
 type SortDirection = 'asc' | 'desc';
 
 interface ViewModalProps {
@@ -435,6 +435,8 @@ const DocumentManagement = () => {
       switch (sortField) {
         case 'company':
           return modifier * a.company_name.localeCompare(b.company_name);
+        case '#': // Sort by company ID
+          return modifier * (a.id - b.id);
         default:
           return 0;
       }
@@ -523,8 +525,12 @@ const DocumentManagement = () => {
                   <th
                     className="p-3 border border-gray-300 font-semibold text-gray-700 sticky left-0 bg-gray-100 z-20"
                     rowSpan={2}
+                    onClick={() => handleSort('#')} // Add sorting for the index column
                   >
-                    #
+                    <div className="flex items-center justify-between">
+                      #
+                      <SortIcon field="#" />
+                    </div>
                   </th>
                   <th
                     className="p-3 border border-gray-300 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 sticky left-[50px] bg-gray-100 z-20"
@@ -725,7 +731,7 @@ const DocumentManagement = () => {
                 {getSortedCompanies().map((company, index) => (
                   <tr key={company.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="p-3 border border-gray-300 font-medium sticky left-0 bg-inherit z-10">
-                      {company.id}
+                      {company.id} {/* This will now reflect the sorted order */}
                     </td>
                     <td className="p-3 border border-gray-300 font-medium sticky left-[50px] bg-inherit z-10">
                       <div className="relative group">
