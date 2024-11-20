@@ -144,27 +144,34 @@ const DocumentManagement = () => {
   });
 
   // Fetch Documents
-  const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Document[]>({
-    queryKey: ['documents', activeTab],
-    queryFn: async () => {
-      let query = supabase.from('acc_portal_kyc').select('*');
-
-      if (activeTab === 'KRA') {
-        query = query
-          .eq('department', 'KRA')
-          .eq('subcategory', 'kra-docs');
-      } else if (activeTab === 'Sheria') {
-        query = query
-          .eq('department', 'Sheria')
-          .eq('subcategory', 'sheria-docs');
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 1000 * 60 * 5,
-  });
+  // Fetch Documents
+const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Document[]>({
+  queryKey: ['documents', activeTab],
+  queryFn: async () => {
+    let query = supabase.from('acc_portal_kyc').select('*');
+  
+    if (activeTab === 'KRA') {
+      query = query
+        .eq('department', 'KRA')
+        .eq('subcategory', 'kra-docs');
+    } else if (activeTab === 'Sheria') {
+      query = query
+        .eq('department', 'Sheria House')
+        .eq('subcategory', 'sheria-docs');
+    }
+  
+    const { data, error } = await query;
+    
+    console.log('Active Tab:', activeTab);
+    console.log('Query Results:', data);
+    if (error) console.error('Query Error:', error);
+    
+    if (error) throw error;
+    return data || [];
+  
+  },
+  staleTime: 1000 * 60 * 5,
+});
 
   // Fetch Uploads
   const { data: uploads = [] } = useQuery<Upload[]>({
@@ -874,17 +881,7 @@ const DocumentManagement = () => {
         />
       )}
 
-      {/* Toast Container */}
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-        }}
-      />
+      
     </div>
   );
 };
