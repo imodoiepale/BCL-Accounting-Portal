@@ -1,0 +1,116 @@
+
+# 2024-11-19 11:18:42.905356
++y
+
+# 2024-11-19 11:18:58.504568
++n
+
+# 2024-11-19 11:25:37.241821
++ analyse app\admin\overallview and tell me what i want to achieve in that code structure ...i want this 1. Dynamic Lo
++ading of categories and subcategories in one table and each tab also will have the specifics according to my table the
++section should be tab and category and subcategory should be filtered in each and then the fields mapped from the db  a
++s per the settings or table structure created ...analyse my codebase and tell me why i am not able to map this dynamica
++lly preserving the table structure used in page copy(tabsworking).tsx 
+
+# 2024-11-19 11:26:11.639694
++y
+
+# 2024-11-19 11:27:46.648984
++n
+
+# 2024-11-19 11:28:02.312544
++analyse all the files in overallview dir
+
+# 2024-11-19 11:28:26.153298
++n
+
+# 2024-11-19 11:28:33.671902
++y
+
+# 2024-11-19 11:29:07.601228
++/run git add app\admin\overallview\components\TableComponents.tsx
+
+# 2024-11-19 11:29:07.681229
++/run git add app\admin\overallview\components\functionalities.tsx
+
+# 2024-11-19 11:29:07.752099
++/run git add app\admin\overallview\components\overview\EditableCell.tsx
+
+# 2024-11-19 11:29:07.826099
++/run git add app\admin\overallview\components\overview\Table.tsx
+
+# 2024-11-19 11:29:07.901161
++/run git add app\admin\overallview\components\overview\Dialogs\ImportDialog.tsx
+
+# 2024-11-19 11:29:07.982165
++/run git add app\admin\overallview\components\overview\Dialogs\settingsDialog.tsx
+
+# 2024-11-19 11:29:08.056162
++/run git add app\admin\overallview\components\missingFieldsDialog.tsx
+
+# 2024-11-19 11:29:08.129162
++/run git add app\admin\overallview\formfields.ts
+
+# 2024-11-19 11:29:08.202161
++/run git add app\admin\overallview\utils\dataFetcher.ts
+
+# 2024-11-19 11:29:08.273162
++/run git add app\admin\overallview\utils\settingsMapper.ts
+
+# 2024-11-19 11:29:08.345162
++/run git status
+
+# 2024-11-19 11:29:22.328464
++n
+
+# 2024-11-19 11:30:08.168500
++are these the main files used in app\admin\overallview\page.tsx
+
+# 2024-11-19 11:30:48.920236
++y
+
+# 2024-11-19 11:30:48.933235
++/run git add app\admin\overallview\components\overview\Table.tsx
+
+# 2024-11-19 11:30:49.009232
++/run git add app\admin\overallview\components\TableComponents.tsx
+
+# 2024-11-19 11:30:49.082232
++/run git add app\admin\overallview\utils\dataFetcher.ts
+
+# 2024-11-19 11:30:49.151237
++/run git add app\admin\overallview\utils\settingsMapper.ts
+
+# 2024-11-19 11:30:49.232237
++/run git status
+
+# 2024-11-19 11:30:59.832590
++n
+
+# 2024-11-19 11:31:14.393450
++y
+
+# 2024-11-19 11:31:26.420362
++/run git add app\admin\overallview\components\overview\Table.tsx
+
+# 2024-11-19 11:31:26.490837
++/run git add app\admin\overallview\components\TableComponents.tsx
+
+# 2024-11-19 11:31:26.566835
++/run git add app\admin\overallview\utils\dataFetcher.ts
+
+# 2024-11-19 11:31:26.647838
++/run git add app\admin\overallview\utils\settingsMapper.ts
+
+# 2024-11-19 11:31:26.747836
++/run git status
+
+# 2024-11-19 11:32:30.184607
++now how do i restructure my code so that i get everything dybnamically from the db even the tables to fetch according to the tab analyse app\admin\overallview and tell me what i want to achieve in that code structure ...i want this 1. Dynamic Lo
++
++ading of categories and subcategories in one table and each tab also will have the specifics according to my table the
++section should be tab and category and subcategory should be filtered in each and then the fields mapped from the db  a
++
++s per the settings or table structure created ...analyse my codebase and tell me why i am not able to map this dynamica
++
++lly preserving the table structure used in page copy(tabsworking).tsx

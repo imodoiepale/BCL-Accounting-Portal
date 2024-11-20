@@ -1,9 +1,36 @@
 // types.ts
-export interface ColumnStructure {
+
+
+// types.ts
+export interface TableHeadersProps {
     sections: Section[];
+    sortConfig: SortConfig;
+    onSort: (key: string) => void;
+    visibility: {
+        sections: Record<string, boolean>;
+        categories: Record<string, boolean>;
+        subcategories: Record<string, boolean>;
+    };
+    helperColumns: {
+        calculation: Record<string, boolean>;
+        reference: Record<string, boolean>;
+    };
+    data: any[];  // Your data array
+    totalRowCount: number;
+    calculations: {
+        stats: Record<string, ColumnStats>;
+        helpers: Record<string, Record<string, any>>;
+    };
 }
 
-export interface Section {
+interface ColumnStats {
+    total: number;
+    completed: number;
+    pending: number;
+    values: any[];
+}
+
+interface Section {
     id: string;
     title: string;
     colspan: number;
@@ -13,7 +40,7 @@ export interface Section {
     categories: Category[];
 }
 
-export interface Category {
+interface Category {
     id: string;
     title: string;
     colspan: number;
@@ -22,12 +49,47 @@ export interface Category {
     subcategories: Subcategory[];
 }
 
-export interface Subcategory {
+interface Subcategory {
     id: string;
     header: string;
-    type: 'text' | 'number' | 'date' | 'select' | 'currency' | 'percentage';
+    type: string;
     width?: string;
 }
+
+interface SortConfig {
+    key: string;
+    direction: 'asc' | 'desc' | null;
+}
+
+export interface ColumnStructure {
+    sections: Section[];
+}
+
+// export interface Section {
+//     id: string;
+//     title: string;
+//     colspan: number;
+//     borderColor: string;
+//     bgColor: string;
+//     headerTextColor: string;
+//     categories: Category[];
+// }
+
+// export interface Category {
+//     id: string;
+//     title: string;
+//     colspan: number;
+//     bgColor: string;
+//     borderColor: string;
+//     subcategories: Subcategory[];
+// }
+
+// export interface Subcategory {
+//     id: string;
+//     header: string;
+//     type: 'text' | 'number' | 'date' | 'select' | 'currency' | 'percentage';
+//     width?: string;
+// }
 
 export interface ProductData {
     companyName: string;
@@ -81,10 +143,10 @@ export interface ProductData {
     };
 }
 
-export interface SortConfig {
-    key: string;
-    direction: 'asc' | 'desc' | null;
-}
+// export interface SortConfig {
+//     key: string;
+//     direction: 'asc' | 'desc' | null;
+// }
 
 export interface VisibilityState {
     sections: Record<string, boolean>;
@@ -192,3 +254,5 @@ export interface HelperColumns {
         notes: boolean;
     };
 }
+
+

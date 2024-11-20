@@ -8,10 +8,40 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Trash, Settings, Edit2, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+
+interface SettingsDialogProps {
+  processedSections: any[]; // Replace 'any' with proper type
+  helperColumnConfigs: {
+    calculation: Record<string, any>;
+    reference: Record<string, any>;
+  };
+  visibility: {
+    sections: Record<string, boolean>;
+    categories: Record<string, boolean>;
+    subcategories: Record<string, boolean>;
+  };
+  helperColumns: {
+    calculation: Record<string, boolean>;
+    reference: Record<string, boolean>;
+  };
+  onHelperColumnChange: (type: string, id: string) => void;
+  mainTabs: string[];
+  mainSections: any;
+  mainSubsections: any;
+  onStructureChange: () => void;
+  onVisibilityChange: (type: string, id: string, value: boolean) => void;
+}
+
 
 interface StructureItem {
   id: number;
@@ -151,8 +181,18 @@ const processStructureData = (data: any[]) => {
 };
 
 
-
-export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStructureChange }) {
+export function SettingsDialog({
+  processedSections = [], // Provide default empty array
+  helperColumnConfigs = { calculation: {}, reference: {} },
+  visibility = { sections: {}, categories: {}, subcategories: {} },
+  helperColumns = { calculation: {}, reference: {} },
+  onHelperColumnChange,
+  mainTabs = [],
+  mainSections = {},
+  mainSubsections = {},
+  onStructureChange,
+  onVisibilityChange,
+}: SettingsDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [structure, setStructure] = useState<StructureItem[]>([]);
   const [uniqueTabs, setUniqueTabs] = useState<string[]>([]);
@@ -172,7 +212,7 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
     isNewSubsection: false,
     table_names: []
   });
-  
+
   const [selectedSection, setSelectedSection] = useState<StructureItem | null>(null);
   const [selectedSubsection, setSelectedSubsection] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -196,7 +236,7 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
   const [sectionFields, setSectionFields] = useState<SectionFields>({});
 
 
-  
+
   const resetNewStructure = () => {
     setNewStructure({
       section: '',
@@ -1237,483 +1277,700 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
       <Dialog open={isOpen} onOpenChange={setIsOpen} modal>
         <DialogContent className="max-w-8xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Table Structure Settings</DialogTitle>
+            <DialogTitle>Table Configuration</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-12 gap-4">
-            {/* Left Panel - Tabs */}
-            <Card className="col-span-2 h-[700px]">
-              <CardContent className="p-2">
-                <ScrollArea className="h-[700px]">
-                  <div className="flex justify-between items-center mb-2 px-2">
-                    <h3 className="font-semibold">Tabs</h3>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedTab('')}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {uniqueTabs.map(tab => (
-                    <button
-                      key={tab}
-                      className={`w-full text-left px-3 py-2 rounded transition-colors ${selectedTab === tab ? 'bg-primary text-white' : 'hover:bg-gray-100'
-                        }`}
-                      onClick={() => handleTabSelection(tab, false)}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </ScrollArea>
-              </CardContent>
-            </Card>
+          <Tabs defaultValue="structure" className="flex-1">
+            <TabsList className="">
+              <TabsTrigger value="add-structure"> Add Table Structure </TabsTrigger>
+              <TabsTrigger value="structure">Table Structure Settings</TabsTrigger>
+              <TabsTrigger value="visibility">Column Visibility</TabsTrigger>
+              <TabsTrigger value="helpers">Helper Columns</TabsTrigger>
+            </TabsList>
 
-            {/* Middle Panel - Sections */}
-            <Card className="col-span-2 h-[700px]">
-              <CardContent className="p-2">
-                <ScrollArea className="h-[700px]">
-                  <div className="flex justify-between items-center mb-2 px-2">
-                    <h3 className="font-semibold">Sections</h3>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedSection(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {existingSections
-                    .filter(section => {
-                      const sectionItems = structure.filter(item =>
-                        item.Tabs === selectedTab &&
-                        item.sections_sections &&
-                        Object.keys(item.sections_sections).includes(section)
-                      );
-                      return sectionItems.length > 0;
-                    })
-                    .map(section => (
-                      <div
-                        key={section}
-                        className={`mb-2 p-2 rounded cursor-pointer transition-colors ${selectedSection?.section === section ? 'bg-primary/10' : 'hover:bg-gray-100'
-                          }`}
-                        onClick={() => setSelectedSection({ section })}
-                      >
-                        <div className="font-medium">{section}</div>
+            <ScrollArea className="flex-1 mt-4">
+              <div className="px-1 py-2">
+                <TabsContent value="add-structure" className="mt-0 space-y-4">
+                  {/* Add New Structure UI */}
+                  <div className="border-t pt-6 mt-6">
+                    <h3 className="text-lg font-semibold mb-6">Add New Structure</h3>
+                    <div className="flex flex-row md:flex-row gap-4">
+                      {/* Tab Selection/Creation */}
+                      <div className="space-y-3 w-full md:w-1/2 mb-4">
+                        <label className="text-sm font-medium text-gray-700">Tab</label>
+                        <Select
+                          value={newStructure.Tabs}
+                          onValueChange={(value) => handleTabSelection(value, true)}
+                        >
+                          <SelectTrigger className="w-full bg-white">
+                            <SelectValue placeholder="Select or Create Tab" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {uniqueTabs.filter(tab => tab?.trim()).map(tab => (
+                              <SelectItem key={tab} value={tab}>{tab}</SelectItem>
+                            ))}
+                            <SelectItem value="new" className="text-blue-600 font-medium">+ Create New Tab</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        {/* Add this input field for new tab */}
+                        {newStructure.isNewTab && (
+                          <Input
+                            placeholder="Enter new tab name"
+                            value={newStructure.Tabs}
+                            onChange={(e) => setNewStructure(prev => ({
+                              ...prev,
+                              Tabs: e.target.value
+                            }))}
+                            className="mt-2"
+                          />
+                        )}
                       </div>
-                    ))}
 
-                </ScrollArea>
-              </CardContent>
-            </Card>
+                      {/* Section Selection/Creation */}
+                      <div className="space-y-3 w-full md:w-1/2 mb-4 ">
+                        <label className="text-sm font-medium text-gray-700">Section</label>
+                        <Select
+                          value={newStructure.section}
+                          onValueChange={(value) => {
+                            if (value === 'new') {
+                              setNewStructure(prev => ({
+                                ...prev,
+                                section: '',
+                                isNewSection: true,
+                                subsection: '',
+                                isNewSubsection: false
+                              }));
+                            } else {
+                              handleSectionSelection(value);
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-full bg-white">
+                            <SelectValue placeholder="Select or Create Section" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {existingSections.filter(section => section?.trim()).map(section => (
+                              <SelectItem key={section} value={section}>{section}</SelectItem>
+                            ))}
+                            <SelectItem value="new" className="text-blue-600 font-medium">+ Create New Section</SelectItem>
+                          </SelectContent>
+                        </Select>
 
-            {/* Subsections Panel */}
-            <Card className="col-span-2 h-[700px]">
-              <CardContent className="p-2">
-                <ScrollArea className="h-[700px]">
-                  <div className="flex justify-between items-center mb-2 px-2">
-                    <h3 className="font-semibold">Subsections</h3>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedSubsection(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {selectedSection && structure
-                    .filter(item =>
-                      item.Tabs === selectedTab &&
-                      item.sections_sections &&
-                      item.sections_subsections &&
-                      Object.keys(item.sections_sections).includes(selectedSection.section)
-                    )
-                    .flatMap(item => {
-                      const subsections = item.sections_subsections[selectedSection.section] || [];
-                      return Array.isArray(subsections) ? subsections : [subsections];
-                    })
-                    .map(subsection => (
-                      <div
-                        key={subsection}
-                        className={`mb-2 p-2 rounded cursor-pointer transition-colors ${selectedSubsection === subsection ? 'bg-primary/10' : 'hover:bg-gray-100'
-                          }`}
-                        onClick={() => setSelectedSubsection(subsection)}
-                      >
-                        <div className="font-medium">{subsection}</div>
+                        {newStructure.isNewSection && (
+                          <Input
+                            placeholder="Enter new section name"
+                            value={newStructure.section}
+                            onChange={(e) => setNewStructure(prev => ({
+                              ...prev,
+                              section: e.target.value
+                            }))}
+                            className="mt-2"
+                          />
+                        )}
                       </div>
-                    ))}
+                    </div>
 
-                </ScrollArea>
-              </CardContent>
-            </Card>
-
-            {/* Right Panel - Details */}
-            <Card className="col-span-6 h-[700px]">
-              <CardContent className="p-4">
-                <ScrollArea className="h-[700px]">
-                  {selectedSubsection ? (
-                    <div className="space-y-4">
-                      {/* Header with Edit Button */}
-                      <div className="flex justify-between items-center">
-                        <h3 className="font-semibold">Section Details</h3>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setEditing(!editing)}
+                    <div className="flex flex-row md:flex-row gap-4">
+                      {/* Subsection Selection/Creation */}
+                      <div className="space-y-3 w-full md:w-1/2 mb-4">
+                        <label className="text-sm font-medium text-gray-700">Subsection</label>
+                        {!newStructure.isNewSection ? (
+                          <Select
+                            value={newStructure.subsection}
+                            onValueChange={(value) => {
+                              if (value === 'new') {
+                                setNewStructure(prev => ({
+                                  ...prev,
+                                  subsection: '',
+                                  isNewSubsection: true
+                                }));
+                              } else {
+                                handleSubsectionSelection(value);
+                              }
+                            }}
                           >
-                            <Edit2 className="h-4 w-4 mr-2" />
-                            {editing ? 'View' : 'Edit'}
-                          </Button>
-                          {editing && (
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => {/* Add delete handler */ }}
-                            >
-                              <Trash className="h-4 w-4 mr-2" />
-                              Delete
-                            </Button>
-                          )}
-                        </div>
+                            <SelectTrigger className="w-full bg-white">
+                              <SelectValue placeholder="Select or Create Subsection" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {/* This is the key change - when in new tab mode, always show all subsections */}
+                              {(newStructure.isNewTab
+                                ? existingSubsections["all"] || []  // Show ALL subsections for new tab
+                                : existingSubsections[newStructure.section] || []  // Show section-specific subsections for existing tab
+                              )
+                                .filter(subsection => subsection?.trim())
+                                .map(subsection => (
+                                  <SelectItem key={subsection} value={subsection}>
+                                    {subsection}
+                                  </SelectItem>
+                                ))}
+                              <SelectItem value="new" className="text-blue-600 font-medium">
+                                + Create New Subsection
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            placeholder="Enter new subsection name"
+                            value={newStructure.subsection}
+                            onChange={(e) => setNewStructure(prev => ({
+                              ...prev,
+                              subsection: e.target.value
+                            }))}
+                            className="mt-2"
+                          />
+                        )}
+
+                        {!newStructure.isNewSection && newStructure.isNewSubsection && (
+                          <Input
+                            placeholder="Enter new subsection name"
+                            value={newStructure.subsection}
+                            onChange={(e) => setNewStructure(prev => ({
+                              ...prev,
+                              subsection: e.target.value
+                            }))}
+                            className="mt-2"
+                          />
+                        )}
                       </div>
 
-                      {/* Section Info */}
-                      <div className="grid gap-4">
-                        <div>
-                          <label className="text-sm font-medium">Section</label>
-                          <Input
-                            value={selectedSection?.section || ''}
-                            disabled={!editing}
-                            onChange={(e) => handleUpdateSection(selectedSection!.id, { section: e.target.value })}
-                          />
+                      {/* Table Selection/Creation */}
+                      <div className="space-y-3 w-full md:w-1/2 mb-4">
+                        <label className="text-sm font-medium text-gray-700">Tables and Fields</label>
+                        <Button
+                          onClick={() => setShowMultiSelectDialog(true)}
+                          variant="outline"
+                          className="w-full justify-between"
+                          type="button"
+                        >
+                          {selectedTables.length > 0
+                            ? `${selectedTables.length} tables selected`
+                            : "Select Tables and Fields"}
+                          <Plus className="h-4 w-4" />
+                        </Button>
+
+                        {/* Show selected tables and fields preview */}
+                        {newStructure.table_names.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            {newStructure.table_names.map(table => (
+                              <div key={table} className="border rounded-md p-2">
+                                <h6 className="font-medium text-sm">{table}</h6>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {selectedTableFields[table]?.map(fieldName => (
+                                    <span key={fieldName} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                      {fieldName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-row md:flex-row gap-4">
+                      {/* Preview and Add Button */}
+                      <div className="pt-6 space-y-6">
+                        {(newStructure.Tabs || newStructure.isNewTab) &&
+                          (newStructure.section || newStructure.isNewSection) &&
+                          (newStructure.subsection || newStructure.isNewSubsection) &&
+                          newStructure.table_name && (
+                            <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-4">
+                              <h4 className="font-medium text-gray-900">Structure Preview</h4>
+                              <div className="flex justify-between gap-4">
+                                <div className="space-y-2">
+                                  <p className="text-sm"><span className="font-medium text-gray-700">Tab:</span> <span className="text-gray-600">{newStructure.Tabs}</span></p>
+                                  <p className="text-sm"><span className="font-medium text-gray-700">Section:</span> <span className="text-gray-600">{newStructure.section}</span></p>
+                                </div>
+                                <div className="space-y-2">
+                                  <p className="text-sm"><span className="font-medium text-gray-700">Subsection:</span> <span className="text-gray-600">{newStructure.subsection}</span></p>
+                                  <p className="text-sm"><span className="font-medium text-gray-700">Table:</span> <span className="text-gray-600">{newStructure.table_name}</span></p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                        <div className="flex justify-end">
+                          <Button
+                            onClick={handleAddStructure}
+                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Structure
+                          </Button>
                         </div>
-                        <div>
-                          <label className="text-sm font-medium">Subsection</label>
-                          <Input
-                            value={selectedSubsection || ''}
-                            disabled={!editing}
-                            onChange={(e) => handleUpdateSection(selectedSection!.id, { subsection: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium">Table Name</label>
-                          {selectedSection && selectedSubsection && structure
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="structure" className="mt-0 space-y-4">
+                  <div className="grid grid-cols-12 gap-4">
+                    {/* Left Panel - Tabs */}
+                    <Card className="col-span-2 h-[700px]">
+                      <CardContent className="p-2">
+                        <ScrollArea className="h-[700px]">
+                          <div className="flex justify-between items-center mb-2 px-2">
+                            <h3 className="font-semibold">Tabs</h3>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedTab('')}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          {uniqueTabs.map(tab => (
+                            <button
+                              key={tab}
+                              className={`w-full text-left px-3 py-2 rounded transition-colors ${selectedTab === tab ? 'bg-primary text-white' : 'hover:bg-gray-100'
+                                }`}
+                              onClick={() => handleTabSelection(tab, false)}
+                            >
+                              {tab}
+                            </button>
+                          ))}
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
+
+                    {/* Middle Panel - Sections */}
+                    <Card className="col-span-2 h-[700px]">
+                      <CardContent className="p-2">
+                        <ScrollArea className="h-[700px]">
+                          <div className="flex justify-between items-center mb-2 px-2">
+                            <h3 className="font-semibold">Sections</h3>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedSection(null)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          {existingSections
+                            .filter(section => {
+                              const sectionItems = structure.filter(item =>
+                                item.Tabs === selectedTab &&
+                                item.sections_sections &&
+                                Object.keys(item.sections_sections).includes(section)
+                              );
+                              return sectionItems.length > 0;
+                            })
+                            .map(section => (
+                              <div
+                                key={section}
+                                className={`mb-2 p-2 rounded cursor-pointer transition-colors ${selectedSection?.section === section ? 'bg-primary/10' : 'hover:bg-gray-100'
+                                  }`}
+                                onClick={() => setSelectedSection({ section })}
+                              >
+                                <div className="font-medium">{section}</div>
+                              </div>
+                            ))}
+
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
+
+                    {/* Subsections Panel */}
+                    <Card className="col-span-2 h-[700px]">
+                      <CardContent className="p-2">
+                        <ScrollArea className="h-[700px]">
+                          <div className="flex justify-between items-center mb-2 px-2">
+                            <h3 className="font-semibold">Subsections</h3>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedSubsection(null)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          {selectedSection && structure
                             .filter(item =>
                               item.Tabs === selectedTab &&
                               item.sections_sections &&
-                              Object.keys(item.sections_sections).includes(selectedSection.section) &&
                               item.sections_subsections &&
-                              item.sections_subsections[selectedSection.section] === selectedSubsection
+                              Object.keys(item.sections_sections).includes(selectedSection.section)
                             )
-                            .map(item => {
-                              const tableNames = typeof item.table_names === 'string'
-                                ? JSON.parse(item.table_names)
-                                : item.table_names || {};
+                            .flatMap(item => {
+                              const subsections = item.sections_subsections[selectedSection.section] || [];
+                              return Array.isArray(subsections) ? subsections : [subsections];
+                            })
+                            .map(subsection => (
+                              <div
+                                key={subsection}
+                                className={`mb-2 p-2 rounded cursor-pointer transition-colors ${selectedSubsection === subsection ? 'bg-primary/10' : 'hover:bg-gray-100'
+                                  }`}
+                                onClick={() => setSelectedSubsection(subsection)}
+                              >
+                                <div className="font-medium">{subsection}</div>
+                              </div>
+                            ))}
 
-                              const sectionTables = tableNames[selectedSection.section] || [];
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
 
-                              return sectionTables.map(tableName => (
-                                <Input
-                                  key={tableName}
-                                  value={tableName || ''}
-                                  disabled={!editing}
-                                  onChange={(e) => handleUpdateSection(item.id, { table_name: e.target.value })}
-                                />
-                              ));
-                            })}
-                        </div>
-                      </div>
-
-                      {/* Column Mappings */}
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <h4 className="font-medium">Column Mappings</h4>
-                          {editing && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setAddFieldDialogOpen(true)}
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Field
-                            </Button>
-                          )}
-                        </div>
-                        <div className="border rounded-lg">
-                          <div className="grid grid-cols-[60px,40px,1fr,1fr,1fr,80px] gap-2 p-2 bg-gray-50 border-b">
-                            <div className="text-sm font-medium text-gray-500">Order</div>
-                            <div className="text-sm font-medium text-gray-500">#</div>
-                            <div className="text-sm font-medium text-gray-500">Column Name</div>
-                            <div className="text-sm font-medium text-gray-500">Display Name</div>
-                            <div className="text-sm font-medium text-gray-500">Table Name</div>
-                            <div></div>
-                          </div>
-
-                          <ScrollArea className="h-[300px]" orientation="both">
-                            {selectedSection && selectedSubsection && structure
-                              .filter(item =>
-                                item.Tabs === selectedTab &&
-                                item.sections_sections &&
-                                Object.keys(item.sections_sections).includes(selectedSection.section) &&
-                                item.sections_subsections &&
-                                item.sections_subsections[selectedSection.section] === selectedSubsection
-                              )
-                              .map(item => {
-                                const columnMappings = typeof item.column_mappings === 'string'
-                                  ? JSON.parse(item.column_mappings)
-                                  : item.column_mappings;
-
-                                return Object.entries(columnMappings)
-                                  .sort((a, b) => {
-                                    const orderA = item.column_order?.[a[0]] || 0;
-                                    const orderB = item.column_order?.[b[0]] || 0;
-                                    return orderA - orderB;
-                                  })
-                                  .map(([key, value], index) => (
-                                    <div
-                                      key={key}
-                                      className="grid grid-cols-[60px,40px,1fr,1fr,1fr,80px] gap-2 p-2 border-b last:border-b-0 hover:bg-gray-50"
+                    {/* Right Panel - Details */}
+                    <Card className="col-span-6 h-[700px]">
+                      <CardContent className="p-4">
+                        <ScrollArea className="h-[700px]">
+                          {selectedSubsection ? (
+                            <div className="space-y-4">
+                              {/* Header with Edit Button */}
+                              <div className="flex justify-between items-center">
+                                <h3 className="font-semibold">Section Details</h3>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setEditing(!editing)}
+                                  >
+                                    <Edit2 className="h-4 w-4 mr-2" />
+                                    {editing ? 'View' : 'Edit'}
+                                  </Button>
+                                  {editing && (
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => {/* Add delete handler */ }}
                                     >
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-sm text-gray-500">{index + 1}</span>
-                                      </div>
-                                      <div className="text-sm text-gray-500">{index + 1}</div>
-                                      <div className="text-sm">{key.split('.')[1]}</div>
-                                      <div className="text-sm">{value}</div>
-                                      <div className="text-sm">{key.split('.')[0]}</div>
-                                      {editing && (
-                                        <div className="flex gap-1">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleDeleteField(key)}
-                                            className="h-6 w-6"
-                                          >
-                                            <Trash className="h-4 w-4 text-red-500" />
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ));
-                              })}
-                          </ScrollArea>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                      <Settings className="h-12 w-12 mb-4" />
-                      <p>Select a section to view details</p>
-                    </div>
-                  )}
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          </div>
-          {/* Add New Structure UI */}
-          <div className="border-t pt-6 mt-6">
-            <h3 className="text-lg font-semibold mb-6">Add New Structure</h3>
-            <div className="flex flex-row md:flex-row gap-4">
-              {/* Tab Selection/Creation */}
-              <div className="space-y-3 w-full md:w-1/2 mb-4">
-                <label className="text-sm font-medium text-gray-700">Tab</label>
-                <Select
-                  value={newStructure.Tabs}
-                  onValueChange={(value) => handleTabSelection(value, true)} 
-                >
-                  <SelectTrigger className="w-full bg-white">
-                    <SelectValue placeholder="Select or Create Tab" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {uniqueTabs.filter(tab => tab?.trim()).map(tab => (
-                      <SelectItem key={tab} value={tab}>{tab}</SelectItem>
-                    ))}
-                    <SelectItem value="new" className="text-blue-600 font-medium">+ Create New Tab</SelectItem>
-                  </SelectContent>
-                </Select>
+                                      <Trash className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
 
-                {/* Add this input field for new tab */}
-                {newStructure.isNewTab && (
-                  <Input
-                    placeholder="Enter new tab name"
-                    value={newStructure.Tabs}
-                    onChange={(e) => setNewStructure(prev => ({
-                      ...prev,
-                      Tabs: e.target.value
-                    }))}
-                    className="mt-2"
-                  />
-                )}
-              </div>
+                              {/* Section Info */}
+                              <div className="grid gap-4">
+                                <div>
+                                  <label className="text-sm font-medium">Section</label>
+                                  <Input
+                                    value={selectedSection?.section || ''}
+                                    disabled={!editing}
+                                    onChange={(e) => handleUpdateSection(selectedSection!.id, { section: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium">Subsection</label>
+                                  <Input
+                                    value={selectedSubsection || ''}
+                                    disabled={!editing}
+                                    onChange={(e) => handleUpdateSection(selectedSection!.id, { subsection: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium">Table Name</label>
+                                  {selectedSection && selectedSubsection && structure
+                                    .filter(item =>
+                                      item.Tabs === selectedTab &&
+                                      item.sections_sections &&
+                                      Object.keys(item.sections_sections).includes(selectedSection.section) &&
+                                      item.sections_subsections &&
+                                      item.sections_subsections[selectedSection.section] === selectedSubsection
+                                    )
+                                    .map(item => {
+                                      const tableNames = typeof item.table_names === 'string'
+                                        ? JSON.parse(item.table_names)
+                                        : item.table_names || {};
 
-              {/* Section Selection/Creation */}
-              <div className="space-y-3 w-full md:w-1/2 mb-4 ">
-                <label className="text-sm font-medium text-gray-700">Section</label>
-                <Select
-                  value={newStructure.section}
-                  onValueChange={(value) => {
-                    if (value === 'new') {
-                      setNewStructure(prev => ({
-                        ...prev,
-                        section: '',
-                        isNewSection: true,
-                        subsection: '',
-                        isNewSubsection: false
-                      }));
-                    } else {
-                      handleSectionSelection(value);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-full bg-white">
-                    <SelectValue placeholder="Select or Create Section" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {existingSections.filter(section => section?.trim()).map(section => (
-                      <SelectItem key={section} value={section}>{section}</SelectItem>
-                    ))}
-                    <SelectItem value="new" className="text-blue-600 font-medium">+ Create New Section</SelectItem>
-                  </SelectContent>
-                </Select>
+                                      const sectionTables = tableNames[selectedSection.section] || [];
 
-                {newStructure.isNewSection && (
-                  <Input
-                    placeholder="Enter new section name"
-                    value={newStructure.section}
-                    onChange={(e) => setNewStructure(prev => ({
-                      ...prev,
-                      section: e.target.value
-                    }))}
-                    className="mt-2"
-                  />
-                )}
-              </div>
-            </div>
+                                      return sectionTables.map(tableName => (
+                                        <Input
+                                          key={tableName}
+                                          value={tableName || ''}
+                                          disabled={!editing}
+                                          onChange={(e) => handleUpdateSection(item.id, { table_name: e.target.value })}
+                                        />
+                                      ));
+                                    })}
+                                </div>
+                              </div>
 
-            <div className="flex flex-row md:flex-row gap-4">
-              {/* Subsection Selection/Creation */}
-              <div className="space-y-3 w-full md:w-1/2 mb-4">
-                <label className="text-sm font-medium text-gray-700">Subsection</label>
-                {!newStructure.isNewSection ? (
-                  <Select
-                    value={newStructure.subsection}
-                    onValueChange={(value) => {
-                      if (value === 'new') {
-                        setNewStructure(prev => ({
-                          ...prev,
-                          subsection: '',
-                          isNewSubsection: true
-                        }));
-                      } else {
-                        handleSubsectionSelection(value);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-full bg-white">
-                      <SelectValue placeholder="Select or Create Subsection" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {/* This is the key change - when in new tab mode, always show all subsections */}
-                      {(newStructure.isNewTab
-                        ? existingSubsections["all"] || []  // Show ALL subsections for new tab
-                        : existingSubsections[newStructure.section] || []  // Show section-specific subsections for existing tab
-                      )
-                        .filter(subsection => subsection?.trim())
-                        .map(subsection => (
-                          <SelectItem key={subsection} value={subsection}>
-                            {subsection}
-                          </SelectItem>
-                        ))}
-                      <SelectItem value="new" className="text-blue-600 font-medium">
-                        + Create New Subsection
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    placeholder="Enter new subsection name"
-                    value={newStructure.subsection}
-                    onChange={(e) => setNewStructure(prev => ({
-                      ...prev,
-                      subsection: e.target.value
-                    }))}
-                    className="mt-2"
-                  />
-                )}
+                              {/* Column Mappings */}
+                              <div>
+                                <div className="flex justify-between items-center mb-2">
+                                  <h4 className="font-medium">Column Mappings</h4>
+                                  {editing && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setAddFieldDialogOpen(true)}
+                                    >
+                                      <Plus className="h-4 w-4 mr-2" />
+                                      Add Field
+                                    </Button>
+                                  )}
+                                </div>
+                                <div className="border rounded-lg">
+                                  <div className="grid grid-cols-[60px,40px,1fr,1fr,1fr,80px] gap-2 p-2 bg-gray-50 border-b">
+                                    <div className="text-sm font-medium text-gray-500">Order</div>
+                                    <div className="text-sm font-medium text-gray-500">#</div>
+                                    <div className="text-sm font-medium text-gray-500">Column Name</div>
+                                    <div className="text-sm font-medium text-gray-500">Display Name</div>
+                                    <div className="text-sm font-medium text-gray-500">Table Name</div>
+                                    <div></div>
+                                  </div>
 
-                {!newStructure.isNewSection && newStructure.isNewSubsection && (
-                  <Input
-                    placeholder="Enter new subsection name"
-                    value={newStructure.subsection}
-                    onChange={(e) => setNewStructure(prev => ({
-                      ...prev,
-                      subsection: e.target.value
-                    }))}
-                    className="mt-2"
-                  />
-                )}
-              </div>
+                                  <ScrollArea className="h-[300px]" orientation="both">
+                                    {selectedSection && selectedSubsection && structure
+                                      .filter(item =>
+                                        item.Tabs === selectedTab &&
+                                        item.sections_sections &&
+                                        Object.keys(item.sections_sections).includes(selectedSection.section) &&
+                                        item.sections_subsections &&
+                                        item.sections_subsections[selectedSection.section] === selectedSubsection
+                                      )
+                                      .map(item => {
+                                        const columnMappings = typeof item.column_mappings === 'string'
+                                          ? JSON.parse(item.column_mappings)
+                                          : item.column_mappings;
 
-              {/* Table Selection/Creation */}
-              <div className="space-y-3 w-full md:w-1/2 mb-4">
-                <label className="text-sm font-medium text-gray-700">Tables and Fields</label>
-                <Button
-                  onClick={() => setShowMultiSelectDialog(true)}
-                  variant="outline"
-                  className="w-full justify-between"
-                  type="button"
-                >
-                  {selectedTables.length > 0
-                    ? `${selectedTables.length} tables selected`
-                    : "Select Tables and Fields"}
-                  <Plus className="h-4 w-4" />
-                </Button>
-
-                {/* Show selected tables and fields preview */}
-                {newStructure.table_names.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    {newStructure.table_names.map(table => (
-                      <div key={table} className="border rounded-md p-2">
-                        <h6 className="font-medium text-sm">{table}</h6>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {selectedTableFields[table]?.map(fieldName => (
-                            <span key={fieldName} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                              {fieldName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                                        return Object.entries(columnMappings)
+                                          .sort((a, b) => {
+                                            const orderA = item.column_order?.[a[0]] || 0;
+                                            const orderB = item.column_order?.[b[0]] || 0;
+                                            return orderA - orderB;
+                                          })
+                                          .map(([key, value], index) => (
+                                            <div
+                                              key={key}
+                                              className="grid grid-cols-[60px,40px,1fr,1fr,1fr,80px] gap-2 p-2 border-b last:border-b-0 hover:bg-gray-50"
+                                            >
+                                              <div className="flex items-center gap-1">
+                                                <span className="text-sm text-gray-500">{index + 1}</span>
+                                              </div>
+                                              <div className="text-sm text-gray-500">{index + 1}</div>
+                                              <div className="text-sm">{key.split('.')[1]}</div>
+                                              <div className="text-sm">{value}</div>
+                                              <div className="text-sm">{key.split('.')[0]}</div>
+                                              {editing && (
+                                                <div className="flex gap-1">
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteField(key)}
+                                                    className="h-6 w-6"
+                                                  >
+                                                    <Trash className="h-4 w-4 text-red-500" />
+                                                  </Button>
+                                                </div>
+                                              )}
+                                            </div>
+                                          ));
+                                      })}
+                                  </ScrollArea>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                              <Settings className="h-12 w-12 mb-4" />
+                              <p>Select a section to view details</p>
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
                   </div>
-                )}
-              </div>
-            </div>
+                </TabsContent>
+                <TabsContent value="visibility" className="mt-0 space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    {/* Sections Column */}
+                    <Card className="col-span-1">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-medium">Sections</CardTitle>
+                        <CardDescription className="text-xs">
+                          Toggle main section visibility
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {processedSections?.length > 0 ? (
+                          processedSections.map(section => !section.isSeparator && (
+                            <div key={section.name}
+                              className="flex items-center justify-between space-x-2 p-2 rounded-md bg-gray-50">
+                              <div className="space-y-1">
+                                <Label htmlFor={`section-${section.name}`}
+                                  className="text-sm font-medium">
+                                  {section.label}
+                                </Label>
+                                <Badge variant="secondary" className="text-xs">
+                                  {section.categorizedFields?.length || 0} categories
+                                </Badge>
+                              </div>
+                              <Switch
+                                id={`section-${section.name}`}
+                                checked={visibility.sections[section.name]}
+                                onCheckedChange={() => onVisibilityChange('sections', section.name, !visibility.sections[section.name])}
+                              />
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center text-gray-500">No sections available</div>
+                        )}
+                      </CardContent>
+                    </Card>
 
-            <div className="flex flex-row md:flex-row gap-4">
-              {/* Preview and Add Button */}
-              <div className="pt-6 space-y-6">
-                {(newStructure.Tabs || newStructure.isNewTab) &&
-                  (newStructure.section || newStructure.isNewSection) &&
-                  (newStructure.subsection || newStructure.isNewSubsection) &&
-                  newStructure.table_name && (
-                    <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-4">
-                      <h4 className="font-medium text-gray-900">Structure Preview</h4>
-                      <div className="flex justify-between gap-4">
-                        <div className="space-y-2">
-                          <p className="text-sm"><span className="font-medium text-gray-700">Tab:</span> <span className="text-gray-600">{newStructure.Tabs}</span></p>
-                          <p className="text-sm"><span className="font-medium text-gray-700">Section:</span> <span className="text-gray-600">{newStructure.section}</span></p>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-sm"><span className="font-medium text-gray-700">Subsection:</span> <span className="text-gray-600">{newStructure.subsection}</span></p>
-                          <p className="text-sm"><span className="font-medium text-gray-700">Table:</span> <span className="text-gray-600">{newStructure.table_name}</span></p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                    {/* Categories Column */}
+                    <Card className="col-span-1">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-medium">Categories</CardTitle>
+                        <CardDescription className="text-xs">
+                          Manage category visibility by section
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ScrollArea className="h-[400px] pr-4">
+                          <div className="space-y-6">
+                            {processedSections.map(section => !section.isSeparator && (
+                              <div key={section.name} className="space-y-3">
+                                <h3 className="text-xs font-semibold px-2 py-1 rounded-md bg-gray-100">
+                                  {section.label}
+                                </h3>
+                                <div className="space-y-2 pl-2">
+                                  {section.categorizedFields?.map(category => !category.isSeparator && (
+                                    <div key={`${section.name}-${category.category}`}
+                                      className="flex items-center justify-between space-x-2 p-2 rounded-md bg-gray-50">
+                                      <Label htmlFor={`category-${section.name}-${category.category}`}
+                                        className="text-sm">
+                                        {category.category}
+                                      </Label>
+                                      <Switch
+                                        id={`category-${section.name}-${category.category}`}
+                                        checked={visibility.categories[`${section.name}-${category.category}`]}
+                                        onCheckedChange={() => handleCategoryVisibilityChange(section.name, category.category)}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
 
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleAddStructure}
-                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Structure
-                  </Button>
-                </div>
+                    {/* Fields Column */}
+                    <Card className="col-span-1">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-medium">Fields</CardTitle>
+                        <CardDescription className="text-xs">
+                          Configure individual field visibility
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ScrollArea className="h-[400px] pr-4">
+                          <div className="space-y-6">
+                            {processedSections.map(section => !section.isSeparator && (
+                              <div key={section.name} className="space-y-4">
+                                <h3 className="text-xs font-semibold px-2 py-1 rounded-md bg-gray-100">
+                                  {section.label}
+                                </h3>
+                                {section.categorizedFields?.map(category => !category.isSeparator && (
+                                  <div key={`${section.name}-${category.category}`} className="space-y-2">
+                                    <h4 className="text-xs font-medium pl-2 pb-1 border-b">
+                                      {category.category}
+                                    </h4>
+                                    <div className="space-y-1 pl-4">
+                                      {category.fields.map(field => (
+                                        <div key={`${section.name}-${category.category}-${field.name}`}
+                                          className="flex items-center justify-between space-x-2 py-1">
+                                          <div className="flex items-center space-x-2">
+                                            <Label htmlFor={`field-${section.name}-${category.category}-${field.name}`}
+                                              className="text-sm">
+                                              {field.label}
+                                            </Label>
+                                            <Badge variant="outline" className="text-[10px]">
+                                              {field.type || 'text'}
+                                            </Badge>
+                                          </div>
+                                          <Switch
+                                            id={`field-${section.name}-${category.category}-${field.name}`}
+                                            checked={visibility.subcategories[`${section.name}-${category.category}-${field.name}`]}
+                                            onCheckedChange={() => handleSubcategoryVisibilityChange(section.name, category.category, field.name)}
+                                          />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+
+
+                <TabsContent value="helpers" className="mt-0 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Calculation Helpers */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm font-medium">Calculation Helpers</CardTitle>
+                        <CardDescription className="text-xs">
+                          Statistical calculations for numeric columns
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {Object.entries(helperColumnConfigs.calculation).map(([id, config]) => (
+                          <div key={`calc-${id}`}
+                            className={cn(
+                              "flex items-center justify-between space-x-2 p-2 rounded-md",
+                              config.bgColor
+                            )}>
+                            <div className="space-y-1">
+                              <Label htmlFor={`helper-calc-${id}`} className="text-sm font-medium">
+                                {config.label}
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                {config.description}
+                              </p>
+                            </div>
+                            <Switch
+                              id={`helper-calc-${id}`}
+                              checked={helperColumns.calculation[id]}
+                              onCheckedChange={() => onHelperColumnChange('calculation', id)}
+                            />
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+
+                    {/* Reference Helpers */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm font-medium">Reference Helpers</CardTitle>
+                        <CardDescription className="text-xs">
+                          Comparative and reference calculations
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {Object.entries(helperColumnConfigs.reference).map(([id, config]) => (
+                          <div key={`ref-${id}`}
+                            className={cn(
+                              "flex items-center justify-between space-x-2 p-2 rounded-md",
+                              config.bgColor
+                            )}>
+                            <div className="space-y-1">
+                              <Label htmlFor={`helper-ref-${id}`} className="text-sm font-medium">
+                                {config.label}
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                {config.description}
+                              </p>
+                            </div>
+                            <Switch
+                              id={`helper-ref-${id}`}
+                              checked={helperColumns.reference[id]}
+                              onCheckedChange={() => onHelperColumnChange('reference', id)}
+                            />
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
               </div>
-            </div>
-          </div>
+            </ScrollArea>
+          </Tabs>
         </DialogContent>
       </Dialog>
+
 
       {/* New Table Dialog */}
       <AlertDialog open={showNewTableDialog} onOpenChange={setShowNewTableDialog}>
