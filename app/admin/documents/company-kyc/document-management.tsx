@@ -261,6 +261,7 @@ const DocumentManagement = () => {
         return data;
       } catch (error) {
         console.error('Upload error:', error);
+        toast.error('Failed to upload document');
         throw error;
       }
     },

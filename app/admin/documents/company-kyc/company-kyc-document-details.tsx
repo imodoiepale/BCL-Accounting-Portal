@@ -42,6 +42,213 @@ interface Document {
 // Utility function to generate unique IDs
 const generateId = () => crypto.randomUUID();
 
+// Extract Details Modal Component
+const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) => {
+  const [extractedData, setExtractedData] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+
+  const extractDetails = async (imageUrl) => {
+    setIsLoading(true);
+    try {
+      const url = 'https://api.hyperbolic.xyz/v1/chat/completions';
+      
+      // Create a prompt that specifically requests field values
+      const fieldPrompt = document.fields?.map(f => f.name).join(', ');
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpamVwYWxlQGdtYWlsLmNvbSIsImlhdCI6MTczMTUxNDExMX0.DZf2t6fUGiVQN6FXCwLOnRG2Yx48aok1vIH00sKhWS4',
+        },
+        body: JSON.stringify({
+          model: 'Qwen/Qwen2-VL-72B-Instruct',
+          messages: [
+            {
+              role: 'system',
+              content: `You are an advanced document analysis assistant capable of extracting specific information accurately and presenting it in structured JSON format. When given a prompt detailing required fields, you must ensure:
+              - The document is carefully analyzed for completeness and accuracy.
+              - Only the specified fields are extracted with no omissions or extra data.
+              - The output is returned as a valid JSON object with keys matching the requested field names.`
+            }
+            ,
+            {
+              role: 'user',
+              content: [
+                {
+                  type: "text",
+                  text: `Analyze the provided document and extract the following fields (respond strictly in JSON format):
+            
+                  Fields to extract: ${fieldPrompt}
+            
+                  Ensure:
+                  - Field names in the JSON match exactly with the provided list.
+                  - Each field has a value extracted from the document or is explicitly marked as null if not found.
+                  - The JSON output is properly formatted with no additional commentary or errors.
+            
+                  Example Response:
+                  {
+                    "field1": "value1",
+                    "field2": "value2",
+                    "field3": null
+                  }`
+                },
+                {
+                  type: "image_url",
+                  image_url: { url: imageUrl }
+                }
+              ]
+            }
+          ],
+          max_tokens: 512,
+          temperature: 0.1,
+          top_p: 0.01,
+          stream: false
+        }),
+      });
+
+      const json = await response.json();
+      const output = json.choices[0].message.content;
+      
+      // Try to parse the response as JSON
+      let parsedData = {};
+      try {
+        // First, try to find a JSON object in the response
+        const jsonMatch = output.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsedData = JSON.parse(jsonMatch[0]);
+        } else {
+          // Fallback to parsing line by line
+          const lines = output.split('\n');
+          lines.forEach(line => {
+            const [key, value] = line.split(':').map(str => str.trim());
+            if (key && value) {
+              parsedData[key] = value;
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error parsing extraction response:', error);
+        toast.error('Error parsing extracted data');
+      }
+
+      // Map the parsed data to fields
+      const mappedData = {};
+      document.fields?.forEach(field => {
+        mappedData[field.name] = parsedData[field.name] || '';
+      });
+
+      console.log('Extracted and mapped data:', mappedData); // Debug log
+      setExtractedData(mappedData);
+
+    } catch (error) {
+      console.error('Extraction error:', error);
+      toast.error('Failed to extract details');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && upload) {
+      const getSignedUrl = async () => {
+        try {
+          const { data, error } = await supabase
+            .storage
+            .from('kyc-documents')
+            .createSignedUrl(upload.filepath, 60);
+
+          if (error) {
+            throw error;
+          }
+
+          await extractDetails(data.signedUrl);
+        } catch (error) {
+          console.error('Error getting signed URL:', error);
+          toast.error('Failed to access document');
+        }
+      };
+
+      getSignedUrl();
+    }
+  }, [isOpen, upload]);
+
+  // Helper function to format field value based on type
+  const formatFieldValue = (value, type) => {
+    switch (type) {
+      case 'date':
+        return value ? new Date(value).toISOString().split('T')[0] : '';
+      case 'number':
+        return value ? parseFloat(value) : '';
+      default:
+        return value || '';
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Extracted Details Preview</DialogTitle>
+        </DialogHeader>
+        
+        {isLoading ? (
+          <div className="flex items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {document.fields?.map((field) => (
+              <div key={field.id} className="space-y-2">
+                <label className="text-sm font-medium">{field.name}</label>
+                {field.type === 'date' ? (
+                  <Input
+                    type="date"
+                    value={formatFieldValue(extractedData[field.name], field.type)}
+                    onChange={(e) => setExtractedData(prev => ({
+                      ...prev,
+                      [field.name]: e.target.value
+                    }))}
+                  />
+                ) : field.type === 'number' ? (
+                  <Input
+                    type="number"
+                    value={formatFieldValue(extractedData[field.name], field.type)}
+                    onChange={(e) => setExtractedData(prev => ({
+                      ...prev,
+                      [field.name]: e.target.value
+                    }))}
+                  />
+                ) : (
+                  <Input
+                    type="text"
+                    value={extractedData[field.name] || ''}
+                    onChange={(e) => setExtractedData(prev => ({
+                      ...prev,
+                      [field.name]: e.target.value
+                    }))}
+                  />
+                )}
+              </div>
+            ))}
+            
+            <DialogFooter>
+              <Button 
+                onClick={() => {
+                  console.log('Submitting data:', extractedData); // Debug log
+                  onSubmit(extractedData);
+                }}
+              >
+                Save Details
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // Document Actions Component
 const DocumentActions = ({ document, onAddField, onUpdateFields }) => {
   const [isManageFieldsOpen, setIsManageFieldsOpen] = useState(false);
@@ -87,7 +294,6 @@ const DocumentActions = ({ document, onAddField, onUpdateFields }) => {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Manage Fields Dialog */}
       <Dialog open={isManageFieldsOpen} onOpenChange={setIsManageFieldsOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -130,7 +336,7 @@ const DocumentActions = ({ document, onAddField, onUpdateFields }) => {
               </div>
             ))}
           </div>
-          <DialogFooter className="flex justify-end items-center">
+          <DialogFooter>
             <Button onClick={handleSaveChanges}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
@@ -140,11 +346,11 @@ const DocumentActions = ({ document, onAddField, onUpdateFields }) => {
 };
 
 // Document Action Cell Component
-const DocumentActionCell = ({ company, document, upload, onView, onUpload }) => {
+const DocumentActionCell = ({ company, document, upload, onView, onUpload, onExtract }) => {
   return (
     <div className="flex items-center justify-center">
       {upload && (
-        <CheckCircle className="text-green-500 h-4 w-4 mr-2" /> // Render the icon if the document exists
+        <CheckCircle className="text-green-500 h-4 w-4 mr-2" />
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -154,120 +360,25 @@ const DocumentActionCell = ({ company, document, upload, onView, onUpload }) => 
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-[160px]">
           {upload ? (
-            <DropdownMenuItem onClick={() => onView(document, company)}>
-              <Eye className="mr-2 h-4 w-4" />
-              View Document
-            </DropdownMenuItem>
+            <>
+              <DropdownMenuItem onClick={() => onView(document, company)}>
+                <Eye className="mr-2 h-4 w-4" />
+                View Document
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExtract(document, upload)}>
+                <Eye className="mr-2 h-4 w-4" />
+                Extract Details
+              </DropdownMenuItem>
+            </>
           ) : (
             <DropdownMenuItem onClick={() => onUpload(company.id, document.id)}>
               <Upload className="mr-2 h-4 w-4" />
               Upload Document
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem>
-            <Edit2 className="mr-2 h-4 w-4" />
-            Edit Details
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Eye className="mr-2 h-4 w-4" />
-            Extract Details
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-  );
-};
-
-// Add Fields Dialog Component
-const AddFieldsDialog = ({ isOpen, onClose, document, onSubmit }) => {
-  const [fields, setFields] = useState([{ id: generateId(), name: '', type: 'text' }]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const validFields = fields.filter(field => field.name.trim() !== '');
-    
-    if (validFields.length === 0) {
-      toast.error('Please add at least one field');
-      return;
-    }
-
-    onSubmit(document.id, validFields);
-  };
-
-  const addField = () => {
-    setFields(prev => [...prev, { id: generateId(), name: '', type: 'text' }]);
-  };
-
-  const removeField = (id) => {
-    if (fields.length === 1) return;
-    setFields(prev => prev.filter(field => field.id !== id));
-  };
-
-  const updateField = (id, key, value) => {
-    setFields(prev => prev.map(field => 
-      field.id === id ? { ...field, [key]: value } : field
-    ));
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Add Fields for {document?.name}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            {fields.map((field) => (
-              <div key={field.id} className="flex gap-2 items-start p-4 bg-gray-50 rounded-lg">
-                <div className="flex-1">
-                  <label className="text-sm font-medium">Field Name</label>
-                  <Input
-                    value={field.name}
-                    onChange={(e) => updateField(field.id, 'name', e.target.value)}
-                    placeholder="Enter field name"
-                    className="mt-1"
-                  />
-                </div>
-                <div className="w-1/3">
-                  <label className="text-sm font-medium">Type</label>
-                  <select
-                    value={field.type}
-                    onChange={(e) => updateField(field.id, 'type', e.target.value)}
-                    className="w-full mt-1 border rounded-md p-2"
-                  >
-                    <option value="text">Text</option>
-                    <option value="number">Number</option>
-                    <option value="date">Date</option>
-                    <option value="file">File</option>
-                  </select>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="mt-6"
-                  onClick={() => removeField(field.id)}
-                >
-                  <Trash2 className="h-4 w-4 text-red-500" />
-                </Button>
-              </div>
-            ))}
-          </div>
-          <DialogFooter className="flex justify-between items-center">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addField}
-              className="ml-auto mr-2"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Add Another Field
-            </Button>
-            <Button type="submit">Save Fields</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 };
 
@@ -349,6 +460,98 @@ const ViewModal = ({ url, onClose }) => {
   );
 };
 
+// Add Fields Dialog Component
+const AddFieldsDialog = ({ isOpen, onClose, document, onSubmit }) => {
+  const [fields, setFields] = useState([{ id: generateId(), name: '', type: 'text' }]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const validFields = fields.filter(field => field.name.trim() !== '');
+    
+    if (validFields.length === 0) {
+      toast.error('Please add at least one field');
+      return;
+    }
+
+    onSubmit(document.id, validFields);
+  };
+
+  const addField = () => {
+    setFields(prev => [...prev, { id: generateId(), name: '', type: 'text' }]);
+  };
+
+  const removeField = (id) => {
+    if (fields.length === 1) return;
+    setFields(prev => prev.filter(field => field.id !== id));
+  };
+
+  const updateField = (id, key, value) => {
+    setFields(prev => prev.map(field => 
+      field.id === id ? { ...field, [key]: value } : field
+    ));
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Add Fields for {document?.name}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {fields.map((field) => (
+              <div key={field.id} className="flex gap-2 items-start p-4 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <label className="text-sm font-medium">Field Name</label>
+                  <Input
+                    value={field.name} onChange={(e) => updateField(field.id, 'name', e.target.value)}
+                    placeholder="Enter field name"
+                    className="mt-1"
+                  />
+                </div>
+                <div className="w-1/3">
+                  <label className="text-sm font-medium">Type</label>
+                  <select
+                    value={field.type}
+                    onChange={(e) => updateField(field.id, 'type', e.target.value)}
+                    className="w-full mt-1 border rounded-md p-2"
+                  >
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
+                    <option value="date">Date</option>
+                    <option value="file">File</option>
+                  </select>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="mt-6"
+                  onClick={() => removeField(field.id)}
+                >
+                  <Trash2 className="h-4 w-4 text-red-500" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="flex justify-between items-center">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addField}
+              className="ml-auto mr-2"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Another Field
+            </Button>
+            <Button type="submit">Save Fields</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // Main Component
 export default function CompanyKycDocumentDetails() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -359,6 +562,9 @@ export default function CompanyKycDocumentDetails() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewUrl, setViewUrl] = useState(null);
   const [selectedUploadCompany, setSelectedUploadCompany] = useState(null);
+  const [showExtractModal, setShowExtractModal] = useState(false);
+  const [selectedExtractDocument, setSelectedExtractDocument] = useState(null);
+  const [selectedExtractUpload, setSelectedExtractUpload] = useState(null);
   const queryClient = useQueryClient();
   const parentRef = useRef();
 
@@ -485,6 +691,30 @@ export default function CompanyKycDocumentDetails() {
     }
   });
 
+  // Extract Details Mutation
+  const extractionMutation = useMutation({
+    mutationFn: async ({ uploadId, extractedData }) => {
+      const { data, error } = await supabase
+        .from('acc_portal_kyc_uploads')
+        .update({ value: extractedData })
+        .eq('id', uploadId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['uploads']);
+      setShowExtractModal(false);
+      toast.success('Details saved successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to save details');
+      console.error('Save error:', error);
+    }
+  });
+
   // Handlers
   const handleViewDocument = async (document, company) => {
     const upload = uploads.find(u => 
@@ -516,6 +746,12 @@ export default function CompanyKycDocumentDetails() {
   const handleUploadClick = (companyId, documentId) => {
     setSelectedUploadCompany(companies.find(c => c.id === companyId));
     setShowUploadModal(true);
+  };
+
+  const handleExtractClick = (document, upload) => {
+    setSelectedExtractDocument(document);
+    setSelectedExtractUpload(upload);
+    setShowExtractModal(true);
   };
 
   // Virtual list for documents
@@ -644,6 +880,7 @@ export default function CompanyKycDocumentDetails() {
                             upload={upload}
                             onView={handleViewDocument}
                             onUpload={handleUploadClick}
+                            onExtract={handleExtractClick}
                           />
                         </TableCell>
                       );
@@ -663,7 +900,7 @@ export default function CompanyKycDocumentDetails() {
                         );
                         return (
                           <TableCell key={company.id} className="text-center">
-                            <span>{upload?.value || '-'}</span>
+                            <span>{upload?.value?.[field.name] || '-'}</span>
                           </TableCell>
                         );
                       })}
@@ -711,6 +948,21 @@ export default function CompanyKycDocumentDetails() {
             const updatedFields = [...existingFields, ...fields];
             updateFieldsMutation.mutate({ documentId, fields: updatedFields });
             setIsAddFieldOpen(false);
+          }}
+        />
+      )}
+
+      {showExtractModal && selectedExtractDocument && selectedExtractUpload && (
+        <ExtractDetailsModal
+          isOpen={showExtractModal}
+          onClose={() => setShowExtractModal(false)}
+          document={selectedExtractDocument}
+          upload={selectedExtractUpload}
+          onSubmit={(extractedData) => {
+            extractionMutation.mutate({
+              uploadId: selectedExtractUpload.id,
+              extractedData
+            });
           }}
         />
       )}
