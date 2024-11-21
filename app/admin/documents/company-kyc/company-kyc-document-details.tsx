@@ -411,7 +411,7 @@ const UploadModal = ({ isOpen, onClose, onUpload, company, document }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!file || !issueDate) {
+    if (!file ) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -419,8 +419,7 @@ const UploadModal = ({ isOpen, onClose, onUpload, company, document }) => {
       companyId: company.id,
       documentId: document.id,
       file,
-      issueDate,
-      expiryDate: expiryDate || undefined
+      
     });
   };
 
@@ -439,23 +438,7 @@ const UploadModal = ({ isOpen, onClose, onUpload, company, document }) => {
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Issue Date</label>
-            <Input
-              type="date"
-              value={issueDate}
-              onChange={(e) => setIssueDate(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Expiry Date (Optional)</label>
-            <Input
-              type="date"
-              value={expiryDate}
-              onChange={(e) => setExpiryDate(e.target.value)}
-            />
-          </div>
+          
           <Button type="submit" className="w-full">Upload</Button>
         </form>
       </DialogContent>
