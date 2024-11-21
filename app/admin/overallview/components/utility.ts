@@ -1104,21 +1104,27 @@ export const handleExport = (data) => {
     XLSX.writeFile(wb, "Companies_Report.xlsx");
 };
 
-export const calculateFieldStats = (fieldName, data) => {
-    const total = data.length;
-    const completed = data.filter(item =>
-        item.company[fieldName] !== null &&
-        item.company[fieldName] !== undefined &&
-        item.company[fieldName] !== ''
-    ).length;
-
+export const calculateFieldStats = (fieldName: string, data: any[]) => {
+    let total = 0;
+    let completed = 0;
+  
+    data.forEach(group => {
+      if (group.rows && group.rows[0] && fieldName in group.rows[0]) {
+        total++;
+        const value = group.rows[0][fieldName];
+        if (value !== null && value !== undefined && value !== '') {
+          completed++;
+        }
+      }
+    });
+  
     return {
-        total,
-        completed,
-        pending: total - completed
+      total: total.toString(), // Convert to string to ensure we're not returning an object
+      completed: completed.toString(),
+      pending: (total - completed).toString()
     };
-};
-
+  };
+  
 export const groupFieldsByCategory = (fields) => {
   // First group fields by their categories
   const categorizedFields = fields.reduce((acc, field) => {
@@ -1176,3 +1182,6 @@ export const calculatePendingFields = (section, data) => {
   return total - completed;
 };
 
+export const getSubsectionFields = (formFields: Record<string, any>, subsection: string) => {
+    return formFields[subsection] || [];
+};

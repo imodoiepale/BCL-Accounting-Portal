@@ -585,6 +585,10 @@ ${field.name === 'company_name' ? 'cursor-pointer hover:text-primary' : ''}`}
 
 // Main Table component
 export const Table: React.FC<TableProps> = ({ data, handleCompanyClick, processedSections , onMissingFieldsClick }) => {
+    // Add a guard clause to check for processedSections
+    if (!processedSections || !Array.isArray(processedSections)) {
+      return null; // Or return a loading state/placeholder
+    }
   return (
     <Card>
       <CardContent className="p-0">
