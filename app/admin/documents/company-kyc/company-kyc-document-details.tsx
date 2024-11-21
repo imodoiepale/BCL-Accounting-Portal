@@ -192,7 +192,7 @@ const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) =>
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-5xl h-[80vh]">
         <DialogHeader>
           <DialogTitle>Extracted Details Preview</DialogTitle>
         </DialogHeader>
@@ -202,40 +202,42 @@ const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) =>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <div className="space-y-4">
-            {document.fields?.map((field) => (
-              <div key={field.id} className="space-y-2">
-                <label className="text-sm font-medium">{field.name}</label>
-                {field.type === 'date' ? (
-                  <Input
-                    type="date"
-                    value={formatFieldValue(extractedData[field.name], field.type)}
-                    onChange={(e) => setExtractedData(prev => ({
-                      ...prev,
-                      [field.name]: e.target.value
-                    }))}
-                  />
-                ) : field.type === 'number' ? (
-                  <Input
-                    type="number"
-                    value={formatFieldValue(extractedData[field.name], field.type)}
-                    onChange={(e) => setExtractedData(prev => ({
-                      ...prev,
-                      [field.name]: e.target.value
-                    }))}
-                  />
-                ) : (
-                  <Input
-                    type="text"
-                    value={extractedData[field.name] || ''}
-                    onChange={(e) => setExtractedData(prev => ({
-                      ...prev,
-                      [field.name]: e.target.value
-                    }))}
-                  />
-                )}
-              </div>
-            ))}
+          <div className="space-y-4 overflow-y-auto max-h-[calc(80vh-8rem)] pr-4">
+            <div className="grid grid-cols-2 gap-4">
+              {document.fields?.map((field) => (
+                <div key={field.id} className="space-y-2">
+                  <label className="text-sm font-medium">{field.name}</label>
+                  {field.type === 'date' ? (
+                    <Input
+                      type="date"
+                      value={formatFieldValue(extractedData[field.name], field.type)}
+                      onChange={(e) => setExtractedData(prev => ({
+                        ...prev,
+                        [field.name]: e.target.value
+                      }))}
+                    />
+                  ) : field.type === 'number' ? (
+                    <Input
+                      type="number"
+                      value={formatFieldValue(extractedData[field.name], field.type)}
+                      onChange={(e) => setExtractedData(prev => ({
+                        ...prev,
+                        [field.name]: e.target.value
+                      }))}
+                    />
+                  ) : (
+                    <Input
+                      type="text"
+                      value={extractedData[field.name] || ''}
+                      onChange={(e) => setExtractedData(prev => ({
+                        ...prev,
+                        [field.name]: e.target.value
+                      }))}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
 
             <DialogFooter>
               <Button
@@ -253,8 +255,6 @@ const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) =>
     </Dialog>
   );
 };
-
-
 const handleExtractSubmit = (extractedData) => {
   console.log('Submitting data:', extractedData);
   if (!selectedExtractUpload?.id || !selectedExtractDocument?.id) {
