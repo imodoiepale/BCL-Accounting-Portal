@@ -22,7 +22,8 @@ interface Upload {
   filepath: string;
   issue_date: string;
   expiry_date?: string;
-  value?: string;
+  value?: Record<string, any>; // Change this to a more flexible type
+  extracted_details?: Record<string, any>; // Add this new column
 }
 
 interface Company {
@@ -38,6 +39,7 @@ interface Document {
     name: string;
     type: string;
   }>;
+  last_extracted_details?: Record<string, any>; // New column for storing last extracted details
 }
 
 // Utility function to generate unique IDs
@@ -52,7 +54,7 @@ const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) =>
     setIsLoading(true);
     try {
       const url = 'https://api.hyperbolic.xyz/v1/chat/completions';
-      
+
       // Create a prompt that specifically requests field values
       const fieldPrompt = document.fields?.map(f => f.name).join(', ');
 
@@ -110,7 +112,7 @@ const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) =>
 
       const json = await response.json();
       const output = json.choices[0].message.content;
-      
+
       // Try to parse the response as JSON
       let parsedData = {};
       try {
@@ -174,6 +176,8 @@ const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) =>
     }
   }, [isOpen, upload]);
 
+
+
   // Helper function to format field value based on type
   const formatFieldValue = (value, type) => {
     switch (type) {
@@ -192,7 +196,7 @@ const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) =>
         <DialogHeader>
           <DialogTitle>Extracted Details Preview</DialogTitle>
         </DialogHeader>
-        
+
         {isLoading ? (
           <div className="flex items-center justify-center p-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -232,9 +236,9 @@ const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) =>
                 )}
               </div>
             ))}
-            
+
             <DialogFooter>
-              <Button 
+              <Button
                 onClick={() => {
                   console.log('Submitting data:', extractedData); // Debug log
                   onSubmit(extractedData);
@@ -249,6 +253,22 @@ const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) =>
     </Dialog>
   );
 };
+
+
+const handleExtractSubmit = (extractedData) => {
+  console.log('Submitting data:', extractedData);
+  if (!selectedExtractUpload?.id || !selectedExtractDocument?.id) {
+    toast.error('Please select a document and upload');
+    return;
+  }
+
+  extractionMutation.mutate({
+    uploadId: selectedExtractUpload.id,
+    documentId: selectedExtractDocument.id,
+    extractedData
+  });
+};
+
 
 // Document Actions Component
 const DocumentActions = ({ document, onAddField, onUpdateFields }) => {
@@ -468,7 +488,7 @@ const AddFieldsDialog = ({ isOpen, onClose, document, onSubmit }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     const validFields = fields.filter(field => field.name.trim() !== '');
-    
+
     if (validFields.length === 0) {
       toast.error('Please add at least one field');
       return;
@@ -487,7 +507,7 @@ const AddFieldsDialog = ({ isOpen, onClose, document, onSubmit }) => {
   };
 
   const updateField = (id, key, value) => {
-    setFields(prev => prev.map(field => 
+    setFields(prev => prev.map(field =>
       field.id === id ? { ...field, [key]: value } : field
     ));
   };
@@ -587,7 +607,7 @@ export default function CompanyKycDocumentDetails() {
         .select('id, company_name')
         .ilike('company_name', `%${debouncedSearch}%`)
         .limit(100);
-      
+
       if (error) throw error;
       return data || [];
     },
@@ -602,7 +622,7 @@ export default function CompanyKycDocumentDetails() {
         .from('acc_portal_kyc')
         .select('*')
         .eq('category', 'company-docs');
-      
+
       if (error) throw error;
       return data || [];
     },
@@ -616,7 +636,7 @@ export default function CompanyKycDocumentDetails() {
       const { data, error } = await supabase
         .from('acc_portal_kyc_uploads')
         .select('*');
-      
+
       if (error) throw error;
       return data || [];
     },
@@ -695,32 +715,64 @@ export default function CompanyKycDocumentDetails() {
 
   // Extract Details Mutation
   const extractionMutation = useMutation({
-    mutationFn: async ({ uploadId, extractedData }) => {
-      const { data, error } = await supabase
+    mutationFn: async ({ uploadId, extractedData, documentId }) => {
+      // Validate inputs
+      if (!uploadId || !documentId) {
+        throw new Error('Upload ID or Document ID is undefined');
+      }
+
+      // Prepare the data for storage
+      const sanitizedData = Object.entries(extractedData).reduce((acc, [key, value]) => {
+        // Ensure all values are properly serialized
+        acc[key] = value === '' ? null : value;
+        return acc;
+      }, {});
+
+      // Update the upload record with the extracted details
+      const uploadUpdateResult = await supabase
         .from('acc_portal_kyc_uploads')
-        .update({ value: extractedData })
+        .update({
+          extracted_details: sanitizedData
+        })
         .eq('id', uploadId)
         .select()
         .single();
 
-      if (error) throw error;
-      return data;
+      if (uploadUpdateResult.error) throw uploadUpdateResult.error;
+
+      // Update the document with last extracted details
+      const documentUpdateResult = await supabase
+        .from('acc_portal_kyc')
+        .update({
+          last_extracted_details: sanitizedData
+        })
+        .eq('id', documentId)
+        .select()
+        .single();
+
+      if (documentUpdateResult.error) throw documentUpdateResult.error;
+
+      return {
+        upload: uploadUpdateResult.data,
+        document: documentUpdateResult.data
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['uploads']);
+      queryClient.invalidateQueries(['documents']);
       setShowExtractModal(false);
-      toast.success('Details saved successfully');
+      toast.success('Details extracted and saved successfully');
     },
     onError: (error) => {
-      toast.error('Failed to save details');
-      console.error('Save error:', error);
+      toast.error('Failed to save extracted details');
+      console.error('Extraction save error:', error);
     }
   });
 
   // Handlers
   const handleViewDocument = async (document, company) => {
-    const upload = uploads.find(u => 
-      u.kyc_document_id === document.id && 
+    const upload = uploads.find(u =>
+      u.kyc_document_id === document.id &&
       u.userid === company.id.toString()
     );
 
@@ -780,12 +832,12 @@ export default function CompanyKycDocumentDetails() {
   return (
     <div className="flex overflow-hidden">
       <Toaster position="top-right" />
-      
+
       {/* Left sidebar - Documents List */}
       <div className="w-1/5 min-w-[200px] border-r overflow-hidden flex flex-col">
         <div className="p-2">
           <h2 className="text-sm font-bold mb-2">Documents</h2>
-          <Input 
+          <Input
             type="text"
             placeholder="Search documents..."
             value={searchTerm}
@@ -793,7 +845,7 @@ export default function CompanyKycDocumentDetails() {
             className="mb-2 h-8 text-xs"
           />
         </div>
-        
+
         <div ref={parentRef} className="overflow-y-auto flex-1">
           {isLoadingDocuments ? (
             <div className="p-2 text-xs">Loading documents...</div>
@@ -802,19 +854,18 @@ export default function CompanyKycDocumentDetails() {
               {documents.map((doc) => (
                 <li
                   key={doc.id}
-                  className={`px-2 py-1 rounded flex items-center justify-between text-xs ${
-                    selectedDocument?.id === doc.id 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'hover:bg-gray-100'
-                  }`}
+                  className={`px-2 py-1 rounded flex items-center justify-between text-xs ${selectedDocument?.id === doc.id
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-gray-100'
+                    }`}
                 >
-                  <span 
+                  <span
                     className="cursor-pointer flex-1"
                     onClick={() => setSelectedDocument(doc)}
                   >
                     {doc.name}
                   </span>
-                  <DocumentActions 
+                  <DocumentActions
                     document={doc}
                     onAddField={() => {
                       setSelectedDocument(doc);
@@ -838,7 +889,7 @@ export default function CompanyKycDocumentDetails() {
             <h2 className="text-sm font-bold p-2 border-b">
               {selectedDocument.name} - Details
             </h2>
-            
+
             <div className="overflow-auto flex-1">
               <Card>
                 <Table>
@@ -901,15 +952,16 @@ export default function CompanyKycDocumentDetails() {
                           </div>
                         </TableCell>
                         {selectedDocument.fields?.map((field) => {
-                          const upload = uploads.find(u => 
-                            u.kyc_document_id === selectedDocument.id && 
+                          const upload = uploads.find(u =>
+                            u.kyc_document_id === selectedDocument.id &&
                             u.userid === company.id.toString()
                           );
                           return (
                             <TableCell key={field.id} className="text-center">
-                              <span>{upload?.value?.[field.name] || '-'}</span>
+                              <span>{upload?.extracted_details?.[field.name] || '-'}</span>
                             </TableCell>
                           );
+                      
                         })}
                       </TableRow>
                     ))}
@@ -969,6 +1021,7 @@ export default function CompanyKycDocumentDetails() {
           onSubmit={(extractedData) => {
             extractionMutation.mutate({
               uploadId: selectedExtractUpload.id,
+              documentId: selectedExtractDocument.id,
               extractedData
             });
           }}
