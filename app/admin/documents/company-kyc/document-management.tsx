@@ -466,15 +466,15 @@ const DocumentManagement = () => {
   };
 
   return (
-    <div className="w-full p-6 bg-white rounded-lg shadow-sm">
+    <div className="w-full p-4 bg-white rounded-lg shadow-sm">
       <Toaster />
-      <div className="mb-4">
-        <div className="flex space-x-4">
+      <div className="mb-2">
+        <div className="flex space-x-2">
           {['All', 'KRA', 'Sheria'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-md ${
+              className={`px-4 py-2 rounded-md text-sm ${
                 activeTab === tab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
               }`}
             >
@@ -484,26 +484,26 @@ const DocumentManagement = () => {
         </div>
       </div>
 
-      <div className="flex justify-between items-center mb-6 text-sm">
-        <div className="flex items-center gap-4">
-          <input
-            type="text"
-            placeholder="Search companies..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
-          />
+      <div className="flex justify-between items-center mb-4 text-sm">
+        <input
+          type="text"
+          placeholder="Search companies..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+        />
+        <div className="flex items-center space-x-2">
           <button
-            className="flex items-center gap-2 px-4 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm"
+            className="flex items-center gap-1 px-3 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm"
           >
-            <FileDown className="w-5 h-5" />
+            <FileDown className="w-4 h-4" />
             Export
           </button>
           <button
             onClick={() => setShowSettingsModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm"
+            className="flex items-center gap-1 px-3 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
@@ -523,7 +523,7 @@ const DocumentManagement = () => {
               <thead className="sticky top-0 bg-white">
                 <tr className="bg-gray-100">
                   <th
-                    className="p-3 border border-gray-300 font-semibold text-gray-700 sticky left-0 bg-gray-100 z-20 text-sm"
+                    className="p-2 border border-gray-300 font-semibold text-gray-700 sticky left-0 bg-gray-100 z-20 text-sm"
                     rowSpan={2}
                     onClick={() => handleSort('#')} // Add sorting for the index column
                   >
@@ -533,7 +533,7 @@ const DocumentManagement = () => {
                     </div>
                   </th>
                   <th
-                    className="p-3 border border-gray-300 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 sticky left-[50px] bg-gray-100 z-20 text-sm"
+                    className="p-2 border border-gray-300 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 sticky left-[50px] bg-gray-100 z-20 text-sm"
                     rowSpan={2}
                     onClick={() => handleSort('company')}
                   >
@@ -548,17 +548,17 @@ const DocumentManagement = () => {
                       <SortIcon field="company" />
                     </div>
                   </th>
-                  <th className="p-3 border border-gray-300 font-semibold text-gray-700 text-sm" rowSpan={2}>
+                  <th className="p-2 border border-gray-300 font-semibold text-gray-700 text-sm" rowSpan={2}>
                     Summary
                   </th>
-                  <th className="p-3 border border-gray-300 font-semibold text-gray-700 text-sm" rowSpan={2}>
+                  <th className="p-2 border border-gray-300 font-semibold text-gray-700 text-sm" rowSpan={2}>
                     Missing Documents
                   </th>
                   {documents.map((doc) => (
                     visibleColumns[doc.id]?.visible && (
                       <th
                         key={`doc-${doc.id}`}
-                        className="p-3 border border-gray-300 font-semibold text-gray-700 text-sm text-center bg-blue-50"
+                        className="p-2 border border-gray-300 font-semibold text-gray-700 text-sm text-center bg-blue-50"
                         colSpan={Object.values(visibleColumns[doc.id]?.subColumns || {}).filter(Boolean).length}
                       >
                         {doc.name}
@@ -571,13 +571,13 @@ const DocumentManagement = () => {
                     visibleColumns[doc.id]?.visible && (
                       <React.Fragment key={`cols-${doc.id}`}>
                         {visibleColumns[doc.id]?.subColumns.upload && (
-                          <th className="p-3 border border-gray-300 font-medium text-gray-600 text-sm">
+                          <th className="p-2 border border-gray-300 font-medium text-gray-600 text-sm">
                             Documents
                           </th>
                         )}
                         {visibleColumns[doc.id]?.subColumns.issueDate && (
                           <th
-                            className="p-3 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
+                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
                             onClick={() => handleSort('issueDate')}
                           >
                             <div className="flex items-center justify-between">
@@ -588,7 +588,7 @@ const DocumentManagement = () => {
                         )}
                         {visibleColumns[doc.id]?.subColumns.expiryDate && (
                           <th
-                            className="p-3 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
+                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
                             onClick={() => handleSort('expiryDate')}
                           >
                             <div className="flex items-center justify-between">
@@ -599,7 +599,7 @@ const DocumentManagement = () => {
                         )}
                         {visibleColumns[doc.id]?.subColumns.daysLeft && (
                           <th
-                            className="p-3 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
+                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
                             onClick={() => handleSort('daysLeft')}
                           >
                             <div className="flex items-center justify-between">
@@ -610,7 +610,7 @@ const DocumentManagement = () => {
                         )}
                         {visibleColumns[doc.id]?.subColumns.status && (
                           <th
-                            className="p-3 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
+                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
                             onClick={() => handleSort('status')}
                           >
                             <div className="flex items-center justify-between">
@@ -628,30 +628,30 @@ const DocumentManagement = () => {
               <tbody className="divide-y divide-gray-300">
                 {/* Stats rows */}
                 <tr className="bg-gray-50">
-                  <td className="p-3 border border-gray-300 font-medium sticky left-0 bg-inherit z-10 text-sm" rowSpan={3}>Stats</td>
-                  <td className="p-3 border border-gray-300 sticky left-[50px] bg-inherit z-10 text-sm" rowSpan={3}></td>
-                  <td className="p-3 border border-gray-300 font-semibold text-blue-600 text-sm">Total</td>
-                  <td className="p-3 border border-gray-300 text-center font-medium text-sm">-</td>
+                  <td className="p-2 border border-gray-300 font-medium sticky left-0 bg-inherit z-10 text-sm" rowSpan={3}>Stats</td>
+                  <td className="p-2 border border-gray-300 sticky left-[50px] bg-inherit z-10 text-sm" rowSpan={3}></td>
+                  <td className="p-2 border border-gray-300 font-semibold text-blue-600 text-sm">Total</td>
+                  <td className="p-2 border border-gray-300 text-center font-medium text-sm">-</td>
                   {documentStats.map((stat, index) => (
                     <React.Fragment key={`stats-${index}`}>
                       {visibleColumns[documents[index].id]?.visible && (
                         <>
                           {visibleColumns[documents[index].id]?.subColumns.upload && (
-                            <td className="p-3 border border-gray-300 text-center font-medium text-sm">
+                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
                               {stat.total}
                             </td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.issueDate && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-400 text-sm">-</td>
+                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.expiryDate && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-400 text-sm">-</td>
+                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.daysLeft && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-400 text-sm">-</td>
+                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.status && (
-                            <td className="p-3 border border-gray-300 text-center font-medium text-sm">
+                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
                               {stat.total}
                             </td>
                           )}
@@ -663,28 +663,28 @@ const DocumentManagement = () => {
                 
                 {/* Pending Stats Row */}
                 <tr className="bg-gray-50">
-                  <td className="p-3 border border-gray-300 font-semibold text-orange-600 text-sm">Missing</td>
-                  <td className="p-3 border border-gray-300 text-center font-medium text-sm">-</td>
+                  <td className="p-2 border border-gray-300 font-semibold text-orange-600 text-sm">Missing</td>
+                  <td className="p-2 border border-gray-300 text-center font-medium text-sm">-</td>
                   {documentStats.map((stat, index) => (
                     <React.Fragment key={`pending-${index}`}>
                       {visibleColumns[documents[index].id]?.visible && (
                         <>
                           {visibleColumns[documents[index].id]?.subColumns.upload && (
-                            <td className="p-3 border border-gray-300 text-center font-medium text-sm">
+                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
                               {stat.pending}
                             </td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.issueDate && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-400 text-sm">-</td>
+                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.expiryDate && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-400 text-sm">-</td>
+                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.daysLeft && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-400 text-sm">-</td>
+                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.status && (
-                            <td className="p-3 border border-gray-300 text-center font-medium text-sm">
+                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
                               {stat.pending}
                             </td>
                           )}
@@ -696,28 +696,28 @@ const DocumentManagement = () => {
 
                 {/* Complete Stats Row */}
                 <tr className="bg-gray-50">
-                  <td className="p-3 border border-gray-300 font-semibold text-green-600 text-sm">Complete</td>
-                  <td className="p-3 border border-gray-300 text-center font-medium text-sm">-</td>
+                  <td className="p-2 border border-gray-300 font-semibold text-green-600 text-sm">Complete</td>
+                  <td className="p-2 border border-gray-300 text-center font-medium text-sm">-</td>
                   {documentStats.map((stat, index) => (
                     <React.Fragment key={`complete-${index}`}>
                       {visibleColumns[documents[index].id]?.visible && (
                         <>
                           {visibleColumns[documents[index].id]?.subColumns.upload && (
-                            <td className="p-3 border border-gray-300 text-center font-medium text-sm">
+                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
                               {stat.complete}
                             </td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.issueDate && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-400 text-sm">-</td>
+                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.expiryDate && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-400 text-sm">-</td>
+                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.daysLeft && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-400 text-sm">-</td>
+                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
                           )}
                           {visibleColumns[documents[index].id]?.subColumns.status && (
-                            <td className="p-3 border border-gray-300 text-center font-medium text-sm">
+                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
                               {stat.complete}
                             </td>
                           )}
@@ -730,10 +730,10 @@ const DocumentManagement = () => {
                 {/* Company Rows */}
                 {getSortedCompanies().map((company, index) => (
                   <tr key={company.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="p-3 border border-gray-300 font-medium sticky left-0 bg-inherit z-10 text-sm">
+                    <td className="p-2 border border-gray-300 font-medium sticky left-0 bg-inherit z-10 text-sm">
                       {company.id} {/* This will now reflect the sorted order */}
                     </td>
-                    <td className="p-3 border border-gray-300 font-medium sticky left-[50px] bg-inherit z-10 text-sm">
+                    <td className="p-2 border border-gray-300 font-medium sticky left-[50px] bg-inherit z-10 text-sm">
                       <div className="relative group">
                         <span>
                           {company.company_name.split(' ')[0]}
@@ -743,8 +743,8 @@ const DocumentManagement = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="p-3 border border-gray-300 text-sm"></td>
-                    <td className="p-3 border border-gray-300 text-center font-medium text-sm">
+                    <td className="p-2 border border-gray-300 text-sm"></td>
+                    <td className="p-2 border border-gray-300 text-center font-medium text-sm">
                       <button
                         onClick={() => {
                           const missingDocs = documents.filter(doc => 
@@ -765,7 +765,7 @@ const DocumentManagement = () => {
                       visibleColumns[doc.id]?.visible && (
                         <React.Fragment key={`${company.id}-${doc.id}`}>
                           {visibleColumns[doc.id]?.subColumns.upload && (
-                            <td className="p-3 border border-gray-300 text-center text-sm">
+                            <td className="p-2 border border-gray-300 text-center text-sm">
                               {uploads.find(u => 
                                 u.kyc_document_id === doc.id && 
                                 u.userid === company.id.toString()
@@ -795,7 +795,7 @@ const DocumentManagement = () => {
                           )}
 
                           {visibleColumns[doc.id]?.subColumns.issueDate && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-600 text-sm">
+                            <td className="p-2 border border-gray-300 text-center text-gray-600 text-sm">
                               {(() => {
                                 const upload = uploads.find(u => 
                                   u.kyc_document_id === doc.id && 
@@ -809,7 +809,7 @@ const DocumentManagement = () => {
                           )}
 
                           {visibleColumns[doc.id]?.subColumns.expiryDate && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-600 text-sm">
+                            <td className="p-2 border border-gray-300 text-center text-gray-600 text-sm">
                               {(() => {
                                 if (doc.document_type === 'one-off') {
                                   return 'No Expiry';
@@ -826,7 +826,7 @@ const DocumentManagement = () => {
                           )}
 
                           {visibleColumns[doc.id]?.subColumns.daysLeft && (
-                            <td className="p-3 border border-gray-300 text-center text-gray-600 text-sm">
+                            <td className="p-2 border border-gray-300 text-center text-gray-600 text-sm">
                               {(() => {
                                 if (doc.document_type === 'one-off') {
                                   return 'N/A';
@@ -842,7 +842,7 @@ const DocumentManagement = () => {
                             </td>
                           )}
                           {visibleColumns[doc.id]?.subColumns.status && (
-                            <td className="p-3 border border-gray-300 text-center text-sm">
+                            <td className="p-2 border border-gray-300 text-center text-sm">
                               {(() => {    
                                 const upload = uploads.find(u => 
                                   u.kyc_document_id === doc.id && 
