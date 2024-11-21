@@ -1,20 +1,17 @@
 // @ts-nocheck
 'use client'
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from '@/lib/supabaseClient';
 import { Input } from "@/components/ui/input";
-import { Eye, Download, Upload, MoreVertical, Plus, Edit2, Settings, Trash2 } from 'lucide-react';
+import { Eye, Upload, MoreVertical, Plus, Edit2, Settings, Trash2, CheckCircle } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useVirtualizer } from '@tanstack/react-virtual';
 import toast, { Toaster } from 'react-hot-toast';
-import debounce from 'lodash/debounce';
-import { CheckCircle } from 'lucide-react'; // Import the icon
-
 
 // Interfaces
 interface Upload {
@@ -46,29 +43,101 @@ interface Document {
 const generateId = () => crypto.randomUUID();
 
 // Document Actions Component
-const DocumentActions = ({ onAddField }) => (
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="ghost" className="h-6 w-6 p-0 hover:bg-transparent">
-        <MoreVertical className="h-4 w-4" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="w-[160px]">
-      <DropdownMenuItem onClick={onAddField}>
-        <Plus className="mr-2 h-4 w-4" />
-        Add Field
-      </DropdownMenuItem>
-      <DropdownMenuItem>
-        <Settings className="mr-2 h-4 w-4" />
-        Manage Fields
-      </DropdownMenuItem>
-      <DropdownMenuItem>
-        <Edit2 className="mr-2 h-4 w-4" />
-        Edit Document
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
-);
+const DocumentActions = ({ document, onAddField, onUpdateFields }) => {
+  const [isManageFieldsOpen, setIsManageFieldsOpen] = useState(false);
+  const [fields, setFields] = useState(document.fields || []);
+
+  const handleFieldChange = (id, key, value) => {
+    setFields(prevFields =>
+      prevFields.map(field => (field.id === id ? { ...field, [key]: value } : field))
+    );
+  };
+
+  const handleDeleteField = (id) => {
+    setFields(prevFields => prevFields.filter(field => field.id !== id));
+  };
+
+  const handleSaveChanges = () => {
+    onUpdateFields(document.id, fields);
+    setIsManageFieldsOpen(false);
+    toast.success('Fields updated successfully');
+  };
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-6 w-6 p-0 hover:bg-transparent">
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-[160px]">
+          <DropdownMenuItem onClick={onAddField}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Field
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setIsManageFieldsOpen(true)}>
+            <Settings className="mr-2 h-4 w-4" />
+            Manage Fields
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <Edit2 className="mr-2 h-4 w-4" />
+            Edit Document
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Manage Fields Dialog */}
+      <Dialog open={isManageFieldsOpen} onOpenChange={setIsManageFieldsOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Manage Fields for {document.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {fields.map((field) => (
+              <div key={field.id} className="flex gap-2 items-start p-4 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <label className="text-sm font-medium">Field Name</label>
+                  <Input
+                    value={field.name}
+                    onChange={(e) => handleFieldChange(field.id, 'name', e.target.value)}
+                    placeholder="Enter field name"
+                    className="mt-1"
+                  />
+                </div>
+                <div className="w-1/3">
+                  <label className="text-sm font-medium">Type</label>
+                  <select
+                    value={field.type}
+                    onChange={(e) => handleFieldChange(field.id, 'type', e.target.value)}
+                    className="w-full mt-1 border rounded-md p-2"
+                  >
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
+                    <option value="date">Date</option>
+                    <option value="file">File</option>
+                  </select>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="mt-6"
+                  onClick={() => handleDeleteField(field.id)}
+                >
+                  <Trash2 className="h-4 w-4 text-red-500" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="flex justify-end items-center">
+            <Button onClick={handleSaveChanges}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 // Document Action Cell Component
 const DocumentActionCell = ({ company, document, upload, onView, onUpload }) => {
@@ -513,9 +582,13 @@ export default function CompanyKycDocumentDetails() {
                         {doc.name}
                       </span>
                       <DocumentActions 
+                        document={doc}
                         onAddField={() => {
                           setSelectedDocument(doc);
                           setIsAddFieldOpen(true);
+                        }}
+                        onUpdateFields={(documentId, fields) => {
+                          updateFieldsMutation.mutate({ documentId, fields });
                         }}
                       />
                     </li>
