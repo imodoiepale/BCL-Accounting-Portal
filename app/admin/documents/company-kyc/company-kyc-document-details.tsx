@@ -1,17 +1,18 @@
 // @ts-nocheck
 'use client'
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from '@/lib/supabaseClient';
 import { Input } from "@/components/ui/input";
-import { Eye, Upload, MoreVertical, Plus, Edit2, Settings, Trash2, CheckCircle } from 'lucide-react';
+import { Eye, Upload, MoreVertical, Plus, Edit2, Settings, Trash2, CheckCircle, DownloadIcon, UploadIcon } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useVirtualizer } from '@tanstack/react-virtual';
 import toast, { Toaster } from 'react-hot-toast';
+import { Card } from '@/components/ui/card';
 
 // Interfaces
 interface Upload {
@@ -565,6 +566,7 @@ export default function CompanyKycDocumentDetails() {
   const [showExtractModal, setShowExtractModal] = useState(false);
   const [selectedExtractDocument, setSelectedExtractDocument] = useState(null);
   const [selectedExtractUpload, setSelectedExtractUpload] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const queryClient = useQueryClient();
   const parentRef = useRef();
 
@@ -754,13 +756,26 @@ export default function CompanyKycDocumentDetails() {
     setShowExtractModal(true);
   };
 
-  // Virtual list for documents
-  const rowVirtualizer = useVirtualizer({
-    count: documents.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 35,
-    overscan: 5,
-  });
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedCompanies = React.useMemo(() => {
+    if (!sortConfig.key) return companies;
+    return [...companies].sort((a, b) => {
+      if (a[sortConfig.key] < b[sortConfig.key]) {
+        return sortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (a[sortConfig.key] > b[sortConfig.key]) {
+        return sortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }, [companies, sortConfig]);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -783,55 +798,35 @@ export default function CompanyKycDocumentDetails() {
           {isLoadingDocuments ? (
             <div className="p-2 text-xs">Loading documents...</div>
           ) : (
-            <div
-              style={{
-                height: `${rowVirtualizer.getTotalSize()}px`,
-                width: '100%',
-                position: 'relative',
-              }}
-            >
-              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const doc = documents[virtualRow.index];
-                return (
-                  <div
-                    key={doc.id}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: `${virtualRow.size}px`,
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
+            <ul>
+              {documents.map((doc) => (
+                <li
+                  key={doc.id}
+                  className={`px-2 py-1 rounded flex items-center justify-between text-xs ${
+                    selectedDocument?.id === doc.id 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'hover:bg-gray-100'
+                  }`}
+                >
+                  <span 
+                    className="cursor-pointer flex-1"
+                    onClick={() => setSelectedDocument(doc)}
                   >
-                    <li
-                      className={`px-2 py-1 rounded flex items-center justify-between text-xs ${
-                        selectedDocument?.id === doc.id 
-                          ? 'bg-primary text-primary-foreground' 
-                          : 'hover:bg-gray-100'
-                      }`}
-                    >
-                      <span 
-                        className="cursor-pointer flex-1"
-                        onClick={() => setSelectedDocument(doc)}
-                      >
-                        {doc.name}
-                      </span>
-                      <DocumentActions 
-                        document={doc}
-                        onAddField={() => {
-                          setSelectedDocument(doc);
-                          setIsAddFieldOpen(true);
-                        }}
-                        onUpdateFields={(documentId, fields) => {
-                          updateFieldsMutation.mutate({ documentId, fields });
-                        }}
-                      />
-                    </li>
-                  </div>
-                );
-              })}
-            </div>
+                    {doc.name}
+                  </span>
+                  <DocumentActions 
+                    document={doc}
+                    onAddField={() => {
+                      setSelectedDocument(doc);
+                      setIsAddFieldOpen(true);
+                    }}
+                    onUpdateFields={(documentId, fields) => {
+                      updateFieldsMutation.mutate({ documentId, fields });
+                    }}
+                  />
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>
@@ -845,69 +840,82 @@ export default function CompanyKycDocumentDetails() {
             </h2>
             
             <div className="overflow-auto flex-1">
-              <Table>
-                <TableHeader>
-                  <TableRow className="text-[11px]">
-                    <TableHead className="sticky top-0 bg-white z-10">Fields</TableHead>
-                    {companies.map((company) => (
-                      <TableHead key={company.id} className="text-center whitespace-nowrap sticky top-0 bg-white z-10">
-                        <div className="relative group">
-                          <span>{company.company_name.split(' ')[0]}</span>
-                          <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 top-full mt-1 bg-gray-800 text-white p-1 rounded text-[10px] whitespace-nowrap z-50">
-                            {company.company_name}
-                          </span>
-                        </div>
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody className="text-[11px]">
-                  {/* File row */}
-                  <TableRow>
-                    <TableCell className="font-medium sticky left-0 bg-white">
-                      File
-                    </TableCell>
-                    {companies.map((company) => {
-                      const upload = uploads.find(u => 
-                        u.kyc_document_id === selectedDocument.id && 
-                        u.userid === company.id.toString()
-                      );
-                      return (
-                        <TableCell key={company.id} className="text-center">
-                          <DocumentActionCell
-                            company={company}
-                            document={selectedDocument}
-                            upload={upload}
-                            onView={handleViewDocument}
-                            onUpload={handleUploadClick}
-                            onExtract={handleExtractClick}
-                          />
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                  
-                  {/* Fields rows */}
-                  {selectedDocument.fields?.map((field) => (
-                    <TableRow key={field.id}>
-                      <TableCell className="font-medium sticky left-0 bg-white">
-                        {field.name}
-                      </TableCell>
-                      {companies.map((company) => {
-                        const upload = uploads.find(u => 
-                          u.kyc_document_id === selectedDocument.id && 
-                          u.userid === company.id.toString()
-                        );
-                        return (
-                          <TableCell key={company.id} className="text-center">
-                            <span>{upload?.value?.[field.name] || '-'}</span>
-                          </TableCell>
-                        );
-                      })}
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="text-[11px] bg-blue-100">
+                      <TableHead className="sticky top-0 left-0 bg-blue-100 z-10">#</TableHead>
+                      <TableHead className="sticky top-0 left-0 bg-blue-100 z-10">Company</TableHead>
+                      <TableHead className="sticky top-0 bg-blue-100 z-10">Actions</TableHead>
+                      {selectedDocument.fields?.map((field) => (
+                        <TableHead
+                          key={field.id}
+                          className="text-center sticky top-0 bg-blue-100 z-10 cursor-pointer"
+                          onClick={() => handleSort(field.name)}
+                        >
+                          {field.name}
+                        </TableHead>
+                      ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody className="text-[11px]">
+                    {sortedCompanies.map((company, index) => (
+                      <TableRow key={company.id}>
+                        <TableCell className="font-medium sticky left-0 bg-white">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell className="font-medium sticky left-0 bg-white">
+                          {company.company_name}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center space-x-2">
+                            {uploads.some(u => u.kyc_document_id === selectedDocument.id && u.userid === company.id.toString()) ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleViewDocument(selectedDocument, company)}
+                                  title="View Document"
+                                >
+                                  <Eye className="h-4 w-4 text-blue-500" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleExtractClick(selectedDocument, uploads.find(u => u.kyc_document_id === selectedDocument.id && u.userid === company.id.toString()))}
+                                  title="Extract Details"
+                                >
+                                  <DownloadIcon className="h-4 w-4 text-green-500" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleUploadClick(company.id, selectedDocument.id)}
+                                title="Upload Document"
+                              >
+                                <UploadIcon className="h-4 w-4 text-orange-500" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                        {selectedDocument.fields?.map((field) => {
+                          const upload = uploads.find(u => 
+                            u.kyc_document_id === selectedDocument.id && 
+                            u.userid === company.id.toString()
+                          );
+                          return (
+                            <TableCell key={field.id} className="text-center">
+                              <span>{upload?.value?.[field.name] || '-'}</span>
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
             </div>
           </div>
         ) : (
