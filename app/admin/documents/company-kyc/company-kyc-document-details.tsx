@@ -778,7 +778,7 @@ export default function CompanyKycDocumentDetails() {
   }, [companies, sortConfig]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex overflow-hidden">
       <Toaster position="top-right" />
       
       {/* Left sidebar - Documents List */}
@@ -832,7 +832,7 @@ export default function CompanyKycDocumentDetails() {
       </div>
 
       {/* Right side - Company Fields Table */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col h-[800px] overflow-hidden">
         {selectedDocument ? (
           <div className="flex flex-col h-full">
             <h2 className="text-sm font-bold p-2 border-b">
