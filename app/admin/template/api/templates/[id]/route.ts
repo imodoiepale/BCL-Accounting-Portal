@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 const templates = {
   'bank-application': {
     id: 'bank-application',
     name: 'Bank Application Form',
+    templateUrl: '/bank-application.docx',
     fields: [
       // Company Information
       { id: 'businessEntityName', label: 'Business Entity Name', type: 'text', required: true },
@@ -100,7 +101,7 @@ const templates = {
 }
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const id = params.id
@@ -112,4 +113,3 @@ export async function GET(
 
   return NextResponse.json(template)
 }
-

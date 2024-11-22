@@ -17,7 +17,7 @@ export default function TemplateSelector() {
   const handleTemplateChange = async (value: string) => {
     setLocalSelectedTemplate(value)
     try {
-      const response = await fetch(`/admin/templates/api/templates/${value}`)
+      const response = await fetch(`/admin/template/api/templates/${value}`)
     if (!response.ok) {
       throw new Error('Failed to fetch template data')
     }

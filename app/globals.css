@@ -67,3 +67,26 @@
     @apply bg-background text-foreground;
   }
 }
+/* globals.css or your CSS file */
+.docx-preview {
+  background: white;
+  padding: 1rem;
+  min-height: 300px;
+  font-family: 'Calibri', 'Arial', sans-serif;
+}
+
+.docx-preview table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.docx-preview table td,
+.docx-preview table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+
+.docx-preview img {
+  max-width: 100%;
+  height: auto;
+}
