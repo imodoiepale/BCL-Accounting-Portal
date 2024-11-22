@@ -49,15 +49,40 @@ const generateId = () => crypto.randomUUID();
 const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) => {
   const [extractedData, setExtractedData] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-
-  const extractDetails = async (imageUrl) => {
+  const extractDetails = async (fileUrl) => {
     setIsLoading(true);
     try {
       const url = 'https://api.hyperbolic.xyz/v1/chat/completions';
-
-      // Create a prompt that specifically requests field values
       const fieldPrompt = document.fields?.map(f => f.name).join(', ');
-
+      const fileType = fileUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image';
+  
+      let content = [];
+      if (fileType === 'pdf') {
+        const pdfResponse = await fetch(fileUrl);
+        const pdfData = await pdfResponse.blob();
+        content = [
+          {
+            type: "text",
+            text: `Extract the following fields from the PDF document: ${fieldPrompt}`
+          },
+          {
+            type: "file",
+            file: pdfData
+          }
+        ];
+      } else {
+        content = [
+          {
+            type: "text",
+            text: `Extract the following fields from the image: ${fieldPrompt}`
+          },
+          {
+            type: "image_url",
+            image_url: { url: fileUrl }
+          }
+        ];
+      }
+  
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -69,38 +94,11 @@ const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) =>
           messages: [
             {
               role: 'system',
-              content: `You are an advanced document analysis assistant capable of extracting specific information accurately and presenting it in structured JSON format. When given a prompt detailing required fields, you must ensure:
-              - The document is carefully analyzed for completeness and accuracy.
-              - Only the specified fields are extracted with no omissions or extra data.
-              - The output is returned as a valid JSON object with keys matching the requested field names.`
-            }
-            ,
+              content: `You are an advanced document analysis assistant. Extract information accurately and return it in JSON format.`
+            },
             {
               role: 'user',
-              content: [
-                {
-                  type: "text",
-                  text: `Analyze the provided document and extract the following fields (respond strictly in JSON format):
-            
-                  Fields to extract: ${fieldPrompt}
-            
-                  Ensure:
-                  - Field names in the JSON match exactly with the provided list.
-                  - Each field has a value extracted from the document or is explicitly marked as null if not found.
-                  - The JSON output is properly formatted with no additional commentary or errors.
-            
-                  Example Response:
-                  {
-                    "field1": "value1",
-                    "field2": "value2",
-                    "field3": null
-                  }`
-                },
-                {
-                  type: "image_url",
-                  image_url: { url: imageUrl }
-                }
-              ]
+              content
             }
           ],
           max_tokens: 512,
@@ -109,6 +107,8 @@ const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) =>
           stream: false
         }),
       });
+  
+     
 
       const json = await response.json();
       const output = json.choices[0].message.content;
@@ -333,11 +333,13 @@ const DocumentActions = ({ document, onAddField, onUpdateFields }) => {
                   />
                 </div>
                 <div className="w-1/3">
-                  <label className="text-sm font-medium">Type</label>
+                  <label htmlFor={`field-type-${field.id}`} className="text-sm font-medium">Type</label>
                   <select
+                    id={`field-type-${field.id}`}
                     value={field.type}
                     onChange={(e) => handleFieldChange(field.id, 'type', e.target.value)}
                     className="w-full mt-1 border rounded-md p-2"
+                    aria-label={`Select field type for ${field.name}`}
                   >
                     <option value="text">Text</option>
                     <option value="number">Number</option>
@@ -514,11 +516,13 @@ const AddFieldsDialog = ({ isOpen, onClose, document, onSubmit }) => {
                   />
                 </div>
                 <div className="w-1/3">
-                  <label className="text-sm font-medium">Type</label>
+                  <label htmlFor={`field-type-${field.id}`} className="text-sm font-medium">Type</label>
                   <select
+                    id={`field-type-${field.id}`}
                     value={field.type}
                     onChange={(e) => updateField(field.id, 'type', e.target.value)}
                     className="w-full mt-1 border rounded-md p-2"
+                    aria-label={`Select field type for ${field.name || 'new field'}`}
                   >
                     <option value="text">Text</option>
                     <option value="number">Number</option>
