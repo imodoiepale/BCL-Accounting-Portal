@@ -9,7 +9,7 @@ const Page = () => {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Company KYC Management</h1>
+      <h1 className="text-2xl font-bold mb-4">Directors KYC Management</h1>
       <div className="flex space-x-4 mb-4">
         {['KYC Docs', 'KYC Document Details'].map(tab => (
           <button
