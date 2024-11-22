@@ -6,12 +6,19 @@ interface Field {
   type: string
   required: boolean
 }
+interface FormField {
+  id: string
+  label: string
+  type: string
+  required?: boolean
+}
 
 interface Template {
   id: string
   name: string
-  fields: Field[]
+  fields: FormField[]
   defaultValues: Record<string, any>
+  templateUrl: string
 }
 
 interface TemplateStore {
@@ -27,4 +34,3 @@ export const useTemplateStore = create<TemplateStore>((set) => ({
   setSelectedTemplate: (template) => set({ selectedTemplate: template }),
   setFormData: (data) => set({ formData: data }),
 }))
-
