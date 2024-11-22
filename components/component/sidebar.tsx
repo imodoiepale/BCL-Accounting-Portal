@@ -1,11 +1,8 @@
-"use client"
-
+import React, { useState } from "react";
 import {
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
   CoinsIcon,
   FileIcon,
   LayoutDashboardIcon,
@@ -14,12 +11,15 @@ import {
   User2Icon,
   UserPlusIcon,
   VoicemailIcon
-} from "lucide-react"
-import Link from "next/link"
-import { usePathname } from 'next/navigation'
-import { useState } from "react"
-
-import { useAuth } from "@clerk/clerk-react"
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from 'next/navigation';
+import { useAuth } from "@clerk/clerk-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 const adminNavItems = [
   { href: "/admin", icon: LayoutDashboardIcon, label: "Admin Dashboard" },
@@ -41,9 +41,9 @@ const adminNavItems = [
   },
   { href: "/admin/reports", icon: FileIcon, label: "Report Management" },
   { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings" },
-  {label: "Table Settings", href: "/settings/table", icon: SettingsIcon},
+  { label: "Table Settings", href: "/settings/table", icon: SettingsIcon },
   { href: "/admin/onboarding", icon: UserPlusIcon, label: "Onboarding" },
-]
+];
 
 const userNavItems = [
   { href: "/", icon: LayoutDashboardIcon, label: "Dashboard" },
@@ -55,64 +55,53 @@ const userNavItems = [
   { href: "/communication", icon: VoicemailIcon, label: "Communication & Ticket" },
   { href: "/pettycash", icon: CoinsIcon, label: "Petty Cash" },
   { href: "/settings", icon: SettingsIcon, label: "Settings" },
-]
+];
 
 export function Sidebar() {
-  const { userId } = useAuth()
-  const isAdmin = userId === "user_2jgO1OWpZw3kf1BUnpLpzTiaMhE"
-  const pathname = usePathname()
-  const [isExpanded, setIsExpanded] = useState(true)
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
-
-  const navItems = isAdmin ? adminNavItems : userNavItems
-
-  const toggleDropdown = (href: string) => {
-    setOpenDropdown(openDropdown === href ? null : href)
-  }
+  const { userId } = useAuth();
+  const isAdmin = userId === "user_2jgO1OWpZw3kf1BUnpLpzTiaMhE";
+  const pathname = usePathname();
+  const [isExpanded, setIsExpanded] = useState(true);
+  const navItems = isAdmin ? adminNavItems : userNavItems;
 
   const renderNavItem = (item: any) => {
-    const isActive = pathname === item.href
-    const hasChildren = item.children && item.children.length > 0
-
-    // Base item rendering
-    const baseItemClassName = `flex items-center p-2 rounded text-sm ${
-      isActive
-        ? "text-blue-600 bg-blue-100"
-        : "text-gray-700 hover:bg-gray-200"
-    } ${isExpanded ? '' : 'justify-center'}`;
+    const isActive = pathname === item.href;
+    const hasChildren = item.children && item.children.length > 0;
+    
+    const baseItemClassName = `
+      flex items-center p-3 rounded-lg text-sm transition-all duration-200
+      ${isActive ? "text-blue-600 bg-blue-100" : "text-gray-700 hover:bg-gray-200"}
+      ${isExpanded ? "w-full" : "justify-center w-10"}
+    `;
 
     if (hasChildren) {
       return (
-        <div key={item.href} className="relative">
-          <button
-            onClick={() => toggleDropdown(item.href)}
-            className={`${baseItemClassName} w-full`}
+        <Popover key={item.href}>
+          <PopoverTrigger asChild>
+            <button className={baseItemClassName}>
+              <item.icon className="w-4 h-4 min-w-4" />
+              {isExpanded && (
+                <span className="ml-3 truncate">{item.label}</span>
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent 
+            className="w-64 p-2 ml-2" 
+            side="right" 
+            align="start"
+            sideOffset={-40}
           >
-            <item.icon className="w-4 h-4 mr-2" />
-            {isExpanded && (
-              <div className="flex justify-between items-center w-full">
-                <span className="truncate">{item.label}</span>
-                {isExpanded && (
-                  hasChildren ? (
-                    openDropdown === item.href ? 
-                      <ChevronUpIcon className="w-3 h-3" /> : 
-                      <ChevronDownIcon className="w-3 h-3" />
-                  ) : null
-                )}
-              </div>
-            )}
-          </button>
-          {isExpanded && hasChildren && openDropdown === item.href && (
-            <div className="pl-6 space-y-1 mt-1">
+            <div className="flex flex-col space-y-1">
               {item.children.map((childItem: any) => (
                 <Link
                   key={childItem.href}
                   href={childItem.href}
-                  className={`flex items-center p-2 rounded text-sm ${
-                    pathname === childItem.href
-                      ? "text-blue-600 bg-blue-100"
-                      : "text-gray-700 hover:bg-gray-200"
-                  }`}
+                  className={`
+                    flex items-center p-2 rounded-md text-sm transition-colors
+                    ${pathname === childItem.href
+                      ? "text-blue-600 bg-blue-50"
+                      : "text-gray-700 hover:bg-gray-100"}
+                  `}
                   prefetch={false}
                 >
                   <childItem.icon className="w-4 h-4 mr-2" />
@@ -120,9 +109,9 @@ export function Sidebar() {
                 </Link>
               ))}
             </div>
-          )}
-        </div>
-      )
+          </PopoverContent>
+        </Popover>
+      );
     }
 
     return (
@@ -132,26 +121,45 @@ export function Sidebar() {
         className={baseItemClassName}
         prefetch={false}
       >
-        <item.icon className="w-4 h-4 mr-2" />
-        {isExpanded && <span className="truncate">{item.label}</span>}
+        <item.icon className="w-4 h-4 min-w-4" />
+        {isExpanded && <span className="ml-3 truncate">{item.label}</span>}
       </Link>
-    )
-  }
+    );
+  };
 
   return (
-    <aside className={`bg-gray-100 transition-all duration-300 ease-in-out ${isExpanded ? 'w-52' : 'w-16'} p-2 hidden md:block relative h-screen`}>
-      <div className={`flex items-center mb-6 ${isExpanded ? '' : 'justify-center'}`}>
-        {isExpanded && <span className="text-lg font-bold">BCL Portal</span>}
+    <aside className={`
+      bg-white shadow-lg transition-all duration-300 ease-in-out
+      ${isExpanded ? 'w-64' : 'w-16'}
+      p-4 hidden md:flex flex-col h-screen sticky top-0
+      border-r border-gray-200
+    `}>
+      <div className={`
+        flex items-center mb-6 h-12
+        ${isExpanded ? '' : 'justify-center'}
+      `}>
+        {isExpanded && (
+          <span className="text-xl font-semibold text-gray-800">BCL Portal</span>
+        )}
       </div>
-      <nav className="space-y-1">
+      
+      <nav className="flex-1 space-y-2">
         {navItems.map(renderNavItem)}
       </nav>
+      
       <button
-        className="absolute top-2 right-1 p-1 rounded-full bg-gray-200 hover:bg-gray-300"
+        className="absolute top-4 -right-3 p-1.5 rounded-full bg-white shadow-md 
+                   hover:bg-gray-50 transition-colors border border-gray-200"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        {isExpanded ? <ChevronLeftIcon className="w-3 h-3" /> : <ChevronRightIcon className="w-3 h-3" />}
+        {isExpanded ? (
+          <ChevronLeftIcon className="w-4 h-4 text-gray-600" />
+        ) : (
+          <ChevronRightIcon className="w-4 h-4 text-gray-600" />
+        )}
       </button>
     </aside>
-  )
+  );
 }
+
+export default Sidebar;
