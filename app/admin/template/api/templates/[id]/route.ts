@@ -4,6 +4,7 @@ const templates = {
   'bank-application': {
     id: 'bank-application',
     name: 'Bank Application Form',
+    templateUrl: '/bank-application.docx',
     fields: [
       // Company Information
       { id: 'businessEntityName', label: 'Business Entity Name', type: 'text', required: true },
