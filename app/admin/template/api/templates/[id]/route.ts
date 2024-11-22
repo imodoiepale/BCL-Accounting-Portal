@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 const templates = {
   'bank-application': {
@@ -101,7 +101,7 @@ const templates = {
 }
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const id = params.id
@@ -113,4 +113,3 @@ export async function GET(
 
   return NextResponse.json(template)
 }
-
