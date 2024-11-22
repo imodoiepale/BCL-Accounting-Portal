@@ -1,6 +1,6 @@
 // @ts-nocheck
 "use client"
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -69,11 +69,6 @@ export function KYCDocumentsList({ category, subcategory }) {
   const [editingDocument, setEditingDocument] = useState(null)
   const [noExpiryDate, setNoExpiryDate] = useState(false)
 
-  useEffect(() => {
-    if (user) {
-      fetchDocuments()
-    }
-  }, [user, category, subcategory, fetchDocuments])
 
   const fetchDocuments = useCallback(async () => {
     const { data: baseDocuments, error: baseError } = await supabase
@@ -112,6 +107,14 @@ export function KYCDocumentsList({ category, subcategory }) {
     setDocuments(mergedDocuments);
   })
 
+
+  useEffect(() => {
+    if (user) {
+      fetchDocuments()
+    }
+  }, [user, category, subcategory, fetchDocuments])
+
+  
   const handleInputChange = (e) => {
     const { id, value, type, checked } = e.target;
     if (type === 'checkbox') {
