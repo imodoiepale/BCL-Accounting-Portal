@@ -1,954 +1,539 @@
 // @ts-nocheck
+// @ts-ignore
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { FileDown, Upload, X, ChevronUp, ChevronDown, Eye, Download, MoreVertical } from 'lucide-react';
+import React, { useState } from 'react';
+import { FileDown, Upload, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabaseClient';
-import { toast, Toaster } from 'react-hot-toast';
-import { UploadModal } from './UploadModal';
-import { SettingsModal } from './SettingsModal';
 
 interface Company {
-  id: number;
-  company_name: string;
-  description?: string;
-  registration_number?: string;
-  date_established?: string;
+name: string;
+id: number;
 }
 
 interface Document {
-  id: string;
-  name: string;
-  department: string;
-  subcategory: string;
-  document_type: 'one-off' | 'renewal';
-  issue_date?: string;
-  expiry_date?: string;
-  validity_days?: string;
+id: number;
+name: string;
+department: string;
+subcategory: string;
 }
 
-interface Upload {
-  id: number;
-  userid: string;
-  kyc_document_id: string;
-  filepath: string;
-  issue_date: Date;
-  expiry_date?: Date;
-}
-
-type SortField = 'company' | 'issueDate' | 'expiryDate' | 'daysLeft' | 'status' | '#';
+type SortField = 'company' | 'issueDate' | 'expiryDate' | 'daysLeft' | 'status';
 type SortDirection = 'asc' | 'desc';
 
-interface ViewModalProps {
-  url: string | null;
-  setShowViewModal: (show: boolean) => void;
-}
-
-const ViewModal: React.FC<ViewModalProps> = ({ url, setShowViewModal }) => {
-  if (!url) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-4 w-11/12 h-5/6 relative">
-        <button
-          onClick={() => setShowViewModal(false)}
-          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-        >
-          <X className="w-5 h-5" />
-        </button>
-        <div className="w-full h-full">
-          <iframe src={url} className="w-full h-full" />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const DocumentActions = ({ onView, onUpdate, onDownload }) => {
-  const [showDropdown, setShowDropdown] = useState(false);
-  
-  return (
-    <div className="relative">
-      <button onClick={() => onView()} className="text-blue-600 hover:text-blue-800 mr-2">
-        <Eye className="w-4 h-4" />
-      </button>
-      <button
-        onClick={() => setShowDropdown(!showDropdown)}
-        className="text-gray-600 hover:text-gray-800"
-      >
-        <MoreVertical className="w-4 h-4" />
-      </button>
-      
-      {showDropdown && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50">
-          <div className="py-1">
-            <button
-              onClick={() => {
-                onUpdate();
-                setShowDropdown(false);
-              }}
-              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Update
-            </button>
-            <button
-              onClick={() => {
-                onDownload();
-                setShowDropdown(false);
-              }}
-              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const MissingDocumentsModal = ({ missingDocuments, onClose, onUpload }) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-4 w-11/12 h-5/6 relative overflow-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-        >
-          <X className="w-5 h-5" />
-        </button>
-        <h2 className="text-lg font-semibold mb-4">Missing Documents</h2>
-        <div className="max-h-[70vh] overflow-y-auto">
-          <ul>
-            {missingDocuments.map(doc => (
-              <li key={doc.id} className="flex justify-between items-center p-2 border-b">
-                <span>{doc.name}</span>
-                <button
-                  onClick={() => onUpload(doc)}
-                  className="px-2 py-1 bg-blue-500 text-white rounded-md"
-                >
-                  Upload
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const DocumentManagement = () => {
-  const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('All');
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [viewUrl, setViewUrl] = useState<string | null>(null);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
-  const [sortField, setSortField] = useState<SortField>('company');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [uploadData, setUploadData] = useState({
-    issueDate: '',
-    expiryDate: '',
-    file: null as File | null,
+const companies: Company[] = [
+  { id: 1, name: 'Company A' },
+  { id: 2, name: 'Company B' },
+  { id: 3, name: 'Company C' },
+  { id: 4, name: 'Company D' },
+  { id: 5, name: 'Company E' },
+  { id: 6, name: 'Company F' },
+  { id: 7, name: 'Company G' },
+];
+
+const documents: Document[] = [
+  { id: 1, name: 'Document 1', department: 'KRA', subcategory: 'kra-docs' },
+  { id: 2, name: 'Document 2', department: 'Sheria', subcategory: 'sheria-docs' },
+  { id: 3, name: 'Document 3', department: 'KRA', subcategory: 'kra-docs' },
+  { id: 4, name: 'Document 4', department: 'Sheria', subcategory: 'sheria-docs' },
+  { id: 5, name: 'Document 5', department: 'KRA', subcategory: 'kra-docs' },
+  { id: 6, name: 'Document 6', department: 'Sheria', subcategory: 'sheria-docs' },
+  { id: 7, name: 'Document 7', department: 'KRA', subcategory: 'kra-docs' },
+];
+
+const [activeTab, setActiveTab] = useState('All');
+const [showUploadModal, setShowUploadModal] = useState(false);
+const [showSettingsModal, setShowSettingsModal] = useState(false);
+const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+const [sortField, setSortField] = useState<SortField>('company');
+const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+const [uploadData, setUploadData] = useState({
+  issueDate: '',
+  expiryDate: '',
+  file: null as File | null,
+});
+
+// State to manage visibility of documents and their sub-columns
+const [visibleColumns, setVisibleColumns] = useState(() => {
+  const initialVisibility = {};
+  documents.forEach(doc => {
+    initialVisibility[doc.id] = {
+      visible: true,
+      subColumns: {
+        upload: true,
+        issueDate: true,
+        expiryDate: true,
+        daysLeft: true,
+        status: true,
+      },
+    };
   });
-  const [showMissingDocumentsModal, setShowMissingDocumentsModal] = useState(false);
-  const [missingDocuments, setMissingDocuments] = useState<Document[]>([]);
+  return initialVisibility;
+});
 
-  // Fetch Companies
-  const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<Company[]>({
-    queryKey: ['companies', searchTerm],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('acc_portal_company_duplicate')
-        .select('*')
-        .ilike('company_name', `%${searchTerm}%`);
-      
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 1000 * 60 * 5,
-  });
+const handleSort = (field: SortField) => {
+  if (sortField === field) {
+    setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+  } else {
+    setSortField(field);
+    setSortDirection('asc');
+  }
+};
 
-  // Fetch Documents
-  const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Document[]>({
-    queryKey: ['documents', activeTab],
-    queryFn: async () => {
-      let query = supabase.from('acc_portal_kyc').select('*');
+const getSortedCompanies = () => {
+  return [...companies].sort((a, b) => {
+    const aDate = new Date(2024, 0, a.id);
+    const bDate = new Date(2024, 0, b.id);
+    const aExpiryDate = new Date(2025, 6, a.id);
+    const bExpiryDate = new Date(2025, 6, b.id);
+    const aDaysLeft = differenceInDays(new Date(2025, 6, a.id), new Date());
+    const bDaysLeft = differenceInDays(new Date(2025, 6, b.id), new Date());
+    const aStatus = a.id % 3 === 0 ? 'Complete' : a.id % 3 === 1 ? 'Pending' : 'Expired';
+    const bStatus = b.id % 3 === 0 ? 'Complete' : b.id % 3 === 1 ? 'Pending' : 'Expired';
 
-      if (activeTab === 'KRA') {
-        query = query
-          .eq('department', 'KRA')
-          .eq('subcategory', 'kra-docs');
-      } else if (activeTab === 'Sheria') {
-        query = query
-          .eq('department', 'Sheria House')
-          .eq('subcategory', 'sheria-docs');
-      } else if (activeTab === 'All') {
-        query = query.eq('category', 'company-docs'); // Filter for "All" tab
-      }
+    const modifier = sortDirection === 'asc' ? 1 : -1;
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 1000 * 60 * 5,
-  });
-
-  // Fetch Uploads
-  const { data: uploads = [] } = useQuery<Upload[]>({
-    queryKey: ['uploads'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('acc_portal_kyc_uploads')
-        .select('*');
-      
-      if (error) throw error;
-      return data || [];
-    }
-  });
-
-  // Upload Mutation
-  const uploadMutation = useMutation({
-    mutationFn: async ({
-      companyId,
-      documentId,
-      file,
-      issueDate,
-      expiryDate
-    }: {
-      companyId: number;
-      documentId: string;
-      file: File;
-      issueDate: string;
-      expiryDate?: string;
-    }) => {
-      try {
-        // Upload file with timestamp to ensure uniqueness
-        const timestamp = new Date().getTime();
-        const fileName = `${companyId}/${documentId}/${timestamp}_${file.name}`;
-        const { data: fileData, error: fileError } = await supabase
-          .storage
-          .from('kyc-documents')
-          .upload(fileName, file);
-
-        if (fileError) throw fileError;
-
-        // Create upload record
-        const uploadData = {
-          userid: companyId.toString(),
-          kyc_document_id: documentId,
-          filepath: fileData.path,
-          issue_date: issueDate,
-          expiry_date: expiryDate || null
-        };
-
-        // Insert new record
-        const { data, error } = await supabase
-          .from('acc_portal_kyc_uploads')
-          .insert(uploadData)
-          .select()
-          .single();
-
-        if (error) throw error;
-        return data;
-      } catch (error) {
-        console.error('Upload error:', error);
-        toast.error('Failed to upload document');
-        throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['uploads'] });
-      setShowUploadModal(false);
-      toast.success('Document uploaded successfully');
-      setUploadData({
-        issueDate: '',
-        expiryDate: '',
-        file: null,
-      });
-    },
-    onError: (error) => {
-      toast.error('Failed to upload document');
-      console.error('Upload error:', error);
+    switch (sortField) {
+      case 'company':
+        return modifier * a.name.localeCompare(b.name);
+      case 'issueDate':
+        return modifier * (aDate.getTime() - bDate.getTime());
+      case 'expiryDate':
+        return modifier * (aExpiryDate.getTime() - bExpiryDate.getTime());
+      case 'daysLeft':
+        return modifier * (aDaysLeft - bDaysLeft);
+      case 'status':
+        return modifier * aStatus.localeCompare(bStatus);
+      default:
+        return 0;
     }
   });
+};
 
-  // Document Actions Handlers
-  const handleViewDocument = async (document: Document, company: Company) => {
-    const upload = uploads.find(u => 
-      u.kyc_document_id === document.id && 
-      u.userid === company.id.toString()
-    );
-
-    if (!upload) {
-      toast.error('Document not found');
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .storage
-        .from('kyc-documents')
-        .createSignedUrl(upload.filepath, 60);
-
-      if (error) throw error;
-
-      setViewUrl(data.signedUrl);
-      setShowViewModal(true);
-    } catch (error) {
-      console.error('Error viewing document:', error);
-      toast.error('Failed to view document');
-    }
-  };
-
-  const handleDownloadDocument = async (document: Document, company: Company) => {
-    const upload = uploads.find(u => 
-      u.kyc_document_id === document.id && 
-      u.userid === company.id.toString()
-    );
-
-    if (!upload) {
-      toast.error('Document not found');
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .storage
-        .from('kyc-documents')
-        .download(upload.filepath);
-
-      if (error) throw error;
-
-      const url = window.URL.createObjectURL(data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = upload.filepath.split('/').pop() || 'document';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading document:', error);
-      toast.error('Failed to download document');
-    }
-  };
-
-  const [visibleColumns, setVisibleColumns] = useState(() => {
-    const initialVisibility = {};
-    documents.forEach(doc => {
-      (initialVisibility as any)[doc.id] = {
-        visible: true,
-        subColumns: {
-          upload: true,
-          issueDate: true,
-          expiryDate: true,
-          daysLeft: true,
-          status: true,
-        },
-      };
-    });
-    return initialVisibility;
+const handleUpload = async (e: React.FormEvent) => {
+  e.preventDefault();
+  console.log('Uploading:', {
+    company: selectedCompany,
+    document: selectedDocument,
+    ...uploadData,
   });
+  setShowUploadModal(false);
+};
 
-  useEffect(() => {
-    if (documents.length > 0) {
-      setVisibleColumns(prev => {
-        const newVisibility = { ...prev };
-        documents.forEach(doc => {
-          if (!(doc.id in newVisibility)) {
-            (newVisibility as any)[doc.id] = {
-              visible: true,
-              subColumns: {
-                upload: true,
-                issueDate: true,
-                expiryDate: true,
-                daysLeft: true,
-                status: true,
-              },
-            };
-          }
-        });
-        return newVisibility;
-      });
-    }
-  }, [documents]);
+const SortIcon = ({ field }: { field: SortField }) => {
+  if (sortField !== field) return <ChevronUp className="w-4 h-4 text-gray-300" />;
+  return sortDirection === 'asc' ? 
+    <ChevronUp className="w-4 h-4 text-blue-600" /> : 
+    <ChevronDown className="w-4 h-4 text-blue-600" />;
+};
 
-  // Calculate missing documents for each company
-  const calculateMissingDocuments = (companyId) => {
-    return documents.reduce((missingCount, doc) => {
-      const hasUpload = uploads.some(
-        (upload) => upload.kyc_document_id === doc.id && upload.userid === companyId.toString()
-      );
-      return hasUpload ? missingCount : missingCount + 1;
-    }, 0);
-  };
+const UploadModal = () => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg p-6 w-96 relative">
+      <button 
+        onClick={() => setShowUploadModal(false)}
+        className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+        aria-label="Close"
+        title="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
 
-  // Handlers
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
+      <h2 className="text-xl font-semibold mb-4">Upload Document</h2>
+      {selectedCompany && selectedDocument && (
+        <p className="text-sm text-gray-600 mb-4">
+          Uploading for {selectedCompany.name} - {selectedDocument.name}
+        </p>
+      )}
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCompany || !selectedDocument || !uploadData.file) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    if (!uploadData.issueDate) {
-      toast.error('Issue Date is required');
-      return;
-    }
-
-    const expiryDate = selectedDocument.document_type === 'renewal' ? uploadData.expiryDate : null;
-
-    if (selectedDocument.document_type === 'renewal' && !expiryDate) {
-      toast.error('Expiry Date is required for renewal documents');
-      return;
-    }
-
-    await uploadMutation.mutateAsync({
-      companyId: selectedCompany.id,
-      documentId: selectedDocument.id,
-      file: uploadData.file,
-      issueDate: uploadData.issueDate,
-      expiryDate
-    });
-  };
-
-  const getSortedCompanies = () => {
-    return [...companies].sort((a, b) => {
-      const modifier = sortDirection === 'asc' ? 1 : -1;
-      switch (sortField) {
-        case 'company':
-          return modifier * a.company_name.localeCompare(b.company_name);
-        case '#': // Sort by company ID
-          return modifier * (a.id - b.id);
-        default:
-          return 0;
-      }
-    });
-  };
-
-  // Calculate stats
-  const calculateStats = (documents: Document[]) => {
-    return documents.map(doc => {
-      const total = companies.length;
-      const complete = uploads.filter(u => 
-        u.kyc_document_id === doc.id
-      ).length;
-      const pending = total - complete;
-
-      return { total, pending, complete };
-    });
-  };
-
-  const documentStats = calculateStats(documents);
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ChevronUp className="w-4 h-4 text-gray-300" />;
-    return sortDirection === 'asc' ? 
-      <ChevronUp className="w-4 h-4 text-blue-600" /> : 
-      <ChevronDown className="w-4 h-4 text-blue-600" />;
-  };
-
-  return (
-    <div className="w-full p-4 bg-white rounded-lg shadow-sm">
-      <Toaster />
-      <div className="mb-2">
-        <div className="flex space-x-2">
-          {['All', 'KRA', 'Sheria'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-md text-sm ${
-                activeTab === tab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+      <form onSubmit={handleUpload} className="space-y-4">
+        <div>
+          <label htmlFor="issueDate" className="block text-sm font-medium text-gray-700 mb-1">
+            Issue Date
+          </label>
+          <input 
+            id="issueDate"
+            type="date" 
+            required
+            className="w-full px-3 py-2 border rounded-md"
+            value={uploadData.issueDate}
+            onChange={(e) => setUploadData(prev => ({ ...prev, issueDate: e.target.value }))}
+          />
         </div>
-      </div>
 
-      <div className="flex justify-between items-center mb-4 text-sm">
-        <input
-          type="text"
-          placeholder="Search companies..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+        <div>
+          <label htmlFor="expiryDate" className="block text-sm font-medium text-gray-700 mb-1">
+            Expiry Date
+          </label>
+          <input 
+            id="expiryDate"
+            type="date"
+            required
+            className="w-full px-3 py-2 border rounded-md"
+            value={uploadData.expiryDate}
+            onChange={(e) => setUploadData(prev => ({ ...prev, expiryDate: e.target.value }))}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="fileUpload" className="block text-sm font-medium text-gray-700 mb-1">
+            Upload File
+          </label>
+          <input 
+            id="fileUpload"
+            type="file"
+            required
+            className="w-full px-3 py-2 border rounded-md"
+            onChange={(e) => setUploadData(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
+          />
+        </div>
+
+        <button 
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700"
+        >
+          Upload Document
+        </button>
+      </form>
+    </div>
+  </div>
+);
+
+const SettingsModal = () => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg p-6 w-full max-w-4xl relative">
+      <button 
+        onClick={() => setShowSettingsModal(false)}
+        className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+        aria-label="Close"
+        title="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      <h2 className="text-xl font-semibold mb-4">Settings</h2>
+      <div className="grid grid-cols-2 gap-6">
+        {documents.map(doc => (
+          <div key={doc.id} className="border p-4 rounded-lg">
+            <div className="flex items-center mb-2">
+              <input 
+                type="checkbox" 
+                checked={visibleColumns[doc.id].visible}
+                onChange={() => {
+                  setVisibleColumns(prev => ({
+                    ...prev,
+                    [doc.id]: {
+                      ...prev[doc.id],
+                      visible: !prev[doc.id].visible,
+                    },
+                  }));
+                }}
+                className="mr-2"
+              />
+              <label className="text-sm font-medium text-gray-700">{doc.name}</label>
+            </div>
+            {visibleColumns[doc.id].visible && (
+              <div className="space-y-2">
+                {Object.keys(visibleColumns[doc.id].subColumns).map(subColumn => (
+                  <div key={subColumn} className="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      checked={visibleColumns[doc.id].subColumns[subColumn]}
+                      onChange={() => {
+                        setVisibleColumns(prev => ({
+                          ...prev,
+                          [doc.id]: {
+                            ...prev[doc.id],
+                            subColumns: {
+                              ...prev[doc.id].subColumns,
+                              [subColumn]: !prev[doc.id].subColumns[subColumn],
+                            },
+                          },
+                        }));
+                      }}
+                      className="mr-2"
+                    />
+                    <label className="text-sm font-medium text-gray-700 capitalize">{subColumn}</label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+const filteredDocuments = documents.filter(doc => {
+  if (activeTab === 'All') return true;
+  if (activeTab === 'KRA') return doc.department === 'KRA' && doc.subcategory === 'kra-docs';
+  if (activeTab === 'Sheria') return doc.department === 'Sheria' && doc.subcategory === 'sheria-docs';
+  return false;
+});
+
+// Generate directors for each company
+const generateDirectors = (companyId: number) => {
+  return Array.from({ length: 3 }, (_, i) => `Director ${i + 1}`);
+};
+
+return (
+  <div className="w-full p-6 bg-white rounded-lg shadow-sm">
+    <div className="flex justify-between items-center mb-6">
+      <div className="flex items-center gap-4">
+        <input 
+          type="text" 
+          placeholder="Search companies..." 
+          className="px-4 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
         />
-        <div className="flex items-center space-x-2">
-          <button
-            className="flex items-center gap-1 px-3 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm"
-          >
-            <FileDown className="w-4 h-4" />
-            Export
-          </button>
-          <button
-            onClick={() => setShowSettingsModal(true)}
-            className="flex items-center gap-1 px-3 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            Settings
-          </button>
-        </div>
+        <button 
+          className="flex items-center gap-2 px-4 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700"
+        >
+          <FileDown className="w-5 h-5" />
+          Export
+        </button>
+        <button 
+          onClick={() => setShowSettingsModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          Settings
+        </button>
       </div>
+    </div>
 
-      {(isLoadingCompanies || isLoadingDocuments) ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-        </div>
-      ) : (
-        <div className="border rounded-lg overflow-hidden">
-          <div className="overflow-auto max-h-[70vh] max-w-full">
-            <table className="w-full text-sm border-collapse min-w-[1500px]">
-              <thead className="sticky top-0 bg-white">
-                <tr className="bg-gray-100">
-                  <th
-                    className="p-2 border border-gray-300 font-semibold text-gray-700 sticky left-0 bg-gray-100 z-20 text-sm"
-                    rowSpan={2}
-                    onClick={() => handleSort('#')} // Add sorting for the index column
-                  >
-                    <div className="flex items-center justify-between">
-                      #
-                      <SortIcon field="#" />
-                    </div>
+    <div className="mb-4">
+      <div className="flex space-x-4">
+        {['All', 'KRA', 'Sheria'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 rounded-md ${activeTab === tab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+    </div>
+
+    <div className="border-2 rounded-lg overflow-hidden">
+      <div className="overflow-auto max-h-[70vh] max-w-full">
+        <table className="w-full text-sm border-collapse min-w-[1500px]">
+          <thead className="sticky top-0 bg-white">
+            <tr className="bg-gray-100">
+              <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Companies</th>
+              <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Directors</th>
+              <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700">Summary</th>
+              {filteredDocuments.map(doc => (
+                visibleColumns[doc.id].visible && (
+                  <th key={`doc-${doc.id}`} className="p-3 border-2 border-gray-300 font-semibold text-gray-700 text-center bg-blue-50" colSpan={5}>
+                    {doc.name}
                   </th>
-                  <th
-                    className="p-2 border border-gray-300 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 sticky left-[50px] bg-gray-100 z-20 text-sm"
-                    rowSpan={2}
-                    onClick={() => handleSort('company')}
-                  >
-                    <div className="flex items-center justify-between">
-                      Company
-                      <span className="relative group">
-                        <span className="ml-1 text-xs text-gray-500">({companies.length})</span>
-                        <span className="absolute left-0 w-auto p-2 m-2 min-w-max rounded-md shadow-md text-white bg-gray-800 text-xs font-bold transition-opacity duration-300 opacity-0 group-hover:opacity-100">
-                          {`${companies.length} total companies`}
-                        </span>
-                      </span>
-                      <SortIcon field="company" />
-                    </div>
-                  </th>
-                  <th className="p-2 border border-gray-300 font-semibold text-gray-700 text-sm" rowSpan={2}>
-                    Summary
-                  </th>
-                  <th className="p-2 border border-gray-300 font-semibold text-gray-700 text-sm" rowSpan={2}>
-                    Missing Documents
-                  </th>
-                  {documents.map((doc) => (
-                    visibleColumns[doc.id]?.visible && (
-                      <th
-                        key={`doc-${doc.id}`}
-                        className="p-2 border border-gray-300 font-semibold text-gray-700 text-sm text-center bg-blue-50"
-                        colSpan={Object.values(visibleColumns[doc.id]?.subColumns || {}).filter(Boolean).length}
+                )
+              ))}
+            </tr>
+            <tr className="bg-gray-50">
+              {filteredDocuments.map(doc => (
+                visibleColumns[doc.id].visible && (
+                  <React.Fragment key={`doc-columns-${doc.id}`}>
+                    {visibleColumns[doc.id].subColumns.upload && (
+                      <th className="p-3 border-2 border-gray-300 font-medium text-gray-600">Upload</th>
+                    )}
+                    {visibleColumns[doc.id].subColumns.issueDate && (
+                      <th 
+                        className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSort('issueDate')}
                       >
-                        {doc.name}
+                        <div className="flex items-center justify-between">
+                          Issue Date
+                          <SortIcon field="issueDate" />
+                        </div>
                       </th>
-                    )
-                  ))}
-                </tr>
-                <tr className="bg-gray-50">
-                  {documents.map((doc) => (
-                    visibleColumns[doc.id]?.visible && (
-                      <React.Fragment key={`cols-${doc.id}`}>
-                        {visibleColumns[doc.id]?.subColumns.upload && (
-                          <th className="p-2 border border-gray-300 font-medium text-gray-600 text-sm">
-                            Documents
-                          </th>
-                        )}
-                        {visibleColumns[doc.id]?.subColumns.issueDate && (
-                          <th
-                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
-                            onClick={() => handleSort('issueDate')}
-                          >
-                            <div className="flex items-center justify-between">
-                              Issue Date
-                              <SortIcon field="issueDate" />
-                            </div>
-                          </th>
-                        )}
-                        {visibleColumns[doc.id]?.subColumns.expiryDate && (
-                          <th
-                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
-                            onClick={() => handleSort('expiryDate')}
-                          >
-                            <div className="flex items-center justify-between">
-                              Expiry Date
-                              <SortIcon field="expiryDate" />
-                            </div>
-                          </th>
-                        )}
-                        {visibleColumns[doc.id]?.subColumns.daysLeft && (
-                          <th
-                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
-                            onClick={() => handleSort('daysLeft')}
-                          >
-                            <div className="flex items-center justify-between">
-                              Days Left
-                              <SortIcon field="daysLeft" />
-                            </div>
-                          </th>
-                        )}
-                        {visibleColumns[doc.id]?.subColumns.status && (
-                          <th
-                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200 text-sm"
-                            onClick={() => handleSort('status')}
-                          >
-                            <div className="flex items-center justify-between">
-                              Status
-                              <SortIcon field="status" />
-                            </div>
-                          </th>
-                        )}
-                      </React.Fragment>
-                    )
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-gray-300">
-                {/* Stats rows */}
-                <tr className="bg-gray-50">
-                  <td className="p-2 border border-gray-300 font-medium sticky left-0 bg-inherit z-10 text-sm" rowSpan={3}>Stats</td>
-                  <td className="p-2 border border-gray-300 sticky left-[50px] bg-inherit z-10 text-sm" rowSpan={3}></td>
-                  <td className="p-2 border border-gray-300 font-semibold text-blue-600 text-sm">Total</td>
-                  <td className="p-2 border border-gray-300 text-center font-medium text-sm">-</td>
-                  {documentStats.map((stat, index) => (
-                    <React.Fragment key={`stats-${index}`}>
-                      {visibleColumns[documents[index].id]?.visible && (
-                        <>
-                          {visibleColumns[documents[index].id]?.subColumns.upload && (
-                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
-                              {stat.total}
-                            </td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.issueDate && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.expiryDate && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.daysLeft && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.status && (
-                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
-                              {stat.total}
-                            </td>
-                          )}
-                        </>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tr>
-                
-                {/* Pending Stats Row */}
-                <tr className="bg-gray-50">
-                  <td className="p-2 border border-gray-300 font-semibold text-orange-600 text-sm">Missing</td>
-                  <td className="p-2 border border-gray-300 text-center font-medium text-sm">-</td>
-                  {documentStats.map((stat, index) => (
-                    <React.Fragment key={`pending-${index}`}>
-                      {visibleColumns[documents[index].id]?.visible && (
-                        <>
-                          {visibleColumns[documents[index].id]?.subColumns.upload && (
-                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
-                              {stat.pending}
-                            </td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.issueDate && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.expiryDate && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.daysLeft && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.status && (
-                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
-                              {stat.pending}
-                            </td>
-                          )}
-                        </>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tr>
-
-                {/* Complete Stats Row */}
-                <tr className="bg-gray-50">
-                  <td className="p-2 border border-gray-300 font-semibold text-green-600 text-sm">Complete</td>
-                  <td className="p-2 border border-gray-300 text-center font-medium text-sm">-</td>
-                  {documentStats.map((stat, index) => (
-                    <React.Fragment key={`complete-${index}`}>
-                      {visibleColumns[documents[index].id]?.visible && (
-                        <>
-                          {visibleColumns[documents[index].id]?.subColumns.upload && (
-                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
-                              {stat.complete}
-                            </td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.issueDate && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.expiryDate && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.daysLeft && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-400 text-sm">-</td>
-                          )}
-                          {visibleColumns[documents[index].id]?.subColumns.status && (
-                            <td className="p-2 border border-gray-300 text-center font-medium text-sm">
-                              {stat.complete}
-                            </td>
-                          )}
-                        </>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tr>
-
-                {/* Company Rows */}
-                {getSortedCompanies().map((company, index) => (
-                  <tr key={company.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="p-2 border border-gray-300 font-medium sticky left-0 bg-inherit z-10 text-sm">
-                      {company.id} {/* This will now reflect the sorted order */}
-                    </td>
-                    <td className="p-2 border border-gray-300 font-medium sticky left-[50px] bg-inherit z-10 text-sm">
-                      <div className="relative group">
-                        <span>
-                          {company.company_name.split(' ')[0]}
-                        </span>
-                        <span className="absolute left-0 w-auto p-2 m-2 min-w-max rounded-md shadow-md text-white bg-gray-800 text-xs font-bold transition-opacity duration-300 opacity-0 group-hover:opacity-100">
-                          {company.company_name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-2 border border-gray-300 text-sm"></td>
-                    <td className="p-2 border border-gray-300 text-center font-medium text-sm">
-                      <button
-                        onClick={() => {
-                          const missingDocs = documents.filter(doc => 
-                            !uploads.some(upload => 
-                              upload.kyc_document_id === doc.id && upload.userid === company.id.toString()
-                            )
-                          );
-                          setMissingDocuments(missingDocs);
-                          setShowMissingDocumentsModal(true);
-                        }}
-                        className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 text-sm"
+                    )}
+                    {visibleColumns[doc.id].subColumns.expiryDate && (
+                      <th 
+                        className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSort('expiryDate')}
                       >
-                        {calculateMissingDocuments(company.id)}
-                      </button>
-                    </td>
-                    
-                    {documents.map((doc) => (
-                      visibleColumns[doc.id]?.visible && (
-                        <React.Fragment key={`${company.id}-${doc.id}`}>
-                          {visibleColumns[doc.id]?.subColumns.upload && (
-                            <td className="p-2 border border-gray-300 text-center text-sm">
-                              {uploads.find(u => 
-                                u.kyc_document_id === doc.id && 
-                                u.userid === company.id.toString()
-                              ) ? (
-                                <DocumentActions
-                                  onView={() => handleViewDocument(doc, company)}
-                                  onUpdate={() => {
-                                    setSelectedCompany(company);
-                                    setSelectedDocument(doc);
-                                    setShowUploadModal(true);
-                                  }}
-                                  onDownload={() => handleDownloadDocument(doc, company)}
-                                />
-                              ) : (
-                                <button
+                        <div className="flex items-center justify-between">
+                          Expiry Date
+                          <SortIcon field="expiryDate" />
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns[doc.id].subColumns.daysLeft && (
+                      <th 
+                        className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSort('daysLeft')}
+                      >
+                        <div className="flex items-center justify-between">
+                          Days Left
+                          <SortIcon field="daysLeft" />
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns[doc.id].subColumns.status && (
+                      <th 
+                        className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSort('status')}
+                      >
+                        <div className="flex items-center justify-between">
+                          Status
+                          <SortIcon field="status" />
+                        </div>
+                      </th>
+                    )}
+                  </React.Fragment>
+                )
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {/* Stats rows */}
+            <tr className="bg-gray-50">
+              <td className="p-3 border-2 border-gray-300 font-medium bg-gray-100" rowSpan={3}></td>
+              <td className="p-3 border-2 border-gray-300" colSpan={2}></td>
+              <td className="p-3 border-2 border-gray-300 font-semibold text-blue-600">Total</td>
+              {filteredDocuments.map(doc => (
+                visibleColumns[doc.id].visible && (
+                  <React.Fragment key={`total-${doc.id}`}>
+                    {visibleColumns[doc.id].subColumns.upload && (
+                      <td className="p-3 border-2 border-gray-300 text-center font-medium">4</td>
+                    )}
+                    {visibleColumns[doc.id].subColumns.issueDate && (
+                      <td className="p-3 border-2 border-gray-300 text-center text-gray-400" colSpan={3}>-</td>
+                    )}
+                    {visibleColumns[doc.id].subColumns.status && (
+                      <td className="p-3 border-2 border-gray-300 text-center font-medium">4</td>
+                    )}
+                  </React.Fragment>
+                )
+              ))}
+            </tr>
+            <tr className="bg-gray-50">
+              <td className="p-3 border-2 border-gray-300" colSpan={2}></td>
+              <td className="p-3 border-2 border-gray-300 font-semibold text-orange-600">Pending</td>
+              {filteredDocuments.map(doc => (
+                visibleColumns[doc.id].visible && (
+                  <React.Fragment key={`pending-${doc.id}`}>
+                    {visibleColumns[doc.id].subColumns.upload && (
+                      <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
+                    )}
+                    {visibleColumns[doc.id].subColumns.issueDate && (
+                      <td className="p-3 border-2 border-gray-300 text-center text-gray-400" colSpan={3}>-</td>
+                    )}
+                    {visibleColumns[doc.id].subColumns.status && (
+                      <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
+                    )}
+                  </React.Fragment>
+                )
+              ))}
+            </tr>
+            <tr className="bg-gray-50">
+              <td className="p-3 border-2 border-gray-300" colSpan={2}></td>
+              <td className="p-3 border-2 border-gray-300 font-semibold text-green-600">Complete</td>
+              {filteredDocuments.map(doc => (
+                visibleColumns[doc.id].visible && (
+                  <React.Fragment key={`complete-${doc.id}`}>
+                    {visibleColumns[doc.id].subColumns.upload && (
+                      <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
+                    )}
+                    {visibleColumns[doc.id].subColumns.issueDate && (
+                      <td className="p-3 border-2 border-gray-300 text-center text-gray-400" colSpan={3}>-</td>
+                    )}
+                    {visibleColumns[doc.id].subColumns.status && (
+                      <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
+                    )}
+                  </React.Fragment>
+                )
+              ))}
+            </tr>
+
+            {/* Separator row */}
+            <tr className="h-2 bg-gray-200">
+              <td colSpan={100} className="border-4 border-gray-300"></td>
+            </tr>
+
+            {/* Company rows - Now using sorted companies */}
+            {getSortedCompanies().map((company, index) => {
+              const date = new Date(2024, 0, company.id);
+              const expiryDate = new Date(2025, 6, company.id);
+              const directors = generateDirectors(company.id);
+              return (
+                <React.Fragment key={company.id}>
+                  {directors.map((director, dirIndex) => (
+                    <tr key={`${company.id}-${dirIndex}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      {dirIndex === 0 && (
+                        <td className="p-3 border-2 border-gray-300 font-medium" rowSpan={3}>
+                          {company.name}
+                        </td>
+                      )}
+                      <td className="p-3 border-2 border-gray-300 font-medium">{director}</td>
+                      <td className="p-3 border-2 border-gray-300"></td>
+                      {filteredDocuments.map((doc) => (
+                        visibleColumns[doc.id].visible && (
+                          <React.Fragment key={`${company.id}-${doc.id}-${dirIndex}`}>
+                            {visibleColumns[doc.id].subColumns.upload && (
+                              <td className="p-3 border-2 border-gray-300 text-center">
+                                <button 
                                   onClick={() => {
                                     setSelectedCompany(company);
                                     setSelectedDocument(doc);
                                     setShowUploadModal(true);
                                   }}
-                                  className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 text-sm"
+                                  className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100"
                                 >
                                   Upload
                                 </button>
-                              )}
-                            </td>
-                          )}
-
-                          {visibleColumns[doc.id]?.subColumns.issueDate && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-600 text-sm">
-                              {(() => {
-                                const upload = uploads.find(u => 
-                                  u.kyc_document_id === doc.id && 
-                                  u.userid === company.id.toString()
-                                );
-                                return upload?.issue_date ? 
-                                  format(new Date(upload.issue_date), 'dd/MM/yyyy') : 
-                                  '-';
-                              })()}
-                            </td>
-                          )}
-
-                          {visibleColumns[doc.id]?.subColumns.expiryDate && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-600 text-sm">
-                              {(() => {
-                                if (doc.document_type === 'one-off') {
-                                  return 'No Expiry';
-                                }
-                                const upload = uploads.find(u => 
-                                  u.kyc_document_id === doc.id && 
-                                  u.userid === company.id.toString()
-                                );
-                                return upload?.expiry_date ? 
-                                  format(new Date(upload.expiry_date), 'dd/MM/yyyy') : 
-                                  '?';
-                              })()}
-                            </td>
-                          )}
-
-                          {visibleColumns[doc.id]?.subColumns.daysLeft && (
-                            <td className="p-2 border border-gray-300 text-center text-gray-600 text-sm">
-                              {(() => {
-                                if (doc.document_type === 'one-off') {
-                                  return 'N/A';
-                                }
-                                const upload = uploads.find(u => 
-                                  u.kyc_document_id === doc.id && 
-                                  u.userid === company.id.toString()
-                                );
-                                return upload?.expiry_date ? 
-                                  differenceInDays(new Date(upload.expiry_date), new Date()) : 
-                                  '-';
-                              })()}
-                            </td>
-                          )}
-                          {visibleColumns[doc.id]?.subColumns.status && (
-                            <td className="p-2 border border-gray-300 text-center text-sm">
-                              {(() => {    
-                                const upload = uploads.find(u => 
-                                  u.kyc_document_id === doc.id && 
-                                  u.userid === company.id.toString()
-                                );
-
-                                if (!upload) {
-                                  return (
-                                    <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">
-                                      Pending
-                                    </span>
-                                  );
-                                }
-
-                                if (doc.document_type === 'one-off') {
-                                  return (
-                                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
-                                      Valid
-                                    </span>
-                                  );
-                                }
-
-                                const daysLeft = upload.expiry_date ? 
-                                  differenceInDays(new Date(upload.expiry_date), new Date()) : 
-                                  null;
-
-                                if (daysLeft === null) return '-';
-
-                                if (daysLeft < 0) {
-                                  return (
-                                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
-                                      Expired
-                                    </span>
-                                  );
-                                }
-
-                                if (daysLeft <= 30) {
-                                  return (
-                                    <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">
-                                      Expiring Soon
-                                    </span>
-                                  );
-                                }
-
-                                return (
-                                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
-                                    Valid
-                                  </span>
-                                );
-                              })()}
-                            </td>
-                          )}
-                        </React.Fragment>
-                      )
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* View Modal */}
-      {showViewModal && (
-        <ViewModal url={viewUrl} setShowViewModal={setShowViewModal} />
-      )}
-
-      {/* Upload Modal */}
-      {showUploadModal && (
-        <UploadModal
-          selectedCompany={selectedCompany}
-          selectedDocument={selectedDocument}
-          uploadData={uploadData}
-          setUploadData={setUploadData}
-          handleUpload={handleUpload}
-          setShowUploadModal={setShowUploadModal}
-          uploadMutation={uploadMutation}
-        />
-      )}
-
-      {/* Settings Modal */}
-      {showSettingsModal && (
-        <SettingsModal
-          documents={documents}
-          visibleColumns={visibleColumns}
-          setVisibleColumns={setVisibleColumns}
-          setShowSettingsModal={setShowSettingsModal}
-        />
-      )}
-
-      {/* Missing Documents Modal */}
-      {showMissingDocumentsModal && (
-        <MissingDocumentsModal
-          missingDocuments={missingDocuments}
-          onClose={() => setShowMissingDocumentsModal(false)}
-          onUpload={(doc) => {
-            setSelectedDocument(doc);
-            setShowUploadModal(true);
-            setShowMissingDocumentsModal(false);
-          }}
-        />
-      )}
-    </div>
-  );
+                              </td>
+                            )}
+                            {visibleColumns[doc.id].subColumns.issueDate && (
+                              <td className="p-3 border-2 border-gray-300 text-center text-gray-600">
+                                {format(date, 'MM/dd/yyyy')}
+                              </td>
+                            )}
+                            {visibleColumns[doc.id].subColumns.expiryDate && (
+                              <td className="p-3 border-2 border-gray-300 text-center text-gray-600">
+                                {format(expiryDate, 'MM/dd/yyyy')}
+                              </td>
+                            )}
+                            {visibleColumns[doc.id].subColumns.daysLeft && (
+                              <td className="p-3 border-2 border-gray-300 text-center font-medium">
+                                {differenceInDays(expiryDate, new Date())}
+                              </td>
+                            )}
+                            {visibleColumns[doc.id].subColumns.status && (
+                              <td className="p-3 border-2 border-gray-300 text-center">
+                                <span className={`px-2 py-1 rounded-full text-xs ${
+                                  company.id % 3 === 0 ? 'bg-green-100 text-green-700' :
+                                  company.id % 3 === 1 ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {company.id % 3 === 0 ? 'Complete' : company.id % 3 === 1 ? 'Pending' : 'Expired'}
+                                </span>
+                              </td>
+                            )}
+                          </React.Fragment>
+                        )
+                      ))}
+                    </tr>
+                  ))}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>      
+    {showUploadModal && <UploadModal />}
+    {showSettingsModal && <SettingsModal />}
+  </div>
+);
 };
 
 export default DocumentManagement;
