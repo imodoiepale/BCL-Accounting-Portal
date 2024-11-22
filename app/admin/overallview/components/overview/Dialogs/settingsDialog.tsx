@@ -190,6 +190,15 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
   const [sectionVisibility, setSectionVisibility] = useState<Record<string, boolean>>({});
 const [categoryVisibility, setCategoryVisibility] = useState<Record<string, boolean>>({});
 const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
+const [indexMapping, setIndexMapping] = useState<{
+  tabs: { [key: string]: number },
+  sections: { [key: string]: string },
+  subsections: { [key: string]: string }
+}>({
+  tabs: {},
+  sections: {},
+  subsections: {}
+});
 
 const [addFieldState, setAddFieldState] = useState({
     displayName: '',
@@ -235,7 +244,11 @@ const [editingField, setEditingField] = useState({
     setSelectedTables([]);
     setSelectedTableFields({});
   };
-
+  const [editedNames, setEditedNames] = useState({
+    tab: '',
+    section: '',
+    subsection: ''
+  });
   useEffect(() => {
     fetchStructure();
   }, []);
@@ -566,7 +579,140 @@ const [editingField, setEditingField] = useState({
       toast.error('Update failed');
     }
   };
+  const handleNameUpdate = async (type: 'tab' | 'section' | 'subsection', oldName: string, newName: string) => {
+    console.log('Starting update:', { type, oldName, newName });
+    
+    try {
+      if (type === 'tab') {
+        const { error } = await supabase
+          .from('profile_category_table_mapping')
+          .update({ Tabs: newName })
+          .eq('Tabs', oldName);
+        if (error) throw error;
+      } 
+      else if (type === 'section') {
+        // Get ALL records that contain this section
+        const { data: records, error: fetchError } = await supabase
+          .from('profile_category_table_mapping')
+          .select('*')
+        
+        if (fetchError) throw fetchError;
+  
+        for (const record of records) {
+          const existingSections = JSON.parse(record.sections_sections || '{}');
+          
+          // Only update records that contain this section
+          if (existingSections[oldName]) {
+            const existingSubsections = JSON.parse(record.sections_subsections || '{}');
+            const existingTableNames = JSON.parse(record.table_names || '{}');
+  
+            delete existingSections[oldName];
+            existingSections[newName] = true;
+  
+            existingSubsections[newName] = existingSubsections[oldName];
+            delete existingSubsections[oldName];
+  
+            existingTableNames[newName] = existingTableNames[oldName];
+            delete existingTableNames[oldName];
+  
+            const { error: updateError } = await supabase
+              .from('profile_category_table_mapping')
+              .update({
+                sections_sections: JSON.stringify(existingSections),
+                sections_subsections: JSON.stringify(existingSubsections),
+                table_names: JSON.stringify(existingTableNames)
+              })
+              .eq('id', record.id);
+  
+            if (updateError) throw updateError;
+          }
+        }
+      }
+      else if (type === 'subsection') {
+        // Get ALL records
+        const { data: records, error: fetchError } = await supabase
+          .from('profile_category_table_mapping')
+          .select('*');
+        
+        if (fetchError) throw fetchError;
+  
+        for (const record of records) {
+          const existingSubsections = JSON.parse(record.sections_subsections || '{}');
+          
+          // Only update if this record has the section and subsection
+          if (existingSubsections[selectedSection?.section] === oldName) {
+            existingSubsections[selectedSection?.section] = newName;
+  
+            const { error: updateError } = await supabase
+              .from('profile_category_table_mapping')
+              .update({
+                sections_subsections: JSON.stringify(existingSubsections)
+              })
+              .eq('id', record.id);
+  
+            if (updateError) throw updateError;
+          }
+        }
+      }
+  
+      await fetchStructure();
+      toast.success(`${type} updated successfully`);
+      
+    } catch (error) {
+      console.error('Update error:', error);
+      toast.error(`Failed to update ${type}`);
+    }
+  };
+  // Add this function to generate indices
+  const generateIndices = (structure: any[]) => {
+    const newIndexMapping = {
+      tabs: {},
+      sections: {},
+      subsections: {}
+    };
+  
+    // Index tabs
+    uniqueTabs.forEach((tab, tabIndex) => {
+      newIndexMapping.tabs[tab] = tabIndex + 1;
+    });
+  
+    // Index sections and subsections
+    structure.forEach(item => {
+      const tabIndex = newIndexMapping.tabs[item.Tabs];
+      
+      // Safely parse JSON or use default empty object
+      const sections = typeof item.sections_sections === 'string' 
+        ? JSON.parse(item.sections_sections) 
+        : item.sections_sections || {};
+        
+      const subsections = typeof item.sections_subsections === 'string'
+        ? JSON.parse(item.sections_subsections)
+        : item.sections_subsections || {};
+  
+      Object.keys(sections).forEach((section, sectionIndex) => {
+        newIndexMapping.sections[section] = `${tabIndex}.${sectionIndex + 1}`;
+  
+        const sectionSubsections = subsections[section];
+        if (Array.isArray(sectionSubsections)) {
+          sectionSubsections.forEach((subsection, subsectionIndex) => {
+            newIndexMapping.subsections[subsection] = `${tabIndex}.${sectionIndex + 1}.${subsectionIndex + 1}`;
+          });
+        } else if (sectionSubsections) {
+          newIndexMapping.subsections[sectionSubsections] = `${tabIndex}.${sectionIndex + 1}.1`;
+        }
+      });
+    });
+  
+    setIndexMapping(newIndexMapping);
+  };
+  
 
+// Call this in useEffect after fetching structure
+useEffect(() => {
+  if (structure.length > 0) {
+    generateIndices(structure);
+  }
+}, [structure, uniqueTabs]);
   const handleAddStructure = async () => {
     try {
       console.log('Adding new structure with:', newStructure);
@@ -728,12 +874,6 @@ const [editingField, setEditingField] = useState({
         setTempSelectedFields(selectedTableFields);
       }
     }, [showMultiSelectDialog, selectedTables, selectedTableFields]);
-
-    useEffect(() => {
-      console.log('Selected Tables:', selectedTables);
-      console.log('Selected Fields:', selectedTableFields);
-    }, [selectedTables, selectedTableFields]);
-
 
     return (
       <Dialog open={showMultiSelectDialog} onOpenChange={setShowMultiSelectDialog}>
@@ -1555,7 +1695,7 @@ const [editingField, setEditingField] = useState({
                         }`}
                       onClick={() => handleTabSelection(tab, false)}
                     >
-                      {tab}
+                        {indexMapping.tabs[tab] || ''} {tab}
                     </button>
                   ))}
                 </ScrollArea>
@@ -1588,7 +1728,7 @@ const [editingField, setEditingField] = useState({
                           }`}
                         onClick={() => setSelectedSection({ section })}
                       >
-                        <div className="font-medium">{section}</div>
+                        <div className="font-medium"> {indexMapping.sections[section] || ''} {section}</div>
                       </div>
                     ))}
 
@@ -1624,7 +1764,7 @@ const [editingField, setEditingField] = useState({
                           }`}
                         onClick={() => setSelectedSubsection(subsection)}
                       >
-                        <div className="font-medium">{subsection}</div>
+                        <div className="font-medium">{indexMapping.subsections[subsection] || ''} {subsection}</div>
                       </div>
                     ))}
 
@@ -1664,23 +1804,61 @@ const [editingField, setEditingField] = useState({
                       </div>
 
                       {/* Section Info */}
-                      <div className="grid gap-4">
-                        <div>
-                          <label className="text-sm font-medium">Section</label>
-                          <Input
-                            value={selectedSection?.section || ''}
-                            disabled={!editing}
-                            onChange={(e) => handleUpdateSection(selectedSection!.id, { section: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium">Subsection</label>
-                          <Input
-                            value={selectedSubsection || ''}
-                            disabled={!editing}
-                            onChange={(e) => handleUpdateSection(selectedSection!.id, { subsection: e.target.value })}
-                          />
-                        </div>
+                      <div className="grid gap-4">  
+                      <div>
+    <label className="text-sm font-medium">Tab Name</label>
+    <Input
+      value={editedNames.tab || selectedTab}
+      disabled={!editing}
+      onChange={(e) => setEditedNames(prev => ({ ...prev, tab: e.target.value }))}
+      onBlur={() => {
+        if (editedNames.tab && editedNames.tab !== selectedTab) {
+          handleNameUpdate('tab', selectedTab, editedNames.tab);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && editedNames.tab && editedNames.tab !== selectedTab) {
+          handleNameUpdate('tab', selectedTab, editedNames.tab);
+        }
+      }}
+    />
+  </div>
+  <div>
+    <label className="text-sm font-medium">Section Name</label>
+    <Input
+      value={editedNames.section || selectedSection?.section}
+      disabled={!editing}
+      onChange={(e) => setEditedNames(prev => ({ ...prev, section: e.target.value }))}
+      onBlur={() => {
+        if (editedNames.section && editedNames.section !== selectedSection?.section) {
+          handleNameUpdate('section', selectedSection?.section || '', editedNames.section);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && editedNames.section && editedNames.section !== selectedSection?.section) {
+          handleNameUpdate('section', selectedSection?.section || '', editedNames.section);
+        }
+      }}
+    />
+  </div>
+  <div>
+    <label className="text-sm font-medium">Subsection Name</label>
+    <Input
+      value={editedNames.subsection || selectedSubsection}
+      disabled={!editing}
+      onChange={(e) => setEditedNames(prev => ({ ...prev, subsection: e.target.value }))}
+      onBlur={() => {
+        if (editedNames.subsection && editedNames.subsection !== selectedSubsection) {
+          handleNameUpdate('subsection', selectedSubsection || '', editedNames.subsection);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && editedNames.subsection && editedNames.subsection !== selectedSubsection) {
+          handleNameUpdate('subsection', selectedSubsection || '', editedNames.subsection);
+        }
+      }}
+    />
+  </div>
                         <div>
                           <label className="text-sm font-medium">Table Name</label>
                           {selectedSection && selectedSubsection && structure

@@ -9,6 +9,8 @@ import { EditableCell } from './EditableCell';
 import { getMissingFields } from '../missingFieldsDialog';
 import { calculateFieldStats } from '../utility';
 
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from 'sonner';
 interface TableProps {
   data: any[];
   handleCompanyClick: (company: any) => void;
@@ -78,6 +80,71 @@ const categoryColors = {
   'Acc': { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' }
 };
 
+// Add these functions at the top of TableComponents.tsx
+
+// Calculate missing fields for a specific row
+const calculateMissingFieldsForRow = (row: any, processedSections: any[]) => {
+  let missingCount = 0;
+
+  processedSections.slice(1).forEach(section => {
+    if (!section.isSeparator) {
+      section.categorizedFields?.forEach(category => {
+        if (!category.isSeparator) {
+          category.fields.forEach(field => {
+            const [tableName, columnName] = field.name.split('.');
+            let value;
+
+            if (row.isAdditionalRow && row.sourceTable === tableName) {
+              value = row[columnName];
+            } else if (row[`${tableName}_data`]) {
+              value = row[`${tableName}_data`][columnName];
+            } else {
+              value = row[columnName];
+            }
+
+            if (value === null || value === undefined || value === '') {
+              missingCount++;
+            }
+          });
+        }
+      });
+    }
+  });
+
+  return missingCount;
+};
+
+// Calculate total statistics for a specific field
+const calculateFieldStatistics = (fieldName: string, data: any[]) => {
+  let total = 0;
+  let completed = 0;
+  let pending = 0;
+
+  data.forEach(companyGroup => {
+    companyGroup.rows.forEach(row => {
+      const [tableName, columnName] = fieldName.split('.');
+      let value;
+
+      if (row.isAdditionalRow && row.sourceTable === tableName) {
+        value = row[columnName];
+      } else if (row[`${tableName}_data`]) {
+        value = row[`${tableName}_data`][columnName];
+      } else {
+        value = row[columnName];
+      }
+
+      total++;
+      if (value !== null && value !== undefined && value !== '') {
+        completed++;
+      } else {
+        pending++;
+      }
+    });
+  });
+
+  return { total, completed, pending };
+};
+
 // Render table headers
 const renderHeaders = (processedSections: any[]) => {
   return (
@@ -112,7 +179,7 @@ const renderHeaders = (processedSections: any[]) => {
               >
                 {index + 1}
               </TableHead>
-              {index < processedSections.length - 2 && renderSeparatorCell(`sec-ref-end-${index}`, 'section')}
+              {/* {index < processedSections.length - 2 && renderSeparatorCell(`sec-ref-end-${index}`, 'section')} */}
             </React.Fragment>
           );
         })}
@@ -145,12 +212,11 @@ const renderHeaders = (processedSections: any[]) => {
               >
                 {section.label}
               </TableHead>
-              {index < processedSections.length - 2 && renderSeparatorCell(`section-end-${index}`, 'section')}
+              {/* {index < processedSections.length - 2 && renderSeparatorCell(`section-end-${index}`, 'section')} */}
             </React.Fragment>
           );
         })}
       </TableRow>
-
       {/* Category Headers */}
       <TableRow>
         <TableHead className="font-medium">Category</TableHead>
@@ -290,12 +356,13 @@ const renderHeaders = (processedSections: any[]) => {
 const renderStatisticsRows = (data: any[], processedSections: any[]) => {
   return (
     <>
-      {/* Statistics Rows */}
+      {/* Total Row */}
       <TableRow className="bg-blue-50">
         <TableHead className="font-semibold text-blue-900 text-start">Total</TableHead>
         {renderSeparatorCell(`total-first-separator`, 'section')}
         <TableCell className="text-center font-medium text-blue-700">
-          {Object.values(data).reduce((sum, company) => sum + getMissingFields(company.rows[0]).length, 0)}
+          {data.reduce((sum, companyGroup) =>
+            sum + calculateMissingFieldsForRow(companyGroup.rows[0], processedSections), 0)}
         </TableCell>
 
         {processedSections.slice(1).map((section, sectionIndex) => {
@@ -314,30 +381,47 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
               );
             }
 
-            return category.fields.map((field, fieldIndex, fieldsArray) => (
-              <>
-                <TableCell
-                  key={`total-${field.name}`}
-                  className="text-center font-medium text-blue-700"
-                >
-                  {calculateFieldStats(field.name, data).total}
-                </TableCell>
-                {fieldIndex < fieldsArray.length - 1 &&
-                  field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
-                  renderSeparatorCell(
-                    `total-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}`,
-                    'mini'
-                  )}
-              </>
-            ));
+            return category.fields.map((field, fieldIndex, fieldsArray) => {
+              const stats = calculateFieldStatistics(field.name, data);
+              return (
+                <React.Fragment key={`total-${field.name}`}>
+                  <TableCell className="text-center font-medium text-blue-700">
+                    {stats.total}
+                  </TableCell>
+                  {fieldIndex < fieldsArray.length - 1 &&
+                    field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                    renderSeparatorCell(
+                      `total-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}`,
+                      'mini'
+                    )}
+                </React.Fragment>
+              );
+            });
           });
         })}
       </TableRow>
 
+      {/* Completed Row */}
       <TableRow className="bg-green-50">
         <TableHead className="font-semibold text-green-900 text-start">Completed</TableHead>
         {renderSeparatorCell(`completed-first-separator`, 'section')}
-        <TableCell className="text-center font-medium text-green-700">-</TableCell>
+        <TableCell className="text-center font-medium text-green-700">
+          {data.reduce((sum, companyGroup) => {
+            const totalFields = processedSections.reduce((fieldCount, section) => {
+              if (!section.isSeparator) {
+                section.categorizedFields?.forEach(category => {
+                  if (!category.isSeparator) {
+                    fieldCount += category.fields.length;
+                  }
+                });
+              }
+              return fieldCount;
+            }, 0);
+            const missingFields = calculateMissingFieldsForRow(companyGroup.rows[0], processedSections);
+            return sum + (totalFields - missingFields);
+          }, 0)}
+        </TableCell>
+
         {processedSections.slice(1).map((section, sectionIndex) => {
           if (section.isSeparator) {
             return renderSeparatorCell(
@@ -354,30 +438,35 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
               );
             }
 
-            return category.fields.map((field, fieldIndex, fieldsArray) => (
-              <>
-                <TableCell
-                  key={`completed-${field.name}`}
-                  className="text-center font-medium text-green-700"
-                >
-                  {calculateFieldStats(field.name, data).completed}
-                </TableCell>
-                {fieldIndex < fieldsArray.length - 1 &&
-                  field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
-                  renderSeparatorCell(
-                    `completed-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}`,
-                    'mini'
-                  )}
-              </>
-            ));
+            return category.fields.map((field, fieldIndex, fieldsArray) => {
+              const stats = calculateFieldStatistics(field.name, data);
+              return (
+                <React.Fragment key={`completed-${field.name}`}>
+                  <TableCell className="text-center font-medium text-green-700">
+                    {stats.completed}
+                  </TableCell>
+                  {fieldIndex < fieldsArray.length - 1 &&
+                    field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                    renderSeparatorCell(
+                      `completed-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}`,
+                      'mini'
+                    )}
+                </React.Fragment>
+              );
+            });
           });
         })}
       </TableRow>
 
+      {/* Pending Row */}
       <TableRow className="bg-red-50">
         <TableHead className="font-semibold text-red-900 text-start">Pending</TableHead>
         {renderSeparatorCell(`pending-first-separator`, 'section')}
-        <TableCell className="text-center font-medium text-red-700">-</TableCell>
+        <TableCell className="text-center font-medium text-red-700">
+          {data.reduce((sum, companyGroup) =>
+            sum + calculateMissingFieldsForRow(companyGroup.rows[0], processedSections), 0)}
+        </TableCell>
+
         {processedSections.slice(1).map((section, sectionIndex) => {
           if (section.isSeparator) {
             return renderSeparatorCell(
@@ -394,22 +483,22 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
               );
             }
 
-            return category.fields.map((field, fieldIndex, fieldsArray) => (
-              <>
-                <TableCell
-                  key={`pending-${field.name}`}
-                  className="text-center font-medium text-red-700"
-                >
-                  {calculateFieldStats(field.name, data).pending}
-                </TableCell>
-                {fieldIndex < fieldsArray.length - 1 &&
-                  field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
-                  renderSeparatorCell(
-                    `pending-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}`,
-                    'mini'
-                  )}
-              </>
-            ));
+            return category.fields.map((field, fieldIndex, fieldsArray) => {
+              const stats = calculateFieldStatistics(field.name, data);
+              return (
+                <React.Fragment key={`pending-${field.name}`}>
+                  <TableCell className="text-center font-medium text-red-700">
+                    {stats.pending}
+                  </TableCell>
+                  {fieldIndex < fieldsArray.length - 1 &&
+                    field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                    renderSeparatorCell(
+                      `pending-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}`,
+                      'mini'
+                    )}
+                </React.Fragment>
+              );
+            });
           });
         })}
       </TableRow>
@@ -427,179 +516,153 @@ const renderDataRows = (
   return data.map((companyGroup, groupIndex) => (
     companyGroup.rows.map((row, rowIndex) => (
       <TableRow
-      key={`${groupIndex}-${rowIndex}`}
-      className="hover:bg-gray-50 transition-colors"
-  >
-      {/* Index cell */}
-      {rowIndex === 0 && (
+        key={`${groupIndex}-${rowIndex}`}
+        className="hover:bg-gray-50 transition-colors"
+      >
+        {/* Index cell */}
+        {rowIndex === 0 && (
           <TableCell
-              className="whitespace-nowrap font-medium"
-              rowSpan={companyGroup.rowSpan}
+            className="whitespace-nowrap font-medium"
+            rowSpan={companyGroup.rowSpan}
           >
-              {groupIndex + 1}
+            {groupIndex + 1}
           </TableCell>
-      )}
+        )}
 
-      {rowIndex === 0 && (
-          <>
-              {renderSeparatorCell(`first-separator-${groupIndex}`, 'section', companyGroup.rowSpan)}
-              <TableCell
-                  className="whitespace-nowrap cursor-pointer hover:bg-gray-100"
-                  rowSpan={companyGroup.rowSpan}
-                    onClick={() => handleCompanyClick(companyGroup.company)} 
-              >
-                  <div className="flex items-center gap-2">
-                      <span className="font-medium text-red-600">
-                          {getMissingFields(row).length}
-                      </span>
-                      <span>Missing Fields</span>
-                  </div>
-              </TableCell>
-          </>
-      )}
-
-      {/* Data cells with separators */}
-      {processedSections.slice(1).map((section, sectionIndex) => {
+        {/* Separator and data cells */}
+        {processedSections.slice(1).map((section, sectionIndex) => {
           if (section.isSeparator) {
-              return rowIndex === 0 && renderSeparatorCell(
-                  `body-sec-sep-${groupIndex}-${sectionIndex}`,
-                  'section',
-                  companyGroup.rowSpan
-              );
+            return (
+              <React.Fragment key={`separator-${sectionIndex}`}>
+                {renderSeparatorCell(`data-sep-${sectionIndex}-start`, 'section')}
+                <TableCell className="whitespace-nowrap cursor-pointer hover:bg-gray-100"
+             
+                  onClick={() => onMissingFieldsClick(companyGroup)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-red-600">
+                      {calculateMissingFieldsForRow(row, processedSections)}
+                    </span>
+                    <span className='text-black'>Missing Fields</span>
+                  </div>
+                </TableCell>
+                {renderSeparatorCell(`data-sep-${sectionIndex}-end`, 'section')}
+              </React.Fragment>
+            );
           }
 
           return section.categorizedFields?.map((category, categoryIndex) => {
-              if (category.isSeparator) {
-                  return rowIndex === 0 && renderSeparatorCell(
-                      `body-cat-sep-${groupIndex}-${sectionIndex}-${categoryIndex}`,
-                      'category',
-                      companyGroup.rowSpan
-                  );
+            if (category.isSeparator) {
+              return renderSeparatorCell(`data-cat-sep-${sectionIndex}-${categoryIndex}`, 'category');
+            }
+
+            return category.fields.map((field, fieldIndex, fieldsArray) => {
+              // Handle table-specific field names
+              const [tableName, columnName] = field.name.split('.');
+
+              // Get value from the appropriate data source
+              let value;
+              if (row.isAdditionalRow && row.sourceTable === tableName) {
+                value = row[columnName];
+              } else if (row[`${tableName}_data`]) {
+                value = row[`${tableName}_data`][columnName];
+              } else {
+                value = row[columnName];
               }
 
-              return category.fields.map((field, fieldIndex, fieldsArray) => {
-                  // Skip company-specific fields for non-first rows
-                  if (field.name.startsWith('company_') && rowIndex > 0) {
-                      return null;
-                  }
+              // Skip company-specific fields for non-first rows
+              if (tableName === 'acc_portal_company_duplicate' && rowIndex > 0) {
+                return null;
+              }
 
-                  // Get the field value
-                  let value = row[field.name];
+              return (
+                <React.Fragment key={`${groupIndex}-${rowIndex}-${field.name}`}>
+                  <TableCell
+                    className={`whitespace-nowrap transition-colors
+                      ${field.name === 'acc_portal_company_duplicate.company_name' ? 'cursor-pointer hover:text-primary' : ''}`}
+                    onClick={field.name === 'acc_portal_company_duplicate.company_name' ?
+                      () => handleCompanyClick(companyGroup.company) : undefined}
+                    rowSpan={tableName === 'acc_portal_company_duplicate' ? companyGroup.rowSpan : 1}
+                  >
+                  <EditableCell
+  value={value}
+  onSave={async (newValue) => {
+    try {
+      const [tableName, columnName] = field.name.split('.');
+      
+      // Special handling for company_name updates
+      if (columnName === 'company_name') {
+        // Update company_name in all related tables
+        const updatePromises = processedSections
+          .filter(section => !section.isSeparator)
+          .flatMap(section => 
+            section.categorizedFields?.flatMap(category => 
+              category.fields.map(f => f.table)
+            )
+          )
+          .filter((table, index, self) => self.indexOf(table) === index) // unique tables
+          .map(table => 
+            supabase
+              .from(table)
+              .update({ company_name: newValue })
+              .eq('company_name', row.company_name)
+          );
+        
+        await Promise.all(updatePromises);
+      } else {
+        // Normal field update
+        const { error } = await supabase
+          .from(tableName)
+          .update({ [columnName]: newValue })
+          .eq('company_name', row.company_name);
 
-                  // Format value based on field type
-                  if (field.type === 'boolean') {
-                      value = value ? 'Yes' : 'No';
-                  } else if (field.type === 'date' && value) {
-                      try {
-                          value = new Date(value).toLocaleDateString();
-                      } catch (e) {
-                          value = value;
-                      }
-                  }
-
-                  const sectionColor = sectionColors[section.name]?.cell || 'bg-gray-50';
-
-                  // Add separators between subcategories
-                  const isSubCategoryChange = fieldIndex < fieldsArray.length - 1 &&
-                      field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory;
-
-                  return (
-                      <>
-                          <TableCell
-                              key={`${groupIndex}-${rowIndex}-${field.name}`}
-                              className={`whitespace-nowrap ${sectionColor} transition-colors
-${field.name === 'company_name' ? 'cursor-pointer hover:text-primary' : ''}`}
-                              onClick={field.name === 'company_name' ? () => handleCompanyClick(row) : undefined}
-                              rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
-                          >
-                              <EditableCell
-                                  value={value}
-                                  onSave={async (newValue) => {
-                                      try {
-                                          const { table, idField } = getTableMapping(field.name); // Ensure correct table mapping
-                                          const { error } = await supabase
-                                              .from(table)
-                                              .update({ [field.name]: newValue })
-                                              .eq(idField, row.id);
-
-                                          if (error) throw error;
-
-                                          // Update local state
-                                          const newData = data.map(group => {
-                                              if (group.company.id === row.id) {
-                                                  return {
-                                                      ...group,
-                                                      company: { ...group.company, [field.name]: newValue },
-                                                      rows: group.rows.map(r =>
-                                                          r.id === row.id ? { ...r, [field.name]: newValue } : r
-                                                      )
-                                                  };
-                                              }
-                                              return group;
-                                          });
-                                          setData(newData);
-
-                                          console.log('Updated successfully');
-                                      } catch (error) {
-                                          console.error('Error updating:', error);
-                                          console.error('Failed to update');
-                                      }
-                                  }}
-                                  fieldName={field.name}
-                                  rowId={row.id}
-                                  companyName={row.company_name}
-                                  className={field.name === 'company_name' ? 'hover:text-primary' : ''}
-                                  field={field}
-                                  options={field.options}
-                              />
-                          </TableCell>
-
-
-                          {/* <TableCell
-                              key={`${groupIndex}-${rowIndex}-${field.name}`}
-                              className={`whitespace-nowrap transition-colors
-                                  ${field.name === 'company_name' ? 'cursor-pointer hover:text-primary' : ''}
-                                  ${categoryColors[field.category]?.bg || 'bg-gray-50'} 
-                                  ${categoryColors[field.category]?.text || 'text-gray-700'}
-                                  ${field.subCategory ? `border-l-2 ${categoryColors[field.category]?.border || 'border-gray-200'}` : ''}`}
-                              onClick={field.name === 'company_name' ? () => handleCompanyClick(row) : undefined}
-                              rowSpan={field.name.startsWith('company_') ? companyGroup.rowSpan : 1}
-                          >
-                              {value || <span className="text-red-500 font-semibold">Missing</span>}
-                          </TableCell> */}
-                          {isSubCategoryChange && rowIndex === 0 && renderSeparatorCell(
-                              `body-subcat-sep-${groupIndex}-${sectionIndex}-${categoryIndex}-${fieldIndex}`,
-                              'mini',
-                              companyGroup.rowSpan
-                          )}
-                      </>
-                  );
-              });
+        if (error) throw error;
+      }
+      
+      window.dispatchEvent(new CustomEvent('refreshData'));
+    } catch (error) {
+      console.error('Error updating:', error);
+      toast.error('Update failed');
+    }
+  }}
+  fieldName={field.name}
+  field={field}
+  dropdownOptions={field.dropdownOptions}
+  rowId={row.id}
+  companyName={row.company_name}
+  className={field.name === 'acc_portal_company_duplicate.company_name' ? 'hover:text-primary' : ''}
+/>
+                  </TableCell>
+                  {fieldIndex < fieldsArray.length - 1 &&
+                    field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                    renderSeparatorCell(`data-subcat-sep-${sectionIndex}-${categoryIndex}-${fieldIndex}`, 'mini')}
+                </React.Fragment>
+              );
+            });
           });
-      })}
-  </TableRow>
+        })}
+      </TableRow>
     ))
   ));
 };
 
+// Updated Table component with sticky headers
+export const Table: React.FC<TableProps> = ({ data, handleCompanyClick, processedSections, onMissingFieldsClick }) => {
+  if (!processedSections || !Array.isArray(processedSections)) {
+    return null;
+  }
 
-// Main Table component
-export const Table: React.FC<TableProps> = ({ data, handleCompanyClick, processedSections , onMissingFieldsClick }) => {
-    // Add a guard clause to check for processedSections
-    if (!processedSections || !Array.isArray(processedSections)) {
-      return null; // Or return a loading state/placeholder
-    }
   return (
     <Card>
       <CardContent className="p-0">
         <ScrollArea className="h-[900px] rounded-md border">
           <UITable>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-white">
               {renderHeaders(processedSections)}
               {renderStatisticsRows(data, processedSections)}
             </TableHeader>
             <TableBody>
-              {renderDataRows(data, handleCompanyClick, onMissingFieldsClick,processedSections)}
+              {renderDataRows(data, handleCompanyClick, onMissingFieldsClick, processedSections)}
             </TableBody>
           </UITable>
         </ScrollArea>

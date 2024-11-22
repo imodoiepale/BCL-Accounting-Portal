@@ -10,12 +10,25 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formFields } from '../formfields';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "sonner";
-import { renderSeparatorCell } from './overview/TableComponents copy';
+import { renderSeparatorCell } from './overview/TableComponents';
 
-export function CompanyEditDialog({ isOpen, onClose, companyData, onSave ,processedSections }) {
-    const [editedData, setEditedData] = useState({});
-    const [loading, setLoading] = useState(false);
+interface CompanyEditDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  companyData: any;
+  processedSections: any[];
+  onSave: (updatedData: any) => void;
+}
 
+export const CompanyEditDialog = ({
+  isOpen,
+  onClose,
+  companyData,
+  processedSections,
+  onSave
+}: CompanyEditDialogProps) => {
+  const [editedData, setEditedData] = useState(companyData || {});
+  const [loading, setLoading] = useState(false);
     useEffect(() => {
         if (companyData) {
             setEditedData(companyData);
@@ -31,122 +44,56 @@ export function CompanyEditDialog({ isOpen, onClose, companyData, onSave ,proces
     const handleSubmit = async () => {
       setLoading(true);
       try {
-          const today = new Date();
-          const changedValues = {};
-          Object.keys(editedData).forEach(key => {
-              if (editedData[key] !== companyData[key]) {
-                  changedValues[key] = editedData[key];
+        const tableUpdates = {};
+        
+        processedSections.forEach(section => {
+          if (!section.isSeparator) {
+            section.categorizedFields?.forEach(category => {
+              if (!category.isSeparator) {
+                category.fields.forEach(field => {
+                  const [tableName, columnName] = field.name.split('.');
+                  if (!tableUpdates[tableName]) {
+                    tableUpdates[tableName] = {
+                      company_name: companyData.company_name,
+                      updates: {}
+                    };
+                  }
                   
-                  // Check effective dates and update status and client fields
-                  if (key === 'acc_client_effective_to') {
-                      const effectiveDate = new Date(editedData[key]);
-                      changedValues['acc_client_status'] = effectiveDate > today ? 'Active' : 'Inactive';
-                      changedValues['acc_client'] = effectiveDate > today ? 'Yes' : 'No';
+                  if (editedData[field.name] !== companyData[field.name]) {
+                    tableUpdates[tableName].updates[columnName] = editedData[field.name];
                   }
-                  if (key === 'audit_tax_client_effective_to') {
-                      const effectiveDate = new Date(editedData[key]);
-                      changedValues['audit_tax_client_status'] = effectiveDate > today ? 'Active' : 'Inactive';
-                      changedValues['audit_tax_client'] = effectiveDate > today ? 'Yes' : 'No';
-                  }
-                  if (key === 'imm_client_effective_to') {
-                      const effectiveDate = new Date(editedData[key]);
-                      changedValues['imm_client_status'] = effectiveDate > today ? 'Active' : 'Inactive';
-                      changedValues['imm_client'] = effectiveDate > today ? 'Yes' : 'No';
-                  }
-                  if (key === 'cps_sheria_client_effective_to') {
-                      const effectiveDate = new Date(editedData[key]);
-                      changedValues['cps_sheria_client_status'] = effectiveDate > today ? 'Active' : 'Inactive';
-                      changedValues['cps_sheria_client'] = effectiveDate > today ? 'Yes' : 'No';
-                  }
+                });
               }
-          });
-  
-          // Map fields to their respective tables
-          const tableUpdates = {
-              acc_portal_company_duplicate: {},
-              nssf_companies_duplicate: {},
-              nhif_companies_duplicate2: {},
-              ecitizen_companies_duplicate: {},
-              etims_companies_duplicate: {}
-          };
-  
-          // Sort changed fields into their respective tables
-          Object.entries(changedValues).forEach(([field, value]) => {
-              const companyName = companyData.company_name;
-  
-              if (field.startsWith('nssf_')) {
-                  tableUpdates.nssf_companies_duplicate[field] = value;
-                  tableUpdates.nssf_companies_duplicate.company_name = companyName;
-              } else if (field.startsWith('nhif_')) {
-                  tableUpdates.nhif_companies_duplicate2[field] = value;
-                  tableUpdates.nhif_companies_duplicate2.company_name = companyName;
-              } else if (field.startsWith('etims_')) {
-                  tableUpdates.etims_companies_duplicate[field] = value;
-                  tableUpdates.etims_companies_duplicate.company_name = companyName;
-              } else if (field.startsWith('ecitizen_')) {
-                  tableUpdates.ecitizen_companies_duplicate[field] = value;
-                  tableUpdates.ecitizen_companies_duplicate.company_name = companyName;
-              } else {
-                  tableUpdates.acc_portal_company_duplicate[field] = value;
-              }
-          });
-  
-          // Execute updates
-          for (const [table, updates] of Object.entries(tableUpdates)) {
-              if (Object.keys(updates).length > 0) {
-                  const { data, error } = await supabase
-                      .from(table)
-                      .update(updates)
-                      .match({ company_name: companyData.company_name });
-  
-                  if (error) {
-                      console.error(`Error updating ${table}:`, error);
-                      throw error;
-                  }
-              }
+            });
           }
+        });
   
-          // Fetch updated data
-          const [
-              { data: companies },
-              { data: users },
-              { data: nssfData },
-              { data: nhifData },
-              { data: ecitizenData },
-              { data: etimsData }
-          ] = await Promise.all([
-              supabase.from('acc_portal_company_duplicate').select('*').eq('company_name', companyData.company_name),
-              supabase.from('acc_portal_clerk_users_duplicate').select('*').eq('company_name', companyData.company_name),
-              supabase.from('nssf_companies_duplicate').select('*').eq('company_name', companyData.company_name),
-              supabase.from('nhif_companies_duplicate2').select('*').eq('company_name', companyData.company_name),
-              supabase.from('ecitizen_companies_duplicate').select('*').eq('company_name', companyData.company_name),
-              supabase.from('etims_companies_duplicate').select('*').eq('company_name', companyData.company_name)
-          ]);
+        // Update each table
+        for (const [tableName, data] of Object.entries(tableUpdates)) {
+          if (Object.keys(data.updates).length > 0) {
+            const { error } = await supabase
+              .from(tableName)
+              .update(data.updates)
+              .match({ 
+                [tableName === 'ecitizen_companies_duplicate' ? 'name' : 'company_name']: 
+                data.company_name 
+              });
   
-          // Combine updated data
-          const updatedCompanyData = {
-              ...companies?.[0],
-              ...users?.[0],
-              ...nssfData?.[0],
-              ...nhifData?.[0],
-              ...ecitizenData?.[0],
-              ...etimsData?.[0]
-          };
+            if (error) throw error;
+          }
+        }
   
-          toast.success('Company details updated successfully');
-          onSave(updatedCompanyData);
-          onClose();
-          // Call the provided fetchAllData function
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('refreshData'));
-      }
+        window.dispatchEvent(new CustomEvent('refreshData'));
+        onSave(editedData);
+        onClose();
+        
       } catch (error) {
-          console.error('Error updating company:', error);
-          toast.error('Failed to update company details');
+        console.error('Error updating company:', error);
+        toast.error('Update failed');
       } finally {
-          setLoading(false);
+        setLoading(false);
       }
-  };
+    };
   
   const renderField = (field) => {
     const value = editedData[field.name] || '';
@@ -190,33 +137,6 @@ export function CompanyEditDialog({ isOpen, onClose, companyData, onSave ,proces
     );
 };
 
-const renderFieldsByCategory = () => {
-    const categorizedFields = {};
-    formFields.companyDetails.fields.forEach(field => {
-        const category = field.category || 'General Information';
-        if (!categorizedFields[category]) {
-            categorizedFields[category] = [];
-        }
-        categorizedFields[category].push(field);
-    });
-
-    return Object.entries(categorizedFields).map(([category, fields], index, array) => (
-        <div key={category} className="rounded-lg bg-gray-50 p-6">
-            <div className="mb-6">
-                <div className="flex items-center space-x-2 mb-6">
-                    <div className="h-8 w-1 bg-primary rounded-full"></div>
-                    <h3 className="text-xl font-bold text-primary">{category}</h3>
-                </div>
-                <div className="grid grid-cols-4 gap-4 bg-white p-4 rounded-md shadow-sm">
-                    {fields.map(field => renderField(field))}
-                </div>
-            </div>
-            {index < array.length - 1 && (
-                <div className="border-b-2 border-gray-200 my-8"></div>
-            )}
-        </div>
-    ));
-};
 
 const renderColumnReferences = () => {
     return (
@@ -272,35 +192,69 @@ const renderColumnReferences = () => {
     );
 };
 
+const renderFieldsByCategory = () => {
+  const categorizedFields = {};
+  formFields.companyDetails.fields.forEach((field) => {
+      const category = field.category || "General Information";
+      if (!categorizedFields[category]) {
+          categorizedFields[category] = [];
+      }
+      categorizedFields[category].push(field);
+  });
+
+  return Object.entries(categorizedFields).map(([category, fields], index) => (
+      <div key={category} className="mb-8">
+          {/* Category Header */}
+          <div className="flex items-center gap-4 mb-6">
+              <div className="h-8 w-2 bg-primary rounded"></div>
+              <h3 className="text-xl font-bold text-gray-800">{category}</h3>
+          </div>
+          {/* Fields Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 bg-gray-100 p-6 rounded-lg shadow-sm">
+              {fields.map((field) => renderField(field))}
+          </div>
+          {/* Separator */}
+          {index < Object.keys(categorizedFields).length - 1 && (
+              <div className="border-b border-gray-300 my-6"></div>
+          )}
+      </div>
+  ));
+};
+
 return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-[95vw] max-h-[90vh] p-8">
-            <DialogHeader>
-                <DialogTitle>Edit Company: {companyData?.company_name}</DialogTitle>
-            </DialogHeader>
-            <ScrollArea className="h-[80vh] px-6">
-                <div className="space-y-6">
-                    {renderFieldsByCategory()}
-                    {renderColumnReferences()} {/* Render column references here */}
-                </div>
-            </ScrollArea>
-            <DialogFooter className="bg-white pt-2">
-                <Button
-                    variant="outline"
-                    onClick={onClose}
-                    className="mr-2"
-                >
-                    Cancel
-                </Button>
-                <Button
-                    onClick={handleSubmit}
-                    disabled={loading}
-                >
-                    {loading ? 'Saving...' : 'Save Changes'}
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
+  <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-8xl max-h-[85vh] p-6 rounded-lg shadow-lg border border-gray-300">
+          {/* Header */}
+          <DialogHeader className="border-b pb-4">
+              <DialogTitle className="text-2xl font-semibold text-gray-900">
+                  Edit Company: {companyData?.company_name}
+              </DialogTitle>
+          </DialogHeader>
+          {/* Scrollable Content */}
+          <ScrollArea className="h-[70vh] mt-4 px-4">
+              <div className="space-y-8">
+                  {renderFieldsByCategory()}
+              </div>
+          </ScrollArea>
+          {/* Footer */}
+          <DialogFooter className="bg-gray-50 pt-4 border-t mt-2 flex justify-end">
+              <Button
+                  variant="outline"
+                  onClick={onClose}
+                  className="mr-4 hover:bg-gray-200 transition-colors"
+              >
+                  Cancel
+              </Button>
+              <Button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="bg-primary hover:bg-primary/90 text-white transition-colors"
+              >
+                  {loading ? "Saving..." : "Save Changes"}
+              </Button>
+          </DialogFooter>
+      </DialogContent>
+  </Dialog>
 );
 }
 

@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { Table } from './components/overview/TableComponents';
 import { SettingsDialog } from './components/overview/Dialogs/settingsDialog';
 import { MissingFieldsDialog } from './components/missingFieldsDialog';
-import { getMissingFields } from './components/missingFieldsDialog';
+import { CompanyEditDialog } from './components/functionalities';
 
 // Utility function to safely parse JSON
 const safeJSONParse = (jsonString: string, defaultValue = {}) => {
@@ -33,32 +33,105 @@ const OverallView: React.FC = () => {
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [selectedMissingFields, setSelectedMissingFields] = useState(null);
     const [isMissingFieldsOpen, setIsMissingFieldsOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState('');
 
-    // Function to fetch company data
-    const fetchData = async () => {
+    const fetchAllData = async () => {
         try {
-            const { data: companies, error } = await supabase
-                .from('acc_portal_company_duplicate')
-                .select('*')
-                .order('id', { ascending: true });
-
-            if (error) throw error;
-
-            const processedData = companies.map(company => ({
-                company,
-                rows: [{ ...company, isFirstRow: true }],
-                rowSpan: 1
-            }));
-
-            setData(processedData);
-            setLoading(false);
+            // First fetch the table mappings
+            const { data: mappings, error: mappingError } = await supabase
+                .from('profile_category_table_mapping')
+                .select('*');
+    
+            if (mappingError) throw mappingError;
+    
+            // Extract unique table names from all mappings
+            const allTables = new Set();
+            mappings.forEach(mapping => {
+                const tableNames = safeJSONParse(mapping.table_names, {});
+                Object.values(tableNames).flat().forEach(table => allTables.add(table));
+            });
+    
+            // Fetch data from all tables concurrently
+            const tableData = {};
+            const queries = Array.from(allTables).map(async tableName => {
+                const { data, error } = await supabase
+                    .from(tableName.toString())
+                    .select('*')
+                    .order('id', { ascending: true });
+                
+                if (error) {
+                    console.error(`Error fetching from ${tableName}:`, error);
+                    return;
+                }
+                
+                tableData[tableName.toString()] = data || [];
+            });
+    
+            await Promise.all(queries);
+    
+            // Start with companies from the main table
+            const baseCompanies = tableData['acc_portal_company_duplicate'] || [];
+            
+            // Group and merge data
+            const groupedData = baseCompanies.map(company => {
+                let mergedData = { ...company,   company_name: company.company_name  };
+                let additionalRows = [];
+    
+                // For each related table
+                Array.from(allTables).forEach(tableName => {
+                    if (tableName === 'acc_portal_company_duplicate') return;
+    
+                    const relatedRecords = tableData[tableName]?.filter(
+                        record => record.company_name?.toLowerCase() === company.company_name?.toLowerCase()
+                    );
+    
+                    if (relatedRecords?.length) {
+                        // Add company_name to each related record
+                        const recordsWithCompanyName = relatedRecords.map(record => ({
+                            ...record,
+                            company_name: company.company_name
+                        }));
+    
+                        // Merge the first record into the main data
+                        mergedData = {
+                            ...mergedData,
+                            [`${tableName}_data`]: recordsWithCompanyName[0]
+                        };
+    
+                        // If there are additional records, add them as new rows
+                        if (recordsWithCompanyName.length > 1) {
+                            additionalRows.push(...recordsWithCompanyName.slice(1).map(record => ({
+                                ...record,
+                                isAdditionalRow: true,
+                                sourceTable: tableName
+                            })));
+                        }
+                    }
+                });
+    
+                // Construct the final company group
+                const rows = [
+                    { ...mergedData, isFirstRow: true },
+                    ...additionalRows
+                ];
+    
+                return {
+                    company: mergedData,
+                    rows: rows,
+                    rowSpan: rows.length
+                };
+            });
+    
+            console.log('Grouped Data Sample:', groupedData[0]);
+            setData(groupedData);
+    
         } catch (error) {
-            console.error('Error fetching data:', error);
+            console.error('Error in fetchAllData:', error);
             toast.error('Failed to fetch data');
+        } finally {
             setLoading(false);
         }
     };
-
     // Function to fetch table structure
     const fetchStructure = async () => {
         try {
@@ -79,8 +152,12 @@ const OverallView: React.FC = () => {
     };
 
     useEffect(() => {
-        fetchData();
+        fetchAllData();
         fetchStructure();
+
+        const handleRefresh = () => fetchAllData();
+        window.addEventListener('refreshData', handleRefresh);
+        return () => window.removeEventListener('refreshData', handleRefresh);
     }, []);
 
     // Process sections for the selected tab
@@ -89,15 +166,29 @@ const OverallView: React.FC = () => {
         
         const processedSections = [
             {
-                name: 'index',
-                label: 'Index',
-                categorizedFields: []
+              name: 'index',
+              label: 'Index',
+              categorizedFields: []
             },
             {
-                isSeparator: true,
-                name: 'missing-fields-separator'
-            }
-        ];
+              isSeparator: true,
+              name: 'company-name-separator'
+            },
+            {
+              name: '',
+              label: '',
+              categorizedFields: [{
+                category: '',
+                fields: [{
+                  name: 'acc_portal_company_duplicate.company_name',
+                  label: 'Company Name',
+                  table: 'acc_portal_company_duplicate',
+                  column: 'company_name',
+                  subCategory: 'Company Info'
+                }]
+              }]
+            },
+          ];
 
         relevantMappings.forEach(mapping => {
             const sections = safeJSONParse(mapping.sections_sections);
@@ -158,7 +249,6 @@ const OverallView: React.FC = () => {
         return processedSections;
     };
 
-
     const handleCompanyClick = (company) => {
         setSelectedCompany(company);
         setIsEditDialogOpen(true);
@@ -188,7 +278,7 @@ const OverallView: React.FC = () => {
             </Button>
         </div>
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden" onValueChange={setActiveTab}>
             <Tabs defaultValue={tabs[0]} className="h-full flex flex-col">
                 <TabsList className="w-full grid grid-cols-10 bg-gray-100 rounded-lg p-1">
                     {tabs.map(tab => (
@@ -214,13 +304,14 @@ const OverallView: React.FC = () => {
                                     <div className="h-full overflow-auto">
                                         <div className="min-w-max">
                                             <Table
-                                                data={data}
-                                                handleCompanyClick={handleCompanyClick}
-                                                onMissingFieldsClick={(company) => {
-                                                    setSelectedMissingFields(getMissingFields(company.rows[0]));
-                                                    setIsMissingFieldsOpen(true);
-                                                }}
-                                                processedSections={processTabSections(tab)}
+                                                 data={data}
+                                                 handleCompanyClick={handleCompanyClick}
+                                                 onMissingFieldsClick={(company) => {
+                                                     const processedSections = processTabSections(tabs[0]); // or current active tab
+                                                     setSelectedMissingFields(company);
+                                                     setIsMissingFieldsOpen(true);
+                                                 }}
+                                                 processedSections={processTabSections(tab)}
                                             />
                                         </div>
                                     </div>
@@ -232,45 +323,32 @@ const OverallView: React.FC = () => {
             </Tabs>
         </div> 
         
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogContent className="sm:max-w-xl">
-                    <div className="grid gap-4">
-                        <h2 className="text-lg font-semibold">Edit Company Details</h2>
-                        {selectedCompany && (
-                            <div className="grid gap-4">
-                                {Object.entries(selectedCompany).map(([key, value]) => (
-                                    <div key={key} className="grid gap-2">
-                                        <label className="text-sm font-medium">{key}</label>
-                                        <input
-                                            type="text"
-                                            value={value as string}
-                                            onChange={(e) => {
-                                                setSelectedCompany({
-                                                    ...selectedCompany,
-                                                    [key]: e.target.value
-                                                });
-                                            }}
-                                            className="p-2 border rounded-md"
-                                        />
-                                    </div>
-                                ))}
-                                <Button onClick={() => setIsEditDialogOpen(false)}>
-                                    Save Changes
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                </DialogContent>
-            </Dialog>
+        <CompanyEditDialog
+    isOpen={isEditDialogOpen}
+    onClose={() => setIsEditDialogOpen(false)}
+    companyData={selectedCompany}
+    processedSections={processTabSections(tabs[0])}
+    onSave={(updatedData) => {
+        fetchAllData();
+        setIsEditDialogOpen(false);
+    }}
+/>
 
             <Dialog open={isMissingFieldsOpen} onOpenChange={setIsMissingFieldsOpen}>
                 <DialogContent>
                     <MissingFieldsDialog
-                        data={selectedMissingFields}
+                        isOpen={isMissingFieldsOpen}
                         onClose={() => setIsMissingFieldsOpen(false)}
+                        companyData={selectedMissingFields}
+                        processedSections={processTabSections(tabs[0])} // or current active tab
+                        onSave={(updatedData) => {
+                            fetchAllData(); // Refresh the data
+                            setIsMissingFieldsOpen(false);
+                        }}
                     />
                 </DialogContent>
             </Dialog>
+            
         </div>
     );
 };

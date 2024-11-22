@@ -1182,6 +1182,36 @@ export const calculatePendingFields = (section, data) => {
   return total - completed;
 };
 
-export const getSubsectionFields = (formFields: Record<string, any>, subsection: string) => {
-    return formFields[subsection] || [];
-};
+export const getMissingFields = (row: any, processedSections: any[]) => {
+    const missingFields = [];
+    
+    processedSections.forEach(section => {
+      if (!section.isSeparator && section.categorizedFields) {
+        section.categorizedFields.forEach(category => {
+          if (!category.isSeparator) {
+            category.fields.forEach(field => {
+              const [tableName, columnName] = field.name.split('.');
+              let value;
+              
+              if (row.isAdditionalRow && row.sourceTable === tableName) {
+                value = row[columnName];
+              } else if (row[`${tableName}_data`]) {
+                value = row[`${tableName}_data`][columnName];
+              } else {
+                value = row[columnName];
+              }
+              
+              if (value === null || value === '' || value === undefined) {
+                missingFields.push({
+                  ...field,
+                  value: value
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    return missingFields;
+  };
