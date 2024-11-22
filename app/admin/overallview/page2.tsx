@@ -410,38 +410,58 @@ const OverallView: React.FC = () => {
             return [];
         }
     }, []);
-      useEffect(() => {
-          const fetchFieldsForSection = async (section: string, subsection: string) => {
-              try {
-                  const { data, error } = await supabase
-                      .from('profile_category_table_mapping')
-                      .select('*')
-                      .match({
-                          sections_sections: JSON.stringify({ [section]: true }),
-                          sections_subsections: JSON.stringify({ [section]: subsection })
-                      });
-
-                  if (error) throw error;
-
-                  return data.reduce((acc, mapping) => {
-                      const columnMappings = safeJSONParse(mapping.column_mappings);
-                      const fields = Object.entries(columnMappings).map(([key, label]) => ({
-                          name: key.split('.')[1],
-                          label,
-                          table: key.split('.')[0],
-                          category: subsection
-                      }));
-
-                      return {
-                          ...acc,
-                          [subsection]: fields || []
-                      };
-                  }, {});
-              } catch (error) {
-                  console.error('Error fetching fields:', error);
-                  return {};
-              }
-          };
+        const fetchFieldsForSection = useCallback(async (section: string, subsection: string) => {
+            try {
+                const { data, error } = await supabase
+                    .from('profile_category_table_mapping')
+                    .select('*')
+                    .match({
+                        sections_sections: JSON.stringify({ [section]: true }),
+                        sections_subsections: JSON.stringify({ [section]: subsection })
+                    });
+        
+                if (error) throw error;
+        
+                return data.reduce((acc, mapping) => {
+                    const columnMappings = safeJSONParse(mapping.column_mappings);
+                    const fields = Object.entries(columnMappings).map(([key, label]) => ({
+                        name: key.split('.')[1],
+                        label,
+                        table: key.split('.')[0],
+                        category: subsection
+                    }));
+        
+                    return {
+                        ...acc,
+                        [subsection]: fields || []
+                    };
+                }, {});
+            } catch (error) {
+                console.error('Error fetching fields:', error);
+                return {};
+            }
+        }, []);
+        
+        useEffect(() => {
+            const updateFormFields = async () => {
+                if (Object.keys(mainSections).length === 0) return;
+        
+                const fields = {};
+                for (const [tab, sections] of Object.entries(mainSections)) {
+                    for (const section of sections) {
+                        const subsections = mainSubsections[section] || [];
+                        for (const subsection of subsections) {
+                            const sectionFields = await fetchFieldsForSection(section, subsection);
+                            Object.assign(fields, sectionFields);
+                        }
+                    }
+                }
+                setFormFields(fields);
+            };
+        
+            updateFormFields();
+        }, [mainSections, mainSubsections, fetchFieldsForSection]);
+        
 
           const updateFormFields = async () => {
               // Ensure mainSections and mainSubsections are not empty
@@ -463,9 +483,7 @@ const OverallView: React.FC = () => {
           };
 
           updateFormFields();
-      }, [mainSections, mainSubsections]);
 
-    // Then update the processedSections creation:
 
     if (loading) {
         return <div>Loading...</div>;
