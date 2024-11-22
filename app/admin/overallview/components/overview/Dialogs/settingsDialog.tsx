@@ -24,21 +24,24 @@ interface StructureItem {
   Tabs: string;
   table_names: Record<string, string[]>;
 }
-
-
 interface Tab {
   name: string;
   sections: Section[];
 }
-
 interface Section {
   name: string;
   subsections: Subsection[];
 }
-
 interface Subsection {
   name: string;
   tables: string[];
+}
+
+interface SettingsDialogProps {
+  mainTabs: string[];
+  onStructureChange: () => void;
+  activeMainTab: string;
+  subTabs: string[];
 }
 
 // Add these helper functions
@@ -75,7 +78,6 @@ interface SectionFields {
     };
   };
 }
-
 
 // Helper function to parse JSON safely
 const safeJSONParse = (jsonString: string, fallback: any = {}) => {
@@ -153,7 +155,10 @@ const processStructureData = (data: any[]) => {
 
 
 
-export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStructureChange }) {
+export function SettingsDialog({ mainTabs, 
+  onStructureChange,
+  activeMainTab,
+  subTabs }) {
   const [isOpen, setIsOpen] = useState(false);
   const [structure, setStructure] = useState<StructureItem[]>([]);
   const [uniqueTabs, setUniqueTabs] = useState<string[]>([]);
@@ -173,7 +178,6 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
     isNewSubsection: false,
     table_names: []
   });
-
   const [selectedSection, setSelectedSection] = useState<StructureItem | null>(null);
   const [selectedSubsection, setSelectedSubsection] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -250,18 +254,23 @@ const [editingField, setEditingField] = useState({
     subsection: ''
   });
   useEffect(() => {
-    fetchStructure();
-  }, []);
+    if (activeMainTab) {
+      fetchStructure(activeMainTab);
+    }
+  }, [activeMainTab]);
 
   const fetchStructure = async () => {
     try {
-      const { data: mappings, error } = await supabase
+      let query = supabase
         .from('profile_category_table_mapping')
         .select('*')
+        .eq('main_tab', activeMainTab) // Filter by activeMainTab
         .order('Tabs', { ascending: true });
-
+  
+      const { data: mappings, error } = await query;
+  
       if (error) throw error;
-
+  
       const processedMappings = mappings.map(mapping => ({
         id: mapping.id,
         section: mapping.section,
@@ -272,21 +281,19 @@ const [editingField, setEditingField] = useState({
           : mapping.column_mappings || {},
         column_order: mapping.column_order || {},
         Tabs: mapping.Tabs,
+        main_tab: activeMainTab,
         sections_subsections: typeof mapping.sections_subsections === 'string'
           ? JSON.parse(mapping.sections_subsections)
           : mapping.sections_subsections || {},
         sections_sections: typeof mapping.sections_sections === 'string'
           ? JSON.parse(mapping.sections_sections)
-          : mapping.sections_sections || {},
-        field_dropdowns: typeof mapping.field_dropdowns === 'string'
-          ? JSON.parse(mapping.field_dropdowns)
-          : mapping.field_dropdowns || {}
+          : mapping.sections_sections || {}
       }));
-
+  
       setStructure(processedMappings);
       const uniqueTabs = [...new Set(mappings.map(m => m.Tabs))];
       setUniqueTabs(uniqueTabs);
-
+  
       if (!selectedTab && uniqueTabs.length > 0) {
         setSelectedTab(uniqueTabs[0]);
       }
@@ -296,6 +303,10 @@ const [editingField, setEditingField] = useState({
     }
   };
 
+  const handleMainTabChange = async (mainTab: string) => {
+    setActiveMainTab(mainTab);
+    await fetchStructure(mainTab);
+  };
   useEffect(() => {
     fetchTables();
     fetchExistingSectionsAndSubsections();
@@ -671,41 +682,47 @@ const [editingField, setEditingField] = useState({
       subsections: {}
     };
   
-    // Index tabs
-    uniqueTabs.forEach((tab, tabIndex) => {
-      newIndexMapping.tabs[tab] = tabIndex + 1;
-    });
-  
-    // Index sections and subsections
+    // Index tabs and organize by tabs
+    const tabStructure = {};
     structure.forEach(item => {
-      const tabIndex = newIndexMapping.tabs[item.Tabs];
+      if (!tabStructure[item.Tabs]) {
+        tabStructure[item.Tabs] = [];
+      }
+      tabStructure[item.Tabs].push(item);
+    });
+    
+    // Process each tab
+    Object.keys(tabStructure).forEach((tab, tabIndex) => {
+      newIndexMapping.tabs[tab] = tabIndex + 1;
       
-      // Safely parse JSON or use default empty object
-      const sections = typeof item.sections_sections === 'string' 
-        ? JSON.parse(item.sections_sections) 
-        : item.sections_sections || {};
-        
-      const subsections = typeof item.sections_subsections === 'string'
-        ? JSON.parse(item.sections_subsections)
-        : item.sections_subsections || {};
-  
-      Object.keys(sections).forEach((section, sectionIndex) => {
-        newIndexMapping.sections[section] = `${tabIndex}.${sectionIndex + 1}`;
-  
-        const sectionSubsections = subsections[section];
-        if (Array.isArray(sectionSubsections)) {
-          sectionSubsections.forEach((subsection, subsectionIndex) => {
-            newIndexMapping.subsections[subsection] = `${tabIndex}.${sectionIndex + 1}.${subsectionIndex + 1}`;
-          });
-        } else if (sectionSubsections) {
-          newIndexMapping.subsections[sectionSubsections] = `${tabIndex}.${sectionIndex + 1}.1`;
-        }
+      // Process items within each tab
+      tabStructure[tab].forEach(item => {
+        // Safely parse JSON or use default empty object
+        const sections = typeof item.sections_sections === 'string' 
+          ? JSON.parse(item.sections_sections) 
+          : item.sections_sections || {};
+          
+        const subsections = typeof item.sections_subsections === 'string'
+          ? JSON.parse(item.sections_subsections)
+          : item.sections_subsections || {};
+    
+        Object.keys(sections).forEach((section, sectionIndex) => {
+          newIndexMapping.sections[section] = `${tabIndex + 1}.${sectionIndex + 1}`;
+    
+          const sectionSubsections = subsections[section];
+          if (Array.isArray(sectionSubsections)) {
+            sectionSubsections.forEach((subsection, subsectionIndex) => {
+              newIndexMapping.subsections[subsection] = `${tabIndex + 1}.${sectionIndex + 1}.${subsectionIndex + 1}`;
+            });
+          } else if (sectionSubsections) {
+            newIndexMapping.subsections[sectionSubsections] = `${tabIndex + 1}.${sectionIndex + 1}.1`;
+          }
+        });
       });
     });
   
     setIndexMapping(newIndexMapping);
-  };
-  
+  };  
 
 // Call this in useEffect after fetching structure
 useEffect(() => {
@@ -713,81 +730,84 @@ useEffect(() => {
     generateIndices(structure);
   }
 }, [structure, uniqueTabs]);
-  const handleAddStructure = async () => {
-    try {
-      console.log('Adding new structure with:', newStructure);
 
-      // Check for matching tab, section, and subsection
-      const { data: existingRecord, error: existingError } = await supabase
+const handleAddStructure = async () => {
+  try {
+    console.log('Adding new structure with:', newStructure);
+
+    // Check for matching tab, section, and subsection
+    const { data: existingRecord, error: existingError } = await supabase
+      .from('profile_category_table_mapping')
+      .select('*')
+      .eq('Tabs', newStructure.Tabs)
+      .eq('main_tab', activeMainTab)
+      .eq('sections_sections', JSON.stringify({ [newStructure.section]: true }))
+      .eq('sections_subsections', JSON.stringify({ [newStructure.section]: newStructure.subsection }))
+      .single();
+
+    if (!existingError && existingRecord) {
+      // Update existing record
+      const updatedColumnMappings = {
+        ...existingRecord.column_mappings,
+        ...newStructure.column_mappings
+      };
+
+      const { error: updateError } = await supabase
         .from('profile_category_table_mapping')
-        .select('*')
-        .eq('Tabs', newStructure.Tabs)
-        .eq('sections_sections', JSON.stringify({ [newStructure.section]: true }))
-        .eq('sections_subsections', JSON.stringify({ [newStructure.section]: newStructure.subsection }))
-        .single();
-
-      if (!existingError && existingRecord) {
-        // Update existing record
-        const updatedColumnMappings = {
-          ...existingRecord.column_mappings,
-          ...newStructure.column_mappings
-        };
-
-        const { error: updateError } = await supabase
-          .from('profile_category_table_mapping')
-          .update({
-            table_names: JSON.stringify({
-              ...JSON.parse(existingRecord.table_names || '{}'),
-              [newStructure.section]: newStructure.table_names
-            }),
-            column_mappings: JSON.stringify(updatedColumnMappings),
-            field_dropdowns: JSON.stringify({
-              ...JSON.parse(existingRecord.field_dropdowns || '{}'),
-              ...newStructure.field_dropdowns
-            }),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingRecord.id);
-
-        if (updateError) throw updateError;
-      } else {
-        // Create new record
-        const payload = {
-          sections_sections: JSON.stringify({ [newStructure.section]: true }),
-          sections_subsections: JSON.stringify({
-            [newStructure.section]: newStructure.subsection
-          }),
-          Tabs: newStructure.Tabs,
-          column_mappings: JSON.stringify(newStructure.column_mappings),
+        .update({
           table_names: JSON.stringify({
+            ...JSON.parse(existingRecord.table_names || '{}'),
             [newStructure.section]: newStructure.table_names
           }),
-          column_order: JSON.stringify(
-            Object.keys(newStructure.column_mappings).reduce((acc, key, index) => {
-              acc[key] = index + 1;
-              return acc;
-            }, {})
-          ),
-          field_dropdowns: JSON.stringify(newStructure.field_dropdowns)
-        };
+          column_mappings: JSON.stringify(updatedColumnMappings),
+          field_dropdowns: JSON.stringify({
+            ...JSON.parse(existingRecord.field_dropdowns || '{}'),
+            ...newStructure.field_dropdowns
+          }),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingRecord.id);
 
-        const { error: insertError } = await supabase
-          .from('profile_category_table_mapping')
-          .insert([payload]);
+      if (updateError) throw updateError;
+    } else {
+      // Create new record
+      const payload = {
+        sections_sections: JSON.stringify({ [newStructure.section]: true }),
+        sections_subsections: JSON.stringify({
+          [newStructure.section]: newStructure.subsection
+        }),
+        Tabs: newStructure.Tabs,
+        main_tab: activeMainTab, // Use the prop
+        column_mappings: JSON.stringify(newStructure.column_mappings),
+        table_names: JSON.stringify({
+          [newStructure.section]: newStructure.table_names
+        }),
+        column_order: JSON.stringify(
+          Object.keys(newStructure.column_mappings).reduce((acc, key, index) => {
+            acc[key] = index + 1;
+            return acc;
+          }, {})
+        ),
+        field_dropdowns: JSON.stringify(newStructure.field_dropdowns)
+      };
 
-        if (insertError) throw insertError;
-      }
+      const { error: insertError } = await supabase
+        .from('profile_category_table_mapping')
+        .insert([payload]);
 
-      await fetchStructure();
-      await onStructureChange();
-      resetNewStructure();
-      toast.success('Structure added/updated successfully');
-
-    } catch (error) {
-      console.error('Error adding/updating structure:', error);
-      toast.error('Failed to add/update structure');
+      if (insertError) throw insertError;
     }
-  };
+
+    await fetchStructure();
+    await onStructureChange();
+    resetNewStructure();
+    toast.success('Structure added/updated successfully');
+
+  } catch (error) {
+    console.error('Error adding/updating structure:', error);
+    toast.error('Failed to add/update structure');
+  }
+};
 
   const processColumnMappings = (mappings: Record<string, string>) => {
     const result: Record<string, string[]> = {};
@@ -1667,6 +1687,7 @@ useEffect(() => {
         <DialogContent className="max-w-8xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Table Structure Settings</DialogTitle>
+            
           </DialogHeader>
           <Tabs defaultValue="structure" className="w-full">
       <TabsList className="grid w-full grid-cols-3">
