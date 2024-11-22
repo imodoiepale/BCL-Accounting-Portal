@@ -720,5 +720,3 @@ const OverallView: React.FC = () => {
 };
 
 export default OverallView;
-
-
