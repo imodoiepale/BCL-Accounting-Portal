@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { FileDown, Upload, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 interface Company {
   name: string;
@@ -124,7 +124,7 @@ const DocumentManagement = () => {
         ...uploadData,
       });
       // Add your upload logic here
-
+      
       setShowUploadModal(false);
       toast.success('Document uploaded successfully');
     } catch (error) {
@@ -144,11 +144,10 @@ const DocumentManagement = () => {
   const generateDirectors = (companyId: number) => {
     return Array.from({ length: 3 }, (_, i) => `Director ${i + 1}`);
   };
-
   return (
-    <div className="w-full p-6 bg-white rounded-lg shadow-sm">
-      {/* Header Section */}
-      <div className="flex justify-between items-center mb-6">
+    <div className="w-full h-screen p-6 bg-white flex flex-col">
+      {/* Header Section - Fixed */}
+      <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div className="flex items-center gap-4">
           <input
             type="text"
@@ -172,128 +171,135 @@ const DocumentManagement = () => {
         </div>
       </div>
 
-      {/* Table Section */}
-      <div className="border-2 rounded-lg overflow-hidden">
-        <div className="overflow-auto max-h-[70vh] max-w-full">
-          <table className="w-full text-sm border-collapse min-w-[1500px]">
-            <thead className="sticky top-0 bg-white">
-              <tr className="bg-gray-100">
-                <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Companies</th>
-                <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Directors</th>
-                <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Summary</th>
-                {documents.map(doc => (
-                  visibleColumns[doc.id].visible && (
-                    <th key={`doc-${doc.id}`} className="p-3 border-2 border-gray-300 font-semibold text-gray-700 text-center bg-blue-50"
-                      colSpan={5}>
-                      {doc.name}
-                    </th>
-                  )
-                ))}
-              </tr>
-              
-            </thead>
-            <tbody>
-              {/* Stats rows */}
-              <tr className="bg-gray-50">
-                <td className="p-3 border-2 border-gray-300 font-medium bg-gray-100" rowSpan={3}></td>
-                <td className="p-3 border-2 border-gray-300" rowSpan={3}></td>
-                <td className="p-3 border-2 border-gray-300 font-semibold text-blue-600">Total</td>
-                {documents.map(doc => (
-                  visibleColumns[doc.id].visible && (
-                    <React.Fragment key={`total-${doc.id}`}>
-                      {visibleColumns[doc.id].subColumns.upload && (
+      {/* Table Section - Scrollable */}
+      <div className="flex-1 border-2 rounded-lg overflow-hidden flex flex-col">
+        <div className="overflow-y-auto flex-1">
+          <div className="pb-4">
+            <table className="w-full text-sm border-collapse min-w-[1500px]">
+              <thead className="sticky top-0 bg-white z-10">
+                <tr className="bg-gray-100">
+                  <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Companies</th>
+                  <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Directors</th>
+                  <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Summary</th>
+                  {documents.map(doc => (
+                    visibleColumns[doc.id].visible && (
+                      <th key={`doc-${doc.id}`} className="p-3 border-2 border-gray-300 font-semibold text-gray-700 text-center bg-blue-50"
+                        colSpan={5}>
+                        {doc.name}
+                      </th>
+                    )
+                  ))}
+                </tr>
+                <tr className="bg-gray-50">
+                  {documents.map(doc => (
+                    visibleColumns[doc.id].visible && (
+                      <React.Fragment key={`doc-columns-${doc.id}`}>
+                        <th className="p-3 border-2 border-gray-300 font-medium text-gray-600">Upload</th>
+                        <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('issueDate')}>
+                          <div className="flex items-center justify-between">
+                            Issue Date
+                            <SortIcon field="issueDate" />
+                          </div>
+                        </th>
+                        <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('expiryDate')}>
+                          <div className="flex items-center justify-between">
+                            Expiry Date
+                            <SortIcon field="expiryDate" />
+                          </div>
+                        </th>
+                        <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('daysLeft')}>
+                          <div className="flex items-center justify-between">
+                            Days Left
+                            <SortIcon field="daysLeft" />
+                          </div>
+                        </th>
+                        <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('status')}>
+                          <div className="flex items-center justify-between">
+                            Status
+                            <SortIcon field="status" />
+                          </div>
+                        </th>
+                      </React.Fragment>
+                    )
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {/* Stats rows */}
+                <tr className="bg-gray-50">
+                  <td className="p-3 border-2 border-gray-300 font-medium bg-gray-100" rowSpan={3}></td>
+                  <td className="p-3 border-2 border-gray-300" rowSpan={3}></td>
+                  <td className="p-3 border-2 border-gray-300 font-semibold text-blue-600">Total</td>
+                  {documents.map(doc => (
+                    visibleColumns[doc.id].visible && (
+                      <React.Fragment key={`total-${doc.id}`}>
                         <td className="p-3 border-2 border-gray-300 text-center font-medium">4</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.issueDate && (
                         <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.expiryDate && (
                         <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.daysLeft && (
                         <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.status && (
                         <td className="p-3 border-2 border-gray-300 text-center font-medium">4</td>
-                      )}
-                    </React.Fragment>
-                  )
-                ))}
-              </tr>
-              <tr className="bg-gray-50">
-                <td className="p-3 border-2 border-gray-300 font-semibold text-orange-600">Missing</td>
-                {documents.map(doc => (
-                  visibleColumns[doc.id].visible && (
-                    <React.Fragment key={`pending-${doc.id}`}>
-                      {visibleColumns[doc.id].subColumns.upload && (
+                      </React.Fragment>
+                    )
+                  ))}
+                </tr>
+                <tr className="bg-gray-50">
+                  <td className="p-3 border-2 border-gray-300 font-semibold text-orange-600">Missing</td>
+                  {documents.map(doc => (
+                    visibleColumns[doc.id].visible && (
+                      <React.Fragment key={`pending-${doc.id}`}>
                         <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.issueDate && (
                         <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.expiryDate && (
                         <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.daysLeft && (
                         <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.status && (
                         <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
-                      )}
-                    </React.Fragment>
-                  )
-                ))}
-              </tr>
-              <tr className="bg-gray-50">
-                <td className="p-3 border-2 border-gray-300 font-semibold text-green-600">Completed</td>
-                {documents.map(doc => (
-                  visibleColumns[doc.id].visible && (
-                    <React.Fragment key={`complete-${doc.id}`}>
-                      {visibleColumns[doc.id].subColumns.upload && (
-                        <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.issueDate && (
-                        <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.expiryDate && (
-                        <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.daysLeft && (
-                        <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
-                      )}
-                      {visibleColumns[doc.id].subColumns.status && (
-                        <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
-                      )}
-                    </React.Fragment>
-                  )
-                ))}
-              </tr>
+                      </React.Fragment>
+                    )
+                  ))}
+                </tr>
 
-              {/* Separator row */}
-              <tr className="h-2 bg-gray-200">
-                <td colSpan={100} className="border-4 border-gray-300"></td>
-              </tr>
+                <tr className="bg-gray-50">
+                  <td className="p-3 border-2 border-gray-300 font-semibold text-green-600">Completed</td>
+                  {documents.map(doc => (
+                    visibleColumns[doc.id].visible && (
+                      <React.Fragment key={`complete-${doc.id}`}>
+                        <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
+                        <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
+                        <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
+                        <td className="p-3 border-2 border-gray-300 text-center text-gray-400">-</td>
+                        <td className="p-3 border-2 border-gray-300 text-center font-medium">2</td>
+                      </React.Fragment>
+                    )
+                  ))}
+                </tr>
 
-              {/* Company rows */}
-              {getSortedCompanies().map((company, index) => {
-                const date = new Date(2024, 0, company.id);
-                const expiryDate = new Date(2025, 6, company.id);
-                const directors = generateDirectors(company.id);
-                return (
-                  <React.Fragment key={company.id}>
-                    {directors.map((director, dirIndex) => (
-                      <tr key={`${company.id}-${dirIndex}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        {dirIndex === 0 && (
-                          <td className="p-3 border-2 border-gray-300 font-medium" rowSpan={3}>
-                            {company.name}
-                          </td>
-                        )}
-                        <td className="p-3 border-2 border-gray-300 font-medium">{director}</td>
-                        <td className="p-3 border-2 border-gray-300"></td>
-                        {documents.map((doc) => (
-                          visibleColumns[doc.id].visible && (
-                            <React.Fragment key={`${company.id}-${doc.id}-${dirIndex}`}>
-                              {visibleColumns[doc.id].subColumns.upload && (
+                {/* Separator row */}
+                <tr className="h-2 bg-gray-200">
+                  <td colSpan={100} className="border-4 border-gray-300"></td>
+                </tr>
+
+                {/* Company rows */}
+                {getSortedCompanies().map((company, index) => {
+                  const date = new Date(2024, 0, company.id);
+                  const expiryDate = new Date(2025, 6, company.id);
+                  const directors = generateDirectors(company.id);
+                  return (
+                    <React.Fragment key={company.id}>
+                      {directors.map((director, dirIndex) => (
+                        <tr key={`${company.id}-${dirIndex}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          {dirIndex === 0 && (
+                            <td className="p-3 border-2 border-gray-300 font-medium" rowSpan={3}>
+                              {company.name}
+                            </td>
+                          )}
+                          <td className="p-3 border-2 border-gray-300 font-medium">{director}</td>
+                          <td className="p-3 border-2 border-gray-300"></td>
+                          {documents.map((doc) => (
+                            visibleColumns[doc.id].visible && (
+                              <React.Fragment key={`${company.id}-${doc.id}-${dirIndex}`}>
                                 <td className="p-3 border-2 border-gray-300 text-center">
                                   <button
                                     onClick={() => {
@@ -312,42 +318,35 @@ const DocumentManagement = () => {
                                     Upload
                                   </button>
                                 </td>
-                              )}
-                              {visibleColumns[doc.id].subColumns.issueDate && (
                                 <td className="p-3 border-2 border-gray-300 text-center text-gray-600">
                                   {format(date, 'MM/dd/yyyy')}
                                 </td>
-                              )}
-                              {visibleColumns[doc.id].subColumns.expiryDate && (
                                 <td className="p-3 border-2 border-gray-300 text-center text-gray-600">
                                   {format(expiryDate, 'MM/dd/yyyy')}
                                 </td>
-                              )}
-                              {visibleColumns[doc.id].subColumns.daysLeft && (
                                 <td className="p-3 border-2 border-gray-300 text-center font-medium">
                                   {differenceInDays(expiryDate, new Date())}
                                 </td>
-                              )}
-                              {visibleColumns[doc.id].subColumns.status && (
                                 <td className="p-3 border-2 border-gray-300 text-center">
-                                  <span className={`px-2 py-1 rounded-full text-xs ${company.id % 3 === 0 ? 'bg-green-100 text-green-700' :
+                                  <span className={`px-2 py-1 rounded-full text-xs ${
+                                    company.id % 3 === 0 ? 'bg-green-100 text-green-700' :
                                     company.id % 3 === 1 ? 'bg-yellow-100 text-yellow-700' :
-                                      'bg-red-100 text-red-700'
-                                    }`}>
+                                    'bg-red-100 text-red-700'
+                                  }`}>
                                     {company.id % 3 === 0 ? 'Complete' : company.id % 3 === 1 ? 'Pending' : 'Expired'}
                                   </span>
                                 </td>
-                              )}
-                            </React.Fragment>
-                          )
-                        ))}
-                      </tr>
-                    ))}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+                              </React.Fragment>
+                            )
+                          ))}
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -396,7 +395,7 @@ const DocumentManagement = () => {
                   required
                   className="w-full px-3 py-2 border rounded-md"
                   value={uploadData.expiryDate}
-                  min={uploadData.issueDate} // Prevent expiry date before issue date
+                  min={uploadData.issueDate}
                   onChange={(e) => setUploadData(prev => ({ ...prev, expiryDate: e.target.value }))}
                 />
               </div>
@@ -430,17 +429,16 @@ const DocumentManagement = () => {
                 className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
                 disabled={!uploadData.file || !uploadData.issueDate || !uploadData.expiryDate}
               >
-                {uploadMutation?.isLoading ? 'Uploading...' : 'Upload Document'}
+                {uploadMutation.isLoading ? 'Uploading...' : 'Upload Document'}
               </button>
             </form>
           </div>
         </div>
       )}
-
       {/* Settings Modal */}
       {showSettingsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl relative">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowSettingsModal(false)}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
