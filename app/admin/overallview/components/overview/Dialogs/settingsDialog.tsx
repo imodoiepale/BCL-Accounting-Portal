@@ -178,6 +178,16 @@ export function SettingsDialog({ mainTabs,
     isNewSubsection: false,
     table_names: []
   });
+  const [currentStructure, setCurrentStructure] = useState({
+    id: '',
+    sections_sections: {},
+    sections_subsections: {},
+    column_mappings: {},
+    column_order: {},
+    Tabs: '',
+    table_names: {}
+  });
+ 
   const [selectedSection, setSelectedSection] = useState<StructureItem | null>(null);
   const [selectedSubsection, setSelectedSubsection] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -590,6 +600,7 @@ const [editingField, setEditingField] = useState({
       toast.error('Update failed');
     }
   };
+
   const handleNameUpdate = async (type: 'tab' | 'section' | 'subsection', oldName: string, newName: string) => {
     console.log('Starting update:', { type, oldName, newName });
     
@@ -693,7 +704,7 @@ const [editingField, setEditingField] = useState({
     
     // Process each tab
     Object.keys(tabStructure).forEach((tab, tabIndex) => {
-      newIndexMapping.tabs[tab] = tabIndex + 1;
+      newIndexMapping.tabs[tab] = `${tabIndex + 1}.0`;
       
       // Process items within each tab
       tabStructure[tab].forEach(item => {
@@ -722,9 +733,9 @@ const [editingField, setEditingField] = useState({
     });
   
     setIndexMapping(newIndexMapping);
-  };  
-
-// Call this in useEffect after fetching structure
+  };
+  
+  // Call this in useEffect after fetching structure
 useEffect(() => {
   if (structure.length > 0) {
     generateIndices(structure);
@@ -1607,14 +1618,19 @@ const handleAddStructure = async () => {
   // Add function to save visibility settings
   const handleSaveVisibilitySettings = async () => {
     try {
-      await supabase.from('visibility_settings').upsert([
-        {
-          sections: sectionVisibility,
-          categories: categoryVisibility,
-          columns: columnVisibility,
+      const { error } = await supabase
+        .from('profile_category_table_mapping')
+        .update({
+          column_order: {
+            sections: sectionVisibility,
+            categories: categoryVisibility,
+            columns: columnVisibility
+          },
           updated_at: new Date().toISOString()
-        }
-      ]);
+        })
+        .eq('id', currentStructure.id);
+
+      if (error) throw error;
       toast.success('Visibility settings saved successfully');
     } catch (error) {
       console.error('Error saving visibility settings:', error);
@@ -1627,16 +1643,17 @@ const handleAddStructure = async () => {
     const loadVisibilitySettings = async () => {
       try {
         const { data, error } = await supabase
-          .from('visibility_settings')
-          .select('*')
+          .from('profile_category_table_mapping')
+          .select('column_order')
+          .eq('id', currentStructure.id)
           .single();
   
         if (error) throw error;
   
-        if (data) {
-          setSectionVisibility(data.sections || {});
-          setCategoryVisibility(data.categories || {});
-          setColumnVisibility(data.columns || {});
+        if (data?.column_order) {
+          setSectionVisibility(data.column_order.sections || {});
+          setCategoryVisibility(data.column_order.categories || {});
+          setColumnVisibility(data.column_order.columns || {});
         }
       } catch (error) {
         console.error('Error loading visibility settings:', error);
@@ -1644,38 +1661,18 @@ const handleAddStructure = async () => {
     };
   
     loadVisibilitySettings();
-  }, []);
-  
+  }, [currentStructure.id]);  
+
   // Add useEffect to initialize visibility settings based on structure
   useEffect(() => {
-    if (structure.length > 0) {
-      const newSectionVisibility = {};
-      const newCategoryVisibility = {};
-      const newColumnVisibility = {};
-  
-      structure.forEach(item => {
-        // Initialize sections
-        if (item.sections_sections) {
-          Object.keys(item.sections_sections).forEach(section => {
-            newSectionVisibility[section] = true;
-          });
-        }
-  
-        // Initialize categories and columns from mappings
-        if (item.column_mappings) {
-          Object.entries(item.column_mappings).forEach(([key, value]) => {
-            const [table, field] = key.split('.');
-            newCategoryVisibility[table] = true;
-            newColumnVisibility[field] = true;
-          });
-        }
-      });
-  
-      setSectionVisibility(prev => ({ ...prev, ...newSectionVisibility }));
-      setCategoryVisibility(prev => ({ ...prev, ...newCategoryVisibility }));
-      setColumnVisibility(prev => ({ ...prev, ...newColumnVisibility }));
+    if (structure.length > 0 && selectedTab) {
+      const current = structure.find(item => item.Tabs === selectedTab);
+      if (current) {
+        setCurrentStructure(current);
+      }
     }
-  }, [structure]);
+  }, [structure, selectedTab]);
+  
   return (
     <>
       <Button onClick={() => setIsOpen(true)} variant="outline">

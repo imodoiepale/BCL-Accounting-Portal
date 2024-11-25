@@ -1,16 +1,13 @@
-/* eslint-disable react/jsx-key */
 // @ts-nocheck
 "use client";
-import React, {  useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { formFields } from '../formfields';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "sonner";
-import { renderSeparatorCell } from './overview/TableComponents';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface CompanyEditDialogProps {
@@ -30,49 +27,61 @@ export const CompanyEditDialog = ({
   onSave,
   mainActiveTab
 }: CompanyEditDialogProps) => {
-  const [formData, setFormData] = useState(() => {
-    if (!companyData?.company) return {};
-    
-    // Merge data from all tables
-    let initialData = {
-        'acc_portal_company_duplicate.company_name': companyData.company.company_name,
-        ...companyData.company
-    };
-    
-    // Merge data from additional rows and log the mapping
-    if (companyData.rows?.length > 0) {
-      console.log('Initial company data:', companyData);
-      
-      companyData.rows.forEach((row, index) => {
-          console.log(`Processing row ${index}:`, row);
-          
-          if (row.isAdditionalRow) {
-              console.log('Additional row data:', row);
-              initialData = { ...initialData, ...row };
-          } else {
-              Object.keys(row).forEach(key => {
-                  if (key.endsWith('_data') && row[key]) {
-                      console.log(`Mapping data from ${key}:`, row[key]);
-                      initialData = { ...initialData, ...row[key] };
-                  }
-              });
-          }
-      });
-  }
-  
-  console.log('Final mapped form data:', initialData);
-  return initialData;
-});
-
+  const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    console.log('Current form data state:', formData);
-    console.log('Processed sections:', processedSections);
-  }, [formData, processedSections]);
+  // CompanyEditDialog.tsx
+useEffect(() => {
+  console.log('CompanyEditDialog - Initial companyData:', companyData);
+  // Add check for all required properties
+  if (!companyData?.company || !companyData?.rows) {
+    console.log('CompanyEditDialog - Missing required data');
+    return;
+  }
+
+  let initialData = {};
+
+  try {
+    // Set company name and basic company data
+    console.log('CompanyEditDialog - Processing company data:', companyData.company);
+    Object.entries(companyData.company).forEach(([key, value]) => {
+      initialData[`acc_portal_company_duplicate.${key}`] = value;
+    });
+
+    // Process all rows including the additional data
+    console.log('CompanyEditDialog - Processing rows:', companyData.rows);
+    companyData.rows.forEach((row) => {
+      // Process regular rows
+      if (!row.isAdditionalRow) {
+        Object.entries(row).forEach(([key, value]) => {
+          if (key.endsWith('_data') && value) {
+            const tableName = key.replace('_data', '');
+            console.log(`CompanyEditDialog - Processing table data for ${tableName}:`, value);
+            Object.entries(value).forEach(([field, fieldValue]) => {
+              initialData[`${tableName}.${field}`] = fieldValue;
+            });
+          }
+        });
+      }
+      // Process additional rows
+      else if (row.sourceTable) {
+        console.log('CompanyEditDialog - Processing additional row:', row);
+        Object.entries(row).forEach(([key, value]) => {
+          if (!['sourceTable', 'isAdditionalRow', 'id'].includes(key)) {
+            initialData[`${row.sourceTable}.${key}`] = value;
+          }
+        });
+      }
+    });
+
+    console.log('CompanyEditDialog - Final processed data:', initialData);
+    setFormData(initialData);
+  } catch (error) {
+    console.error('CompanyEditDialog - Error processing data:', error);
+  }
+}, [companyData]);
 
   const handleChange = (field: string, value: string) => {
-    console.log('Field changed:', field, 'New value:', value);
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -82,23 +91,18 @@ export const CompanyEditDialog = ({
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      console.log('Submitting form data:', formData);
-      
       const { data: mappings, error: mappingError } = await supabase
         .from('profile_category_table_mapping')
         .select('*');
 
       if (mappingError) throw mappingError;
-      
-      console.log('Table mappings:', mappings);
 
       const allTableNames = parseTableNames(mappings);
       const updates = {};
 
       for (const [fieldName, value] of Object.entries(formData)) {
         const [tableName, columnName] = fieldName.split('.');
-        console.log('Processing field:', fieldName, 'Value:', value);
-        
+
         if (allTableNames.includes(tableName)) {
           if (!updates[tableName]) {
             updates[tableName] = {
@@ -110,12 +114,8 @@ export const CompanyEditDialog = ({
         }
       }
 
-      console.log('Prepared updates:', updates);
-
       for (const [tableName, { updates: tableUpdates, idField }] of Object.entries(updates)) {
         if (Object.keys(tableUpdates).length > 0) {
-          console.log(`Updating table ${tableName}:`, tableUpdates);
-          
           const { error: updateError } = await supabase
             .from(tableName)
             .update(tableUpdates)
@@ -139,8 +139,7 @@ export const CompanyEditDialog = ({
 
   const renderInput = (field: any) => {
     const currentValue = formData[field.name] ?? '';
-    console.log('Rendering input for field:', field.name, 'Current value:', currentValue);
-    
+
     if (field.dropdownOptions?.length > 0) {
       return (
         <select
@@ -174,10 +173,8 @@ export const CompanyEditDialog = ({
 
   const groupFieldsBySection = () => {
     const groups = {};
-    
+
     if (processedSections && Array.isArray(processedSections)) {
-      console.log('Processing sections:', processedSections);
-      
       processedSections.forEach(section => {
         if (!section.isSeparator && section.categorizedFields) {
           section.categorizedFields.forEach(category => {
@@ -193,79 +190,80 @@ export const CompanyEditDialog = ({
         }
       });
     }
-    
-    console.log('Grouped fields by section:', groups);
+
     return groups;
   };
 
   return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-[95vw] max-h-[90vh] p-8">
-          <DialogHeader>
-            <DialogTitle>
-              Edit Company: {companyData?.company?.company_name}
-              <span className="ml-2 text-sm text-gray-500">
-                ({companyData?.activeTab})
-              </span>
-            </DialogTitle>
-          </DialogHeader>
-          <Tabs defaultValue="edit" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="edit">Edit {mainActiveTab}</TabsTrigger>
-              <TabsTrigger value="details">Add New {mainActiveTab}</TabsTrigger>
-            </TabsList>
-            <TabsContent value="edit">
-              <ScrollArea className="h-[80vh] px-6">
-                <div className="space-y-6">
-                  {Object.entries(groupFieldsBySection())
-                    .map(([category, fields]) => (
-                      <div key={category} className="rounded-lg bg-gray-50 p-6">
-                        <div className="mb-6">
-                          <div className="flex items-center space-x-2 mb-6">
-                            <div className="h-8 w-1 bg-primary rounded-full"></div>
-                            <h3 className="text-xl font-bold text-primary">{category}</h3>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 bg-white p-4 rounded-md shadow-sm">
-                            {fields.map((field) => (
-                              <div key={field.name} className="flex flex-col gap-2 mb-4">
-                                <Label htmlFor={field.name} className="text-sm font-medium">
-                                  {field.label}
-                                </Label>
-                                {renderInput(field)}
-                              </div>
-                            ))}
-                          </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-[95vw] max-h-[100vh] p-8">
+        <DialogHeader>
+          <DialogTitle className="flex items-center space-x-2">
+            <span className="font-bold text-xl">
+              {companyData?.company?.company_name || 'Company Details'}
+            </span>
+            <span className="text-sm text-gray-500">
+              ({companyData?.activeTab})
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+        <Tabs defaultValue="edit" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="edit">Edit {mainActiveTab}</TabsTrigger>
+            <TabsTrigger value="details">Add New {mainActiveTab}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="edit">
+            <ScrollArea className="h-[70vh] px-6">
+              <div className="space-y-6">
+                {Object.entries(groupFieldsBySection())
+                  .map(([category, fields]) => (
+                    <div key={category} className="rounded-lg bg-gray-50 p-6">
+                      <div className="mb-6">
+                        <div className="flex items-center space-x-2 mb-6">
+                          <div className="h-8 w-1 bg-primary rounded-full"></div>
+                          <h3 className="text-xl font-bold text-primary">{category}</h3>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 bg-white p-4 rounded-md shadow-sm">
+                          {fields.map((field) => (
+                            <div key={field.name} className="flex flex-col gap-2 mb-4">
+                              <Label htmlFor={field.name} className="text-sm font-medium">
+                                {field.label}
+                              </Label>
+                              {renderInput(field)}
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-            <TabsContent value="details">
-              <ScrollArea className="h-[80vh] px-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Company Details</h3>
-                  <pre className="bg-gray-50 p-4 rounded-md">
-                    {JSON.stringify(companyData, null, 2)}
-                  </pre>
-                </div>
-              </ScrollArea>
-            </TabsContent>
-          </Tabs>
-          <DialogFooter className="bg-white pt-2">
-            <Button variant="outline" onClick={onClose} className="mr-2">
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={loading}>
-              {loading ? (
-                <div className="flex items-center">
-                  <span className="animate-spin mr-2">⟳</span>
-                  Saving...
-                </div>
-              ) : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                    </div>
+                  ))}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+          <TabsContent value="details">
+            <ScrollArea className="h-[80vh] px-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Company Details</h3>
+                <pre className="bg-gray-50 p-4 rounded-md">
+                  {JSON.stringify(companyData, null, 2)}
+                </pre>
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
+        <DialogFooter className="bg-white pt-2">
+          <Button variant="outline" onClick={onClose} className="mr-2">
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? (
+              <div className="flex items-center">
+                <span className="animate-spin mr-2">⟳</span>
+                Saving...
+              </div>
+            ) : 'Save Changes'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
