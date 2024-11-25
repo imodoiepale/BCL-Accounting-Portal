@@ -1,4 +1,3 @@
-
 "use client"
 import React, { useState } from 'react';
 import DocumentManagement from './document-management';
@@ -8,21 +7,39 @@ const Page = () => {
   const [activeTab, setActiveTab] = useState('KYC Docs');
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Directors KYC Management</h1>
-      <div className="flex space-x-4 mb-4">
-        {['KYC Docs', 'KYC Document Details'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-md ${activeTab === tab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-          >
-            {tab}
-          </button>
-        ))}
+    <div className="min-h-screen bg-white">
+      <div className="p-4 max-w-full mx-auto">
+        <h1 className="text-xl font-semibold mb-3 text-gray-800">Directors KYC Management</h1>
+        
+        <div className="flex space-x-3 mb-3">
+          {['KYC Docs', 'KYC Document Details'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors duration-200 ${
+                activeTab === tab 
+                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <div className="bg-white rounded-lg h-[calc(100vh-130px)]">
+          {activeTab === 'KYC Docs' && (
+            <div className="h-full">
+              <DocumentManagement />
+            </div>
+          )}
+          {activeTab === 'KYC Document Details' && (
+            <div className="h-full">
+              <CompanyKycDocumentDetails />
+            </div>
+          )}
+        </div>
       </div>
-      {activeTab === 'KYC Docs' && <DocumentManagement />}
-      {activeTab === 'KYC Document Details' && <CompanyKycDocumentDetails />}
     </div>
   );
 };

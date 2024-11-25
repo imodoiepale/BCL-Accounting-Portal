@@ -293,16 +293,16 @@ const renderDocumentDetails = (companyId: number, directorId: number, documentId
 
   return (
     <>
-      <td className="p-3 border-2 border-gray-300 text-center text-gray-600">
+      <td className="p-2 border border-gray-300 text-center text-gray-600">
         {documentRecord ? format(new Date(documentRecord.issue_date), 'MM/dd/yyyy') : '-'}
       </td>
-      <td className="p-3 border-2 border-gray-300 text-center text-gray-600">
+      <td className="p-2 border border-gray-300 text-center text-gray-600">
         {documentRecord ? format(new Date(documentRecord.expiry_date), 'MM/dd/yyyy') : '-'}
       </td>
-      <td className="p-3 border-2 border-gray-300 text-center font-medium">
+      <td className="p-2 border border-gray-300 text-center font-medium">
         {documentRecord ? daysLeft : '-'}
       </td>
-      <td className="p-3 border-2 border-gray-300 text-center">
+      <td className="p-2 border border-gray-300 text-center">
         <span className={`px-2 py-1 rounded-full text-xs ${
           status === 'complete' ? 'bg-green-100 text-green-700' :
           status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
@@ -333,26 +333,26 @@ if (isLoading) {
 const stats = calculateStats();
 
 return (
-  <div className="w-full h-screen p-6 bg-white flex flex-col">
+  <div className="w-full h-screen p-4 bg-white flex flex-col">
     {/* Header Section */}
-    <div className="flex justify-between items-center mb-6 flex-shrink-0">
-      <div className="flex items-center gap-4">
+    <div className="flex justify-between items-center mb-4 flex-shrink-0">
+      <div className="flex items-center gap-2">
         <input
           type="text"
           placeholder="Search companies..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="px-4 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          className="px-3 py-1 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
         />
-        <button className="flex items-center gap-2 px-4 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700">
-          <FileDown className="w-5 h-5" />
+        <button className="flex items-center gap-1 px-3 py-1 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm">
+          <FileDown className="w-4 h-4" />
           Export
         </button>
         <button
           onClick={() => setShowSettingsModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700"
+          className="flex items-center gap-1 px-3 py-1 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
@@ -362,18 +362,19 @@ return (
     </div>
 
     {/* Table Section */}
-    <div className="flex-1 border-2 rounded-lg overflow-hidden flex flex-col">
-      <div className="overflow-y-auto flex-1">
-        <table className="w-full text-sm border-collapse min-w-[1500px]">
+    <div className="flex-1 border rounded-lg overflow-hidden flex flex-col">
+
+      <div className="overflow-auto flex-1 h-screen">
+        <table className="w-full text-xs border-collapse">
           {/* Table Header */}
           <thead className="sticky top-0 bg-white z-10">
             <tr className="bg-gray-100">
-              <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Companies</th>
-              <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Directors</th>
-              <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Summary</th>
+              <th className="p-2 border border-gray-300 font-semibold text-gray-700" rowSpan={2}>Companies</th>
+              <th className="p-2 border border-gray-300 font-semibold text-gray-700" rowSpan={2}>Directors</th>
+              <th className="p-2 border border-gray-300 font-semibold text-gray-700" rowSpan={2}>Summary</th>
               {documents.map(doc => (
                 visibleColumns[doc.id]?.visible && (
-                  <th key={doc.id} className="p-3 border-2 border-gray-300 font-semibold text-gray-700 text-center bg-blue-50"
+                  <th key={doc.id} className="p-2 border border-gray-300 font-semibold text-gray-700 text-center bg-blue-50"
                     colSpan={5}>
                     {doc.name}
                   </th>
@@ -384,29 +385,29 @@ return (
               {documents.map(doc => (
                 visibleColumns[doc.id]?.visible && (
                   <React.Fragment key={`header-${doc.id}`}>
-                    <th className="p-3 border-2 border-gray-300 font-medium text-gray-600">Upload</th>
-                    <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                    <th className="p-2 border border-gray-300 font-medium text-gray-600">Upload</th>
+                    <th className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
                       onClick={() => handleSort('issueDate')}>
                       <div className="flex items-center justify-between">
                         Issue Date
                         <SortIcon field="issueDate" />
                       </div>
                     </th>
-                    <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                    <th className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
                       onClick={() => handleSort('expiryDate')}>
                       <div className="flex items-center justify-between">
                         Expiry Date
                         <SortIcon field="expiryDate" />
                       </div>
                     </th>
-                    <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                    <th className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
                       onClick={() => handleSort('daysLeft')}>
                       <div className="flex items-center justify-between">
                         Days Left
                         <SortIcon field="daysLeft" />
                       </div>
                     </th>
-                    <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                    <th className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
                       onClick={() => handleSort('status')}>
                       <div className="flex items-center justify-between">
                         Status
@@ -421,42 +422,42 @@ return (
           <tbody>
             {/* Stats rows */}
             <tr className="bg-gray-50">
-              <td className="p-3 border-2 border-gray-300 font-medium bg-gray-100" rowSpan={3}></td>
-              <td className="p-3 border-2 border-gray-300" rowSpan={3}></td>
-              <td className="p-3 border-2 border-gray-300 font-semibold text-blue-600">Total</td>
+              <td className="p-2 border border-gray-300 font-medium bg-gray-100" rowSpan={3}></td>
+              <td className="p-2 border border-gray-300" rowSpan={3}></td>
+              <td className="p-2 border border-gray-300 font-semibold text-blue-600">Total</td>
               {documents.map(doc => (
                 visibleColumns[doc.id]?.visible && (
                   <React.Fragment key={`total-${doc.id}`}>
-                    <td className="p-3 border-2 border-gray-300 text-center font-medium">
+                    <td className="p-2 border border-gray-300 text-center font-medium">
                       {stats.total}
                     </td>
-                    <td colSpan={4} className="p-3 border-2 border-gray-300"></td>
+                    <td colSpan={4} className="p-2 border border-gray-300"></td>
                   </React.Fragment>
                 )
               ))}
             </tr>
             <tr className="bg-gray-50">
-              <td className="p-3 border-2 border-gray-300 font-semibold text-orange-600">Missing</td>
+              <td className="p-2 border border-gray-300 font-semibold text-orange-600">Missing</td>
               {documents.map(doc => (
                 visibleColumns[doc.id]?.visible && (
                   <React.Fragment key={`missing-${doc.id}`}>
-                    <td className="p-3 border-2 border-gray-300 text-center font-medium">
+                    <td className="p-2 border border-gray-300 text-center font-medium">
                       {stats.missing}
                     </td>
-                    <td colSpan={4} className="p-3 border-2 border-gray-300"></td>
+                    <td colSpan={4} className="p-2 border border-gray-300"></td>
                   </React.Fragment>
                 )
               ))}
             </tr>
             <tr className="bg-gray-50">
-              <td className="p-3 border-2 border-gray-300 font-semibold text-green-600">Completed</td>
+              <td className="p-2 border border-gray-300 font-semibold text-green-600">Completed</td>
               {documents.map(doc => (
                 visibleColumns[doc.id]?.visible && (
                   <React.Fragment key={`complete-${doc.id}`}>
-                    <td className="p-3 border-2 border-gray-300 text-center font-medium">
+                    <td className="p-2 border border-gray-300 text-center font-medium">
                       {stats.complete}
                     </td>
-                    <td colSpan={4} className="p-3 border-2 border-gray-300"></td>
+                    <td colSpan={4} className="p-2 border border-gray-300"></td>
                   </React.Fragment>
                 )
               ))}
@@ -473,16 +474,16 @@ return (
                   {companyDirectors.map((director, dirIndex) => (
                     <tr key={`${company.id}-${director.id}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       {dirIndex === 0 && (
-                        <td className="p-3 border-2 border-gray-300 font-medium" rowSpan={companyDirectors.length}>
+                        <td className="p-2 border border-gray-300 font-medium" rowSpan={companyDirectors.length}>
                           {company.company_name}
                         </td>
                       )}
-                      <td className="p-3 border-2 border-gray-300 font-medium">{director.full_name}</td>
-                      <td className="p-3 border-2 border-gray-300"></td>
+                      <td className="p-2 border border-gray-300 font-medium">{director.full_name}</td>
+                      <td className="p-2 border border-gray-300"></td>
                       {documents.map((doc) => (
                         visibleColumns[doc.id]?.visible && (
                           <React.Fragment key={`${company.id}-${doc.id}-${director.id}`}>
-                            <td className="p-3 border-2 border-gray-300 text-center">
+                            <td className="p-2 border border-gray-300 text-center">
                               <button
                                 onClick={() => {
                                   setSelectedCompany(company);
@@ -495,7 +496,7 @@ return (
                                   });
                                   setShowUploadModal(true);
                                 }}
-                                className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100"
+                                className="px-2 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 text-xs"
                               >
                                 Upload
                               </button>
