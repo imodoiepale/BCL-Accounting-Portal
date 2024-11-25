@@ -221,7 +221,7 @@ const DocumentManagement = () => {
                 ))}
               </tr>
               <tr className="bg-gray-50">
-                <td className="p-3 border-2 border-gray-300 font-semibold text-orange-600">Pending</td>
+                <td className="p-3 border-2 border-gray-300 font-semibold text-orange-600">Missing</td>
                 {documents.map(doc => (
                   visibleColumns[doc.id].visible && (
                     <React.Fragment key={`pending-${doc.id}`}>
