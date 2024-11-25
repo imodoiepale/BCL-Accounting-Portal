@@ -53,7 +53,7 @@ export const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmi
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: 'Bearer YOUR_API_KEY',
+          Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpamVwYWxlQGdtYWlsLmNvbSIsImlhdCI6MTczMTUxNDExMX0.DZf2t6fUGiVQN6FXCwLOnRG2Yx48aok1vIH00sKhWS4',
         },
         body: JSON.stringify({
           model: 'Qwen/Qwen2-VL-72B-Instruct',
