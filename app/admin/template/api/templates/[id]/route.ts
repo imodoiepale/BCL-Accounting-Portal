@@ -122,9 +122,9 @@ export type Params = { id: string }
 
 export async function GET(
   request: NextRequest,
-  context: { params: Params }
+  { params }: { params: Params }
 ) {
-  const { id } = context.params
+  const { id } = params
   const template = templates[id]
 
   if (!template) {
