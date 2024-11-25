@@ -121,13 +121,15 @@ const templates: Templates = {
 export type Params = { id: string }
 
 
-
-// Update the route handler signature to match Next.js expectations
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  context: {
+    params: {
+      id: string
+    }
+  }
 ) {
-  const { id } = params
+  const { id } = context.params
   const template = templates[id]
 
   if (!template) {
