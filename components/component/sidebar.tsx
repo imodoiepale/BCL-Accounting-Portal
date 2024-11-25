@@ -25,13 +25,13 @@ const adminNavItems = [
   { href: "/admin", icon: LayoutDashboardIcon, label: "Admin Dashboard" },
   { href: "/mail", icon: Mail, label: "Mail" },
   { href: "/admin/registry", icon: User2Icon, label: "Registry" },
-  { href: "/admin/overallview", icon: LayoutDashboardIcon, label: "Overall TableView" },  
+  { href: "/admin/overallview", icon: LayoutDashboardIcon, label: "Overall TableView" },
   { href: "/admin/documents/kyc", icon: FileIcon, label: "Kyc Documents" },
   { href: "/admin/documents/monthly", icon: FileIcon, label: "Monthly Documents" },
   { href: "/admin/companies", icon: User2Icon, label: "Companies" },
-  { 
-    href: "/admin/documents", 
-    icon: FileIcon, 
+  {
+    href: "/admin/documents",
+    icon: FileIcon,
     label: "Document Management",
     children: [
       { href: "/admin/documents/company-kyc", icon: FileIcon, label: "Company KYC Documents" },
@@ -39,6 +39,7 @@ const adminNavItems = [
       { href: "/admin/documents/others", icon: FileIcon, label: "Other Documents" }
     ]
   },
+  { href: "/admin/template", icon: FileIcon, label: "Templates" },
   { href: "/admin/reports", icon: FileIcon, label: "Report Management" },
   { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings" },
   { label: "Table Settings", href: "/settings/table", icon: SettingsIcon },
@@ -67,7 +68,7 @@ export function Sidebar() {
   const renderNavItem = (item: any) => {
     const isActive = pathname === item.href;
     const hasChildren = item.children && item.children.length > 0;
-    
+
     const baseItemClassName = `
       flex items-center p-3 rounded-lg text-sm transition-all duration-200
       ${isActive ? "text-blue-600 bg-blue-100" : "text-gray-700 hover:bg-gray-200"}
@@ -85,9 +86,9 @@ export function Sidebar() {
               )}
             </button>
           </PopoverTrigger>
-          <PopoverContent 
-            className="w-64 p-2 ml-2" 
-            side="right" 
+          <PopoverContent
+            className="w-64 p-2 ml-2"
+            side="right"
             align="start"
             sideOffset={-40}
           >
@@ -142,11 +143,11 @@ export function Sidebar() {
           <span className="text-xl font-semibold text-gray-800">BCL Portal</span>
         )}
       </div>
-      
+
       <nav className="flex-1 space-y-2">
         {navItems.map(renderNavItem)}
       </nav>
-      
+
       <button
         className="absolute top-4 -right-3 p-1.5 rounded-full bg-white shadow-md 
                    hover:bg-gray-50 transition-colors border border-gray-200"
