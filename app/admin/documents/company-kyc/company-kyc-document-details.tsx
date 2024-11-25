@@ -12,6 +12,11 @@ import { Card } from '@/components/ui/card';
 import toast, { Toaster } from 'react-hot-toast';
 import { DocumentActions } from './DocumentComponents';
 import { UploadModal, ViewModal, AddFieldsDialog, ExtractDetailsModal } from './DocumentModals';
+import {
+  performExtraction,
+  saveExtractedData,
+  validateExtractedData
+} from '@/lib/extractionUtils';
 
 interface Upload {
   id: string;
@@ -53,7 +58,9 @@ export default function CompanyKycDocumentDetails() {
   const [selectedExtractDocument, setSelectedExtractDocument] = useState<Document | null>(null);
   const [selectedExtractUpload, setSelectedExtractUpload] = useState<Upload | null>(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  
+  const [isExtracting, setIsExtracting] = useState(false);
+
+
   const queryClient = useQueryClient();
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -125,11 +132,13 @@ export default function CompanyKycDocumentDetails() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ companyId, documentId, file }) => {
+    mutationFn: async ({ companyId, documentId, file, extractOnUpload, onProgress }) => {
       try {
+        onProgress?.('Uploading file...');
+
         const timestamp = new Date().getTime();
         const fileName = `${companyId}/${documentId}/${timestamp}_${file.name}`;
-        
+
         const { data: fileData, error: fileError } = await supabase
           .storage
           .from('kyc-documents')
@@ -143,29 +152,43 @@ export default function CompanyKycDocumentDetails() {
           filepath: fileData.path,
         };
 
-        const { data, error } = await supabase
+        const { data: uploadResult, error } = await supabase
           .from('acc_portal_kyc_uploads')
           .insert(uploadData)
           .select()
           .single();
 
         if (error) throw error;
-        return data;
+
+        // If extractOnUpload is true, show extraction modal
+        if (extractOnUpload) {
+          setSelectedExtractDocument(documents.find(d => d.id === documentId));
+          setSelectedExtractUpload(uploadResult);
+          setShowExtractModal(true);
+          return uploadResult;
+        }
+
+        return uploadResult;
       } catch (error) {
         console.error('Upload error:', error);
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries(['uploads']);
-      setShowUploadModal(false);
-      toast.success('Document uploaded successfully');
+      if (!data.extracted_details) {
+        setShowUploadModal(false);
+        toast.success('Document uploaded successfully');
+      }
     },
     onError: (error) => {
       toast.error('Failed to upload document');
       console.error('Upload error:', error);
     }
   });
+
+
+
 
   const extractionMutation = useMutation({
     mutationFn: async ({ uploadId, extractedData, documentId }) => {
@@ -177,6 +200,12 @@ export default function CompanyKycDocumentDetails() {
         acc[key] = value === '' ? null : value;
         return acc;
       }, {});
+
+      // First validate the data
+      const document = documents.find(d => d.id === documentId);
+      if (document && !validateExtractedData(sanitizedData, document.fields || [])) {
+        throw new Error('Invalid extracted data format');
+      }
 
       const [uploadUpdate, documentUpdate] = await Promise.all([
         supabase
@@ -213,6 +242,49 @@ export default function CompanyKycDocumentDetails() {
       console.error('Extraction save error:', error);
     }
   });
+
+
+  const handleExtractComplete = async (extractedData: any) => {
+    try {
+      if (!selectedExtractDocument || !selectedExtractUpload) return;
+
+      await extractionMutation.mutateAsync({
+        uploadId: selectedExtractUpload.id,
+        documentId: selectedExtractDocument.id,
+        extractedData
+      });
+
+      // Close both modals if this was from an upload
+      setShowUploadModal(false);
+      setShowExtractModal(false);
+
+    } catch (error) {
+      console.error('Error saving extracted data:', error);
+      toast.error('Failed to save extracted data');
+    }
+  };
+
+  const handleCancelExtraction = () => {
+    setShowExtractModal(false);
+    // If this was from an upload, we need to delete the upload
+    if (uploadMutation.isSuccess && selectedExtractUpload) {
+      // Delete the uploaded file
+      supabase.storage
+        .from('kyc-documents')
+        .remove([selectedExtractUpload.filepath])
+        .then(() => {
+          // Delete the upload record
+          supabase
+            .from('acc_portal_kyc_uploads')
+            .delete()
+            .eq('id', selectedExtractUpload.id)
+            .then(() => {
+              queryClient.invalidateQueries(['uploads']);
+              toast.success('Upload cancelled');
+            });
+        });
+    }
+  };
 
   const handleViewDocument = async (document: Document, company: Company) => {
     const upload = uploads.find(u =>
@@ -295,11 +367,10 @@ export default function CompanyKycDocumentDetails() {
               {documents.map((doc) => (
                 <li
                   key={doc.id}
-                  className={`px-2 py-1 rounded flex items-center justify-between text-xs ${
-                    selectedDocument?.id === doc.id
+                  className={`px-2 py-1 rounded flex items-center justify-between text-xs ${selectedDocument?.id === doc.id
                       ? 'bg-primary text-primary-foreground'
                       : 'hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   <span
                     className="cursor-pointer flex-1"
@@ -404,6 +475,7 @@ export default function CompanyKycDocumentDetails() {
                               >
                                 <UploadIcon className="h-4 w-4 text-orange-500" />
                               </Button>
+                              
                             )}
                           </div>
                         </TableCell>
@@ -426,7 +498,7 @@ export default function CompanyKycDocumentDetails() {
               </Card>
             </div>
           </div>
-         ) : (
+        ) : (
           <div className="flex items-center justify-center h-full text-gray-500 text-sm">
             Select a document to view details
           </div>
@@ -471,16 +543,10 @@ export default function CompanyKycDocumentDetails() {
       {showExtractModal && selectedExtractDocument && selectedExtractUpload && (
         <ExtractDetailsModal
           isOpen={showExtractModal}
-          onClose={() => setShowExtractModal(false)}
+          onClose={handleCancelExtraction}
           document={selectedExtractDocument}
           upload={selectedExtractUpload}
-          onSubmit={(extractedData) => {
-            extractionMutation.mutate({
-              uploadId: selectedExtractUpload.id,
-              documentId: selectedExtractDocument.id,
-              extractedData
-            });
-          }}
+          onSubmit={handleExtractComplete}
         />
       )}
     </div>
