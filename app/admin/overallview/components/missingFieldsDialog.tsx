@@ -156,19 +156,19 @@ const handleSubmit = async () => {
       if (!acc[tableName]) {
         acc[tableName] = {};
       }
-      acc[tableName][columnName] = value;
+      // Skip the ID field
+      if (columnName !== 'id') {
+        acc[tableName][columnName] = value;
+      }
       return acc;
     }, {});
 
-    console.log('Updates grouped by table:', updatesByTable);
-
-    // Execute updates for each table
     for (const [tableName, updates] of Object.entries(updatesByTable)) {
-      console.log(`Updating table ${tableName}:`, updates);
       const { error } = await supabase
         .from(tableName)
         .update(updates)
-        .eq('company_name', companyData.company.company_name);
+        .eq('company_name', companyData.company.company_name)
+        .eq('company_id', companyData.company.company_id);
 
       if (error) throw error;
     }
