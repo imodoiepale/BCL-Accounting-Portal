@@ -7,14 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from '@/lib/supabaseClient';
 import { Input } from "@/components/ui/input";
-import { Eye, Upload, MoreVertical, Plus, Edit2, Settings, Trash2, CheckCircle, DownloadIcon, UploadIcon } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { useVirtualizer } from '@tanstack/react-virtual';
-import toast, { Toaster } from 'react-hot-toast';
+import { Eye, DownloadIcon, UploadIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import toast, { Toaster } from 'react-hot-toast';
+import { DocumentActions } from './DocumentComponents';
+import { UploadModal, ViewModal, AddFieldsDialog, ExtractDetailsModal } from './DocumentModals';
 
-// Interfaces
 interface Upload {
   id: string;
   userid: string;
@@ -22,8 +20,8 @@ interface Upload {
   filepath: string;
   issue_date: string;
   expiry_date?: string;
-  value?: Record<string, any>; // Change this to a more flexible type
-  extracted_details?: Record<string, any>; // Add this new column
+  value?: Record<string, any>;
+  extracted_details?: Record<string, any>;
 }
 
 interface Company {
@@ -39,545 +37,26 @@ interface Document {
     name: string;
     type: string;
   }>;
-  last_extracted_details?: Record<string, any>; // New column for storing last extracted details
+  last_extracted_details?: Record<string, any>;
 }
 
-// Utility function to generate unique IDs
-const generateId = () => crypto.randomUUID();
-
-// Extract Details Modal Component
-const ExtractDetailsModal = ({ isOpen, onClose, document, upload, onSubmit }) => {
-  const [extractedData, setExtractedData] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  const extractDetails = async (fileUrl) => {
-    setIsLoading(true);
-    try {
-      const url = 'https://api.hyperbolic.xyz/v1/chat/completions';
-      const fieldPrompt = document.fields?.map(f => f.name).join(', ');
-      const fileType = fileUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image';
-  
-      let content = [];
-      if (fileType === 'pdf') {
-        const pdfResponse = await fetch(fileUrl);
-        const pdfData = await pdfResponse.blob();
-        content = [
-          {
-            type: "text",
-            text: `Extract the following fields from the PDF document: ${fieldPrompt}`
-          },
-          {
-            type: "file",
-            file: pdfData
-          }
-        ];
-      } else {
-        content = [
-          {
-            type: "text",
-            text: `Extract the following fields from the image: ${fieldPrompt}`
-          },
-          {
-            type: "image_url",
-            image_url: { url: fileUrl }
-          }
-        ];
-      }
-  
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpamVwYWxlQGdtYWlsLmNvbSIsImlhdCI6MTczMTUxNDExMX0.DZf2t6fUGiVQN6FXCwLOnRG2Yx48aok1vIH00sKhWS4',
-        },
-        body: JSON.stringify({
-          model: 'Qwen/Qwen2-VL-72B-Instruct',
-          messages: [
-            {
-              role: 'system',
-              content: `You are an advanced document analysis assistant. Extract information accurately and return it in JSON format.`
-            },
-            {
-              role: 'user',
-              content
-            }
-          ],
-          max_tokens: 512,
-          temperature: 0.1,
-          top_p: 0.01,
-          stream: false
-        }),
-      });
-  
-     
-
-      const json = await response.json();
-      const output = json.choices[0].message.content;
-
-      // Try to parse the response as JSON
-      let parsedData = {};
-      try {
-        // First, try to find a JSON object in the response
-        const jsonMatch = output.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          parsedData = JSON.parse(jsonMatch[0]);
-        } else {
-          // Fallback to parsing line by line
-          const lines = output.split('\n');
-          lines.forEach(line => {
-            const [key, value] = line.split(':').map(str => str.trim());
-            if (key && value) {
-              parsedData[key] = value;
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Error parsing extraction response:', error);
-        toast.error('Error parsing extracted data');
-      }
-
-      // Map the parsed data to fields
-      const mappedData = {};
-      document.fields?.forEach(field => {
-        mappedData[field.name] = parsedData[field.name] || '';
-      });
-
-      console.log('Extracted and mapped data:', mappedData); // Debug log
-      setExtractedData(mappedData);
-
-    } catch (error) {
-      console.error('Extraction error:', error);
-      toast.error('Failed to extract details');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen && upload) {
-      const getSignedUrl = async () => {
-        try {
-          const { data, error } = await supabase
-            .storage
-            .from('kyc-documents')
-            .createSignedUrl(upload.filepath, 60);
-
-          if (error) {
-            throw error;
-          }
-
-          await extractDetails(data.signedUrl);
-        } catch (error) {
-          console.error('Error getting signed URL:', error);
-          toast.error('Failed to access document');
-        }
-      };
-
-      getSignedUrl();
-    }
-  }, [isOpen, upload]);
-
-
-
-  // Helper function to format field value based on type
-  const formatFieldValue = (value, type) => {
-    switch (type) {
-      case 'date':
-        return value ? new Date(value).toISOString().split('T')[0] : '';
-      case 'number':
-        return value ? parseFloat(value) : '';
-      default:
-        return value || '';
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl h-[80vh]">
-        <DialogHeader>
-          <DialogTitle>Extracted Details Preview</DialogTitle>
-        </DialogHeader>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        ) : (
-          <div className="space-y-4 overflow-y-auto max-h-[calc(80vh-8rem)] pr-4">
-            <div className="grid grid-cols-2 gap-4">
-              {document.fields?.map((field) => (
-                <div key={field.id} className="space-y-2">
-                  <label className="text-sm font-medium">{field.name}</label>
-                  {field.type === 'date' ? (
-                    <Input
-                      type="date"
-                      value={formatFieldValue(extractedData[field.name], field.type)}
-                      onChange={(e) => setExtractedData(prev => ({
-                        ...prev,
-                        [field.name]: e.target.value
-                      }))}
-                    />
-                  ) : field.type === 'number' ? (
-                    <Input
-                      type="number"
-                      value={formatFieldValue(extractedData[field.name], field.type)}
-                      onChange={(e) => setExtractedData(prev => ({
-                        ...prev,
-                        [field.name]: e.target.value
-                      }))}
-                    />
-                  ) : (
-                    <Input
-                      type="text"
-                      value={extractedData[field.name] || ''}
-                      onChange={(e) => setExtractedData(prev => ({
-                        ...prev,
-                        [field.name]: e.target.value
-                      }))}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <DialogFooter>
-              <Button
-                onClick={() => {
-                  console.log('Submitting data:', extractedData); // Debug log
-                  onSubmit(extractedData);
-                }}
-              >
-                Save Details
-              </Button>
-            </DialogFooter>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-};
-const handleExtractSubmit = (extractedData) => {
-  console.log('Submitting data:', extractedData);
-  if (!selectedExtractUpload?.id || !selectedExtractDocument?.id) {
-    toast.error('Please select a document and upload');
-    return;
-  }
-
-  extractionMutation.mutate({
-    uploadId: selectedExtractUpload.id,
-    documentId: selectedExtractDocument.id,
-    extractedData
-  });
-};
-
-
-// Document Actions Component
-const DocumentActions = ({ document, onAddField, onUpdateFields }) => {
-  const [isManageFieldsOpen, setIsManageFieldsOpen] = useState(false);
-  const [fields, setFields] = useState(document.fields || []);
-
-  const handleFieldChange = (id, key, value) => {
-    setFields(prevFields =>
-      prevFields.map(field => (field.id === id ? { ...field, [key]: value } : field))
-    );
-  };
-
-  const handleDeleteField = (id) => {
-    setFields(prevFields => prevFields.filter(field => field.id !== id));
-  };
-
-  const handleSaveChanges = () => {
-    onUpdateFields(document.id, fields);
-    setIsManageFieldsOpen(false);
-    toast.success('Fields updated successfully');
-  };
-
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-6 w-6 p-0 hover:bg-transparent">
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[160px]">
-          <DropdownMenuItem onClick={onAddField}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Field
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setIsManageFieldsOpen(true)}>
-            <Settings className="mr-2 h-4 w-4" />
-            Manage Fields
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Edit2 className="mr-2 h-4 w-4" />
-            Edit Document
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Dialog open={isManageFieldsOpen} onOpenChange={setIsManageFieldsOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Manage Fields for {document.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            {fields.map((field) => (
-              <div key={field.id} className="flex gap-2 items-start p-4 bg-gray-50 rounded-lg">
-                <div className="flex-1">
-                  <label className="text-sm font-medium">Field Name</label>
-                  <Input
-                    value={field.name}
-                    onChange={(e) => handleFieldChange(field.id, 'name', e.target.value)}
-                    placeholder="Enter field name"
-                    className="mt-1"
-                  />
-                </div>
-                <div className="w-1/3">
-                  <label htmlFor={`field-type-${field.id}`} className="text-sm font-medium">Type</label>
-                  <select
-                    id={`field-type-${field.id}`}
-                    value={field.type}
-                    onChange={(e) => handleFieldChange(field.id, 'type', e.target.value)}
-                    className="w-full mt-1 border rounded-md p-2"
-                    aria-label={`Select field type for ${field.name}`}
-                  >
-                    <option value="text">Text</option>
-                    <option value="number">Number</option>
-                    <option value="date">Date</option>
-                    <option value="file">File</option>
-                  </select>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="mt-6"
-                  onClick={() => handleDeleteField(field.id)}
-                >
-                  <Trash2 className="h-4 w-4 text-red-500" />
-                </Button>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button onClick={handleSaveChanges}>Save Changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-};
-
-// Document Action Cell Component
-const DocumentActionCell = ({ company, document, upload, onView, onUpload, onExtract }) => {
-  return (
-    <div className="flex items-center justify-center">
-      {upload && (
-        <CheckCircle className="text-green-500 h-4 w-4 mr-2" />
-      )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-6 w-6 p-0">
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[160px]">
-          {upload ? (
-            <>
-              <DropdownMenuItem onClick={() => onView(document, company)}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Document
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onExtract(document, upload)}>
-                <Eye className="mr-2 h-4 w-4" />
-                Extract Details
-              </DropdownMenuItem>
-            </>
-          ) : (
-            <DropdownMenuItem onClick={() => onUpload(company.id, document.id)}>
-              <Upload className="mr-2 h-4 w-4" />
-              Upload Document
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-};
-
-// Upload Modal Component
-const UploadModal = ({ isOpen, onClose, onUpload, company, document }) => {
-  const [issueDate, setIssueDate] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [file, setFile] = useState(null);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!file ) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-    onUpload({
-      companyId: company.id,
-      documentId: document.id,
-      file,
-      
-    });
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Upload Document for {company?.company_name}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Document File</label>
-            <Input
-              type="file"
-              onChange={(e) => setFile(e.target.files?.[0])}
-              required
-            />
-          </div>
-          
-          <Button type="submit" className="w-full">Upload</Button>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-// View Modal Component
-const ViewModal = ({ url, onClose }) => {
-  if (!url) return null;
-
-  return (
-    <Dialog open={!!url} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>Document Preview</DialogTitle>
-        </DialogHeader>
-        <div className="flex-1 min-h-[500px]">
-          <iframe src={url} className="w-full h-full" />
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-// Add Fields Dialog Component
-const AddFieldsDialog = ({ isOpen, onClose, document, onSubmit }) => {
-  const [fields, setFields] = useState([{ id: generateId(), name: '', type: 'text' }]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const validFields = fields.filter(field => field.name.trim() !== '');
-
-    if (validFields.length === 0) {
-      toast.error('Please add at least one field');
-      return;
-    }
-
-    onSubmit(document.id, validFields);
-  };
-
-  const addField = () => {
-    setFields(prev => [...prev, { id: generateId(), name: '', type: 'text' }]);
-  };
-
-  const removeField = (id) => {
-    if (fields.length === 1) return;
-    setFields(prev => prev.filter(field => field.id !== id));
-  };
-
-  const updateField = (id, key, value) => {
-    setFields(prev => prev.map(field =>
-      field.id === id ? { ...field, [key]: value } : field
-    ));
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Add Fields for {document?.name}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            {fields.map((field) => (
-              <div key={field.id} className="flex gap-2 items-start p-4 bg-gray-50 rounded-lg">
-                <div className="flex-1">
-                  <label className="text-sm font-medium">Field Name</label>
-                  <Input
-                    value={field.name} onChange={(e) => updateField(field.id, 'name', e.target.value)}
-                    placeholder="Enter field name"
-                    className="mt-1"
-                  />
-                </div>
-                <div className="w-1/3">
-                  <label htmlFor={`field-type-${field.id}`} className="text-sm font-medium">Type</label>
-                  <select
-                    id={`field-type-${field.id}`}
-                    value={field.type}
-                    onChange={(e) => updateField(field.id, 'type', e.target.value)}
-                    className="w-full mt-1 border rounded-md p-2"
-                    aria-label={`Select field type for ${field.name || 'new field'}`}
-                  >
-                    <option value="text">Text</option>
-                    <option value="number">Number</option>
-                    <option value="date">Date</option>
-                    <option value="file">File</option>
-                  </select>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="mt-6"
-                  onClick={() => removeField(field.id)}
-                >
-                  <Trash2 className="h-4 w-4 text-red-500" />
-                </Button>
-              </div>
-            ))}
-          </div>
-          <DialogFooter className="flex justify-between items-center">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addField}
-              className="ml-auto mr-2"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Add Another Field
-            </Button>
-            <Button type="submit">Save Fields</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-// Main Component
 export default function CompanyKycDocumentDetails() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
-  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [isAddFieldOpen, setIsAddFieldOpen] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
-  const [viewUrl, setViewUrl] = useState(null);
-  const [selectedUploadCompany, setSelectedUploadCompany] = useState(null);
+  const [viewUrl, setViewUrl] = useState<string | null>(null);
+  const [selectedUploadCompany, setSelectedUploadCompany] = useState<Company | null>(null);
   const [showExtractModal, setShowExtractModal] = useState(false);
-  const [selectedExtractDocument, setSelectedExtractDocument] = useState(null);
-  const [selectedExtractUpload, setSelectedExtractUpload] = useState(null);
+  const [selectedExtractDocument, setSelectedExtractDocument] = useState<Document | null>(null);
+  const [selectedExtractUpload, setSelectedExtractUpload] = useState<Upload | null>(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  
   const queryClient = useQueryClient();
-  const parentRef = useRef();
+  const parentRef = useRef<HTMLDivElement>(null);
 
-  // Debounce search updates
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -585,7 +64,6 @@ export default function CompanyKycDocumentDetails() {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // Companies Query
   const { data: companies = [], isLoading: isLoadingCompanies } = useQuery({
     queryKey: ['companies', debouncedSearch],
     queryFn: async () => {
@@ -601,7 +79,6 @@ export default function CompanyKycDocumentDetails() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Documents Query
   const { data: documents = [], isLoading: isLoadingDocuments } = useQuery({
     queryKey: ['documents'],
     queryFn: async () => {
@@ -616,7 +93,6 @@ export default function CompanyKycDocumentDetails() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Uploads Query
   const { data: uploads = [], isLoading: isLoadingUploads } = useQuery({
     queryKey: ['uploads'],
     queryFn: async () => {
@@ -630,7 +106,6 @@ export default function CompanyKycDocumentDetails() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Update Fields Mutation
   const updateFieldsMutation = useMutation({
     mutationFn: async ({ documentId, fields }) => {
       const { data, error } = await supabase
@@ -649,18 +124,12 @@ export default function CompanyKycDocumentDetails() {
     },
   });
 
-  // Upload Document Mutation
   const uploadMutation = useMutation({
-    mutationFn: async ({
-      companyId,
-      documentId,
-      file,
-      issueDate,
-      expiryDate
-    }) => {
+    mutationFn: async ({ companyId, documentId, file }) => {
       try {
         const timestamp = new Date().getTime();
         const fileName = `${companyId}/${documentId}/${timestamp}_${file.name}`;
+        
         const { data: fileData, error: fileError } = await supabase
           .storage
           .from('kyc-documents')
@@ -672,8 +141,6 @@ export default function CompanyKycDocumentDetails() {
           userid: companyId.toString(),
           kyc_document_id: documentId,
           filepath: fileData.path,
-          issue_date: issueDate,
-          expiry_date: expiryDate || null
         };
 
         const { data, error } = await supabase
@@ -700,48 +167,39 @@ export default function CompanyKycDocumentDetails() {
     }
   });
 
-  // Extract Details Mutation
   const extractionMutation = useMutation({
     mutationFn: async ({ uploadId, extractedData, documentId }) => {
-      // Validate inputs
       if (!uploadId || !documentId) {
         throw new Error('Upload ID or Document ID is undefined');
       }
 
-      // Prepare the data for storage
       const sanitizedData = Object.entries(extractedData).reduce((acc, [key, value]) => {
-        // Ensure all values are properly serialized
         acc[key] = value === '' ? null : value;
         return acc;
       }, {});
 
-      // Update the upload record with the extracted details
-      const uploadUpdateResult = await supabase
-        .from('acc_portal_kyc_uploads')
-        .update({
-          extracted_details: sanitizedData
-        })
-        .eq('id', uploadId)
-        .select()
-        .single();
+      const [uploadUpdate, documentUpdate] = await Promise.all([
+        supabase
+          .from('acc_portal_kyc_uploads')
+          .update({ extracted_details: sanitizedData })
+          .eq('id', uploadId)
+          .select()
+          .single(),
 
-      if (uploadUpdateResult.error) throw uploadUpdateResult.error;
+        supabase
+          .from('acc_portal_kyc')
+          .update({ last_extracted_details: sanitizedData })
+          .eq('id', documentId)
+          .select()
+          .single()
+      ]);
 
-      // Update the document with last extracted details
-      const documentUpdateResult = await supabase
-        .from('acc_portal_kyc')
-        .update({
-          last_extracted_details: sanitizedData
-        })
-        .eq('id', documentId)
-        .select()
-        .single();
-
-      if (documentUpdateResult.error) throw documentUpdateResult.error;
+      if (uploadUpdate.error) throw uploadUpdate.error;
+      if (documentUpdate.error) throw documentUpdate.error;
 
       return {
-        upload: uploadUpdateResult.data,
-        document: documentUpdateResult.data
+        upload: uploadUpdate.data,
+        document: documentUpdate.data
       };
     },
     onSuccess: () => {
@@ -756,8 +214,7 @@ export default function CompanyKycDocumentDetails() {
     }
   });
 
-  // Handlers
-  const handleViewDocument = async (document, company) => {
+  const handleViewDocument = async (document: Document, company: Company) => {
     const upload = uploads.find(u =>
       u.kyc_document_id === document.id &&
       u.userid === company.id.toString()
@@ -784,22 +241,19 @@ export default function CompanyKycDocumentDetails() {
     }
   };
 
-  const handleUploadClick = (companyId, documentId) => {
-    setSelectedUploadCompany(companies.find(c => c.id === companyId));
+  const handleUploadClick = (companyId: number, documentId: string) => {
+    setSelectedUploadCompany(companies.find(c => c.id === companyId) || null);
     setShowUploadModal(true);
   };
 
-  const handleExtractClick = (document, upload) => {
+  const handleExtractClick = (document: Document, upload: Upload) => {
     setSelectedExtractDocument(document);
     setSelectedExtractUpload(upload);
     setShowExtractModal(true);
   };
 
-  const handleSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
+  const handleSort = (key: string) => {
+    const direction = sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc';
     setSortConfig({ key, direction });
   };
 
@@ -841,10 +295,11 @@ export default function CompanyKycDocumentDetails() {
               {documents.map((doc) => (
                 <li
                   key={doc.id}
-                  className={`px-2 py-1 rounded flex items-center justify-between text-xs ${selectedDocument?.id === doc.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'hover:bg-gray-100'
-                    }`}
+                  className={`px-2 py-1 rounded flex items-center justify-between text-xs ${
+                    selectedDocument?.id === doc.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-gray-100'
+                  }`}
                 >
                   <span
                     className="cursor-pointer flex-1"
@@ -907,7 +362,10 @@ export default function CompanyKycDocumentDetails() {
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">
-                            {uploads.some(u => u.kyc_document_id === selectedDocument.id && u.userid === company.id.toString()) ? (
+                            {uploads.some(u =>
+                              u.kyc_document_id === selectedDocument.id &&
+                              u.userid === company.id.toString()
+                            ) ? (
                               <>
                                 <Button
                                   variant="ghost"
@@ -920,7 +378,16 @@ export default function CompanyKycDocumentDetails() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleExtractClick(selectedDocument, uploads.find(u => u.kyc_document_id === selectedDocument.id && u.userid === company.id.toString()))}
+                                  onClick={() =>
+                                    handleExtractClick(
+                                      selectedDocument,
+                                      uploads.find(
+                                        u =>
+                                          u.kyc_document_id === selectedDocument.id &&
+                                          u.userid === company.id.toString()
+                                      )
+                                    )
+                                  }
                                   title="Extract Details"
                                 >
                                   <DownloadIcon className="h-4 w-4 text-green-500" />
@@ -930,7 +397,9 @@ export default function CompanyKycDocumentDetails() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleUploadClick(company.id, selectedDocument.id)}
+                                onClick={() =>
+                                  handleUploadClick(company.id, selectedDocument.id)
+                                }
                                 title="Upload Document"
                               >
                                 <UploadIcon className="h-4 w-4 text-orange-500" />
@@ -939,16 +408,16 @@ export default function CompanyKycDocumentDetails() {
                           </div>
                         </TableCell>
                         {selectedDocument.fields?.map((field) => {
-                          const upload = uploads.find(u =>
-                            u.kyc_document_id === selectedDocument.id &&
-                            u.userid === company.id.toString()
+                          const upload = uploads.find(
+                            u =>
+                              u.kyc_document_id === selectedDocument.id &&
+                              u.userid === company.id.toString()
                           );
                           return (
                             <TableCell key={field.id} className="text-center">
                               <span>{upload?.extracted_details?.[field.name] || '-'}</span>
                             </TableCell>
                           );
-                      
                         })}
                       </TableRow>
                     ))}
@@ -957,7 +426,7 @@ export default function CompanyKycDocumentDetails() {
               </Card>
             </div>
           </div>
-        ) : (
+         ) : (
           <div className="flex items-center justify-center h-full text-gray-500 text-sm">
             Select a document to view details
           </div>
