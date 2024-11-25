@@ -53,3 +53,9 @@ export interface Company {
   export interface VisibleColumns {
     [key: string]: ColumnConfig;
   }
+
+  export interface Stats {
+    total: number;
+    missing: number;
+    complete: number;
+  }
