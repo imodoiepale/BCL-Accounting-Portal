@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const templates = {
+type Template = {
+  id: string;
+  name: string;
+  templateUrl?: string;
+  fields: Array<{
+    id: string;
+    label: string;
+    type: string;
+    required?: boolean;
+    options?: string[];
+    default?: any;
+    fields?: Array<any>;
+  }>;
+  defaultValues: Record<string, any>;
+}
+
+type Templates = {
+  [key: string]: Template;
+}
+
+const templates: Templates = {
   'bank-application': {
     id: 'bank-application',
     name: 'Bank Application Form',
@@ -38,7 +58,6 @@ const templates = {
             { id: 'enabled', label: 'Enable Cheque Book', type: 'checkbox', default: false },
             { id: 'preferredNameFormat', label: 'Preferred Name Format', type: 'text' }
           ]},
-          // Add other facility fields similarly
         ]
       }
     ],
@@ -63,7 +82,6 @@ const templates = {
           preferredNameFormat: ''
         }
       }
-      // Add other default values following the same structure
     }
   },
   'job-application': {
@@ -100,15 +118,20 @@ const templates = {
   },
 }
 
+export type Params = { id: string }
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Params }
 ) {
-  const id = params.id
-  const template = templates[id as keyof typeof templates]
+  const { id } = context.params
+  const template = templates[id]
 
   if (!template) {
-    return NextResponse.json({ error: 'Template not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Template not found' }, 
+      { status: 404 }
+    )
   }
 
   return NextResponse.json(template)
