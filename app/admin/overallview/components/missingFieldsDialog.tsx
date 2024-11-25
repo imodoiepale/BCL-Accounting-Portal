@@ -30,44 +30,80 @@ onSave
 }: MissingFieldsDialogProps) => {
 const [formData, setFormData] = useState({});
 const [loading, setLoading] = useState(false);
-
+// Add this helper function to both dialogs
+const parseTableNames = (mappings) => {
+  try {
+    const allTables = new Set();
+    if (Array.isArray(mappings)) {
+      mappings.forEach(mapping => {
+        try {
+          let tableNames;
+          if (typeof mapping.table_names === 'string') {
+            tableNames = JSON.parse(mapping.table_names || '{}');
+          } else if (typeof mapping.table_names === 'object') {
+            tableNames = mapping.table_names;
+          }
+          
+          if (tableNames) {
+            Object.values(tableNames).forEach(tables => {
+              if (Array.isArray(tables)) {
+                tables.forEach(table => allTables.add(table));
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('Error parsing individual table names:', e);
+        }
+      });
+    }
+    return Array.from(allTables);
+  } catch (error) {
+    console.error('Error in parseTableNames:', error);
+    return ['acc_portal_company_duplicate']; // Fallback to base table
+  }
+};
 // MissingFieldsDialog.tsx
 useEffect(() => {
   console.log('MissingFieldsDialog - Initial companyData:', companyData);
+  console.log('MissingFieldsDialog - Processed Sections:', processedSections);
+
   if (!companyData?.company) {
     console.log('MissingFieldsDialog - No company data available');
     return;
   }
 
   try {
-    // Collect all possible fields from processed sections
-    const allFields = new Set();
+    // Get all fields from processed sections
+    const allFields = new Map(); // Changed to Map to store field info
     const existingData = {};
 
-    console.log('MissingFieldsDialog - Processing sections:', processedSections);
+    // First collect all fields
     processedSections.forEach(section => {
       if (!section.isSeparator && section.categorizedFields) {
         section.categorizedFields.forEach(category => {
-          if (!category.isSeparator) {
+          if (!category.isSeparator && category.fields) {
             category.fields.forEach(field => {
-              allFields.add(field.name);
+              console.log('Processing field:', field);
+              allFields.set(field.name, field);
             });
           }
         });
       }
     });
 
-    console.log('MissingFieldsDialog - All possible fields:', Array.from(allFields));
+    console.log('MissingFieldsDialog - All possible fields:', Array.from(allFields.values()));
 
-    // Process company data
-    Object.entries(companyData.company).forEach(([key, value]) => {
-      existingData[`acc_portal_company_duplicate.${key}`] = value;
-    });
+    // Process existing data
+    // Company data
+    if (companyData.company) {
+      Object.entries(companyData.company).forEach(([key, value]) => {
+        existingData[`acc_portal_company_duplicate.${key}`] = value;
+      });
+    }
 
-    // Process all row data
+    // Process rows data
     if (companyData.rows?.length > 0) {
       companyData.rows.forEach((row) => {
-        // Handle regular rows
         if (!row.isAdditionalRow) {
           Object.entries(row).forEach(([key, value]) => {
             if (key.endsWith('_data') && value) {
@@ -78,31 +114,27 @@ useEffect(() => {
             }
           });
         }
-        // Handle additional rows
-        else if (row.sourceTable) {
-          Object.entries(row).forEach(([key, value]) => {
-            if (!['sourceTable', 'isAdditionalRow', 'id'].includes(key)) {
-              existingData[`${row.sourceTable}.${key}`] = value;
-            }
-          });
-        }
       });
     }
 
-    // Identify truly missing or empty fields
+    console.log('MissingFieldsDialog - Existing data:', existingData);
+
+    // Find missing or empty fields
     const missingFields = {};
-    allFields.forEach(fieldName => {
+    allFields.forEach((fieldInfo, fieldName) => {
       const value = existingData[fieldName];
-      if (value === undefined || value === null || value === '' || value === 'null') {
+      if (value === undefined || value === null || value === '' || 
+          value === 'null' || value === ' ' || value === "null") {
+        console.log('Found missing field:', fieldName, value);
         missingFields[fieldName] = '';
       }
     });
 
-    console.log('MissingFieldsDialog - Existing data:', existingData);
     console.log('MissingFieldsDialog - Missing fields:', missingFields);
     setFormData(missingFields);
+
   } catch (error) {
-    console.error('MissingFieldsDialog - Error processing data:', error);
+    console.error('MissingFieldsDialog - Error:', error);
   }
 }, [companyData, processedSections]);
 
@@ -115,52 +147,44 @@ const handleChange = (field: string, value: string) => {
 
 const handleSubmit = async () => {
   setLoading(true);
+  console.log('Submitting form data:', formData);
+  
   try {
-    const { data: mappings, error: mappingError } = await supabase
-      .from('profile_category_table_mapping')
-      .select('*');
-
-    if (mappingError) throw mappingError;
-
-    const allTableNames = parseTableNames(mappings);
-    const updates = {};
-
-    for (const [fieldName, value] of Object.entries(formData)) {
+    // Group updates by table
+    const updatesByTable = Object.entries(formData).reduce((acc, [fieldName, value]) => {
       const [tableName, columnName] = fieldName.split('.');
-      if (allTableNames.includes(tableName)) {
-        if (!updates[tableName]) {
-          updates[tableName] = {
-            updates: {},
-            idField: tableName === 'ecitizen_companies_duplicate' ? 'name' : 'company_name'
-          };
-        }
-        updates[tableName].updates[columnName] = value;
+      if (!acc[tableName]) {
+        acc[tableName] = {};
       }
+      acc[tableName][columnName] = value;
+      return acc;
+    }, {});
+
+    console.log('Updates grouped by table:', updatesByTable);
+
+    // Execute updates for each table
+    for (const [tableName, updates] of Object.entries(updatesByTable)) {
+      console.log(`Updating table ${tableName}:`, updates);
+      const { error } = await supabase
+        .from(tableName)
+        .update(updates)
+        .eq('company_name', companyData.company.company_name);
+
+      if (error) throw error;
     }
 
-    for (const [tableName, { updates: tableUpdates, idField }] of Object.entries(updates)) {
-      if (Object.keys(tableUpdates).length > 0) {
-        const { error: updateError } = await supabase
-          .from(tableName)
-          .update(tableUpdates)
-          .eq(idField, companyData.company.company_name);
-
-        if (updateError) throw updateError;
-      }
-    }
-
-    toast.success('All changes saved successfully');
-    window.dispatchEvent(new CustomEvent('refreshData'));
+    toast.success('Changes saved successfully');
     onSave(formData);
     onClose();
   } catch (error) {
-    console.error('Error updating company:', error);
+    console.error('Error saving changes:', error);
     toast.error('Failed to save changes: ' + (error.message || 'Unexpected error'));
   } finally {
     setLoading(false);
   }
 };
 
+// In both dialogs, modify renderInput
 const renderInput = (field: any) => {
   const currentValue = formData[field.name] ?? '';
 
@@ -190,7 +214,6 @@ const renderInput = (field: any) => {
       onChange={(e) => handleChange(field.name, e.target.value)}
       className="w-full"
       placeholder={`Enter ${field.label.toLowerCase()}`}
-      readOnly={field.name === 'acc_portal_company_duplicate.company_name'}
     />
   );
 };
@@ -198,26 +221,25 @@ const renderInput = (field: any) => {
 const groupFieldsBySection = () => {
   const groups = {};
 
-  if (processedSections && Array.isArray(processedSections)) {
-    processedSections.forEach(section => {
-      if (!section.isSeparator && section.categorizedFields) {
-        section.categorizedFields.forEach(category => {
-          if (!category.isSeparator) {
-            const missingFieldsInCategory = category.fields.filter(field => 
-              formData.hasOwnProperty(field.name)
-            );
+  processedSections.forEach(section => {
+    if (!section.isSeparator && section.categorizedFields) {
+      section.categorizedFields.forEach(category => {
+        if (!category.isSeparator && category.fields) {
+          const categoryName = category.category || 'General';
+          const missingFieldsInCategory = category.fields.filter(field => {
+            return formData.hasOwnProperty(field.name);
+          });
 
-            if (missingFieldsInCategory.length > 0) {
-              if (!groups[category.category]) {
-                groups[category.category] = [];
-              }
-              groups[category.category].push(...missingFieldsInCategory);
+          if (missingFieldsInCategory.length > 0) {
+            if (!groups[categoryName]) {
+              groups[categoryName] = [];
             }
+            groups[categoryName].push(...missingFieldsInCategory);
           }
-        });
-      }
-    });
-  }
+        }
+      });
+    }
+  });
 
   return groups;
 };

@@ -184,6 +184,38 @@ const OverallView: React.FC = () => {
         }
     }, []);
 
+    const handleSave = async (updatedData: any) => {
+        console.log('Saving updated data:', updatedData);
+        try {
+          // Update local data
+          const updatedDataArray = data.map(item => {
+            if (item.company.company_name === selectedCompany?.company?.company_name) {
+              return {
+                ...item,
+                company: {
+                  ...item.company,
+                  ...Object.entries(updatedData).reduce((acc, [key, value]) => {
+                    const [table, field] = key.split('.');
+                    if (table === 'acc_portal_company_duplicate') {
+                      acc[field] = value;
+                    }
+                    return acc;
+                  }, {})
+                }
+              };
+            }
+            return item;
+          });
+      
+          setData(updatedDataArray);
+          
+          // Refresh data from server
+          await fetchAllData(activeMainTab, activeSubTab);
+        } catch (error) {
+          console.error('Error saving data:', error);
+          toast.error('Failed to save changes');
+        }
+      };
     useEffect(() => {
         const initializeData = async () => {
             await fetchStructure();
@@ -279,18 +311,16 @@ const OverallView: React.FC = () => {
     }, [structure]);
 
     const handleCompanyClick = useCallback((company: any) => {
-        const currentMainTab = activeMainTab || mainTabs[0];
-        const currentSubTab = activeSubTab || subTabs[currentMainTab]?.[0];
-        const processedSections = processTabSections(currentMainTab, currentSubTab);
-        setSelectedCompany({
-            company: company.company,
+        console.log('Selected company data:', company);
+        const selectedCompanyData = {
+            company: company,  // Changed this line - pass the entire company object
             rows: company.rows,
-            processedSections,
-            activeMainTab: currentMainTab,
-            activeSubTab: currentSubTab
-        });
+            activeTab: activeSubTab,
+        };
+        console.log('Prepared company data:', selectedCompanyData);
+        setSelectedCompany(selectedCompanyData);
         setIsEditDialogOpen(true);
-    }, [activeMainTab, activeSubTab, mainTabs, subTabs, processTabSections]);
+    }, [activeMainTab, activeSubTab, processTabSections]);
 
     const handleMainTabChange = useCallback((tabValue: string) => {
         setActiveMainTab(tabValue);
@@ -404,28 +434,20 @@ const OverallView: React.FC = () => {
             <CompanyEditDialog
                 isOpen={isEditDialogOpen}
                 onClose={() => setIsEditDialogOpen(false)}
-                companyData={{
-                    company: selectedCompany?.company,
-                    rows: selectedCompany?.rows,
-                    activeTab: selectedCompany?.activeSubTab
-                }}
-                processedSections={processTabSections(selectedCompany?.activeMainTab, selectedCompany?.activeSubTab)}
-                // onSave={handleSave}
+                companyData={selectedCompany}
+                processedSections={processTabSections(activeMainTab, activeSubTab)}
+                onSave={handleSave}
                 mainActiveTab={activeMainTab}
             />
 
 
-            <Dialog open={isMissingFieldsOpen} onOpenChange={setIsMissingFieldsOpen}>
-                <DialogContent>
-                    <MissingFieldsDialog
-                        isOpen={isMissingFieldsOpen}
-                        onClose={() => setIsMissingFieldsOpen(false)}
-                        companyData={selectedMissingFields}
-                        processedSections={processTabSections(selectedMissingFields?.activeMainTab, selectedMissingFields?.activeSubTab)}
-                        // onSave={handleSave}
-                    />
-                </DialogContent>
-            </Dialog>
+            <MissingFieldsDialog
+                isOpen={isMissingFieldsOpen}
+                onClose={() => setIsMissingFieldsOpen(false)}
+                companyData={selectedMissingFields}
+                processedSections={processTabSections(activeMainTab, activeSubTab)}
+                onSave={handleSave}
+            />
         </div>
     );
 };
