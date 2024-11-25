@@ -245,7 +245,7 @@ const DocumentManagement = () => {
                 ))}
               </tr>
               <tr className="bg-gray-50">
-                <td className="p-3 border-2 border-gray-300 font-semibold text-green-600">Complete</td>
+                <td className="p-3 border-2 border-gray-300 font-semibold text-green-600">Completed</td>
                 {documents.map(doc => (
                   visibleColumns[doc.id].visible && (
                     <React.Fragment key={`complete-${doc.id}`}>
