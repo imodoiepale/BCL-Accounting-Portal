@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { FileDown, Upload, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
+import { toast, Toaster } from 'react-hot-toast';
 
 interface Company {
   name: string;
@@ -47,7 +48,9 @@ const DocumentManagement = () => {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [sortField, setSortField] = useState<SortField>('company');
+  const [selectedDirector, setSelectedDirector] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [uploadMutation, setUploadMutation] = useState({ isLoading: false });
   const [uploadData, setUploadData] = useState({
     issueDate: '',
     expiryDate: '',
@@ -112,12 +115,23 @@ const DocumentManagement = () => {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Uploading:', {
-      company: selectedCompany,
-      document: selectedDocument,
-      ...uploadData,
-    });
-    setShowUploadModal(false);
+    try {
+      setUploadMutation({ isLoading: true });
+      console.log('Uploading:', {
+        company: selectedCompany,
+        director: selectedDirector,
+        document: selectedDocument,
+        ...uploadData,
+      });
+      // Add your upload logic here
+
+      setShowUploadModal(false);
+      toast.success('Document uploaded successfully');
+    } catch (error) {
+      toast.error('Failed to upload document');
+    } finally {
+      setUploadMutation({ isLoading: false });
+    }
   };
 
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -166,54 +180,17 @@ const DocumentManagement = () => {
               <tr className="bg-gray-100">
                 <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Companies</th>
                 <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Directors</th>
-                <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" colSpan={1}>Summary</th>
+                <th className="p-3 border-2 border-gray-300 font-semibold text-gray-700" rowSpan={2}>Summary</th>
                 {documents.map(doc => (
                   visibleColumns[doc.id].visible && (
                     <th key={`doc-${doc.id}`} className="p-3 border-2 border-gray-300 font-semibold text-gray-700 text-center bg-blue-50"
-                      colSpan={5}>  {/* Fixed colSpan to always be 5 for each document */}
+                      colSpan={5}>
                       {doc.name}
                     </th>
                   )
                 ))}
               </tr>
-              <tr className="bg-gray-50">
-                <th className="p-3 border-2 border-gray-300 font-medium text-gray-600">Upload</th>
-                {documents.map(doc => (
-                  visibleColumns[doc.id].visible && (
-                    <React.Fragment key={`doc-columns-${doc.id}`}>
-                      <th className="p-3 border-2 border-gray-300 font-medium text-gray-600">Upload</th>
-                      <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                        onClick={() => handleSort('issueDate')}>
-                        <div className="flex items-center justify-between">
-                          Issue Date
-                          <SortIcon field="issueDate" />
-                        </div>
-                      </th>
-                      <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                        onClick={() => handleSort('expiryDate')}>
-                        <div className="flex items-center justify-between">
-                          Expiry Date
-                          <SortIcon field="expiryDate" />
-                        </div>
-                      </th>
-                      <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                        onClick={() => handleSort('daysLeft')}>
-                        <div className="flex items-center justify-between">
-                          Days Left
-                          <SortIcon field="daysLeft" />
-                        </div>
-                      </th>
-                      <th className="p-3 border-2 border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                        onClick={() => handleSort('status')}>
-                        <div className="flex items-center justify-between">
-                          Status
-                          <SortIcon field="status" />
-                        </div>
-                      </th>
-                    </React.Fragment>
-                  )
-                ))}
-              </tr>
+              
             </thead>
             <tbody>
               {/* Stats rows */}
@@ -322,6 +299,12 @@ const DocumentManagement = () => {
                                     onClick={() => {
                                       setSelectedCompany(company);
                                       setSelectedDocument(doc);
+                                      setSelectedDirector(director);
+                                      setUploadData({
+                                        issueDate: '',
+                                        expiryDate: '',
+                                        file: null
+                                      });
                                       setShowUploadModal(true);
                                     }}
                                     className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100"
@@ -348,8 +331,8 @@ const DocumentManagement = () => {
                               {visibleColumns[doc.id].subColumns.status && (
                                 <td className="p-3 border-2 border-gray-300 text-center">
                                   <span className={`px-2 py-1 rounded-full text-xs ${company.id % 3 === 0 ? 'bg-green-100 text-green-700' :
-                                      company.id % 3 === 1 ? 'bg-yellow-100 text-yellow-700' :
-                                        'bg-red-100 text-red-700'
+                                    company.id % 3 === 1 ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-red-100 text-red-700'
                                     }`}>
                                     {company.id % 3 === 0 ? 'Complete' : company.id % 3 === 1 ? 'Pending' : 'Expired'}
                                   </span>
@@ -382,9 +365,9 @@ const DocumentManagement = () => {
             </button>
 
             <h2 className="text-xl font-semibold mb-4">Upload Document</h2>
-            {selectedCompany && selectedDocument && (
+            {selectedCompany && selectedDocument && selectedDirector && (
               <p className="text-sm text-gray-600 mb-4">
-                Uploading for {selectedCompany.name} - {selectedDocument.name}
+                Uploading for {selectedCompany.name} - {selectedDirector} - {selectedDocument.name}
               </p>
             )}
 
@@ -413,6 +396,7 @@ const DocumentManagement = () => {
                   required
                   className="w-full px-3 py-2 border rounded-md"
                   value={uploadData.expiryDate}
+                  min={uploadData.issueDate} // Prevent expiry date before issue date
                   onChange={(e) => setUploadData(prev => ({ ...prev, expiryDate: e.target.value }))}
                 />
               </div>
@@ -425,16 +409,28 @@ const DocumentManagement = () => {
                   id="fileUpload"
                   type="file"
                   required
+                  accept=".pdf,.jpg,.jpeg,.png"
                   className="w-full px-3 py-2 border rounded-md"
-                  onChange={(e) => setUploadData(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
+                  onChange={(e) => {
+                    const file = e.target.files ? e.target.files[0] : null;
+                    if (file && !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
+                      toast.error('Please upload a valid document or image file');
+                      return;
+                    }
+                    setUploadData(prev => ({ ...prev, file }));
+                  }}
                 />
+                <p className="mt-1 text-sm text-gray-500">
+                  Accepted formats: PDF, JPEG, PNG
+                </p>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700"
+                className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                disabled={!uploadData.file || !uploadData.issueDate || !uploadData.expiryDate}
               >
-                Upload Document
+                {uploadMutation?.isLoading ? 'Uploading...' : 'Upload Document'}
               </button>
             </form>
           </div>
