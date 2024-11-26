@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FileDown, Upload, X, ChevronUp, ChevronDown, MoreVertical, Eye } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
-import { toast } from 'react-hot-toast';
+import { toast, Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabaseClient';
 
 // Types
@@ -665,7 +665,7 @@ return (
               </label>
               <input
                 type="date"
-                required
+                
                 className="w-full px-3 py-1.5 border rounded-md text-sm"
                 value={uploadData.issueDate}
                 onChange={(e) => setUploadData(prev => ({ ...prev, issueDate: e.target.value }))}
@@ -678,7 +678,7 @@ return (
               </label>
               <input
                 type="date"
-                required
+                
                 className="w-full px-3 py-1.5 border rounded-md text-sm"
                 value={uploadData.expiryDate}
                 min={uploadData.issueDate}
@@ -708,7 +708,7 @@ return (
             <button
               type="submit"
               className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 text-sm"
-              disabled={!uploadData.file || !uploadData.issueDate || !uploadData.expiryDate || uploadMutation.isLoading}
+              disabled={!uploadData.file || uploadMutation.isLoading}
             >
               {uploadMutation.isLoading ? 'Uploading...' : 'Upload Document'}
             </button>
