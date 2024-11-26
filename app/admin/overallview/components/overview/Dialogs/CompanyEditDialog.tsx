@@ -65,7 +65,7 @@ const parseTableNames = (mappings) => {
 };
 
 useEffect(() => {
-  console.log('CompanyEditDialog - Initial companyData:', companyData);
+  // console.log('CompanyEditDialog - Initial companyData:', companyData);
 
   if (!companyData?.company) {
     console.log('CompanyEditDialog - No company data available');
@@ -80,7 +80,7 @@ useEffect(() => {
       initialData[`acc_portal_company_duplicate.${key}`] = value ?? '';
     });
 
-    console.log('Initial company data mapped:', initialData);
+    // console.log('Initial company data mapped:', initialData);
 
     // Then add any additional fields from rows
     if (companyData.rows?.length > 0) {
@@ -98,7 +98,7 @@ useEffect(() => {
       });
     }
 
-    console.log('CompanyEditDialog - Final mapped data:', initialData);
+    // console.log('CompanyEditDialog - Final mapped data:', initialData);
     setFormData(initialData);
   } catch (error) {
     console.error('Error mapping company data:', error);
@@ -107,7 +107,7 @@ useEffect(() => {
 }, [companyData]);
   const handleSubmit = async () => {
     setLoading(true);
-    console.log('Submitting form data:', formData);
+    // console.log('Submitting form data:', formData);
 
     try {
       // Group updates by table
@@ -120,7 +120,7 @@ useEffect(() => {
         return acc;
       }, {});
 
-      console.log('Updates grouped by table:', updatesByTable);
+      // console.log('Updates grouped by table:', updatesByTable);
 
       // Execute updates for each table
       for (const [tableName, updates] of Object.entries(updatesByTable)) {
@@ -152,7 +152,7 @@ useEffect(() => {
 
   const handleNewDataSubmit = async () => {
     setLoading(true);
-    console.log('Submitting new data:', newFormData);
+    // console.log('Submitting new data:', newFormData);
 
     try {
       const updatesByTable = Object.entries(newFormData).reduce((acc, [fieldName, value]) => {

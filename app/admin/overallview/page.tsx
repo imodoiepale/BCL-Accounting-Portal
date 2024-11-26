@@ -18,8 +18,34 @@ import { ImportDialog } from './components/overview/Dialogs/ImportDialog';
 
 export const safeJSONParse = (jsonString: string, defaultValue = {}) => {
     try {
-        return jsonString ? JSON.parse(jsonString) : defaultValue;
-    } catch {
+        if (!jsonString) return defaultValue;
+        
+        // Handle already parsed objects
+        if (typeof jsonString === 'object') return jsonString;
+        
+        // Handle strings with escaped quotes
+        let processedString = jsonString;
+        if (typeof jsonString === 'string') {
+            // Replace escaped backslashes first
+            processedString = processedString.replace(/\\\\/g, '\\');
+            // Replace escaped quotes
+            processedString = processedString.replace(/\\"/g, '"');
+            // Handle double-encoded JSON
+            while (processedString.includes('\\"')) {
+                try {
+                    processedString = JSON.parse(processedString);
+                    if (typeof processedString !== 'string') break;
+                } catch {
+                    break;
+                }
+            }
+        }
+
+        return typeof processedString === 'string' 
+            ? JSON.parse(processedString) 
+            : processedString;
+    } catch (error) {
+        console.error('JSON Parse Error:', error, 'Input:', jsonString);
         return defaultValue;
     }
 };
@@ -161,23 +187,72 @@ const OverallView: React.FC = () => {
                 .select('*')
                 .order('main_tab')
                 .order('Tabs');
-
+    
             if (error) throw error;
-
-            setStructure(mappings);
-
-            const mainTabsSet = new Set(mappings.map(m => m.main_tab).filter(Boolean));
+    
+            // Process each mapping to ensure proper JSON parsing
+            const processedMappings = mappings.map(mapping => ({
+                ...mapping,
+                sections_sections: safeJSONParse(mapping.sections_sections, {}),
+                sections_subsections: safeJSONParse(mapping.sections_subsections, {}),
+                column_mappings: safeJSONParse(mapping.column_mappings, {}),
+                column_order: safeJSONParse(mapping.column_order, {}),
+                table_names: safeJSONParse(mapping.table_names, {}),
+                field_dropdowns: safeJSONParse(mapping.field_dropdowns, {})
+            }));
+    
+            setStructure(processedMappings);
+    
+            // Process main tabs
+            const mainTabsSet = new Set(processedMappings
+                .map(m => m.main_tab)
+                .filter(Boolean));
             const uniqueMainTabs = Array.from(mainTabsSet);
             setMainTabs(uniqueMainTabs);
-
+    
+            // Process sub tabs and their relationships
             const subTabsMap = uniqueMainTabs.reduce((acc, mainTab) => {
-                acc[mainTab] = mappings
+                // Get all unique sub tabs for this main tab
+                acc[mainTab] = [...new Set(processedMappings
                     .filter(item => item.main_tab === mainTab)
-                    .map(item => item.Tabs);
+                    .map(item => item.Tabs)
+                    .filter(Boolean))];
                 return acc;
             }, {});
-
+    
+            // Process main sections and subsections
+            const allSections = new Set();
+            const allSubsections = new Set();
+    
+            processedMappings.forEach(mapping => {
+                // Handle sections
+                Object.keys(mapping.sections_sections).forEach(section => {
+                    allSections.add(section);
+                });
+    
+                // Handle subsections - supporting both array and string formats
+                Object.entries(mapping.sections_subsections).forEach(([_, subsectionValue]) => {
+                    if (Array.isArray(subsectionValue)) {
+                        subsectionValue.forEach(sub => allSubsections.add(sub));
+                    } else if (typeof subsectionValue === 'string') {
+                        allSubsections.add(subsectionValue);
+                    } else if (typeof subsectionValue === 'object' && subsectionValue !== null) {
+                        Object.keys(subsectionValue).forEach(sub => allSubsections.add(sub));
+                    }
+                });
+            });
+    
+            setMainSections(Array.from(allSections));
+            setMainSubsections(Array.from(allSubsections));
             setSubTabs(subTabsMap);
+    
+            // console.log('Processed structure:', {
+            //     mainTabs: uniqueMainTabs,
+            //     subTabs: subTabsMap,
+            //     sections: Array.from(allSections),
+            //     subsections: Array.from(allSubsections)
+            // });
+    
         } catch (error) {
             console.error('Error fetching structure:', error);
             toast.error('Failed to fetch structure');
@@ -234,10 +309,7 @@ const OverallView: React.FC = () => {
     }, []);
 
     const processTabSections = useMemo(() => (selectedMainTab: string, selectedSubTab: string) => {
-        const relevantMappings = structure.filter(item =>
-            item.Tabs === selectedSubTab && item.main_tab === selectedMainTab
-        );
-
+        // Initialize with default columns
         const processedSections = [
             {
                 name: 'index',
@@ -261,43 +333,63 @@ const OverallView: React.FC = () => {
                         subCategory: 'Company Info'
                     }]
                 }]
-            },
+            }
         ];
-
+    
+        const relevantMappings = structure.filter(item =>
+            item.Tabs === selectedSubTab && item.main_tab === selectedMainTab
+        );
+    
         relevantMappings.forEach(mapping => {
-            const sections = safeJSONParse(mapping.sections_sections);
-            const subsections = safeJSONParse(mapping.sections_subsections);
-            const columnMappings = safeJSONParse(mapping.column_mappings);
-            const fieldDropdowns = safeJSONParse(mapping.field_dropdowns);
-            const tableNames = safeJSONParse(mapping.table_names);
-
-            Object.entries(sections).forEach(([sectionName, _], index, arr) => {
-                const sectionSubsections = subsections[sectionName];
-                const subsectionArray = Array.isArray(sectionSubsections) ?
-                    sectionSubsections : [sectionSubsections];
-
-                const categorizedFields = subsectionArray.map(subsection => {
-                    const sectionTables = tableNames[sectionName] || [];
-                    const fields = Object.entries(columnMappings)
-                        .filter(([key]) => sectionTables.includes(key.split('.')[0]))
-                        .map(([key, value]) => ({
+            // console.log('Processing mapping:', mapping);
+    
+            // Parse all JSON structures
+            const sections = mapping.sections_sections || {};
+            const subsections = mapping.sections_subsections || {};
+            const columnMappings = mapping.column_mappings || {};
+            const fieldDropdowns = mapping.field_dropdowns || {};
+            const tableNames = mapping.table_names || {};
+    
+            // Process each section
+            Object.entries(sections).forEach(([sectionName, sectionValue], index, arr) => {
+                // Skip if not a valid section
+                if (!sectionValue) return;
+    
+                // Get subsection value
+                const sectionSubsection = subsections[sectionName];
+                
+                // Get tables for this section
+                const sectionTables = tableNames[sectionName] || [];
+                
+                // Process fields for this section
+                const fields = Object.entries(columnMappings)
+                    .filter(([key]) => {
+                        const tableName = key.split('.')[0];
+                        return sectionTables.includes(tableName);
+                    })
+                    .map(([key, value]) => {
+                        const [table, column] = key.split('.');
+                        return {
                             name: key,
                             label: value,
-                            table: key.split('.')[0],
-                            column: key.split('.')[1],
+                            table,
+                            column,
                             dropdownOptions: fieldDropdowns[key] || [],
-                            subCategory: subsection
-                        }));
-
-                    return { category: subsection, fields };
-                });
-
+                            subCategory: typeof sectionSubsection === 'string' ? sectionSubsection : sectionName
+                        };
+                    });
+    
+                // Add section to processed sections
                 processedSections.push({
                     name: sectionName,
                     label: sectionName,
-                    categorizedFields
+                    categorizedFields: [{
+                        category: typeof sectionSubsection === 'string' ? sectionSubsection : sectionName,
+                        fields: fields
+                    }]
                 });
-
+    
+                // Add separator if not the last section
                 if (index < arr.length - 1) {
                     processedSections.push({
                         isSeparator: true,
@@ -306,7 +398,8 @@ const OverallView: React.FC = () => {
                 }
             });
         });
-
+    
+        // console.log('Final processed sections:', processedSections);
         return processedSections;
     }, [structure]);
 
@@ -337,6 +430,32 @@ const OverallView: React.FC = () => {
     if (loading) {
         return <div>Loading...</div>;
     }
+// Add to OverallView.tsx
+const toggleTabVisibility = async (tab: string) => {
+    try {
+      const { error } = await supabase
+        .from('profile_category_table_mapping')
+        .update({
+          column_order: {
+            ...currentOrder,
+            visibility: {
+              ...currentOrder.visibility,
+              tabs: {
+                ...currentOrder.visibility.tabs,
+                [tab]: !currentOrder.visibility.tabs[tab]
+              }
+            }
+          }
+        })
+        .eq('Tabs', tab);
+  
+      if (error) throw error;
+      await fetchStructure();
+    } catch (error) {
+      console.error('Error toggling tab visibility:', error);
+      toast.error('Failed to toggle tab visibility');
+    }
+  };
 
     return (
         <div className="h-screen flex flex-col">
@@ -363,6 +482,7 @@ const OverallView: React.FC = () => {
                                 onStructureChange={fetchStructure}
                                 activeMainTab={activeMainTab}
                                 subTabs={subTabs[activeMainTab] || []}
+                                processedSections={processTabSections(activeMainTab, activeSubTab)}
                             />
                             <ImportDialog
                                 isOpen={isImportDialogOpen}

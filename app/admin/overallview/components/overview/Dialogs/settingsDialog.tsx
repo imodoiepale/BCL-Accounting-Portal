@@ -275,36 +275,29 @@ export function SettingsDialog({ mainTabs,
       let query = supabase
         .from('profile_category_table_mapping')
         .select('*')
-        .eq('main_tab', activeMainTab) // Filter by activeMainTab
+        .eq('main_tab', activeMainTab)
         .order('Tabs', { ascending: true });
-
+  
       const { data: mappings, error } = await query;
-
+  
       if (error) throw error;
-
+  
       const processedMappings = mappings.map(mapping => ({
         id: mapping.id,
-        section: mapping.section,
-        subsection: mapping.subsection,
-        table_name: mapping.table_name,
-        column_mappings: typeof mapping.column_mappings === 'string'
-          ? JSON.parse(mapping.column_mappings)
-          : mapping.column_mappings || {},
-        column_order: mapping.column_order || {},
+        main_tab: mapping.main_tab,
         Tabs: mapping.Tabs,
-        main_tab: activeMainTab,
-        sections_subsections: typeof mapping.sections_subsections === 'string'
-          ? JSON.parse(mapping.sections_subsections)
-          : mapping.sections_subsections || {},
-        sections_sections: typeof mapping.sections_sections === 'string'
-          ? JSON.parse(mapping.sections_sections)
-          : mapping.sections_sections || {}
+        sections_sections: safeJSONParse(mapping.sections_sections, {}),
+        sections_subsections: safeJSONParse(mapping.sections_subsections, {}),
+        column_mappings: safeJSONParse(mapping.column_mappings, {}),
+        column_order: safeJSONParse(mapping.column_order, {}),
+        table_names: safeJSONParse(mapping.table_names, {}),
+        field_dropdowns: safeJSONParse(mapping.field_dropdowns, {})
       }));
-
+  
       setStructure(processedMappings);
       const uniqueTabs = [...new Set(mappings.map(m => m.Tabs))];
       setUniqueTabs(uniqueTabs);
-
+  
       if (!selectedTab && uniqueTabs.length > 0) {
         setSelectedTab(uniqueTabs[0]);
       }
@@ -392,53 +385,108 @@ export function SettingsDialog({ mainTabs,
         .from('profile_category_table_mapping')
         .select('sections_sections, sections_subsections')
         .eq('Tabs', tab);
-
+  
       if (error) throw error;
-
+  
       const sections = [];
       const subsections = {};
-
+  
       data.forEach(item => {
-        let sectionsData = {};
-        let subsectionsData = {};
-
-        if (typeof item.sections_sections === 'string') {
-          sectionsData = JSON.parse(item.sections_sections);
-        } else {
-          sectionsData = item.sections_sections;
-        }
-
-        if (typeof item.sections_subsections === 'string') {
-          subsectionsData = JSON.parse(item.sections_subsections);
-        } else {
-          subsectionsData = item.sections_subsections;
-        }
-
-        Object.keys(sectionsData).forEach(section => {
+        // Parse sections data
+        let sectionsData = safeJSONParse(item.sections_sections, {});
+        let subsectionsData = safeJSONParse(item.sections_subsections, {});
+  
+        // Handle sections
+        Object.entries(sectionsData).forEach(([section, value]) => {
           const normalizedSection = section.replace(/\s+/g, ' ').trim();
+          
+          // Add section if it doesn't exist
           if (!sections.includes(normalizedSection)) {
             sections.push(normalizedSection);
           }
+  
+          // Initialize subsections array for this section if it doesn't exist
           if (!subsections[normalizedSection]) {
             subsections[normalizedSection] = [];
           }
+  
+          // Handle subsections
           if (subsectionsData[section]) {
-            const subsection = subsectionsData[section];
-            if (!subsections[normalizedSection].includes(subsection)) {
-              subsections[normalizedSection].push(subsection);
+            const subsectionValue = subsectionsData[section];
+  
+            if (typeof subsectionValue === 'string') {
+              // Handle string subsection
+              if (!subsections[normalizedSection].includes(subsectionValue)) {
+                subsections[normalizedSection].push(subsectionValue);
+              }
+            } else if (Array.isArray(subsectionValue)) {
+              // Handle array of subsections
+              subsectionValue.forEach(sub => {
+                if (sub && !subsections[normalizedSection].includes(sub)) {
+                  subsections[normalizedSection].push(sub);
+                }
+              });
+            } else if (typeof subsectionValue === 'object' && subsectionValue !== null) {
+              // Handle object subsection
+              Object.keys(subsectionValue).forEach(subKey => {
+                if (!subsections[normalizedSection].includes(subKey)) {
+                  subsections[normalizedSection].push(subKey);
+                }
+              });
             }
           }
         });
+  
+        // Handle case where subsectionsData might have additional sections not in sectionsData
+        Object.entries(subsectionsData).forEach(([section, value]) => {
+          const normalizedSection = section.replace(/\s+/g, ' ').trim();
+          
+          if (!sections.includes(normalizedSection)) {
+            sections.push(normalizedSection);
+          }
+          
+          if (!subsections[normalizedSection]) {
+            subsections[normalizedSection] = [];
+          }
+  
+          if (typeof value === 'string') {
+            if (!subsections[normalizedSection].includes(value)) {
+              subsections[normalizedSection].push(value);
+            }
+          } else if (Array.isArray(value)) {
+            value.forEach(sub => {
+              if (sub && !subsections[normalizedSection].includes(sub)) {
+                subsections[normalizedSection].push(sub);
+              }
+            });
+          } else if (typeof value === 'object' && value !== null) {
+            Object.keys(value).forEach(subKey => {
+              if (!subsections[normalizedSection].includes(subKey)) {
+                subsections[normalizedSection].push(subKey);
+              }
+            });
+          }
+        });
       });
-
+  
+      // Sort sections and subsections alphabetically
+      sections.sort();
+      Object.keys(subsections).forEach(section => {
+        subsections[section].sort();
+      });
+  
+      console.log('Processed sections:', sections);
+      console.log('Processed subsections:', subsections);
+  
       setExistingSections(sections);
       setExistingSubsections(subsections);
+  
     } catch (error) {
       console.error('Error fetching sections and subsections:', error);
       toast.error('Failed to fetch sections and subsections');
     }
   };
-
+  
   // fetches only one type , the one with /
   
   // const fetchExistingSectionsAndSubsections = async (tab) => {
@@ -493,6 +541,7 @@ export function SettingsDialog({ mainTabs,
   //     toast.error('Failed to fetch sections and subsections');
   //   }
   // };
+  
   const handleAddField = async () => {
     if (!selectedSection || !newField.value) return;
 
@@ -817,211 +866,202 @@ export function SettingsDialog({ mainTabs,
     }
   }, [structure, uniqueTabs]);
   
-      const handleAddStructure = async () => {
-        try {
-          if (!newStructure.Tabs || !newStructure.section || !newStructure.subsection) {
-            toast.error('Please fill in all required fields');
-            return;
-          }
-
-          // Check for existing structures with various combinations
-          const { data: existingStructures, error: checkError } = await supabase
-            .from('profile_category_table_mapping')
-            .select('*')
-            .or(`main_tab.eq.${activeMainTab},Tabs.eq.${newStructure.Tabs}`);
-
-          if (checkError) throw checkError;
-
-          const exactMatch = existingStructures?.find(item => {
-            const sections = safeJSONParse(item?.sections_sections) || {};
-            const subsections = safeJSONParse(item?.sections_subsections) || {};
-            return item?.main_tab === activeMainTab && 
-               item?.Tabs === newStructure.Tabs && 
+  const handleAddStructure = async () => {
+    try {
+      if (!newStructure.Tabs || !newStructure.section || !newStructure.subsection) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+  
+      // Check for existing structures with various combinations
+      const { data: existingStructures, error: checkError } = await supabase
+        .from('profile_category_table_mapping')
+        .select('*')
+        .or(`main_tab.eq.${activeMainTab},Tabs.eq.${newStructure.Tabs}`);
+  
+      if (checkError) throw checkError;
+  
+      // Find matches based on different criteria
+      const mainTabMatch = existingStructures?.find(item => 
+        item.main_tab === activeMainTab
+      );
+  
+      const tabMatch = mainTabMatch && existingStructures?.find(item => 
+        item.main_tab === activeMainTab && 
+        item.Tabs === newStructure.Tabs
+      );
+  
+      const sectionMatch = tabMatch && existingStructures?.find(item => {
+        const sections = safeJSONParse(item.sections_sections);
+        return item.main_tab === activeMainTab && 
+               item.Tabs === newStructure.Tabs && 
+               sections[newStructure.section] === true;
+      });
+  
+      const subsectionMatch = sectionMatch && existingStructures?.find(item => {
+        const sections = safeJSONParse(item.sections_sections);
+        const subsections = safeJSONParse(item.sections_subsections);
+        return item.main_tab === activeMainTab && 
+               item.Tabs === newStructure.Tabs && 
                sections[newStructure.section] === true &&
                subsections[newStructure.section] === newStructure.subsection;
-          });
-
-          const mainTabMatch = existingStructures?.find(item => item?.main_tab === activeMainTab);
-          const tabMatch = existingStructures?.find(item => item?.Tabs === newStructure.Tabs);
-          const sectionMatch = existingStructures?.find(item => {
-            const sections = safeJSONParse(item?.sections_sections) || {};
-            return sections[newStructure.section] === true;
-          });
-
-          if (exactMatch) {
-            // Update only column_mappings and column_order
-            const currentMappings = safeJSONParse(exactMatch?.column_mappings) || {};
-            const currentOrder = safeJSONParse(exactMatch?.column_order) || { columns: {} };
-            const currentSections = safeJSONParse(exactMatch?.sections_sections) || {};
-            const currentSubsections = safeJSONParse(exactMatch?.sections_subsections) || {};
-
-            const updatedMappings = {
+      });
+  
+      // Prepare update data
+      const newMappings = newStructure.column_mappings || {};
+      const newTableNames = { [newStructure.section]: newStructure.table_names || [] };
+      const newSections = { [newStructure.section]: true };
+      const newSubsections = { [newStructure.section]: newStructure.subsection };
+      const newOrder = {
+        columns: Object.keys(newMappings).reduce((acc, key, idx) => ({
+          ...acc,
+          [key]: idx + 1
+        }), {})
+      };
+  
+      if (subsectionMatch) {
+        // Update just column mappings and order
+        const currentMappings = safeJSONParse(subsectionMatch.column_mappings, {});
+        const currentOrder = safeJSONParse(subsectionMatch.column_order, { columns: {} });
+        const currentTableNames = safeJSONParse(subsectionMatch.table_names, {});
+  
+        const { error: updateError } = await supabase
+          .from('profile_category_table_mapping')
+          .update({
+            column_mappings: {
               ...currentMappings,
-              ...(newStructure.column_mappings || {})
-            };
-
-            const newColumns = Object.keys(newStructure.column_mappings || {});
-            const updatedOrder = {
+              ...newMappings
+            },
+            column_order: {
+              ...currentOrder,
               columns: {
                 ...currentOrder.columns,
-                ...newColumns.reduce((acc, key, idx) => ({
-                  ...acc,
-                  [key]: currentOrder.columns?.[key] || (Object.keys(currentOrder.columns || {}).length + idx + 1)
-                }), {})
+                ...newOrder.columns
               }
-            };
-
-            const { error: updateError } = await supabase
-              .from('profile_category_table_mapping')
-              .update({
-                column_mappings: JSON.stringify(updatedMappings),
-                column_order: JSON.stringify(updatedOrder),
-                sections_sections: JSON.stringify({ ...currentSections, [newStructure.section]: true }),
-                sections_subsections: JSON.stringify({ ...currentSubsections, [newStructure.section]: newStructure.subsection }),
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', exactMatch.id);
-
-            if (updateError) throw updateError;
-          } else if (sectionMatch) {
-            // Update column_mappings and column_order
-            const currentMappings = safeJSONParse(sectionMatch?.column_mappings) || {};
-            const currentOrder = safeJSONParse(sectionMatch?.column_order) || { columns: {} };
-            const currentSections = safeJSONParse(sectionMatch?.sections_sections) || {};
-            const currentSubsections = safeJSONParse(sectionMatch?.sections_subsections) || {};
-
-            const newColumns = Object.keys(newStructure.column_mappings || {});
-            const updatedOrder = {
+            },
+            table_names: {
+              ...currentTableNames,
+              ...newTableNames
+            }
+          })
+          .eq('id', subsectionMatch.id);
+  
+        if (updateError) throw updateError;
+      } else if (sectionMatch) {
+        // Update subsections and related data
+        const currentSubsections = safeJSONParse(sectionMatch.sections_subsections, {});
+        const currentMappings = safeJSONParse(sectionMatch.column_mappings, {});
+        const currentOrder = safeJSONParse(sectionMatch.column_order, { columns: {} });
+        const currentTableNames = safeJSONParse(sectionMatch.table_names, {});
+  
+        const { error: updateError } = await supabase
+          .from('profile_category_table_mapping')
+          .update({
+            sections_subsections: {
+              ...currentSubsections,
+              ...newSubsections
+            },
+            column_mappings: {
+              ...currentMappings,
+              ...newMappings
+            },
+            column_order: {
+              ...currentOrder,
               columns: {
                 ...currentOrder.columns,
-                ...newColumns.reduce((acc, key, idx) => ({
-                  ...acc,
-                  [key]: currentOrder.columns?.[key] || (Object.keys(currentOrder.columns || {}).length + idx + 1)
-                }), {})
+                ...newOrder.columns
               }
-            };
-
-            const { error: updateError } = await supabase
-              .from('profile_category_table_mapping')
-              .update({
-                column_mappings: JSON.stringify({
-                  ...currentMappings,
-                  ...(newStructure.column_mappings || {})
-                }),
-                column_order: JSON.stringify(updatedOrder),
-                sections_sections: JSON.stringify({ ...currentSections, [newStructure.section]: true }),
-                sections_subsections: JSON.stringify({ ...currentSubsections, [newStructure.section]: newStructure.subsection }),
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', sectionMatch.id);
-
-            if (updateError) throw updateError;
-          } else if (mainTabMatch) {
-            // Update tab and remaining columns
-            const currentMappings = safeJSONParse(mainTabMatch?.column_mappings) || {};
-            const currentOrder = safeJSONParse(mainTabMatch?.column_order) || { columns: {} };
-            const currentTableNames = safeJSONParse(mainTabMatch?.table_names) || {};
-            const currentSections = safeJSONParse(mainTabMatch?.sections_sections) || {};
-            const currentSubsections = safeJSONParse(mainTabMatch?.sections_subsections) || {};
-
-            const newColumns = Object.keys(newStructure.column_mappings || {});
-            const updatedOrder = {
+            },
+            table_names: {
+              ...currentTableNames,
+              ...newTableNames
+            }
+          })
+          .eq('id', sectionMatch.id);
+  
+        if (updateError) throw updateError;
+      } else if (tabMatch) {
+        // Update sections and related data
+        const currentSections = safeJSONParse(tabMatch.sections_sections, {});
+        const currentSubsections = safeJSONParse(tabMatch.sections_subsections, {});
+        const currentMappings = safeJSONParse(tabMatch.column_mappings, {});
+        const currentOrder = safeJSONParse(tabMatch.column_order, { columns: {} });
+        const currentTableNames = safeJSONParse(tabMatch.table_names, {});
+  
+        const { error: updateError } = await supabase
+          .from('profile_category_table_mapping')
+          .update({
+            sections_sections: {
+              ...currentSections,
+              ...newSections
+            },
+            sections_subsections: {
+              ...currentSubsections,
+              ...newSubsections
+            },
+            column_mappings: {
+              ...currentMappings,
+              ...newMappings
+            },
+            column_order: {
+              ...currentOrder,
               columns: {
                 ...currentOrder.columns,
-                ...newColumns.reduce((acc, key, idx) => ({
-                  ...acc,
-                  [key]: currentOrder.columns?.[key] || (Object.keys(currentOrder.columns || {}).length + idx + 1)
-                }), {})
+                ...newOrder.columns
               }
-            };
-
-            const { error: updateError } = await supabase
-              .from('profile_category_table_mapping')
-              .update({
-                Tabs: newStructure.Tabs,
-                column_mappings: JSON.stringify({
-                  ...currentMappings,
-                  ...(newStructure.column_mappings || {})
-                }),
-                column_order: JSON.stringify(updatedOrder),
-                table_names: JSON.stringify({ ...currentTableNames, [newStructure.section]: newStructure.table_names || [] }),
-                sections_sections: JSON.stringify({ ...currentSections, [newStructure.section]: true }),
-                sections_subsections: JSON.stringify({ ...currentSubsections, [newStructure.section]: newStructure.subsection }),
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', mainTabMatch.id);
-
-            if (updateError) throw updateError;
-          } else if (tabMatch) {
-            // Update main_tab and remaining columns
-            const currentMappings = safeJSONParse(tabMatch?.column_mappings) || {};
-            const currentOrder = safeJSONParse(tabMatch?.column_order) || { columns: {} };
-            const currentTableNames = safeJSONParse(tabMatch?.table_names) || {};
-            const currentSections = safeJSONParse(tabMatch?.sections_sections) || {};
-            const currentSubsections = safeJSONParse(tabMatch?.sections_subsections) || {};
-
-            const newColumns = Object.keys(newStructure.column_mappings || {});
-            const updatedOrder = {
-              columns: {
-                ...currentOrder.columns,
-                ...newColumns.reduce((acc, key, idx) => ({
-                  ...acc,
-                  [key]: currentOrder.columns?.[key] || (Object.keys(currentOrder.columns || {}).length + idx + 1)
-                }), {})
-              }
-            };
-
-            const { error: updateError } = await supabase
-              .from('profile_category_table_mapping')
-              .update({
-                main_tab: activeMainTab,
-                column_mappings: JSON.stringify({
-                  ...currentMappings,
-                  ...(newStructure.column_mappings || {})
-                }),
-                column_order: JSON.stringify(updatedOrder),
-                table_names: JSON.stringify({ ...currentTableNames, [newStructure.section]: newStructure.table_names || [] }),
-                sections_sections: JSON.stringify({ ...currentSections, [newStructure.section]: true }),
-                sections_subsections: JSON.stringify({ ...currentSubsections, [newStructure.section]: newStructure.subsection }),
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', tabMatch.id);
-
-            if (updateError) throw updateError;
-          } else {
-            // Insert new record if no matches found
-            const { error: insertError } = await supabase
-              .from('profile_category_table_mapping')
-              .insert([{
-                main_tab: activeMainTab,
-                Tabs: newStructure.Tabs,
-                sections_sections: JSON.stringify({ [newStructure.section]: true }),
-                sections_subsections: JSON.stringify({ [newStructure.section]: newStructure.subsection }),
-                column_mappings: JSON.stringify(newStructure.column_mappings || {}),
-                table_names: JSON.stringify({ [newStructure.section]: newStructure.table_names || [] }),
-                column_order: JSON.stringify({
-                  columns: Object.keys(newStructure.column_mappings || {}).reduce((acc, key, idx) => ({
-                    ...acc,
-                    [key]: idx + 1
-                  }), {})
-                })
-              }]);
-
-            if (insertError) throw insertError;
-          }
-
-          await fetchStructure();
-          await onStructureChange();
-          resetNewStructure();
-          setSelectedTables([]);
-          setSelectedTableFields({});
-          toast.success('Structure updated successfully');
-
-        } catch (error) {
-          console.error('Error managing structure:', error);
-          toast.error('Failed to manage structure');
-        }
-      };    
+            },
+            table_names: {
+              ...currentTableNames,
+              ...newTableNames
+            }
+          })
+          .eq('id', tabMatch.id);
+  
+        if (updateError) throw updateError;
+      } else if (mainTabMatch) {
+        // Update tabs and related data
+        const { error: updateError } = await supabase
+          .from('profile_category_table_mapping')
+          .update({
+            Tabs: newStructure.Tabs,
+            sections_sections: newSections,
+            sections_subsections: newSubsections,
+            column_mappings: newMappings,
+            column_order: newOrder,
+            table_names: newTableNames
+          })
+          .eq('id', mainTabMatch.id);
+  
+        if (updateError) throw updateError;
+      } else {
+        // Insert new record
+        const { error: insertError } = await supabase
+          .from('profile_category_table_mapping')
+          .insert([{
+            main_tab: activeMainTab,
+            Tabs: newStructure.Tabs,
+            sections_sections: newSections,
+            sections_subsections: newSubsections,
+            column_mappings: newMappings,
+            column_order: newOrder,
+            table_names: newTableNames
+          }]);
+  
+        if (insertError) throw insertError;
+      }
+  
+      await fetchStructure();
+      await onStructureChange();
+      resetNewStructure();
+      setSelectedTables([]);
+      setSelectedTableFields({});
+      toast.success('Structure updated successfully');
+  
+    } catch (error) {
+      console.error('Error managing structure:', error);
+      toast.error('Failed to manage structure');
+    }
+  };
 
   // submitting the normal jsons without /
   //   const handleAddStructure = async () => {
@@ -1544,11 +1584,15 @@ export function SettingsDialog({ mainTabs,
         .select('*');
 
       if (error) throw error;
+      if (!data) {
+        throw new Error('No data returned from database');
+      }
 
       console.log('Found data for subsection:', data);
 
       // Find relevant structure with this subsection
       const relevantStructures = data.filter(item => {
+        if (!item.sections_subsections) return false;
         const subsectionsData = safeJSONParse(item.sections_subsections, {});
         return Object.values(subsectionsData).some(subs => {
           if (Array.isArray(subs)) {
@@ -1566,12 +1610,14 @@ export function SettingsDialog({ mainTabs,
 
       relevantStructures.forEach(item => {
         // Get tables
-        const tableNames = safeJSONParse(item.table_names, {});
+        const tableNames = safeJSONParse(item.table_names || '{}', {});
         console.log('Table names:', tableNames);
-        Object.values(tableNames).flat().forEach(table => allTables.add(table));
+        Object.values(tableNames).flat().forEach(table => {
+          if (table) allTables.add(table);
+        });
 
         // Get column mappings
-        const columnMappings = safeJSONParse(item.column_mappings, {});
+        const columnMappings = safeJSONParse(item.column_mappings || '{}', {});
         console.log('Column mappings:', columnMappings);
         Object.assign(allMappings, columnMappings);
       });
@@ -2989,6 +3035,18 @@ export function SettingsDialog({ mainTabs,
               {/* Tables Selection */}
               <div className="border rounded-lg p-4">
                 <h4 className="font-medium mb-2">Select Tables</h4>
+                <input
+                  type="text"
+                  placeholder="Search tables..."
+                  className="w-full p-2 mb-2 border rounded"
+                  onChange={(e) => {
+                    const searchValue = e.target.value.toLowerCase();
+                    const filteredTables = tables.filter(table => 
+                      table.toLowerCase().includes(searchValue)
+                    );
+                    setTables(filteredTables);
+                  }}
+                />
                 <ScrollArea className="h-[400px]">
                   {tables.map(table => (
                     <div key={table} className="flex items-center gap-2 p-2 hover:bg-gray-50">
@@ -3014,6 +3072,18 @@ export function SettingsDialog({ mainTabs,
               {/* Fields Selection */}
               <div className="border rounded-lg p-4">
                 <h4 className="font-medium mb-2">Select Fields</h4>
+                <input
+                  type="text"
+                  placeholder="Search fields..."
+                  className="w-full p-2 mb-2 border rounded"
+                  onChange={(e) => {
+                    const searchValue = e.target.value.toLowerCase();
+                    const filteredFields = tableColumns.filter(field => 
+                      field.column_name.toLowerCase().includes(searchValue)
+                    );
+                    setTableColumns(filteredFields);
+                  }}
+                />
                 <ScrollArea className="h-[400px]">
                   {selectedTables.map((tableName) => {
                     const tableFields = tableColumns.filter(col => col.table_name === tableName);

@@ -64,11 +64,11 @@ const parseTableNames = (mappings) => {
 };
 // MissingFieldsDialog.tsx
 useEffect(() => {
-  console.log('MissingFieldsDialog - Initial companyData:', companyData);
-  console.log('MissingFieldsDialog - Processed Sections:', processedSections);
+  // console.log('MissingFieldsDialog - Initial companyData:', companyData);
+  // console.log('MissingFieldsDialog - Processed Sections:', processedSections);
 
   if (!companyData?.company) {
-    console.log('MissingFieldsDialog - No company data available');
+    // console.log('MissingFieldsDialog - No company data available');
     return;
   }
 
@@ -83,7 +83,7 @@ useEffect(() => {
         section.categorizedFields.forEach(category => {
           if (!category.isSeparator && category.fields) {
             category.fields.forEach(field => {
-              console.log('Processing field:', field);
+              // console.log('Processing field:', field);
               allFields.set(field.name, field);
             });
           }
@@ -91,7 +91,7 @@ useEffect(() => {
       }
     });
 
-    console.log('MissingFieldsDialog - All possible fields:', Array.from(allFields.values()));
+    // console.log('MissingFieldsDialog - All possible fields:', Array.from(allFields.values()));
 
     // Process existing data
     // Company data
@@ -117,7 +117,7 @@ useEffect(() => {
       });
     }
 
-    console.log('MissingFieldsDialog - Existing data:', existingData);
+    // console.log('MissingFieldsDialog - Existing data:', existingData);
 
     // Find missing or empty fields
     const missingFields = {};
@@ -125,12 +125,12 @@ useEffect(() => {
       const value = existingData[fieldName];
       if (value === undefined || value === null || value === '' || 
           value === 'null' || value === ' ' || value === "null") {
-        console.log('Found missing field:', fieldName, value);
+        // console.log('Found missing field:', fieldName, value);
         missingFields[fieldName] = '';
       }
     });
 
-    console.log('MissingFieldsDialog - Missing fields:', missingFields);
+    // console.log('MissingFieldsDialog - Missing fields:', missingFields);
     setFormData(missingFields);
 
   } catch (error) {
@@ -147,7 +147,7 @@ const handleChange = (field: string, value: string) => {
 
 const handleSubmit = async () => {
   setLoading(true);
-  console.log('Submitting form data:', formData);
+  // console.log('Submitting form data:', formData);
   
   try {
     // Group updates by table

@@ -5,13 +5,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-
+interface EditableCellProps {
+    value: any;
+    onSave: (value: any) => void;
+    fieldName: string;
+    rowId?: number | string;
+    companyName?: string;
+    companyId?: number | string; // Add this line
+    className?: string;
+    field: any;
+}
 export const EditableCell = ({
     value: initialValue,
     onSave,
     fieldName,
     rowId,
     companyName,
+    companyId,
     className,
     field,
 }) => {
@@ -31,12 +41,12 @@ export const EditableCell = ({
             const { data, error } = await supabase
                 .from('profile_category_table_mapping')
                 .select('field_dropdowns');
-    
+
             if (error) {
                 console.error('Error fetching dropdowns:', error);
                 return;
             }
-    
+
             // Combine and parse all field_dropdowns
             const allDropdowns = data.reduce((acc, curr) => {
                 try {
@@ -49,7 +59,7 @@ export const EditableCell = ({
                     return acc;
                 }
             }, {});
-    
+
             const options = allDropdowns[fieldName];
             if (Array.isArray(options) && options.length > 0) {
                 setDropdownOptions(options);
@@ -61,36 +71,50 @@ export const EditableCell = ({
             toast.error('Failed to fetch dropdown options');
         }
     };
-// Helper function to parse table names
-const parseTableNames = (mappings) => {
-    return mappings.reduce((acc, mapping) => {
-        try {
-            // Parse the JSON string if it's a string
-            const tableData = typeof mapping.table_names === 'string' 
-                ? JSON.parse(mapping.table_names)
-                : mapping.table_names;
-            
-            // Extract table names from all categories
-            Object.values(tableData).forEach(tables => {
-                if (Array.isArray(tables)) {
-                    acc.push(...tables);
+    // Helper function to parse table names
+    const parseTableNames = (mappings) => {
+        return mappings.reduce((acc, mapping) => {
+            try {
+
+
+
+
+                // Parse the JSON string if it's a string and ensure it's not null/undefined
+                const tableData = mapping.table_names ? (
+                    typeof mapping.table_names === 'string'
+                        ? JSON.parse(mapping.table_names)
+                        : mapping.table_names
+                ) : {};
+
+
+
+
+
+
+
+                // Extract table names from all categories if tableData exists
+                if (tableData && typeof tableData === 'object') {
+                    Object.values(tableData).forEach(tables => {
+                        if (Array.isArray(tables)) {
+                            acc.push(...tables);
+                        }
+                    });
                 }
-            });
-        } catch (error) {
-            console.error('Error parsing table names:', error);
-        }
-        return acc;
-    }, []);
-};
+            } catch (error) {
+                console.error('Error parsing table names:', error);
+            }
+            return acc;
+        }, []);
+    };
+
     const handleSave = async () => {
         if (editValue !== initialValue) {
             try {
                 const today = new Date();
                 const [tableName, columnName] = fieldName.split('.');
-                let changedValues = { [columnName]: editValue }; // Use columnName without table prefix
- console.log('Changed values:', changedValues);
-    
-                // Keep the effective date handling
+                let changedValues = { [columnName]: editValue };
+
+                // Handle effective date fields
                 const effectiveDateFields = {
                     'acc_client_effective_to': {
                         status: 'acc_client_status',
@@ -109,57 +133,55 @@ const parseTableNames = (mappings) => {
                         flag: 'cps_sheria_client'
                     }
                 };
-                console.log('Effective date fields:', effectiveDateFields);
-    
+
                 if (fieldName in effectiveDateFields) {
                     const effectiveDate = new Date(editValue);
                     const { status, flag } = effectiveDateFields[fieldName];
                     changedValues[status] = effectiveDate > today ? 'Active' : 'Inactive';
                     changedValues[flag] = effectiveDate > today ? 'Yes' : 'No';
-                    console.log('Updated changed values with effective date:', changedValues);
                 }
-    
-                // Get table names from profile_category_table_mapping
+
                 const { data: mappings, error: mappingError } = await supabase
-                .from('profile_category_table_mapping')
-                .select('*');
+                    .from('profile_category_table_mapping')
+                    .select('*');
 
-            if (mappingError) {
-                console.error('Error fetching table mappings:', mappingError);
-                return;
+                if (mappingError) throw mappingError;
+
+                const allTableNames = parseTableNames(mappings);
+
+                if (allTableNames.includes(tableName)) {
+                    const query = supabase
+                        .from(tableName)
+                        .update(changedValues);
+
+                    // Primary update condition using the source table's ID
+                    if (rowId) {
+                        query.eq('id', rowId);
+                    }
+
+                    const { error: updateError } = await query;
+
+                    if (updateError) throw updateError;
+
+                    console.log(`Updated field ${fieldName} in table: ${tableName} with ID: ${rowId}`);
+                    setEditValue(editValue);
+                    onSave(editValue);
+                    setIsEditing(false);
+                    toast.success('Updated successfully');
+                } else {
+                    toast.error(`Table "${tableName}" not found`);
+                }
+            } catch (error) {
+                console.error('Error during update operation:', error);
+                toast.error('Update failed: ' + (error.message || 'Unexpected error'));
+                setEditValue(initialValue);
             }
-
-            // Combine all table_names from all rows
-          const allTableNames = parseTableNames(mappings);
-            console.log('Available tables:', allTableNames);
-
-            if (allTableNames.includes(tableName)) {
-                const { error: updateError } = await supabase
-                    .from(tableName)
-                    .update(changedValues)
-                    .eq(tableName === 'ecitizen_companies_duplicate' ? 'name' : 'company_name', companyName);
-
-                if (updateError) throw updateError;
-
-                console.log(`Updated field ${fieldName} in table: ${tableName}`);
-                setEditValue(editValue);
-                onSave(editValue);
-                setIsEditing(false);
-                toast.success('Updated successfully');
-            } else {
-                console.error(`Table ${tableName} not found in available tables:`, allTableNames);
-                toast.error(`Table "${tableName}" not found`);
-            }
-        } catch (error) {
-            console.error('Error during update operation:', error);
-            toast.error('Update failed: ' + (error.message || 'Unexpected error'));
-            setEditValue(initialValue);
+        } else {
+            setIsEditing(false);
         }
-    } else {
-        setIsEditing(false);
-    }
-};
-        const handleDoubleClick = async () => {
+    };
+
+    const handleDoubleClick = async () => {
         console.log('Double clicked field:', fieldName);
         await fetchDropdownOptions();
         setIsEditing(true);
@@ -215,7 +237,7 @@ const parseTableNames = (mappings) => {
         }
     }
 
-    useEffect(() => {        
+    useEffect(() => {
         if (isEditing && inputRef.current) {
             inputRef.current.focus();
             if (inputRef.current.select) { // Check if select() is a function
@@ -223,7 +245,7 @@ const parseTableNames = (mappings) => {
             }
         }
     }, [isEditing]);
-  
+
     if (isEditing) {
         // Check if this field has dropdown options
         if (dropdownOptions && dropdownOptions.length > 0) {
@@ -260,7 +282,7 @@ const parseTableNames = (mappings) => {
         }
     }
 
-    if (isEditing &&dropdownOptions && dropdownOptions.length > 0) {
+    if (isEditing && dropdownOptions && dropdownOptions.length > 0) {
         return (
             <select
                 ref={inputRef}
@@ -279,7 +301,7 @@ const parseTableNames = (mappings) => {
         );
     }
 
-   const renderValue = () => {
+    const renderValue = () => {
         if (fieldName === 'acc_portal_company_duplicate.company_name') {
             return (
                 <div className="group relative">
@@ -292,9 +314,9 @@ const parseTableNames = (mappings) => {
         }
         return editValue || <span className="text-red-500 font-semibold">Missing</span>;
     };
-if (isLoading) {
-    return <div className="p-2">Loading...</div>;
-}
+    if (isLoading) {
+        return <div className="p-2">Loading...</div>;
+    }
     return (
         <div
             onDoubleClick={handleDoubleClick}

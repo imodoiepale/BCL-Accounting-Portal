@@ -1,4 +1,3 @@
-
 // components/overview/TableComponents.tsx
 // @ts-nocheck
 "use client";
@@ -394,53 +393,43 @@ if (field.type === 'date') {
                     rowSpan={tableName === 'acc_portal_company_duplicate' ? companyGroup.rowSpan : 1}
                   >
                     <EditableCell
-                      value={value}
-                      onSave={async (newValue) => {
-                        try {
-                          const [tableName, columnName] = field.name.split('.');
+  value={value}
+  onSave={async (newValue) => {
+    try {
+      const [tableName, columnName] = field.name.split('.');
+      
+      // Get the correct row ID based on the data source
+      let sourceId;
+      if (row.isAdditionalRow && row.sourceTable === tableName) {
+        sourceId = row.id;
+      } else if (row[`${tableName}_data`]) {
+        sourceId = row[`${tableName}_data`].id;
+      } else {
+        sourceId = row.id;
+      }
 
-                          // Special handling for company_name updates
-                          if (columnName === 'company_name') {
-                            // Update company_name in all related tables
-                            const updatePromises = processedSections
-                              .filter(section => !section.isSeparator)
-                              .flatMap(section =>
-                                section.categorizedFields?.flatMap(category =>
-                                  category.fields.map(f => f.table)
-                                )
-                              )
-                              .filter((table, index, self) => self.indexOf(table) === index) // unique tables
-                              .map(table =>
-                                supabase
-                                  .from(table)
-                                  .update({ company_name: newValue })
-                                  .eq('company_name', row.company_name)
-                              );
+      // Normal field update
+      const { error } = await supabase
+        .from(tableName)
+        .update({ [columnName]: newValue })
+        .eq('id', sourceId);
 
-                            await Promise.all(updatePromises);
-                          } else {
-                            // Normal field update
-                            const { error } = await supabase
-                              .from(tableName)
-                              .update({ [columnName]: newValue })
-                              .eq('company_name', row.company_name);
-
-                            if (error) throw error;
-                          }
-
-                          window.dispatchEvent(new CustomEvent('refreshData'));
-                        } catch (error) {
-                          console.error('Error updating:', error);
-                          toast.error('Update failed');
-                        }
-                      }}
-                      fieldName={field.name}
-                      field={field}
-                      dropdownOptions={field.dropdownOptions}
-                      rowId={row.id}
-                      companyName={row.company_name}
-                      className={field.name === 'acc_portal_company_duplicate.company_name' ? 'hover:text-primary' : ''}
-                    />
+      if (error) throw error;
+      
+      window.dispatchEvent(new CustomEvent('refreshData'));
+    } catch (error) {
+      console.error('Error updating:', error);
+      toast.error('Update failed');
+    }
+  }}
+  fieldName={field.name}
+  field={field}
+  dropdownOptions={field.dropdownOptions}
+  rowId={row.isAdditionalRow && row.sourceTable === tableName ? 
+    row.id : row[`${tableName}_data`]?.id || row.id}
+  companyName={row.company_name}
+  className={field.name === 'acc_portal_company_duplicate.company_name' ? 'hover:text-primary' : ''}
+/>
                   </TableCell>
                   {fieldIndex < fieldsArray.length - 1 &&
                     field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
