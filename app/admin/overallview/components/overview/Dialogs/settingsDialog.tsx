@@ -1,19 +1,19 @@
-// @ts-nocheck
+// @ts-nocheck 
 "use client";
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Plus, Trash, Settings, Edit2, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Trash, Settings, Edit2, X} from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-
+import { Switch } from '@/components/ui/switch';
+import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
 interface StructureItem {
   id: number;
   section: string;
@@ -39,11 +39,42 @@ interface Subsection {
 
 interface SettingsDialogProps {
   mainTabs: string[];
+  mainSections: string[];
+  mainSubsections: string[];
   onStructureChange: () => void;
   activeMainTab: string;
   subTabs: string[];
+  processedSections: {
+    name: string;
+    label: string;
+    categorizedFields?: {
+      category: string;
+      fields: {
+        name: string;
+        label: string;
+        table: string;
+        column: string;
+        dropdownOptions?: string[];
+        subCategory?: string;
+      }[];
+    }[];
+    isSeparator?: boolean;
+  }[];
 }
-
+interface ColumnOrder {
+  order: {
+    tabs: { [key: string]: number },
+    sections: { [key: string]: number },
+    subsections: { [key: string]: number },
+    columns: { [key: string]: number }
+  },
+  visibility: {
+    tabs: { [key: string]: boolean },
+    sections: { [key: string]: boolean },
+    subsections: { [key: string]: boolean },
+    columns: { [key: string]: boolean }
+  }
+}
 // Add these helper functions
 const toColumnName = (displayName: string) => {
   return displayName
@@ -78,7 +109,12 @@ interface SectionFields {
     };
   };
 }
-
+interface VisibilitySettings {
+  tabs: { [key: string]: boolean };
+  sections: { [key: string]: boolean };
+  subsections: { [key: string]: boolean };
+  columns: { [key: string]: boolean };
+}
 // Helper function to parse JSON safely
 const safeJSONParse = (jsonString: string, fallback: any = {}) => {
   try {
@@ -153,12 +189,48 @@ const processStructureData = (data: any[]) => {
   };
 };
 
+const reorderColumns = (columns, startIndex, endIndex) => {
+  const result = Array.from(columns);
+  const [removed] = result.splice(startIndex, 1);
+  result.splice(endIndex, 0, removed);
+  return result;
+};
 
+const getColumnOrder = (structure) => {
+  if (!structure || !structure.column_order?.columns) return [];
+  
+  return Object.entries(structure.column_order.columns)
+    .sort((a, b) => a[1] - b[1])
+    .map(([key]) => key);
+};
+const DragHandle = () => (
+  <div className="cursor-move flex items-center justify-center w-6 h-6">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="9" cy="12" r="1" />
+      <circle cx="9" cy="5" r="1" />
+      <circle cx="9" cy="19" r="1" />
+      <circle cx="15" cy="12" r="1" />
+      <circle cx="15" cy="5" r="1" />
+      <circle cx="15" cy="19" r="1" />
+    </svg>
+  </div>
+);
+interface ColumnOrderState {
+  columns: string[];
+  visibility: Record<string, boolean>;
+}
 
-export function SettingsDialog({ mainTabs,
-  onStructureChange,
-  activeMainTab,
-  subTabs }) {
+export function SettingsDialog({ mainTabs, onStructureChange, activeMainTab, subTabs, processedSections = [] }) {
   const [isOpen, setIsOpen] = useState(false);
   const [structure, setStructure] = useState<StructureItem[]>([]);
   const [uniqueTabs, setUniqueTabs] = useState<string[]>([]);
@@ -187,7 +259,6 @@ export function SettingsDialog({ mainTabs,
     Tabs: '',
     table_names: {}
   });
-
   const [selectedSection, setSelectedSection] = useState<StructureItem | null>(null);
   const [selectedSubsection, setSelectedSubsection] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -200,7 +271,6 @@ export function SettingsDialog({ mainTabs,
   const [loadingTable, setLoadingTable] = useState(false);
   const [addFieldDialogOpen, setAddFieldDialogOpen] = useState(false);
   const [showMultiSelectDialog, setShowMultiSelectDialog] = useState(false);
-  const [availableFields, setAvailableFields] = useState<{ table: string, fields: TableColumn[] }[]>([]);
   const [sectionVisibility, setSectionVisibility] = useState<Record<string, boolean>>({});
   const [categoryVisibility, setCategoryVisibility] = useState<Record<string, boolean>>({});
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
@@ -213,7 +283,6 @@ export function SettingsDialog({ mainTabs,
     sections: {},
     subsections: {}
   });
-
   const [addFieldState, setAddFieldState] = useState({
     displayName: '',
     selectedTables: [],
@@ -263,7 +332,27 @@ export function SettingsDialog({ mainTabs,
     section: '',
     subsection: ''
   });
-
+  const [visibilitySettings, setVisibilitySettings] = useState({
+    tabs: {},
+    sections: {},
+    subsections: {},
+    columns: {}
+  });
+  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>({
+    columns: [],
+    visibility: {}
+  });
+  useEffect(() => {
+    if (structure && structure.length > 0) {
+      const currentStructure = structure.find(item => item.Tabs === selectedTab);
+      if (currentStructure) {
+        setColumnOrder({
+          columns: getColumnOrder(currentStructure),
+          visibility: currentStructure.column_order?.visibility?.columns || {}
+        });
+      }
+    }
+  }, [structure, selectedTab]);
   useEffect(() => {
     if (activeMainTab) {
       fetchStructure(activeMainTab);
@@ -277,11 +366,11 @@ export function SettingsDialog({ mainTabs,
         .select('*')
         .eq('main_tab', activeMainTab)
         .order('Tabs', { ascending: true });
-  
+
       const { data: mappings, error } = await query;
-  
+
       if (error) throw error;
-  
+
       const processedMappings = mappings.map(mapping => ({
         id: mapping.id,
         main_tab: mapping.main_tab,
@@ -293,11 +382,11 @@ export function SettingsDialog({ mainTabs,
         table_names: safeJSONParse(mapping.table_names, {}),
         field_dropdowns: safeJSONParse(mapping.field_dropdowns, {})
       }));
-  
+
       setStructure(processedMappings);
       const uniqueTabs = [...new Set(mappings.map(m => m.Tabs))];
       setUniqueTabs(uniqueTabs);
-  
+
       if (!selectedTab && uniqueTabs.length > 0) {
         setSelectedTab(uniqueTabs[0]);
       }
@@ -305,11 +394,6 @@ export function SettingsDialog({ mainTabs,
       console.error('Error fetching structure:', error);
       toast.error('Failed to fetch table structure');
     }
-  };
-
-  const handleMainTabChange = async (mainTab: string) => {
-    setActiveMainTab(mainTab);
-    await fetchStructure(mainTab);
   };
 
   useEffect(() => {
@@ -385,35 +469,35 @@ export function SettingsDialog({ mainTabs,
         .from('profile_category_table_mapping')
         .select('sections_sections, sections_subsections')
         .eq('Tabs', tab);
-  
+
       if (error) throw error;
-  
+
       const sections = [];
       const subsections = {};
-  
+
       data.forEach(item => {
         // Parse sections data
         let sectionsData = safeJSONParse(item.sections_sections, {});
         let subsectionsData = safeJSONParse(item.sections_subsections, {});
-  
+
         // Handle sections
         Object.entries(sectionsData).forEach(([section, value]) => {
           const normalizedSection = section.replace(/\s+/g, ' ').trim();
-          
+
           // Add section if it doesn't exist
           if (!sections.includes(normalizedSection)) {
             sections.push(normalizedSection);
           }
-  
+
           // Initialize subsections array for this section if it doesn't exist
           if (!subsections[normalizedSection]) {
             subsections[normalizedSection] = [];
           }
-  
+
           // Handle subsections
           if (subsectionsData[section]) {
             const subsectionValue = subsectionsData[section];
-  
+
             if (typeof subsectionValue === 'string') {
               // Handle string subsection
               if (!subsections[normalizedSection].includes(subsectionValue)) {
@@ -436,19 +520,19 @@ export function SettingsDialog({ mainTabs,
             }
           }
         });
-  
+
         // Handle case where subsectionsData might have additional sections not in sectionsData
         Object.entries(subsectionsData).forEach(([section, value]) => {
           const normalizedSection = section.replace(/\s+/g, ' ').trim();
-          
+
           if (!sections.includes(normalizedSection)) {
             sections.push(normalizedSection);
           }
-          
+
           if (!subsections[normalizedSection]) {
             subsections[normalizedSection] = [];
           }
-  
+
           if (typeof value === 'string') {
             if (!subsections[normalizedSection].includes(value)) {
               subsections[normalizedSection].push(value);
@@ -468,27 +552,27 @@ export function SettingsDialog({ mainTabs,
           }
         });
       });
-  
+
       // Sort sections and subsections alphabetically
       sections.sort();
       Object.keys(subsections).forEach(section => {
         subsections[section].sort();
       });
-  
-      console.log('Processed sections:', sections);
-      console.log('Processed subsections:', subsections);
-  
+
+      // console.log('Processed sections:', sections);
+      // console.log('Processed subsections:', subsections);
+
       setExistingSections(sections);
       setExistingSubsections(subsections);
-  
+
     } catch (error) {
       console.error('Error fetching sections and subsections:', error);
       toast.error('Failed to fetch sections and subsections');
     }
   };
-  
+
   // fetches only one type , the one with /
-  
+
   // const fetchExistingSectionsAndSubsections = async (tab) => {
   //   try {
   //     const { data, error } = await supabase
@@ -541,7 +625,7 @@ export function SettingsDialog({ mainTabs,
   //     toast.error('Failed to fetch sections and subsections');
   //   }
   // };
-  
+
   const handleAddField = async () => {
     if (!selectedSection || !newField.value) return;
 
@@ -645,38 +729,6 @@ export function SettingsDialog({ mainTabs,
     }
   };
 
-  const handleReorder = async (key: string, newOrder: number) => {
-    if (!selectedSection) return;
-
-    try {
-      // Update column order
-      const { error: updateError } = await supabase.rpc('update_column_order_overalltable', {
-        p_table_name: selectedSection.table_name,
-        p_column_name: key,
-        p_new_order: newOrder
-      });
-
-      if (updateError) throw updateError;
-
-      // Refresh the selected section to get updated order
-      const { data: updatedSection } = await supabase
-        .from('profile_category_table_mapping')
-        .select('*')
-        .eq('id', selectedSection.id)
-        .single();
-
-      if (updatedSection) {
-        setSelectedSection(updatedSection);
-      }
-
-      toast.success('Order updated successfully');
-
-    } catch (error) {
-      console.error('Error updating order:', error);
-      toast.error('Failed to update order');
-    }
-  };
-
   const handleCreateTable = async (tableName: string) => {
     setLoadingTable(true);
     try {
@@ -743,12 +795,24 @@ export function SettingsDialog({ mainTabs,
         if (fetchError) throw fetchError;
 
         for (const record of records) {
-          const existingSections = JSON.parse(record.sections_sections || '{}');
+
+          let existingSections = {};
+          let existingSubsections = {};
+          let existingTableNames = {};
+
+          try {
+            existingSections = typeof record.sections_sections === 'string' ? JSON.parse(record.sections_sections) : record.sections_sections || {};
+            existingSubsections = typeof record.sections_subsections === 'string' ? JSON.parse(record.sections_subsections) : record.sections_subsections || {};
+            existingTableNames = typeof record.table_names === 'string' ? JSON.parse(record.table_names) : record.table_names || {};
+          } catch (parseError) {
+            console.error('Parse error:', parseError);
+            continue;
+          }
 
           // Only update records that contain this section
           if (existingSections[oldName]) {
-            const existingSubsections = JSON.parse(record.sections_subsections || '{}');
-            const existingTableNames = JSON.parse(record.table_names || '{}');
+
+
 
             delete existingSections[oldName];
             existingSections[newName] = true;
@@ -781,7 +845,14 @@ export function SettingsDialog({ mainTabs,
         if (fetchError) throw fetchError;
 
         for (const record of records) {
-          const existingSubsections = JSON.parse(record.sections_subsections || '{}');
+
+          let existingSubsections = {};
+          try {
+            existingSubsections = typeof record.sections_subsections === 'string' ? JSON.parse(record.sections_subsections) : record.sections_subsections || {};
+          } catch (parseError) {
+            console.error('Parse error:', parseError);
+            continue;
+          }
 
           // Only update if this record has the section and subsection
           if (existingSubsections[selectedSection?.section] === oldName) {
@@ -806,7 +877,8 @@ export function SettingsDialog({ mainTabs,
       console.error('Update error:', error);
       toast.error(`Failed to update ${type}`);
     }
-  };
+
+  };  
   // Add this function to generate indices
   const generateIndices = (structure: any[]) => {
     const newIndexMapping = {
@@ -865,48 +937,48 @@ export function SettingsDialog({ mainTabs,
       generateIndices(structure);
     }
   }, [structure, uniqueTabs]);
-  
+
   const handleAddStructure = async () => {
     try {
       if (!newStructure.Tabs || !newStructure.section || !newStructure.subsection) {
         toast.error('Please fill in all required fields');
         return;
       }
-  
+
       // Check for existing structures with various combinations
       const { data: existingStructures, error: checkError } = await supabase
         .from('profile_category_table_mapping')
         .select('*')
         .or(`main_tab.eq.${activeMainTab},Tabs.eq.${newStructure.Tabs}`);
-  
+
       if (checkError) throw checkError;
-  
+
       // Find matches based on different criteria
-      const mainTabMatch = existingStructures?.find(item => 
+      const mainTabMatch = existingStructures?.find(item =>
         item.main_tab === activeMainTab
       );
-  
-      const tabMatch = mainTabMatch && existingStructures?.find(item => 
-        item.main_tab === activeMainTab && 
+
+      const tabMatch = mainTabMatch && existingStructures?.find(item =>
+        item.main_tab === activeMainTab &&
         item.Tabs === newStructure.Tabs
       );
-  
+
       const sectionMatch = tabMatch && existingStructures?.find(item => {
         const sections = safeJSONParse(item.sections_sections);
-        return item.main_tab === activeMainTab && 
-               item.Tabs === newStructure.Tabs && 
-               sections[newStructure.section] === true;
+        return item.main_tab === activeMainTab &&
+          item.Tabs === newStructure.Tabs &&
+          sections[newStructure.section] === true;
       });
-  
+
       const subsectionMatch = sectionMatch && existingStructures?.find(item => {
         const sections = safeJSONParse(item.sections_sections);
         const subsections = safeJSONParse(item.sections_subsections);
-        return item.main_tab === activeMainTab && 
-               item.Tabs === newStructure.Tabs && 
-               sections[newStructure.section] === true &&
-               subsections[newStructure.section] === newStructure.subsection;
+        return item.main_tab === activeMainTab &&
+          item.Tabs === newStructure.Tabs &&
+          sections[newStructure.section] === true &&
+          subsections[newStructure.section] === newStructure.subsection;
       });
-  
+
       // Prepare update data
       const newMappings = newStructure.column_mappings || {};
       const newTableNames = { [newStructure.section]: newStructure.table_names || [] };
@@ -918,13 +990,13 @@ export function SettingsDialog({ mainTabs,
           [key]: idx + 1
         }), {})
       };
-  
+
       if (subsectionMatch) {
         // Update just column mappings and order
         const currentMappings = safeJSONParse(subsectionMatch.column_mappings, {});
         const currentOrder = safeJSONParse(subsectionMatch.column_order, { columns: {} });
         const currentTableNames = safeJSONParse(subsectionMatch.table_names, {});
-  
+
         const { error: updateError } = await supabase
           .from('profile_category_table_mapping')
           .update({
@@ -945,7 +1017,7 @@ export function SettingsDialog({ mainTabs,
             }
           })
           .eq('id', subsectionMatch.id);
-  
+
         if (updateError) throw updateError;
       } else if (sectionMatch) {
         // Update subsections and related data
@@ -953,7 +1025,7 @@ export function SettingsDialog({ mainTabs,
         const currentMappings = safeJSONParse(sectionMatch.column_mappings, {});
         const currentOrder = safeJSONParse(sectionMatch.column_order, { columns: {} });
         const currentTableNames = safeJSONParse(sectionMatch.table_names, {});
-  
+
         const { error: updateError } = await supabase
           .from('profile_category_table_mapping')
           .update({
@@ -978,7 +1050,7 @@ export function SettingsDialog({ mainTabs,
             }
           })
           .eq('id', sectionMatch.id);
-  
+
         if (updateError) throw updateError;
       } else if (tabMatch) {
         // Update sections and related data
@@ -987,7 +1059,7 @@ export function SettingsDialog({ mainTabs,
         const currentMappings = safeJSONParse(tabMatch.column_mappings, {});
         const currentOrder = safeJSONParse(tabMatch.column_order, { columns: {} });
         const currentTableNames = safeJSONParse(tabMatch.table_names, {});
-  
+
         const { error: updateError } = await supabase
           .from('profile_category_table_mapping')
           .update({
@@ -1016,7 +1088,7 @@ export function SettingsDialog({ mainTabs,
             }
           })
           .eq('id', tabMatch.id);
-  
+
         if (updateError) throw updateError;
       } else if (mainTabMatch) {
         // Update tabs and related data
@@ -1031,7 +1103,7 @@ export function SettingsDialog({ mainTabs,
             table_names: newTableNames
           })
           .eq('id', mainTabMatch.id);
-  
+
         if (updateError) throw updateError;
       } else {
         // Insert new record
@@ -1046,17 +1118,17 @@ export function SettingsDialog({ mainTabs,
             column_order: newOrder,
             table_names: newTableNames
           }]);
-  
+
         if (insertError) throw insertError;
       }
-  
+
       await fetchStructure();
       await onStructureChange();
       resetNewStructure();
       setSelectedTables([]);
       setSelectedTableFields({});
       toast.success('Structure updated successfully');
-  
+
     } catch (error) {
       console.error('Error managing structure:', error);
       toast.error('Failed to manage structure');
@@ -1160,8 +1232,8 @@ export function SettingsDialog({ mainTabs,
   //     toast.error(`Failed to ${exactMatch ? 'update' : 'add'} structure`);
   //   }
   // };
- 
- 
+
+
   const processColumnMappings = (mappings: Record<string, string>) => {
     const result: Record<string, string[]> = {};
     Object.keys(mappings).forEach(key => {
@@ -1250,7 +1322,7 @@ export function SettingsDialog({ mainTabs,
       }
     }, [showMultiSelectDialog, selectedTables, selectedTableFields]);
 
-    const filteredTables = tables.filter(table => 
+    const filteredTables = tables.filter(table =>
       table.toLowerCase().includes(tableSearchQuery.toLowerCase())
     );
 
@@ -1433,7 +1505,7 @@ export function SettingsDialog({ mainTabs,
               if (sectionsData) {
                 Object.keys(sectionsData).forEach(section => section && allSections.add(section));
               }
-              
+
               if (subsectionsData) {
                 Object.values(subsectionsData).forEach(subs => {
                   if (Array.isArray(subs)) {
@@ -1484,6 +1556,7 @@ export function SettingsDialog({ mainTabs,
       toast.error('Failed to load tab data');
     }
   };
+
   const handleSectionSelection = async (sectionValue: string) => {
     try {
       if (sectionValue === 'new') {
@@ -1816,40 +1889,6 @@ export function SettingsDialog({ mainTabs,
     }
   };
 
-  const handleNewStructureTabSelection = async (tabValue: string) => {
-    try {
-      if (tabValue === 'new') {
-        const { data, error } = await supabase
-          .from('profile_category_table_mapping')
-          .select('*');
-
-        if (error) throw error;
-
-        const allSections = new Set<string>();
-        data.forEach(item => {
-          const sectionsData = safeJSONParse(item.sections_sections, {});
-          Object.keys(sectionsData).forEach(section => allSections.add(section));
-        });
-
-        setExistingSections(Array.from(allSections));
-        setNewStructure(prev => ({
-          ...prev,
-          Tabs: '',
-          isNewTab: true
-        }));
-      } else {
-        setNewStructure(prev => ({
-          ...prev,
-          Tabs: tabValue,
-          isNewTab: false
-        }));
-      }
-    } catch (error) {
-      console.error('Error in new structure tab selection:', error);
-      toast.error('Failed to load tab data');
-    }
-  };
-
   const EditFieldDialog = () => (
     <Dialog open={editFieldDialogOpen} onOpenChange={setEditFieldDialogOpen}>
       <DialogContent className="max-w-2xl">
@@ -2001,33 +2040,6 @@ export function SettingsDialog({ mainTabs,
     }
   };
 
-  const toggleSectionVisibility = (section: string) => {
-    setSectionVisibility(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
-  const toggleCategoryVisibility = (category: string) => {
-    setCategoryVisibility(prev => ({
-      ...prev,
-      [category]: !prev[category]
-    }));
-  };
-
-  const toggleColumnVisibility = (column: string) => {
-    setColumnVisibility(prev => ({
-      ...prev,
-      [column]: !prev[column]
-    }));
-  };
-
-  const resetAll = () => {
-    setSectionVisibility({});
-    setCategoryVisibility({});
-    setColumnVisibility({});
-  };
-
   // Add function to save visibility settings
   const handleSaveVisibilitySettings = async () => {
     try {
@@ -2086,146 +2098,279 @@ export function SettingsDialog({ mainTabs,
     }
   }, [structure, selectedTab]);
 
-  // Add these functions to SettingsDialog component
-  const handleReorderSection = async (section: string, direction: 'up' | 'down') => {
+  const toggleVisibility = async (type: 'tabs' | 'sections' | 'subsections' | 'columns', key: string) => {
     try {
-      if (!currentStructure || !selectedTab) return;
-
-      const order = { ...currentStructure.column_order };
-      const sections = Object.keys(currentStructure.sections_sections || {});
-      const currentIndex = sections.indexOf(section);
-
-      if (direction === 'up' && currentIndex > 0) {
-        [sections[currentIndex], sections[currentIndex - 1]] =
-          [sections[currentIndex - 1], sections[currentIndex]];
-      } else if (direction === 'down' && currentIndex < sections.length - 1) {
-        [sections[currentIndex], sections[currentIndex + 1]] =
-          [sections[currentIndex + 1], sections[currentIndex]];
-      }
-
-      const updatedOrder = sections.reduce((acc, sec, idx) => ({
-        ...acc,
-        [`section_${sec}`]: idx
-      }), {});
-
-      const { error } = await supabase
-        .from('profile_category_table_mapping')
-        .update({ column_order: { ...order, sections: updatedOrder } })
-        .eq('id', currentStructure.id);
-
-      if (error) throw error;
-      await fetchStructure();
-    } catch (error) {
-      console.error('Error reordering section:', error);
-      toast.error('Failed to reorder section');
-    }
-  };
-
-  const handleReorderSubsection = async (section: string, subsection: string, direction: 'up' | 'down') => {
-    try {
-      if (!currentStructure || !selectedTab) return;
-
-      const order = { ...currentStructure.column_order };
-      const subsections = currentStructure.sections_subsections?.[section] || [];
-      const currentIndex = subsections.indexOf(subsection);
-
-      if (direction === 'up' && currentIndex > 0) {
-        [subsections[currentIndex], subsections[currentIndex - 1]] =
-          [subsections[currentIndex - 1], subsections[currentIndex]];
-      } else if (direction === 'down' && currentIndex < subsections.length - 1) {
-        [subsections[currentIndex], subsections[currentIndex + 1]] =
-          [subsections[currentIndex + 1], subsections[currentIndex]];
-      }
-
-      const updatedOrder = subsections.reduce((acc, sub, idx) => ({
-        ...acc,
-        [`${section}_${sub}`]: idx
-      }), {});
-
-      const { error } = await supabase
-        .from('profile_category_table_mapping')
-        .update({
-          column_order: { ...order, subsections: updatedOrder },
-          sections_subsections: {
-            ...currentStructure.sections_subsections,
-            [section]: subsections
-          }
-        })
-        .eq('id', currentStructure.id);
-
-      if (error) throw error;
-      await fetchStructure();
-    } catch (error) {
-      console.error('Error reordering subsection:', error);
-      toast.error('Failed to reorder subsection');
-    }
-  };
-
-  const handleReorderColumn = async (key: string, direction: 'up' | 'down') => {
-    try {
-      if (!currentStructure || !selectedTab) return;
-
-      const mappings = typeof currentStructure.column_mappings === 'string'
-        ? JSON.parse(currentStructure.column_mappings)
-        : currentStructure.column_mappings || {};
-
-      const columns = Object.keys(mappings);
-      const currentIndex = columns.indexOf(key);
-
-      if (direction === 'up' && currentIndex > 0) {
-        [columns[currentIndex], columns[currentIndex - 1]] =
-          [columns[currentIndex - 1], columns[currentIndex]];
-      } else if (direction === 'down' && currentIndex < columns.length - 1) {
-        [columns[currentIndex], columns[currentIndex + 1]] =
-          [columns[currentIndex + 1], columns[currentIndex]];
-      }
-
-      const updatedOrder = columns.reduce((acc, col, idx) => ({
-        ...acc,
-        [col]: idx
-      }), {});
-
-      const { error } = await supabase
-        .from('profile_category_table_mapping')
-        .update({ column_order: { ...currentStructure.column_order, columns: updatedOrder } })
-        .eq('id', currentStructure.id);
-
-      if (error) throw error;
-      await fetchStructure();
-    } catch (error) {
-      console.error('Error reordering column:', error);
-      toast.error('Failed to reorder column');
-    }
-  };
-
-  const toggleSubsectionVisibility = async (section: string, subsection: string) => {
-    try {
-      if (!currentStructure || !selectedTab) return;
-
-      const visibility = currentStructure.column_order?.visibility || {};
-      const key = `${section}_${subsection}`;
-      const newVisibility = {
-        ...visibility,
-        [key]: !visibility[key]
+      const newSettings = {
+        ...visibilitySettings,
+        [type]: {
+          ...visibilitySettings[type],
+          [key]: !visibilitySettings[type][key]
+        }
       };
-
+  
       const { error } = await supabase
         .from('profile_category_table_mapping')
         .update({
           column_order: {
-            ...currentStructure.column_order,
-            visibility: newVisibility
+            ...columnOrder,
+            visibility: newSettings
           }
         })
         .eq('id', currentStructure.id);
-
+  
       if (error) throw error;
-      await fetchStructure();
+      setVisibilitySettings(newSettings);
     } catch (error) {
-      console.error('Error toggling subsection visibility:', error);
+      console.error('Error updating visibility:', error);
       toast.error('Failed to update visibility');
     }
   };
+
+// Inside SettingsDialog component
+const onDragEnd = async (result) => {
+  if (!result.destination) return;
+
+  const { source, destination, type } = result;
+
+  if (type === 'columns') {
+    const newOrder = reorderColumns(
+      columnOrder.columns,
+      source.index,
+      destination.index
+    );
+
+    // Update local state immediately for smooth UX
+    setColumnOrder(prev => ({
+      ...prev,
+      columns: newOrder
+    }));
+
+    // Persist to database
+    await persistColumnOrder(newOrder);
+  }
+};
+
+  // Add bulk visibility controls
+  const toggleAllVisibility = async (type: string, value: boolean) => {
+    try {
+      const newSettings = {
+        ...visibilitySettings,
+        [type]: Object.keys(visibilitySettings[type]).reduce((acc, key) => ({
+          ...acc,
+          [key]: value
+        }), {})
+      };
+  
+      await updateVisibilitySettings(newSettings);
+    } catch (error) {
+      console.error('Error updating visibility:', error);
+      toast.error('Failed to update visibility');
+    }
+  };
+
+const isVisible = (type: string, key: string): boolean => {
+  return visibilitySettings[type]?.[key] !== false;
+};
+// const visibleColumns = Object.entries(columnMappings)
+//   .filter(([key]) => isVisible('columns', key))
+//   .sort((a, b) => {
+//     const orderA = columnOrder.order.columns[a[0]] || 0;
+//     const orderB = columnOrder.order.columns[b[0]] || 0;
+//     return orderA - orderB;
+//   });
+
+// In SettingsDialog.tsx
+const DraggableColumns = ({
+  columnMappings,
+  dropdowns,
+  visibilitySettings,
+  columnOrder,
+  onDragEnd,
+  handleEditField,
+  handleDeleteField,
+  toggleVisibility
+}) => {
+  // Add null checks and provide default values
+  const mappings = columnMappings || {};
+  const visibility = visibilitySettings?.columns || {};
+  const order = columnOrder?.order?.columns || {};
+  const dropdownOptions = dropdowns || {};
+
+  // Safely get visible columns with error handling
+  const visibleColumns = React.useMemo(() => {
+    try {
+      return Object.entries(mappings)
+        .filter(([key]) => visibility[key] !== false)
+        .sort((a, b) => {
+          const orderA = order[a[0]] || 0;
+          const orderB = order[b[0]] || 0;
+          return orderA - orderB;
+        });
+    } catch (error) {
+      console.error('Error processing columns:', error);
+      return [];
+    }
+  }, [mappings, visibility, order]);
+
+  // If no visible columns, show a message
+  if (!visibleColumns.length) {
+    return (
+      <div className="p-4 text-center text-gray-500">
+        No columns available
+      </div>
+    );
+  }
+
+  return (
+    <DragDropContext onDragEnd={onDragEnd}>
+      <Droppable droppableId="columns" direction="vertical">
+        {(provided) => (
+          <div 
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className="min-w-full"
+          >
+            {visibleColumns.map(([key, value], index) => {
+              const [tableName, columnName] = key.split('.');
+              if (!tableName || !columnName) return null; // Skip invalid entries
+
+              return (
+                <Draggable key={key} draggableId={key} index={index}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      className={`grid grid-cols-[60px,40px,1fr,1fr,1fr,1fr,120px] gap-2 p-2 border-b last:border-b-0 ${
+                        snapshot.isDragging ? 'bg-gray-100' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      {/* Drag Handle */}
+                      <div className="flex items-center" {...provided.dragHandleProps}>
+                        <DragHandle />
+                        <span className="ml-2 text-sm text-gray-500">{index + 1}</span>
+                      </div>
+
+                      {/* Index */}
+                      <div className="text-sm text-gray-500">
+                        {index + 1}
+                      </div>
+
+                      {/* Column Name */}
+                      <div className="text-sm">
+                        {columnName}
+                      </div>
+
+                      {/* Display Name */}
+                      <div className="text-sm">
+                        {value}
+                      </div>
+
+                      {/* Table Name */}
+                      <div className="text-sm">
+                        {tableName}
+                      </div>
+
+                      {/* Dropdown Options */}
+                      <div className="text-sm">
+                        {dropdownOptions[key]?.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {dropdownOptions[key].map((option, idx) => (
+                              <div key={idx} className="text-xs py-1 px-2 bg-gray-50 rounded-md border">
+                                {option}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditField(key)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit2 className="h-4 w-4 text-blue-500" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteField(key)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Trash className="h-4 w-4 text-red-500" />
+                        </Button>
+                        <Switch
+                          checked={visibility[key] !== false}
+                          onCheckedChange={() => toggleVisibility('columns', key)}
+                          className="ml-2"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </Draggable>
+              );
+            })}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
+    </DragDropContext>
+  );
+};
+  // Inside SettingsDialog component
+const persistColumnOrder = async (newOrder: string[]) => {
+  try {
+    if (!currentStructure || !selectedTab) return;
+
+    const updatedOrder = {
+      ...currentStructure.column_order,
+      order: {
+        ...currentStructure.column_order?.order,
+        columns: newOrder.reduce((acc, key, index) => ({
+          ...acc,
+          [key]: index
+        }), {})
+      }
+    };
+
+    const { error } = await supabase
+      .from('profile_category_table_mapping')
+      .update({
+        column_order: updatedOrder
+      })
+      .eq('id', currentStructure.id);
+
+    if (error) throw error;
+    
+    // Update local state
+    setColumnOrder(prev => ({
+      ...prev,
+      columns: newOrder
+    }));
+
+    // Refresh structure
+    await fetchStructure();
+    
+  } catch (error) {
+    console.error('Error persisting column order:', error);
+    toast.error('Failed to save column order');
+  }
+};  
+const getVisibleColumns = (structure) => {
+  const mappings = typeof structure?.column_mappings === 'string'
+    ? JSON.parse(structure.column_mappings)
+    : structure?.column_mappings || {};
+
+  return Object.entries(mappings)
+    .filter(([key]) => visibilitySettings?.columns?.[key] !== false)
+    .sort((a, b) => {
+      const orderA = structure?.column_order?.columns?.[a[0]] || 0;
+      const orderB = structure?.column_order?.columns?.[b[0]] || 0;
+      return orderA - orderB;
+    });
+};
 
   return (
     <>
@@ -2300,8 +2445,13 @@ export function SettingsDialog({ mainTabs,
                               }`}
                             onClick={() => setSelectedSection({ section })}
                           >
-                            <div className="font-medium"> {indexMapping.sections[section] || ''} {section}</div>
-                          </div>
+                         <div className="flex items-center justify-between mb-2">
+  <div className="font-medium">{indexMapping.sections[section] || ''} {section}</div>
+  <Switch
+    checked={visibilitySettings.sections[section] !== false}
+    onCheckedChange={() => toggleVisibility('sections', section)}
+  />
+</div>  </div>
                         ))}
 
                     </ScrollArea>
@@ -2336,8 +2486,15 @@ export function SettingsDialog({ mainTabs,
                               }`}
                             onClick={() => setSelectedSubsection(subsection)}
                           >
-                            <div className="font-medium">{indexMapping.subsections[subsection] || ''} {subsection}</div>
-                          </div>
+                         <div className="flex items-center justify-between mb-2">
+  <div className="font-medium">
+    {indexMapping.subsections[subsection] || ''} {subsection}
+  </div>
+  <Switch
+    checked={visibilitySettings.subsections[subsection] !== false}
+    onCheckedChange={() => toggleVisibility('subsections', subsection)}
+  />
+</div>  </div>
                         ))}
 
                     </ScrollArea>
@@ -2475,82 +2632,16 @@ export function SettingsDialog({ mainTabs,
                                 </Button>
                               )}
                             </div>
-                            <div className="border rounded-lg">
-                              <div className="grid grid-cols-[60px,40px,1fr,1fr,1fr,1fr,120px] gap-2 p-2 bg-gray-50 border-b">
-                                <div className="text-sm font-medium text-gray-500">Order</div>
-                                <div className="text-sm font-medium text-gray-500">#</div>
-                                <div className="text-sm font-medium text-gray-500">Column Name</div>
-                                <div className="text-sm font-medium text-gray-500">Display Name</div>
-                                <div className="text-sm font-medium text-gray-500">Table Name</div>
-                                <div className="text-sm font-medium text-gray-500">Dropdown Options</div>
-                                <div className="text-sm font-medium text-gray-500">Actions</div>
-                              </div>
-                              <ScrollArea className="h-[300px]" orientation="both">
-                                {selectedSection && selectedSubsection && structure
-                                  .filter(item =>
-                                    item.Tabs === selectedTab &&
-                                    item.sections_sections &&
-                                    Object.keys(item.sections_sections).includes(selectedSection.section) &&
-                                    item.sections_subsections &&
-                                    item.sections_subsections[selectedSection.section] === selectedSubsection
-                                  )
-                                  .map(item => {
-                                    const columnMappings = typeof item.column_mappings === 'string'
-                                      ? JSON.parse(item.column_mappings)
-                                      : item.column_mappings;
-
-                                    const dropdowns = item.field_dropdowns || {};
-
-                                    return Object.entries(columnMappings)
-                                      .sort((a, b) => {
-                                        const orderA = item.column_order?.[a[0]] || 0;
-                                        const orderB = item.column_order?.[b[0]] || 0;
-                                        return orderA - orderB;
-                                      })
-                                      .map(([key, value], index) => (
-                                        <div key={key} className="grid grid-cols-[60px,40px,1fr,1fr,1fr,1fr,120px] gap-2 p-2 border-b last:border-b-0 hover:bg-gray-50">
-                                          <div className="flex items-center gap-1">
-                                            <span className="text-sm text-gray-500">{index + 1}</span>
-                                          </div>
-                                          <div className="text-sm text-gray-500">{index + 1}</div>
-                                          <div className="text-sm">{key.split('.')[1]}</div>
-                                          <div className="text-sm">{value}</div>
-                                          <div className="text-sm">{key.split('.')[0]}</div>
-                                          <div className="text-sm">
-                                            {dropdowns[key] && (
-                                              <div className="flex flex-wrap gap-1">
-                                                {dropdowns[key].map((option, idx) => (
-                                                  <div key={idx} className="text-xs py-1 px-2 bg-gray-50 rounded-md border">
-                                                    {option}
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            )}
-                                          </div>
-                                          <div className="flex gap-2">
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => handleEditField(key)}
-                                              className="h-6 w-6 p-0"
-                                            >
-                                              <Edit2 className="h-4 w-4 text-blue-500" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => handleDeleteField(key)}
-                                              className="h-6 w-6 p-0"
-                                            >
-                                              <Trash className="h-4 w-4 text-red-500" />
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ));
-                                  })}
-                                <ScrollBar orientation="horizontal" />
-                              </ScrollArea>
-                            </div>
+                            <DraggableColumns
+        columnMappings={currentStructure.column_mappings}
+        dropdowns={currentStructure.field_dropdowns}
+        visibilitySettings={visibilitySettings}
+        columnOrder={columnOrder}
+        onDragEnd={onDragEnd}
+        handleEditField={handleEditField}
+        handleDeleteField={handleDeleteField}
+        toggleVisibility={toggleVisibility}
+      />
                           </div>
                         </div>
                       ) : (
@@ -2819,78 +2910,115 @@ export function SettingsDialog({ mainTabs,
             <TabsContent value="visibility" className="space-y-6">
               <Card>
                 <CardContent className="p-6">
-                  <div className="space-y-8">
-                    {uniqueTabs.map(tab => (
-                      <div key={tab} className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold">{tab}</h3>
-                          <div className="h-px flex-1 bg-gray-200 mx-4" />
-                        </div>
+                  <div className="space-y-4">
+                    {/* Global controls */}
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold">Visibility Settings</h3>
+                    <div className="flex gap-2">
+  <Button onClick={() => toggleAllVisibility('columns', true)}>
+    Show All
+  </Button>
+  <Button onClick={() => toggleAllVisibility('columns', false)}>
+    Hide All
+  </Button>
+</div>
+                    </div>
 
-                        {structure
-                          .filter(item => item.Tabs === tab)
-                          .map(item => {
-                            const sections = safeJSONParse(item.sections_sections);
-                            const subsections = safeJSONParse(item.sections_subsections);
-                            const columnMappings = safeJSONParse(item.column_mappings);
-                            const order = safeJSONParse(item.column_order);
-
-                            return (
-                              <div key={item.id} className="pl-4 space-y-4">
-                                {Object.keys(sections).map(section => (
-                                  <div key={section} className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                      <Checkbox
-                                        checked={sectionVisibility[section]}
-                                        onCheckedChange={() => toggleSectionVisibility(section)}
-                                      />
-                                      <h4 className="font-medium">{section}</h4>
-                                    </div>
-
-                                    <div className="pl-4 space-y-2">
-                                      {(Array.isArray(subsections[section])
-                                        ? subsections[section]
-                                        : [subsections[section]]
-                                      ).map(subsection => (
-                                        <div key={subsection} className="space-y-2">
-                                          <div className="flex items-center gap-2">
-                                            <Checkbox
-                                              checked={columnVisibility[`${section}_${subsection}`]}
-                                              onCheckedChange={() =>
-                                                toggleSubsectionVisibility(section, subsection)
-                                              }
-                                            />
-                                            <span>{subsection}</span>
-                                          </div>
-
-                                          <div className="pl-4">
-                                            {Object.entries(columnMappings)
-                                              .sort((a, b) =>
-                                                (order?.columns?.[a[0]] || 0) -
-                                                (order?.columns?.[b[0]] || 0)
-                                              )
-                                              .map(([key, value]) => (
-                                                <div key={key} className="flex items-center gap-2">
-                                                  <Checkbox
-                                                    checked={columnVisibility[key]}
-                                                    onCheckedChange={() =>
-                                                      toggleColumnVisibility(key)
-                                                    }
-                                                  />
-                                                  <span>{value}</span>
-                                                </div>
-                                              ))}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })}
+                    {/* Tab visibility */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between pb-2 border-b">
+                        <h4 className="font-medium">Tabs</h4>
+                        <Switch
+                          checked={visibilitySettings.tabs[selectedTab] !== false}
+                          onCheckedChange={(checked) => toggleVisibility('tabs', selectedTab)}
+                        />
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Sections and columns */}
+                    {structure
+  .filter(item => item.Tabs === selectedTab)
+  .map(item => {
+    const columnMappings = typeof item.column_mappings === 'string' 
+      ? JSON.parse(item.column_mappings) 
+      : item.column_mappings || {};
+    
+    const visibleColumns = Object.entries(columnMappings)
+      .filter(([key]) => visibilitySettings?.columns?.[key] !== false)
+      .sort((a, b) => {
+        const orderA = item.column_order?.columns?.[a[0]] || 0;
+        const orderB = item.column_order?.columns?.[b[0]] || 0;
+        return orderA - orderB;
+      });
+
+    return (
+                          <div key={item.Section} className="border rounded-lg p-4 space-y-4 mt-4">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-medium">{item.Section}</h4>
+                              <Switch
+                                checked={visibilitySettings.sections[item.Section] !== false}
+                                onCheckedChange={(checked) => toggleVisibility('sections', item.Section)}
+                              />
+                            </div>
+
+                            {/* Subsections */}
+                            <div className="pl-4 space-y-2">
+                              {typeof item.subsections === 'string' ? (
+                                <div className="flex items-center justify-between">
+                                  <span>{item.subsections}</span>
+                                  <Switch
+                                    checked={visibilitySettings.subsections[item.subsections] !== false}
+                                    onCheckedChange={(checked) =>
+                                      toggleVisibility('subsections', item.subsections)
+                                    }
+                                  />
+                                </div>
+                              ) : (
+                                Array.isArray(item.subsections) &&
+                                item.subsections.map(subsection => (
+                                  <div key={subsection} className="flex items-center justify-between">
+                                    <span>{subsection}</span>
+                                    <Switch
+                                      checked={visibilitySettings.subsections[subsection] !== false}
+                                      onCheckedChange={(checked) =>
+                                        toggleVisibility('subsections', subsection)
+                                      }
+                                    />
+                                  </div>
+                                ))
+                              )}
+
+                              {/* Columns */}
+                              <div className="pl-4 mt-2 space-y-2">
+                                {Object.entries(columnMappings)
+                                  .sort((a, b) => {
+                                    const orderA = item.column_order?.columns?.[a[0]] || 0;
+                                    const orderB = item.column_order?.columns?.[b[0]] || 0;
+                                    return orderA - orderB;
+                                  })
+                                  .map(([key, value]) => (
+                                    <div key={key} className="flex items-center justify-between">
+                                      <span>{value}</span>
+                                      <Switch
+                                        checked={visibilitySettings.columns[key] !== false}
+                                        onCheckedChange={(checked) =>
+                                          toggleVisibility('columns', key)
+                                        }
+                                      />
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          </div>
+                       );
+                      })}
+
+                    {/* Save button */}
+                    <div className="flex justify-end mt-6">
+                      <Button onClick={handleSaveVisibilitySettings}>
+                        Save Visibility Settings
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -3041,7 +3169,7 @@ export function SettingsDialog({ mainTabs,
                   className="w-full p-2 mb-2 border rounded"
                   onChange={(e) => {
                     const searchValue = e.target.value.toLowerCase();
-                    const filteredTables = tables.filter(table => 
+                    const filteredTables = tables.filter(table =>
                       table.toLowerCase().includes(searchValue)
                     );
                     setTables(filteredTables);
@@ -3078,7 +3206,7 @@ export function SettingsDialog({ mainTabs,
                   className="w-full p-2 mb-2 border rounded"
                   onChange={(e) => {
                     const searchValue = e.target.value.toLowerCase();
-                    const filteredFields = tableColumns.filter(field => 
+                    const filteredFields = tableColumns.filter(field =>
                       field.column_name.toLowerCase().includes(searchValue)
                     );
                     setTableColumns(filteredFields);

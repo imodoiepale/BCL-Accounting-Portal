@@ -15,8 +15,10 @@ interface TableProps {
   data: any[];
   handleCompanyClick: (company: any) => void;
   onMissingFieldsClick: (company: any) => void;
-  processedSections: any[]; // Add this line
-}
+  processedSections: any[];
+  refreshData: () => Promise<void>; // Add this line
+  }
+  
 interface SortConfig {
   field: string | null;
   direction: 'asc' | 'desc' | null;
@@ -314,7 +316,8 @@ const renderDataRows = (
   data: any[],
   handleCompanyClick: (company: any) => void,
   onMissingFieldsClick: (company: any) => void,
-  processedSections: any[]
+  processedSections: any[],
+  refreshData: () => Promise<void> 
 ) => {
   return data.map((companyGroup, groupIndex) => (
     companyGroup.rows.map((row, rowIndex) => (
@@ -376,11 +379,16 @@ const renderDataRows = (
 if (field.type === 'date') {
   value = formatDate(value);
 }
-              // Skip company-specific fields for non-first rows
-              if (tableName === 'acc_portal_company_duplicate' && rowIndex > 0) {
-                return null;
-              }
-
+              // Skip company-specific fields for non-first rows and non-prefixed company_name
+      // Update the condition to:
+if ((tableName === 'acc_portal_company_duplicate' && rowIndex > 0) || 
+(columnName === 'company_name' && field.name === 'acc_portal_company_duplicate.company_name')) {
+const showCompanyName = field.name === 'acc_portal_company_duplicate.company_name' && 
+                     row.isFirstRow;
+if (!showCompanyName) {
+return null;
+}
+}
               return (
                 <React.Fragment key={`${groupIndex}-${rowIndex}-${field.name}`}>
                   <TableCell
@@ -429,7 +437,8 @@ if (field.type === 'date') {
     row.id : row[`${tableName}_data`]?.id || row.id}
   companyName={row.company_name}
   className={field.name === 'acc_portal_company_duplicate.company_name' ? 'hover:text-primary' : ''}
-/>
+  refreshData={refreshData}
+  />
                   </TableCell>
                   {fieldIndex < fieldsArray.length - 1 &&
                     field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
@@ -445,7 +454,7 @@ if (field.type === 'date') {
 };
 
 // Updated Table component with sticky headers
-export const Table: React.FC<TableProps> = ({ data, handleCompanyClick, processedSections, onMissingFieldsClick }) => {
+export const Table: React.FC<TableProps> = ({ data, handleCompanyClick, refreshData , processedSections, onMissingFieldsClick }) => {
   const [sortConfig, setSortConfig] = useState<{
     field: string | null;
     direction: 'asc' | 'desc' | null;
@@ -492,7 +501,7 @@ if (!processedSections || !Array.isArray(processedSections)) {
   {renderStatisticsRows(data, processedSections)}
 </TableHeader>
             <TableBody>
-            {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, processedSections)}
+            {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, processedSections, refreshData)}
             </TableBody>
           </UITable>
         </ScrollArea>

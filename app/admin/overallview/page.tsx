@@ -538,6 +538,7 @@ const toggleTabVisibility = async (tab: string) => {
                                                                 setSelectedMissingFields(company);
                                                                 setIsMissingFieldsOpen(true);
                                                             }}
+                                                            refreshData={() => fetchAllData(activeMainTab, activeSubTab)} // Pass the refresh function
                                                             processedSections={processTabSections(activeMainTab, activeSubTab)}
                                                         />
                                                     </div>

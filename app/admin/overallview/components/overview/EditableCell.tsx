@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 interface EditableCellProps {
     value: any;
     onSave: (value: any) => void;
+    refreshData: () => Promise<void>; 
     fieldName: string;
     rowId?: number | string;
     companyName?: string;
@@ -18,6 +19,7 @@ interface EditableCellProps {
 export const EditableCell = ({
     value: initialValue,
     onSave,
+    refreshData, 
     fieldName,
     rowId,
     companyName,
@@ -75,23 +77,12 @@ export const EditableCell = ({
     const parseTableNames = (mappings) => {
         return mappings.reduce((acc, mapping) => {
             try {
-
-
-
-
                 // Parse the JSON string if it's a string and ensure it's not null/undefined
                 const tableData = mapping.table_names ? (
                     typeof mapping.table_names === 'string'
                         ? JSON.parse(mapping.table_names)
                         : mapping.table_names
                 ) : {};
-
-
-
-
-
-
-
                 // Extract table names from all categories if tableData exists
                 if (tableData && typeof tableData === 'object') {
                     Object.values(tableData).forEach(tables => {
@@ -166,6 +157,7 @@ export const EditableCell = ({
                     console.log(`Updated field ${fieldName} in table: ${tableName} with ID: ${rowId}`);
                     setEditValue(editValue);
                     onSave(editValue);
+                    await refreshData(); 
                     setIsEditing(false);
                     toast.success('Updated successfully');
                 } else {
