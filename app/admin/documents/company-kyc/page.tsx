@@ -10,7 +10,7 @@ const Page = () => {
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4">Company KYC Management</h1>
       <div className="flex space-x-4 mb-4">
-        {['KYC Docs', 'KYC Document Details'].map(tab => (
+        {['Company KYC Documents', 'Company KYC Document Extracted Details'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -20,8 +20,8 @@ const Page = () => {
           </button>
         ))}
       </div>
-      {activeTab === 'KYC Docs' && <DocumentManagement />}
-      {activeTab === 'KYC Document Details' && <CompanyKycDocumentDetails />}
+      {activeTab === 'Company KYC Documents' && <DocumentManagement />}
+      {activeTab === 'Company KYC Document Extracted Details' && <CompanyKycDocumentDetails />}
     </div>
   );
 };
