@@ -124,21 +124,17 @@ export type Params = { id: string }
 
 export async function GET(
   req: NextRequest,
-  context: {
-    params: {
-      id: string
-    }
-  }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = context.params
-  const template = templates[id]
+  const { id } = params;
+  const template = templates[id];
 
   if (!template) {
     return NextResponse.json(
       { error: 'Template not found' }, 
       { status: 404 }
-    )
+    );
   }
 
-  return NextResponse.json(template)
+  return NextResponse.json(template);
 }
