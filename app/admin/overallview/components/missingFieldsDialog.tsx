@@ -1,274 +1,298 @@
-//@ts-nocheck
+// @ts-nocheck
 "use client";
-import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from '@/lib/supabaseClient';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { formFields } from '../formfields';
-
-interface MissingField {
-  field: string;
-  label: string;
-  value: string | null;
-}
+import { toast } from 'sonner';
 
 interface MissingFieldsDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  companyData: {
-    id: number;
-    missingFields: MissingField[];
-    [key: string]: any;
-  };
-  onSave: (updatedData: any) => void;
+isOpen: boolean;
+onClose: () => void;
+companyData: {
+  company: any;
+  rows: any[];
+  rowSpan: number;
+};
+processedSections: any[];
+onSave: (updatedData: any) => void;
 }
 
-export const MissingFieldsDialog = ({ isOpen, onClose, companyData, onSave }: MissingFieldsDialogProps) => {
-  const [formData, setFormData] = useState(companyData);
-  const [loading, setLoading] = useState(false);
-
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleSubmit = async () => {
-    setLoading(true);
-    try {
-      const today = new Date();
-      const changedValues = {};
-      
-      Object.keys(formData).forEach(key => {
-        if (formData[key] !== companyData[key]) {
-          changedValues[key] = formData[key];
+export const MissingFieldsDialog = ({ 
+isOpen, 
+onClose, 
+companyData, 
+processedSections,
+onSave 
+}: MissingFieldsDialogProps) => {
+const [formData, setFormData] = useState({});
+const [loading, setLoading] = useState(false);
+// Add this helper function to both dialogs
+const parseTableNames = (mappings) => {
+  try {
+    const allTables = new Set();
+    if (Array.isArray(mappings)) {
+      mappings.forEach(mapping => {
+        try {
+          let tableNames;
+          if (typeof mapping.table_names === 'string') {
+            tableNames = JSON.parse(mapping.table_names || '{}');
+          } else if (typeof mapping.table_names === 'object') {
+            tableNames = mapping.table_names;
+          }
           
-          if (key === 'acc_client_effective_to') {
-            const effectiveDate = new Date(formData[key]);
-            changedValues['acc_client_status'] = effectiveDate > today ? 'Active' : 'Inactive';
-            changedValues['acc_client'] = effectiveDate > today ? 'Yes' : 'No';
+          if (tableNames) {
+            Object.values(tableNames).forEach(tables => {
+              if (Array.isArray(tables)) {
+                tables.forEach(table => allTables.add(table));
+              }
+            });
           }
-          if (key === 'audit_tax_client_effective_to') {
-            const effectiveDate = new Date(formData[key]);
-            changedValues['audit_tax_client_status'] = effectiveDate > today ? 'Active' : 'Inactive';
-            changedValues['audit_tax_client'] = effectiveDate > today ? 'Yes' : 'No';
-          }
-          if (key === 'imm_client_effective_to') {
-            const effectiveDate = new Date(formData[key]);
-            changedValues['imm_client_status'] = effectiveDate > today ? 'Active' : 'Inactive';
-            changedValues['imm_client'] = effectiveDate > today ? 'Yes' : 'No';
-          }
-          if (key === 'cps_sheria_client_effective_to') {
-            const effectiveDate = new Date(formData[key]);
-            changedValues['cps_sheria_client_status'] = effectiveDate > today ? 'Active' : 'Inactive';
-            changedValues['cps_sheria_client'] = effectiveDate > today ? 'Yes' : 'No';
-          }
+        } catch (e) {
+          console.warn('Error parsing individual table names:', e);
         }
       });
-
-      const tableUpdates = {
-        acc_portal_company_duplicate: {},
-        nssf_companies_duplicate: {},
-        nhif_companies_duplicate2: {},
-        ecitizen_companies_duplicate: {},
-        etims_companies_duplicate: {}
-      };
-
-      Object.entries(changedValues).forEach(([field, value]) => {
-        const companyName = companyData.company_name;
-        
-        if (field.startsWith('nssf_')) {
-          tableUpdates.nssf_companies_duplicate[field] = value;
-          tableUpdates.nssf_companies_duplicate.company_name = companyName;
-        } else if (field.startsWith('nhif_')) {
-          tableUpdates.nhif_companies_duplicate2[field] = value;
-          tableUpdates.nhif_companies_duplicate2.company_name = companyName;
-        } else if (field.startsWith('etims_')) {
-          tableUpdates.etims_companies_duplicate[field] = value;
-          tableUpdates.etims_companies_duplicate.company_name = companyName;
-        } else if (field.startsWith('ecitizen_')) {
-          tableUpdates.ecitizen_companies_duplicate[field] = value;
-          tableUpdates.ecitizen_companies_duplicate.company_name = companyName;
-        } else {
-          tableUpdates.acc_portal_company_duplicate[field] = value;
-        }
-      });
-
-      for (const [table, updates] of Object.entries(tableUpdates)) {
-        if (Object.keys(updates).length > 0) {
-          const { data, error } = await supabase
-            .from(table)
-            .update(updates)
-            .match({ company_name: companyData.company_name });
-
-          if (error) {
-            console.error(`Error updating ${table}:`, error);
-            throw error;
-          }
-        }
-      }
-
-      const [
-        { data: companies },
-        { data: users },
-        { data: nssfData },
-        { data: nhifData },
-        { data: ecitizenData },
-        { data: etimsData }
-      ] = await Promise.all([
-        supabase.from('acc_portal_company_duplicate').select('*').eq('company_name', companyData.company_name),
-        supabase.from('acc_portal_clerk_users_duplicate').select('*').eq('company_name', companyData.company_name),
-        supabase.from('nssf_companies_duplicate').select('*').eq('company_name', companyData.company_name),
-        supabase.from('nhif_companies_duplicate2').select('*').eq('company_name', companyData.company_name),
-        supabase.from('ecitizen_companies_duplicate').select('*').eq('company_name', companyData.company_name),
-        supabase.from('etims_companies_duplicate').select('*').eq('company_name', companyData.company_name)
-      ]);
-
-      const updatedCompanyData = {
-        ...companies?.[0],
-        ...users?.[0],
-        ...nssfData?.[0],
-        ...nhifData?.[0],
-        ...ecitizenData?.[0],
-        ...etimsData?.[0]
-      };
-
-      onSave(updatedCompanyData);
-      onClose();
-      
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('refreshData'));
-      }
-    } catch (error) {
-      console.error('Error updating company:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+    return Array.from(allTables);
+  } catch (error) {
+    console.error('Error in parseTableNames:', error);
+    return ['acc_portal_company_duplicate']; // Fallback to base table
+  }
+};
+// MissingFieldsDialog.tsx
+useEffect(() => {
+  // console.log('MissingFieldsDialog - Initial companyData:', companyData);
+  // console.log('MissingFieldsDialog - Processed Sections:', processedSections);
 
-  const renderInput = (field: MissingField & { type?: string; options?: string[] }) => {
-    if (field.type === 'select' && field.options) {
-      return (
-        <select
-          id={field.field}
-          value={formData[field.field] || ''}
-          onChange={(e) => handleChange(field.field, e.target.value)}
-          className="w-full rounded-md border border-input bg-background px-3 py-2"
-        >
-          <option value="">Select {field.label}</option>
-          {field.options.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      );
-    }
-  
-    return (
-      <Input
-        id={field.field}
-        type={field.type || 'text'}
-        value={formData[field.field] || ''}
-        onChange={(e) => handleChange(field.field, e.target.value)}
-        className="w-full"
-        placeholder={`Enter ${field.label.toLowerCase()}`}
-      />
-    );
-  };
+  if (!companyData?.company) {
+    // console.log('MissingFieldsDialog - No company data available');
+    return;
+  }
 
-  const groupFieldsByCategory = (fields: MissingField[]) => {
-    // Find field definitions from formFields
-    const fieldDefinitions = formFields.companyDetails.fields;
-    
-    return fields.reduce((groups, field) => {
-      const fieldDef = fieldDefinitions.find(f => f.name === field.field);
-      const category = fieldDef?.category || 'General Information';
-      
-      if (!groups[category]) {
-        groups[category] = [];
+  try {
+    // Get all fields from processed sections
+    const allFields = new Map(); // Changed to Map to store field info
+    const existingData = {};
+
+    // First collect all fields
+    processedSections.forEach(section => {
+      if (!section.isSeparator && section.categorizedFields) {
+        section.categorizedFields.forEach(category => {
+          if (!category.isSeparator && category.fields) {
+            category.fields.forEach(field => {
+              // console.log('Processing field:', field);
+              allFields.set(field.name, field);
+            });
+          }
+        });
       }
-      groups[category].push({
-        ...field,
-        type: fieldDef?.type || 'text',
-        options: fieldDef?.options
-      });
-      return groups;
-    }, {} as Record<string, Array<MissingField & { type?: string; options?: string[] }>>);
-  };
+    });
 
-  return (
-<Dialog open={isOpen} onOpenChange={onClose}>
-  <DialogContent className="max-w-[95vw] max-h-[90vh] p-8">
-    <DialogHeader>
-      <DialogTitle>Edit Missing Fields: {companyData?.company_name}</DialogTitle>
-    </DialogHeader>
-    <ScrollArea className="h-[80vh] px-6">
-      <div className="space-y-6">
-        {Object.entries(groupFieldsByCategory(companyData.missingFields))
-          .map(([category, fields]) => (
-            <div key={category} className="rounded-lg bg-gray-50 p-6">
-              <div className="mb-6">
-                <div className="flex items-center space-x-2 mb-6">
-                  <div className="h-8 w-1 bg-primary rounded-full"></div>
-                  <h3 className="text-xl font-bold text-primary">{category}</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-4 bg-white p-4 rounded-md shadow-sm">
-                  {fields.map((field) => (
-                    <div key={field.field} className="flex flex-col gap-2 mb-4">
-                    <Label htmlFor={field.field} className="text-sm font-medium">
-                      {field.label}
-                    </Label>
-                    {renderInput(field)}
-                  </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-      </div>
-    </ScrollArea>
-    <DialogFooter className="bg-white pt-2">
-      <Button
-        variant="outline"
-        onClick={onClose}
-        className="mr-2"
-      >
-        Cancel
-      </Button>
-      <Button
-        onClick={handleSubmit}
-        disabled={loading}
-      >
-        {loading ? (
-          <div className="flex items-center">
-            <span className="animate-spin mr-2">⟳</span>
-            Saving...
-          </div>
-        ) : 'Save Changes'}
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
-    );
+    // console.log('MissingFieldsDialog - All possible fields:', Array.from(allFields.values()));
+
+    // Process existing data
+    // Company data
+    if (companyData.company) {
+      Object.entries(companyData.company).forEach(([key, value]) => {
+        existingData[`acc_portal_company_duplicate.${key}`] = value;
+      });
+    }
+
+    // Process rows data
+    if (companyData.rows?.length > 0) {
+      companyData.rows.forEach((row) => {
+        if (!row.isAdditionalRow) {
+          Object.entries(row).forEach(([key, value]) => {
+            if (key.endsWith('_data') && value) {
+              const tableName = key.replace('_data', '');
+              Object.entries(value).forEach(([field, fieldValue]) => {
+                existingData[`${tableName}.${field}`] = fieldValue;
+              });
+            }
+          });
+        }
+      });
+    }
+
+    // console.log('MissingFieldsDialog - Existing data:', existingData);
+
+    // Find missing or empty fields
+    const missingFields = {};
+    allFields.forEach((fieldInfo, fieldName) => {
+      const value = existingData[fieldName];
+      if (value === undefined || value === null || value === '' || 
+          value === 'null' || value === ' ' || value === "null") {
+        // console.log('Found missing field:', fieldName, value);
+        missingFields[fieldName] = '';
+      }
+    });
+
+    // console.log('MissingFieldsDialog - Missing fields:', missingFields);
+    setFormData(missingFields);
+
+  } catch (error) {
+    console.error('MissingFieldsDialog - Error:', error);
+  }
+}, [companyData, processedSections]);
+
+const handleChange = (field: string, value: string) => {
+  setFormData(prev => ({
+    ...prev,
+    [field]: value
+  }));
 };
 
-export const getMissingFields = (row: any): MissingField[] => {
-  return Object.entries(row)
-    .filter(([key, value]) => 
-      !key.startsWith('data.') && 
-      !['index', 'isFirstRow', 'rowSpan'].includes(key) &&
-      (value === null || value === '')
-    )
-    .map(([key, value]) => ({
-      field: key,
-      label: key.split('_').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-      ).join(' '),
-      value
-    }));
+const handleSubmit = async () => {
+  setLoading(true);
+  // console.log('Submitting form data:', formData);
+  
+  try {
+    // Group updates by table
+    const updatesByTable = Object.entries(formData).reduce((acc, [fieldName, value]) => {
+      const [tableName, columnName] = fieldName.split('.');
+      if (!acc[tableName]) {
+        acc[tableName] = {};
+      }
+      // Skip the ID field
+      if (columnName !== 'id') {
+        acc[tableName][columnName] = value;
+      }
+      return acc;
+    }, {});
+
+    for (const [tableName, updates] of Object.entries(updatesByTable)) {
+      const { error } = await supabase
+        .from(tableName)
+        .update(updates)
+        .eq('company_name', companyData.company.company_name)
+        .eq('company_id', companyData.company.company_id);
+
+      if (error) throw error;
+    }
+
+    toast.success('Changes saved successfully');
+    onSave(formData);
+    onClose();
+  } catch (error) {
+    console.error('Error saving changes:', error);
+    toast.error('Failed to save changes: ' + (error.message || 'Unexpected error'));
+  } finally {
+    setLoading(false);
+  }
+};
+
+// In both dialogs, modify renderInput
+const renderInput = (field: any) => {
+  const currentValue = formData[field.name] ?? '';
+
+  if (field.dropdownOptions?.length > 0) {
+    return (
+      <select
+        id={field.name}
+        value={currentValue}
+        onChange={(e) => handleChange(field.name, e.target.value)}
+        className="w-full rounded-md border border-input bg-background px-3 py-2"
+      >
+        <option value="">Select {field.label}</option>
+        {field.dropdownOptions.map((option: string) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <Input
+      id={field.name}
+      type={field.type || 'text'}
+      value={currentValue}
+      onChange={(e) => handleChange(field.name, e.target.value)}
+      className="w-full"
+      placeholder={`Enter ${field.label.toLowerCase()}`}
+    />
+  );
+};
+
+const groupFieldsBySection = () => {
+  const groups = {};
+
+  processedSections.forEach(section => {
+    if (!section.isSeparator && section.categorizedFields) {
+      section.categorizedFields.forEach(category => {
+        if (!category.isSeparator && category.fields) {
+          const categoryName = category.category || 'General';
+          const missingFieldsInCategory = category.fields.filter(field => {
+            return formData.hasOwnProperty(field.name);
+          });
+
+          if (missingFieldsInCategory.length > 0) {
+            if (!groups[categoryName]) {
+              groups[categoryName] = [];
+            }
+            groups[categoryName].push(...missingFieldsInCategory);
+          }
+        }
+      });
+    }
+  });
+
+  return groups;
+};
+
+return (
+  <Dialog open={isOpen} onOpenChange={onClose}>
+    <DialogContent className="max-w-[95vw] max-h-[90vh] p-8">
+    <DialogHeader>
+  <DialogTitle className="flex items-center space-x-2">
+    <span className="font-bold text-xl">
+      Missing Fields: {companyData?.company?.company_name || 'Company'}
+    </span>
+  </DialogTitle>
+</DialogHeader>
+      <ScrollArea className="h-[80vh] px-6">
+        <div className="space-y-6">
+          {Object.entries(groupFieldsBySection())
+            .map(([category, fields]) => (
+              <div key={category} className="rounded-lg bg-gray-50 p-6">
+                <div className="mb-6">
+                  <div className="flex items-center space-x-2 mb-6">
+                    <div className="h-8 w-1 bg-primary rounded-full"></div>
+                    <h3 className="text-xl font-bold text-primary">{category}</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 bg-white p-4 rounded-md shadow-sm">
+                    {fields.map((field) => (
+                      <div key={field.name} className="flex flex-col gap-2 mb-4">
+                        <Label htmlFor={field.name} className="text-sm font-medium">
+                          {field.label}
+                        </Label>
+                        {renderInput(field)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+        </div>
+      </ScrollArea>
+      <DialogFooter className="bg-white pt-2">
+        <Button variant="outline" onClick={onClose} className="mr-2">
+          Cancel
+        </Button>
+        <Button onClick={handleSubmit} disabled={loading}>
+          {loading ? (
+            <div className="flex items-center">
+              <span className="animate-spin mr-2">⟳</span>
+              Saving...
+            </div>
+          ) : 'Save Changes'}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
 };
