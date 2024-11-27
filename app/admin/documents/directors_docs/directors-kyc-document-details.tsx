@@ -434,10 +434,10 @@ export default function DirectorsKycDocumentDetails() {
               <Card>
                 <Table>
                   <TableHeader>
-                    <TableRow className="text-[11px] bg-blue-100">
-                      <TableHead className="sticky top-0 left-0 bg-blue-100 z-10">#</TableHead>
+                    <TableRow className="text-[11px] bg-blue-50 border-b-2 border-gray-300">
+                      <TableHead className="sticky top-0 left-0 bg-blue-50 z-10 border-r-2 border-gray-300 w-[50px]">#</TableHead>
                       <TableHead
-                        className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer"
+                        className="sticky top-0 left-0 bg-blue-50 z-10 cursor-pointer border-r-2 border-gray-300"
                         onClick={() => handleSort('company_name')}
                       >
                         Company
@@ -447,11 +447,11 @@ export default function DirectorsKycDocumentDetails() {
                           </span>
                         )}
                       </TableHead>
-                      <TableHead className="sticky top-0 bg-blue-100 z-10">Directors</TableHead>
+                      <TableHead className="sticky top-0 bg-blue-50 z-10 border-r-2 border-gray-300">Directors</TableHead>
                       {selectedDocument.fields?.map((field) => (
                         <TableHead
                           key={field.id}
-                          className="text-center sticky top-0 bg-blue-100 z-10"
+                          className="text-center sticky top-0 bg-blue-50 z-10 border-l-2 border-gray-300"
                         >
                           {field.name}
                         </TableHead>
@@ -459,91 +459,108 @@ export default function DirectorsKycDocumentDetails() {
                     </TableRow>
                   </TableHeader>
                   <TableBody className="text-[11px]">
-                    {sortedCompanies.map((company, index) => (
-                      <TableRow key={company.id}>
-                        <TableCell className="font-medium sticky left-0 bg-white">
-                          {index + 1}
-                        </TableCell>
-                        <TableCell className="font-medium sticky left-0 bg-white">
-                          {company.company_name}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="space-y-2">
-                            {directorsByCompany[company.id]?.map((director) => (
-                              <div key={director.id} className="flex items-center justify-between p-1 border-b">
-                                <span className="text-left">
-                                  {director.full_name || `${director.first_name || ''} ${director.last_name || ''}`}
-                                </span>
-                                <div className="flex justify-center space-x-2">
-                                  {uploads.some(u =>
-                                    u.kyc_document_id === selectedDocument?.id &&
-                                    u.userid === director.id.toString()
-                                  ) ? (
-                                    <>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => handleViewDocument(selectedDocument, director)}
-                                        title="View Document"
-                                        disabled={isLoading}
-                                      >
-                                        <Eye className="h-4 w-4 text-blue-500" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() =>
-                                          handleExtractClick(
-                                            selectedDocument,
-                                            uploads.find(
-                                              u =>
-                                                u.kyc_document_id === selectedDocument.id &&
-                                                u.userid === director.id.toString()
-                                            )!
-                                          )
-                                        }
-                                        title="Extract Details"
-                                        disabled={isLoading}
-                                      >
-                                        <DownloadIcon className="h-4 w-4 text-green-500" />
-                                      </Button>
-                                    </>
-                                  ) : (
+                    {sortedCompanies.map((company, index) => {
+                      const companyDirectors = directorsByCompany[company.id] || [];
+
+                      return companyDirectors.map((director, directorIndex) => (
+                        <TableRow
+                          key={`${company.id}-${director.id}`}
+                          className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b-2 border-gray-300`}
+                        >
+                          {/* Render row number and company name only for first director */}
+                          {directorIndex === 0 && (
+                            <>
+                              <TableCell
+                                className="font-medium sticky left-0 bg-inherit border-r-2 border-gray-300 text-center"
+                                rowSpan={companyDirectors.length}
+                              >
+                                {index + 1}
+                              </TableCell>
+                              <TableCell
+                                className="font-medium sticky left-0 bg-inherit border-r-2 border-gray-300"
+                                rowSpan={companyDirectors.length}
+                              >
+                                {company.company_name}
+                              </TableCell>
+                            </>
+                          )}
+
+                          {/* Director Cell */}
+                          <TableCell className="border-r-2 border-gray-300 text-center">
+                            <div className="flex items-center justify-between p-1">
+                              <span className="text-left">
+                                {director.full_name || `${director.first_name || ''} ${director.last_name || ''}`}
+                              </span>
+                              <div className="flex justify-center space-x-2">
+                                {uploads.some(u =>
+                                  u.kyc_document_id === selectedDocument?.id &&
+                                  u.userid === director.id.toString()
+                                ) ? (
+                                  <>
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      onClick={() => handleUploadClick(director, selectedDocument?.id)}
-                                      title="Upload Document"
+                                      onClick={() => handleViewDocument(selectedDocument, director)}
+                                      title="View Document"
                                       disabled={isLoading}
                                     >
-                                      <UploadIcon className="h-4 w-4 text-orange-500" />
+                                      <Eye className="h-4 w-4 text-blue-500" />
                                     </Button>
-                                  )}
-                                </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() =>
+                                        handleExtractClick(
+                                          selectedDocument,
+                                          uploads.find(
+                                            u =>
+                                              u.kyc_document_id === selectedDocument.id &&
+                                              u.userid === director.id.toString()
+                                          )!
+                                        )
+                                      }
+                                      title="Extract Details"
+                                      disabled={isLoading}
+                                    >
+                                      <DownloadIcon className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleUploadClick(director, selectedDocument?.id)}
+                                    title="Upload Document"
+                                    disabled={isLoading}
+                                  >
+                                    <UploadIcon className="h-4 w-4 text-orange-500" />
+                                  </Button>
+                                )}
                               </div>
-                            ))}
-                          </div>
-                        </TableCell>
-                        {selectedDocument.fields?.map((field) => (
-                          <TableCell key={field.id} className="text-center">
-                            <div className="space-y-2">
-                              {directorsByCompany[company.id]?.map((director) => {
+                            </div>
+                          </TableCell>
+
+                          {/* Extracted Details Cells */}
+                          {selectedDocument.fields?.map((field) => (
+                            <TableCell
+                              key={field.id}
+                              className="text-center border-l-2 border-gray-300"
+                            >
+                              {(() => {
                                 const upload = uploads.find(
                                   u =>
                                     u.kyc_document_id === selectedDocument.id &&
                                     u.userid === director.id.toString()
                                 );
                                 return (
-                                  <div key={director.id} className="min-h-[2.5rem] flex items-center justify-center">
-                                    <span>{upload?.extracted_details?.[field.name] || '-'}</span>
-                                  </div>
+                                  <span>{upload?.extracted_details?.[field.name] || '-'}</span>
                                 );
-                              })}
-                            </div>
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
+                              })()}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ));
+                    })}
                   </TableBody>
                 </Table>
               </Card>
