@@ -9,10 +9,9 @@ import { Plus, Trash, Settings, Edit2, X, ChevronUp, ChevronDown } from 'lucide-
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Checkbox } from '@/components/ui/checkbox';
 
 interface StructureItem {
   id: number;
@@ -24,10 +23,13 @@ interface StructureItem {
   Tabs: string;
   table_names: Record<string, string[]>;
 }
+
+
 interface Tab {
   name: string;
   sections: Section[];
 }
+
 interface Section {
   name: string;
   subsections: Subsection[];
@@ -72,6 +74,7 @@ interface SectionFields {
     };
   };
 }
+
 
 // Helper function to parse JSON safely
 const safeJSONParse = (jsonString: string, fallback: any = {}) => {
@@ -148,7 +151,6 @@ const processStructureData = (data: any[]) => {
 };
 
 
-
 export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStructureChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const [structure, setStructure] = useState<StructureItem[]>([]);
@@ -183,20 +185,7 @@ export function SettingsDialog({ mainTabs, mainSections, mainSubsections, onStru
   const [addFieldDialogOpen, setAddFieldDialogOpen] = useState(false);
   const [showMultiSelectDialog, setShowMultiSelectDialog] = useState(false);
   const [availableFields, setAvailableFields] = useState<{ table: string, fields: TableColumn[] }[]>([]);
-  const [sectionVisibility, setSectionVisibility] = useState<Record<string, boolean>>({});
-const [categoryVisibility, setCategoryVisibility] = useState<Record<string, boolean>>({});
-const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
-const [indexMapping, setIndexMapping] = useState<{
-  tabs: { [key: string]: number },
-  sections: { [key: string]: string },
-  subsections: { [key: string]: string }
-}>({
-  tabs: {},
-  sections: {},
-  subsections: {}
-});
-
-const [addFieldState, setAddFieldState] = useState({
+  const [addFieldState, setAddFieldState] = useState({
     displayName: '',
     selectedTables: [],
     selectedFields: {},
@@ -240,11 +229,7 @@ const [editingField, setEditingField] = useState({
     setSelectedTables([]);
     setSelectedTableFields({});
   };
-  const [editedNames, setEditedNames] = useState({
-    tab: '',
-    section: '',
-    subsection: ''
-  });
+
   useEffect(() => {
     fetchStructure();
   }, []);
@@ -575,213 +560,41 @@ const [editingField, setEditingField] = useState({
       toast.error('Update failed');
     }
   };
-  const handleNameUpdate = async (type: 'tab' | 'section' | 'subsection', oldName: string, newName: string) => {
-    console.log('Starting update:', { type, oldName, newName });
-    
-    try {
-      if (type === 'tab') {
-        const { error } = await supabase
-          .from('profile_category_table_mapping')
-          .update({ Tabs: newName })
-          .eq('Tabs', oldName);
-        if (error) throw error;
-      } 
-      else if (type === 'section') {
-        // Get ALL records that contain this section
-        const { data: records, error: fetchError } = await supabase
-          .from('profile_category_table_mapping')
-          .select('*')
-        
-        if (fetchError) throw fetchError;
-  
-        for (const record of records) {
-          const existingSections = JSON.parse(record.sections_sections || '{}');
-          
-          // Only update records that contain this section
-          if (existingSections[oldName]) {
-            const existingSubsections = JSON.parse(record.sections_subsections || '{}');
-            const existingTableNames = JSON.parse(record.table_names || '{}');
-  
-            delete existingSections[oldName];
-            existingSections[newName] = true;
-  
-            existingSubsections[newName] = existingSubsections[oldName];
-            delete existingSubsections[oldName];
-  
-            existingTableNames[newName] = existingTableNames[oldName];
-            delete existingTableNames[oldName];
-  
-            const { error: updateError } = await supabase
-              .from('profile_category_table_mapping')
-              .update({
-                sections_sections: JSON.stringify(existingSections),
-                sections_subsections: JSON.stringify(existingSubsections),
-                table_names: JSON.stringify(existingTableNames)
-              })
-              .eq('id', record.id);
-  
-            if (updateError) throw updateError;
-          }
-        }
-      }
-      else if (type === 'subsection') {
-        // Get ALL records
-        const { data: records, error: fetchError } = await supabase
-          .from('profile_category_table_mapping')
-          .select('*');
-        
-        if (fetchError) throw fetchError;
-  
-        for (const record of records) {
-          const existingSubsections = JSON.parse(record.sections_subsections || '{}');
-          
-          // Only update if this record has the section and subsection
-          if (existingSubsections[selectedSection?.section] === oldName) {
-            existingSubsections[selectedSection?.section] = newName;
-  
-            const { error: updateError } = await supabase
-              .from('profile_category_table_mapping')
-              .update({
-                sections_subsections: JSON.stringify(existingSubsections)
-              })
-              .eq('id', record.id);
-  
-            if (updateError) throw updateError;
-          }
-        }
-      }
-  
-      await fetchStructure();
-      toast.success(`${type} updated successfully`);
-      
-    } catch (error) {
-      console.error('Update error:', error);
-      toast.error(`Failed to update ${type}`);
-    }
-  };
-  // Add this function to generate indices
-  const generateIndices = (structure: any[]) => {
-    const newIndexMapping = {
-      tabs: {},
-      sections: {},
-      subsections: {}
-    };
-  
-    // Index tabs
-    uniqueTabs.forEach((tab, tabIndex) => {
-      newIndexMapping.tabs[tab] = tabIndex + 1;
-    });
-  
-    // Index sections and subsections
-    structure.forEach(item => {
-      const tabIndex = newIndexMapping.tabs[item.Tabs];
-      
-      // Safely parse JSON or use default empty object
-      const sections = typeof item.sections_sections === 'string' 
-        ? JSON.parse(item.sections_sections) 
-        : item.sections_sections || {};
-        
-      const subsections = typeof item.sections_subsections === 'string'
-        ? JSON.parse(item.sections_subsections)
-        : item.sections_subsections || {};
-  
-      Object.keys(sections).forEach((section, sectionIndex) => {
-        newIndexMapping.sections[section] = `${tabIndex}.${sectionIndex + 1}`;
-  
-        const sectionSubsections = subsections[section];
-        if (Array.isArray(sectionSubsections)) {
-          sectionSubsections.forEach((subsection, subsectionIndex) => {
-            newIndexMapping.subsections[subsection] = `${tabIndex}.${sectionIndex + 1}.${subsectionIndex + 1}`;
-          });
-        } else if (sectionSubsections) {
-          newIndexMapping.subsections[sectionSubsections] = `${tabIndex}.${sectionIndex + 1}.1`;
-        }
-      });
-    });
-  
-    setIndexMapping(newIndexMapping);
-  };
-  
 
-// Call this in useEffect after fetching structure
-useEffect(() => {
-  if (structure.length > 0) {
-    generateIndices(structure);
-  }
-}, [structure, uniqueTabs]);
   const handleAddStructure = async () => {
     try {
-      console.log('Adding new structure with:', newStructure);
+      const payload = {
+        sections_sections: JSON.stringify({ [newStructure.section]: true }),
+        sections_subsections: JSON.stringify({
+          [newStructure.section]: newStructure.subsections
+        }),
+        Tabs: newStructure.Tabs,
+        column_mappings: JSON.stringify(newStructure.column_mappings),
+        table_names: JSON.stringify({
+          [newStructure.section]: selectedTables
+        }),
+        column_order: JSON.stringify(
+          Object.keys(newStructure.column_mappings).reduce((acc, key, index) => {
+            acc[key] = index + 1;
+            return acc;
+          }, {})
+        )
+      };
 
-      // Check for matching tab, section, and subsection
-      const { data: existingRecord, error: existingError } = await supabase
+      const { error } = await supabase
         .from('profile_category_table_mapping')
-        .select('*')
-        .eq('Tabs', newStructure.Tabs)
-        .eq('sections_sections', JSON.stringify({ [newStructure.section]: true }))
-        .eq('sections_subsections', JSON.stringify({ [newStructure.section]: newStructure.subsection }))
-        .single();
+        .insert([payload]);
 
-      if (!existingError && existingRecord) {
-        // Update existing record
-        const updatedColumnMappings = {
-          ...existingRecord.column_mappings,
-          ...newStructure.column_mappings
-        };
-
-        const { error: updateError } = await supabase
-          .from('profile_category_table_mapping')
-          .update({
-            table_names: JSON.stringify({
-              ...JSON.parse(existingRecord.table_names || '{}'),
-              [newStructure.section]: newStructure.table_names
-            }),
-            column_mappings: JSON.stringify(updatedColumnMappings),
-            field_dropdowns: JSON.stringify({
-              ...JSON.parse(existingRecord.field_dropdowns || '{}'),
-              ...newStructure.field_dropdowns
-            }),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingRecord.id);
-
-        if (updateError) throw updateError;
-      } else {
-        // Create new record
-        const payload = {
-          sections_sections: JSON.stringify({ [newStructure.section]: true }),
-          sections_subsections: JSON.stringify({
-            [newStructure.section]: newStructure.subsection
-          }),
-          Tabs: newStructure.Tabs,
-          column_mappings: JSON.stringify(newStructure.column_mappings),
-          table_names: JSON.stringify({
-            [newStructure.section]: newStructure.table_names
-          }),
-          column_order: JSON.stringify(
-            Object.keys(newStructure.column_mappings).reduce((acc, key, index) => {
-              acc[key] = index + 1;
-              return acc;
-            }, {})
-          ),
-          field_dropdowns: JSON.stringify(newStructure.field_dropdowns)
-        };
-
-        const { error: insertError } = await supabase
-          .from('profile_category_table_mapping')
-          .insert([payload]);
-
-        if (insertError) throw insertError;
-      }
+      if (error) throw error;
 
       await fetchStructure();
       await onStructureChange();
       resetNewStructure();
-      toast.success('Structure added/updated successfully');
+      toast.success('Structure added successfully');
 
     } catch (error) {
-      console.error('Error adding/updating structure:', error);
-      toast.error('Failed to add/update structure');
+      console.error('Error adding structure:', error);
+      toast.error('Failed to add structure');
     }
   };
 
@@ -870,6 +683,12 @@ useEffect(() => {
         setTempSelectedFields(selectedTableFields);
       }
     }, [showMultiSelectDialog, selectedTables, selectedTableFields]);
+
+    useEffect(() => {
+      console.log('Selected Tables:', selectedTables);
+      console.log('Selected Fields:', selectedTableFields);
+    }, [selectedTables, selectedTableFields]);
+
 
     return (
       <Dialog open={showMultiSelectDialog} onOpenChange={setShowMultiSelectDialog}>
@@ -1080,31 +899,23 @@ useEffect(() => {
         }));
         return;
       }
-  
-      console.log('Fetching data for section:', sectionValue);
-  
-      // Fetch all data associated with this section across all tabs
+
+      // Fetch all data associated with this section regardless of tab
       const { data, error } = await supabase
         .from('profile_category_table_mapping')
         .select('*')
         .filter('sections_sections', 'cs', `{"${sectionValue}": true}`);
-  
+
       if (error) throw error;
-  
-      console.log('Found data for section:', data);
-  
+
       // Process all subsections, tables and mappings for this section
       const allSubsections = new Set();
       const allTables = new Set();
       const allMappings = {};
-  
+
       data.forEach(item => {
-        console.log('Processing item:', item);
-  
         // Get subsections
         const subsectionsData = safeJSONParse(item.sections_subsections, {});
-        console.log('Subsections data:', subsectionsData);
-  
         if (subsectionsData[sectionValue]) {
           if (Array.isArray(subsectionsData[sectionValue])) {
             subsectionsData[sectionValue].forEach(sub => allSubsections.add(sub));
@@ -1112,24 +923,16 @@ useEffect(() => {
             allSubsections.add(subsectionsData[sectionValue]);
           }
         }
-  
+
         // Get tables
         const tableNames = safeJSONParse(item.table_names, {})[sectionValue] || [];
-        console.log('Table names:', tableNames);
         tableNames.forEach(table => allTables.add(table));
-  
+
         // Get column mappings
         const columnMappings = safeJSONParse(item.column_mappings, {});
-        console.log('Column mappings:', columnMappings);
         Object.assign(allMappings, columnMappings);
       });
-  
-      console.log('Processed data:', {
-        subsections: Array.from(allSubsections),
-        tables: Array.from(allTables),
-        mappings: allMappings
-      });
-  
+
       // Update state with all found data
       setNewStructure(prev => ({
         ...prev,
@@ -1139,11 +942,11 @@ useEffect(() => {
         table_names: Array.from(allTables),
         column_mappings: allMappings
       }));
-  
+
       // Update preview data
       setSelectedTables(Array.from(allTables));
       setSelectedTableFields(processColumnMappings(allMappings));
-  
+
     } catch (error) {
       console.error('Error fetching section data:', error);
       toast.error('Failed to load section data');
@@ -1161,70 +964,68 @@ useEffect(() => {
         }));
         return;
       }
-  
-      console.log('Fetching data for subsection:', subsectionValue);
-  
-      // Fetch all data associated with this subsection across all tabs and sections
-      const { data, error } = await supabase
-        .from('profile_category_table_mapping')
-        .select('*');
-  
-      if (error) throw error;
-  
-      console.log('Found data for subsection:', data);
-  
-      // Find relevant structure with this subsection
-      const relevantStructures = data.filter(item => {
-        const subsectionsData = safeJSONParse(item.sections_subsections, {});
-        return Object.values(subsectionsData).some(subs => {
-          if (Array.isArray(subs)) {
-            return subs.includes(subsectionValue);
-          }
-          return subs === subsectionValue;
+
+      let mappingsToUse = {};
+
+      if (newStructure.isNewTab) {
+        // For new tab, get all mappings for this section/subsection combination
+        const { data, error } = await supabase
+          .from('profile_category_table_mapping')
+          .select('*');
+
+        if (error) throw error;
+
+        const relevantStructure = data.find(item => {
+          const sections = safeJSONParse(item.sections_sections);
+          const subsections = safeJSONParse(item.sections_subsections);
+          return Object.keys(sections).includes(newStructure.section) &&
+            subsections[newStructure.section] === subsectionValue;
         });
-      });
-  
-      console.log('Relevant structures:', relevantStructures);
-  
-      // Combine all mappings and tables
-      const allTables = new Set();
-      const allMappings = {};
-  
-      relevantStructures.forEach(item => {
-        // Get tables
-        const tableNames = safeJSONParse(item.table_names, {});
-        console.log('Table names:', tableNames);
-        Object.values(tableNames).flat().forEach(table => allTables.add(table));
-  
-        // Get column mappings
-        const columnMappings = safeJSONParse(item.column_mappings, {});
-        console.log('Column mappings:', columnMappings);
-        Object.assign(allMappings, columnMappings);
-      });
-  
-      console.log('Processed data:', {
-        tables: Array.from(allTables),
-        mappings: allMappings
-      });
-  
+
+        if (relevantStructure) {
+          mappingsToUse = safeJSONParse(relevantStructure.column_mappings);
+        }
+      } else {
+        // For existing tab, get mappings only from this tab
+        const existingStructure = structure.find(item =>
+          item.Tabs === newStructure.Tabs &&
+          item.sections_sections &&
+          Object.keys(safeJSONParse(item.sections_sections)).includes(newStructure.section) &&
+          safeJSONParse(item.sections_subsections)[newStructure.section] === subsectionValue
+        );
+
+        if (existingStructure) {
+          mappingsToUse = safeJSONParse(existingStructure.column_mappings);
+        }
+      }
+
+      // Extract tables and fields
+      const mappings = Object.entries(mappingsToUse).reduce((acc, [key, value]) => {
+        const [table, field] = key.split('.');
+        if (!acc[table]) {
+          acc[table] = [];
+        }
+        acc[table].push(field);
+        return acc;
+      }, {} as Record<string, string[]>);
+
       // Update states
-      setSelectedTables(Array.from(allTables));
-      setSelectedTableFields(processColumnMappings(allMappings));
-  
+      setSelectedTables(Object.keys(mappings));
+      setSelectedTableFields(mappings);
+
       setNewStructure(prev => ({
         ...prev,
         subsection: subsectionValue,
         isNewSubsection: false,
-        table_names: Array.from(allTables),
-        column_mappings: allMappings
+        table_names: Object.keys(mappings),
+        column_mappings: mappingsToUse
       }));
-  
+
     } catch (error) {
       console.error('Error in subsection selection:', error);
       toast.error('Failed to load subsection data');
     }
   };
-  
   const handleAddNewField = async () => {
     if (!addFieldState.displayName || !addFieldState.newFieldTable) {
       toast.error('Please fill in all fields');
@@ -1553,105 +1354,7 @@ useEffect(() => {
       toast.error('Failed to update field');
     }
   };
-  const toggleSectionVisibility = (section: string) => {
-    setSectionVisibility(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-  
-  const toggleCategoryVisibility = (category: string) => {
-    setCategoryVisibility(prev => ({
-      ...prev,
-      [category]: !prev[category]
-    }));
-  };
-  
-  const toggleColumnVisibility = (column: string) => {
-    setColumnVisibility(prev => ({
-      ...prev,
-      [column]: !prev[column]
-    }));
-  };
-  
-  const resetAll = () => {
-    setSectionVisibility({});
-    setCategoryVisibility({});
-    setColumnVisibility({});
-  };
-  
-  // Add function to save visibility settings
-  const handleSaveVisibilitySettings = async () => {
-    try {
-      await supabase.from('visibility_settings').upsert([
-        {
-          sections: sectionVisibility,
-          categories: categoryVisibility,
-          columns: columnVisibility,
-          updated_at: new Date().toISOString()
-        }
-      ]);
-      toast.success('Visibility settings saved successfully');
-    } catch (error) {
-      console.error('Error saving visibility settings:', error);
-      toast.error('Failed to save visibility settings');
-    }
-  };
-  
-  // Add useEffect to load initial visibility settings
-  useEffect(() => {
-    const loadVisibilitySettings = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('visibility_settings')
-          .select('*')
-          .single();
-  
-        if (error) throw error;
-  
-        if (data) {
-          setSectionVisibility(data.sections || {});
-          setCategoryVisibility(data.categories || {});
-          setColumnVisibility(data.columns || {});
-        }
-      } catch (error) {
-        console.error('Error loading visibility settings:', error);
-      }
-    };
-  
-    loadVisibilitySettings();
-  }, []);
-  
-  // Add useEffect to initialize visibility settings based on structure
-  useEffect(() => {
-    if (structure.length > 0) {
-      const newSectionVisibility = {};
-      const newCategoryVisibility = {};
-      const newColumnVisibility = {};
-  
-      structure.forEach(item => {
-        // Initialize sections
-        if (item.sections_sections) {
-          Object.keys(item.sections_sections).forEach(section => {
-            newSectionVisibility[section] = true;
-          });
-        }
-  
-        // Initialize categories and columns from mappings
-        if (item.column_mappings) {
-          Object.entries(item.column_mappings).forEach(([key, value]) => {
-            const [table, field] = key.split('.');
-            newCategoryVisibility[table] = true;
-            newColumnVisibility[field] = true;
-          });
-        }
-      });
-  
-      setSectionVisibility(prev => ({ ...prev, ...newSectionVisibility }));
-      setCategoryVisibility(prev => ({ ...prev, ...newCategoryVisibility }));
-      setColumnVisibility(prev => ({ ...prev, ...newColumnVisibility }));
-    }
-  }, [structure]);
+
   return (
     <>
       <Button onClick={() => setIsOpen(true)} variant="outline">
@@ -1664,15 +1367,7 @@ useEffect(() => {
           <DialogHeader>
             <DialogTitle>Table Structure Settings</DialogTitle>
           </DialogHeader>
-          <Tabs defaultValue="structure" className="w-full">
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="newstructure">Add Structure</TabsTrigger>
-        <TabsTrigger value="structure">Table Structure</TabsTrigger>
-        <TabsTrigger value="visibility">Column Management</TabsTrigger>
-      </TabsList>
 
-        {/* Table Structure Tab */}
-        <TabsContent value="structure" className="space-y-4">
           <div className="grid grid-cols-12 gap-4">
             {/* Left Panel - Tabs */}
             <Card className="col-span-2 h-[700px]">
@@ -1691,7 +1386,7 @@ useEffect(() => {
                         }`}
                       onClick={() => handleTabSelection(tab, false)}
                     >
-                        {indexMapping.tabs[tab] || ''} {tab}
+                      {tab}
                     </button>
                   ))}
                 </ScrollArea>
@@ -1724,7 +1419,7 @@ useEffect(() => {
                           }`}
                         onClick={() => setSelectedSection({ section })}
                       >
-                        <div className="font-medium"> {indexMapping.sections[section] || ''} {section}</div>
+                        <div className="font-medium">{section}</div>
                       </div>
                     ))}
 
@@ -1760,7 +1455,7 @@ useEffect(() => {
                           }`}
                         onClick={() => setSelectedSubsection(subsection)}
                       >
-                        <div className="font-medium">{indexMapping.subsections[subsection] || ''} {subsection}</div>
+                        <div className="font-medium">{subsection}</div>
                       </div>
                     ))}
 
@@ -1800,61 +1495,23 @@ useEffect(() => {
                       </div>
 
                       {/* Section Info */}
-                      <div className="grid gap-4">  
-                      <div>
-    <label className="text-sm font-medium">Tab Name</label>
-    <Input
-      value={editedNames.tab || selectedTab}
-      disabled={!editing}
-      onChange={(e) => setEditedNames(prev => ({ ...prev, tab: e.target.value }))}
-      onBlur={() => {
-        if (editedNames.tab && editedNames.tab !== selectedTab) {
-          handleNameUpdate('tab', selectedTab, editedNames.tab);
-        }
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && editedNames.tab && editedNames.tab !== selectedTab) {
-          handleNameUpdate('tab', selectedTab, editedNames.tab);
-        }
-      }}
-    />
-  </div>
-  <div>
-    <label className="text-sm font-medium">Section Name</label>
-    <Input
-      value={editedNames.section || selectedSection?.section}
-      disabled={!editing}
-      onChange={(e) => setEditedNames(prev => ({ ...prev, section: e.target.value }))}
-      onBlur={() => {
-        if (editedNames.section && editedNames.section !== selectedSection?.section) {
-          handleNameUpdate('section', selectedSection?.section || '', editedNames.section);
-        }
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && editedNames.section && editedNames.section !== selectedSection?.section) {
-          handleNameUpdate('section', selectedSection?.section || '', editedNames.section);
-        }
-      }}
-    />
-  </div>
-  <div>
-    <label className="text-sm font-medium">Subsection Name</label>
-    <Input
-      value={editedNames.subsection || selectedSubsection}
-      disabled={!editing}
-      onChange={(e) => setEditedNames(prev => ({ ...prev, subsection: e.target.value }))}
-      onBlur={() => {
-        if (editedNames.subsection && editedNames.subsection !== selectedSubsection) {
-          handleNameUpdate('subsection', selectedSubsection || '', editedNames.subsection);
-        }
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && editedNames.subsection && editedNames.subsection !== selectedSubsection) {
-          handleNameUpdate('subsection', selectedSubsection || '', editedNames.subsection);
-        }
-      }}
-    />
-  </div>
+                      <div className="grid gap-4">
+                        <div>
+                          <label className="text-sm font-medium">Section</label>
+                          <Input
+                            value={selectedSection?.section || ''}
+                            disabled={!editing}
+                            onChange={(e) => handleUpdateSection(selectedSection!.id, { section: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Subsection</label>
+                          <Input
+                            value={selectedSubsection || ''}
+                            disabled={!editing}
+                            onChange={(e) => handleUpdateSection(selectedSection!.id, { subsection: e.target.value })}
+                          />
+                        </div>
                         <div>
                           <label className="text-sm font-medium">Table Name</label>
                           {selectedSection && selectedSubsection && structure
@@ -1986,10 +1643,7 @@ useEffect(() => {
                 </ScrollArea>
               </CardContent>
             </Card>
-            </div>
-      </TabsContent>
-
-      <TabsContent value="newstructure" className="space-y-6">
+          </div>
           {/* Add New Structure UI */}
           <div className="border-t pt-6 mt-6">
             <h3 className="text-lg font-semibold mb-6">Add New Structure</h3>
@@ -2233,89 +1887,11 @@ useEffect(() => {
                     Add Structure
                   </Button>
                 </div>
-              </div>  
+              </div>
             </div>
           </div>
-
-      </TabsContent>
-
-       {/* Column Management Tab */}
-       <TabsContent value="visibility" className="space-y-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-3 gap-6">
-              {/* Section Management */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Section Visibility</h3>
-                {Object.entries(sectionVisibility).map(([section, visible]) => (
-                  <div key={section} className="flex items-center mb-2">
-                    <Checkbox 
-                      id={`section-${section}`}
-                      checked={visible}
-                      onCheckedChange={() => toggleSectionVisibility(section)}
-                    />
-                    <label className="ml-2" htmlFor={`section-${section}`}>
-                      {section}
-                    </label>
-                  </div>
-                ))}
-              </div>
-
-              {/* Category Management */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Category Visibility</h3>
-                {Object.entries(categoryVisibility).map(([category, visible]) => (
-                  <div key={category} className="flex items-center mb-2">
-                    <Checkbox 
-                      id={`category-${category}`}
-                      checked={visible}
-                      onCheckedChange={() => toggleCategoryVisibility(category)}
-                    />
-                    <label className="ml-2" htmlFor={`category-${category}`}>
-                      {category}
-                    </label>
-                  </div>
-                ))}
-              </div>
-
-              {/* Column Management */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Column Visibility</h3>
-                {Object.entries(columnVisibility).map(([column, visible]) => (
-                  <div key={column} className="flex items-center mb-2">
-                    <Checkbox 
-                      id={`column-${column}`}
-                      checked={visible}
-                      onCheckedChange={() => toggleColumnVisibility(column)}
-                    />
-                    <label className="ml-2" htmlFor={`column-${column}`}>
-                      {column}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Additional Management Tools */}
-            <div className="mt-8 space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">Quick Actions</h3>
-                <div className="space-x-2">
-                  <Button variant="outline" onClick={resetAll}>
-                    Reset All
-                  </Button>
-                  <Button onClick={() => handleSaveVisibilitySettings()}>
-                    Save Changes
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
-  </DialogContent>
-</Dialog>
+        </DialogContent>
+      </Dialog>
 
       {/* New Table Dialog */}
       <AlertDialog open={showNewTableDialog} onOpenChange={setShowNewTableDialog}>
