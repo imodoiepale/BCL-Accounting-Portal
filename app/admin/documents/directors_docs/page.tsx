@@ -1,7 +1,7 @@
 "use client"
 import React, { useState } from 'react';
 import DocumentManagement from './document-management';
-import CompanyKycDocumentDetails from './company-kyc-document-details';
+import DirectorsKycDocumentDetails from './directors-kyc-document-details';
 
 const Page = () => {
   const [activeTab, setActiveTab] = useState('KYC Docs');
@@ -35,7 +35,7 @@ const Page = () => {
           )}
           {activeTab === 'KYC Document Details' && (
             <div className="h-full">
-              <CompanyKycDocumentDetails />
+              <DirectorsKycDocumentDetails />
             </div>
           )}
         </div>
