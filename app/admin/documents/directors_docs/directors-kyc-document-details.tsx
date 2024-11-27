@@ -434,10 +434,10 @@ export default function DirectorsKycDocumentDetails() {
               <Card>
                 <Table>
                   <TableHeader>
-                    <TableRow className="text-[11px] bg-blue-50 border-b-2 border-gray-300">
-                      <TableHead className="sticky top-0 left-0 bg-blue-50 z-10 border-r-2 border-gray-300 w-[50px]">#</TableHead>
+                    <TableRow className="text-[11px] bg-blue-50 border-b border-gray-300">
+                      <TableHead className="sticky top-0 left-0 bg-blue-50 z-10 border-r border-gray-300 w-[50px]">#</TableHead>
                       <TableHead
-                        className="sticky top-0 left-0 bg-blue-50 z-10 cursor-pointer border-r-2 border-gray-300"
+                        className="sticky top-0 left-0 bg-blue-50 z-10 cursor-pointer border-r border-gray-300"
                         onClick={() => handleSort('company_name')}
                       >
                         Company
@@ -447,11 +447,14 @@ export default function DirectorsKycDocumentDetails() {
                           </span>
                         )}
                       </TableHead>
-                      <TableHead className="sticky top-0 bg-blue-50 z-10 border-r-2 border-gray-300">Directors</TableHead>
+                      <TableHead className="sticky top-0 bg-blue-50 z-10 border-r border-gray-300">Directors</TableHead>
+                      <TableHead className="sticky top-0 bg-blue-50 z-10 border-r border-gray-300 text-center w-[100px]">
+                        Actions
+                      </TableHead>
                       {selectedDocument.fields?.map((field) => (
                         <TableHead
                           key={field.id}
-                          className="text-center sticky top-0 bg-blue-50 z-10 border-l-2 border-gray-300"
+                          className="text-center sticky top-0 bg-blue-50 z-10 border-l border-gray-300"
                         >
                           {field.name}
                         </TableHead>
@@ -465,19 +468,19 @@ export default function DirectorsKycDocumentDetails() {
                       return companyDirectors.map((director, directorIndex) => (
                         <TableRow
                           key={`${company.id}-${director.id}`}
-                          className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b-2 border-gray-300`}
+                          className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-300`}
                         >
                           {/* Render row number and company name only for first director */}
                           {directorIndex === 0 && (
                             <>
                               <TableCell
-                                className="font-medium sticky left-0 bg-inherit border-r-2 border-gray-300 text-center"
+                                className="font-medium sticky left-0 bg-inherit border-r border-gray-300 text-center"
                                 rowSpan={companyDirectors.length}
                               >
                                 {index + 1}
                               </TableCell>
                               <TableCell
-                                className="font-medium sticky left-0 bg-inherit border-r-2 border-gray-300"
+                                className="font-medium sticky left-0 bg-inherit border-r border-gray-300"
                                 rowSpan={companyDirectors.length}
                               >
                                 {company.company_name}
@@ -486,57 +489,64 @@ export default function DirectorsKycDocumentDetails() {
                           )}
 
                           {/* Director Cell */}
-                          <TableCell className="border-r-2 border-gray-300 text-center">
+                          <TableCell className="border-r border-gray-300 text-center">
                             <div className="flex items-center justify-between p-1">
                               <span className="text-left">
                                 {director.full_name || `${director.first_name || ''} ${director.last_name || ''}`}
                               </span>
-                              <div className="flex justify-center space-x-2">
-                                {uploads.some(u =>
-                                  u.kyc_document_id === selectedDocument?.id &&
-                                  u.userid === director.id.toString()
-                                ) ? (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleViewDocument(selectedDocument, director)}
-                                      title="View Document"
-                                      disabled={isLoading}
-                                    >
-                                      <Eye className="h-4 w-4 text-blue-500" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() =>
-                                        handleExtractClick(
-                                          selectedDocument,
-                                          uploads.find(
-                                            u =>
-                                              u.kyc_document_id === selectedDocument.id &&
-                                              u.userid === director.id.toString()
-                                          )!
-                                        )
-                                      }
-                                      title="Extract Details"
-                                      disabled={isLoading}
-                                    >
-                                      <DownloadIcon className="h-4 w-4 text-green-500" />
-                                    </Button>
-                                  </>
-                                ) : (
+                            </div>
+                          </TableCell>
+
+                          {/* Actions Cell */}
+                          <TableCell className="border-r border-gray-300 text-center">
+                            <div className="flex justify-center space-x-1 text-[10px]">
+                              {uploads.some(u =>
+                                u.kyc_document_id === selectedDocument?.id &&
+                                u.userid === director.id.toString()
+                              ) ? (
+                                <>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleUploadClick(director, selectedDocument?.id)}
-                                    title="Upload Document"
+                                    className="h-6 w-6"
+                                    onClick={() => handleViewDocument(selectedDocument, director)}
+                                    title="View Document"
                                     disabled={isLoading}
                                   >
-                                    <UploadIcon className="h-4 w-4 text-orange-500" />
+                                    <Eye className="h-3 w-3 text-blue-500" />
                                   </Button>
-                                )}
-                              </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() =>
+                                      handleExtractClick(
+                                        selectedDocument,
+                                        uploads.find(
+                                          u =>
+                                            u.kyc_document_id === selectedDocument.id &&
+                                            u.userid === director.id.toString()
+                                        )!
+                                      )
+                                    }
+                                    title="Extract Details"
+                                    disabled={isLoading}
+                                  >
+                                    <DownloadIcon className="h-3 w-3 text-green-500" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => handleUploadClick(director, selectedDocument?.id)}
+                                  title="Upload Document"
+                                  disabled={isLoading}
+                                >
+                                  <UploadIcon className="h-3 w-3 text-orange-500" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
 
@@ -544,7 +554,7 @@ export default function DirectorsKycDocumentDetails() {
                           {selectedDocument.fields?.map((field) => (
                             <TableCell
                               key={field.id}
-                              className="text-center border-l-2 border-gray-300"
+                              className="text-center border-l border-gray-300"
                             >
                               {(() => {
                                 const upload = uploads.find(
