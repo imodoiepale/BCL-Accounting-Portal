@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # Next.js Application
+  web:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      # Database Connection
+      - DATABASE_URL=${DATABASE_URL}
+      
+      # Authentication
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=http://localhost:3000
+      
+      # Other environment variables
+      - NODE_ENV=production
+      
+    # Optional: Restart policy
+    restart: unless-stopped
+
+  # Optional: Database Service (if not using external DB)
+  # database:
+  #   image: postgres:13
+  #   environment:
+  #     - POSTGRES_DB=your_database
+  #     - POSTGRES_USER=your_username
+  #     - POSTGRES_PASSWORD=your_password
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+
+# Optional: Volume for persistent data
+# volumes:
+#   postgres-data:
