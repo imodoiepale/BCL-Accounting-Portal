@@ -16,7 +16,7 @@ import { CompanyEditDialog } from './components/overview/Dialogs/CompanyEditDial
 import { handleExport, handleImport } from './components/utility';
 import { ImportDialog } from './components/overview/Dialogs/ImportDialog';
 
-export const safeJSONParse = (jsonString: string, defaultValue = {}) => {
+const safeJSONParse = (jsonString: string, defaultValue = {}) => {
     try {
         if (!jsonString) return defaultValue;
         

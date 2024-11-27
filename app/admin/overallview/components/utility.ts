@@ -5,7 +5,41 @@ import { formFields } from '../formfields';
 import { supabase } from '@/lib/supabaseClient';
 import * as XLSX from 'xlsx';
 import { toast } from "sonner";
-import { safeJSONParse } from '../page';
+
+const safeJSONParse = (jsonString: string, defaultValue = {}) => {
+  try {
+      if (!jsonString) return defaultValue;
+      
+      // Handle already parsed objects
+      if (typeof jsonString === 'object') return jsonString;
+      
+      // Handle strings with escaped quotes
+      let processedString = jsonString;
+      if (typeof jsonString === 'string') {
+          // Replace escaped backslashes first
+          processedString = processedString.replace(/\\\\/g, '\\');
+          // Replace escaped quotes
+          processedString = processedString.replace(/\\"/g, '"');
+          // Handle double-encoded JSON
+          while (processedString.includes('\\"')) {
+              try {
+                  processedString = JSON.parse(processedString);
+                  if (typeof processedString !== 'string') break;
+              } catch {
+                  break;
+              }
+          }
+      }
+
+      return typeof processedString === 'string' 
+          ? JSON.parse(processedString) 
+          : processedString;
+  } catch (error) {
+      console.error('JSON Parse Error:', error, 'Input:', jsonString);
+      return defaultValue;
+  }
+};
+
 export interface CompanyData {
   company_name: string;
   [key: string]: any;
