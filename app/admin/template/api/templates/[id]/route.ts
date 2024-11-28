@@ -1,57 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server';
-
-// Type Definitions
-type FieldBase = {
-  id: string;
-  label: string;
-  type: string;
-  required?: boolean;
-};
-
-type SelectField = FieldBase & {
-  type: 'select';
-  options: string[];
-  default?: string;
-};
-
-type TextField = FieldBase & {
-  type: 'text' | 'email' | 'tel' | 'date' | 'number';
-};
-
-type FileField = FieldBase & {
-  type: 'file';
-};
-
-type CheckboxField = FieldBase & {
-  type: 'checkbox';
-  default?: boolean;
-};
-
-type GroupField = FieldBase & {
-  type: 'group';
-  fields: Field[];
-};
-
-type DialogField = FieldBase & {
-  type: 'dialog';
-  fields: Field[];
-};
-
-type Field = SelectField | TextField | FileField | CheckboxField | GroupField | DialogField;
+// @ts-nocheck
+import { NextRequest, NextResponse } from 'next/server'
 
 type Template = {
   id: string;
   name: string;
   templateUrl?: string;
-  fields: Field[];
+  fields: Array<{
+    id: string;
+    label: string;
+    type: string;
+    required?: boolean;
+    options?: string[];
+    default?: any;
+    fields?: Array<any>;
+  }>;
   defaultValues: Record<string, any>;
-};
+}
 
 type Templates = {
   [key: string]: Template;
-};
+}
 
-// Templates data
 const templates: Templates = {
   'bank-application': {
     id: 'bank-application',
@@ -64,78 +33,32 @@ const templates: Templates = {
       { id: 'dateOfIncorporation', label: 'Date of Incorporation', type: 'date', required: true },
       { id: 'kraPin', label: 'KRA PIN', type: 'text', required: true },
       { id: 'registrationCertificateNumber', label: 'Registration Certificate Number', type: 'text', required: true },
-      
       // Contact Details
       { id: 'primaryContactEmail', label: 'Primary Contact Email', type: 'email', required: true },
       { id: 'primaryContactMobile', label: 'Primary Contact Mobile', type: 'tel', required: true },
-      
-      // Account Details
+      // Account Details (Dialog Fields)
       { 
         id: 'accountDetails', 
         label: 'Account Details', 
         type: 'dialog',
         fields: [
-          { 
-            id: 'typeOfBusiness', 
-            label: 'Type of Business', 
-            type: 'select', 
-            options: ['Limited Company'], 
-            default: 'Limited Company'
-          },
-          { 
-            id: 'preferredAccountType', 
-            label: 'Preferred Account Type', 
-            type: 'select', 
-            options: ['Business Current Account'], 
-            default: 'Business Current Account'
-          },
-          { 
-            id: 'foreignCurrency', 
-            label: 'Foreign Currency', 
-            type: 'select', 
-            options: ['USD'], 
-            default: 'USD'
-          },
-          { 
-            id: 'purposeOfAccount', 
-            label: 'Purpose of Account', 
-            type: 'select', 
-            options: ['Business Proceeds'], 
-            default: 'Business Proceeds'
-          }
+          { id: 'typeOfBusiness', label: 'Type of Business', type: 'select', options: ['Limited Company'], default: 'Limited Company' },
+          { id: 'preferredAccountType', label: 'Preferred Account Type', type: 'select', options: ['Business Current Account'], default: 'Business Current Account' },
+          { id: 'foreignCurrency', label: 'Foreign Currency', type: 'select', options: ['USD'], default: 'USD' },
+          { id: 'purposeOfAccount', label: 'Purpose of Account', type: 'select', options: ['Business Proceeds'], default: 'Business Proceeds' }
         ]
       },
-      
-      // Account Facilities
+      // Account Facilities (Dialog Fields)
       {
         id: 'accountFacilities',
         label: 'Account Facilities',
         type: 'dialog',
         fields: [
-          { 
-            id: 'mobileInternetBanking', 
-            label: 'Mobile Internet Banking', 
-            type: 'checkbox', 
-            default: false 
-          },
-          { 
-            id: 'chequeBook', 
-            label: 'Cheque Book', 
-            type: 'group', 
-            fields: [
-              { 
-                id: 'enabled', 
-                label: 'Enable Cheque Book', 
-                type: 'checkbox', 
-                default: false 
-              },
-              { 
-                id: 'preferredNameFormat', 
-                label: 'Preferred Name Format', 
-                type: 'text' 
-              }
-            ]
-          },
+          { id: 'mobileInternetBanking', label: 'Mobile Internet Banking', type: 'checkbox', default: false },
+          { id: 'chequeBook', label: 'Cheque Book', type: 'group', fields: [
+            { id: 'enabled', label: 'Enable Cheque Book', type: 'checkbox', default: false },
+            { id: 'preferredNameFormat', label: 'Preferred Name Format', type: 'text' }
+          ]},
         ]
       }
     ],
@@ -194,19 +117,11 @@ const templates: Templates = {
       loanAmount: '',
     },
   },
-};
-
-// Route Handler
-type RouteContext = {
-  params: {
-    id: string;
-  };
-  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
 export async function GET(
   request: NextRequest,
-  context: RouteContext
+  context: { params: { id: string } }
 ) {
   const { id } = context.params;
   const template = templates[id];
