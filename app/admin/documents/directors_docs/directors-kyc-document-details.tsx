@@ -318,6 +318,82 @@ export default function DirectorsKycDocumentDetails() {
   const filteredAndSortedCompanies = sortCompanies(filterCompanies(companies));
   const statusCounts = getStatusCounts();
 
+
+
+  const handleViewDocument = async (document: Document, director: Director) => {
+    try {
+      const upload = uploads.find(u =>
+        u.kyc_document_id === document.id &&
+        u.userid === director.id.toString()
+      );
+  
+      if (!upload) {
+        toast.error('Document not found');
+        return;
+      }
+  
+      const { data, error } = await supabase
+        .storage
+        .from('kyc-documents')
+        .createSignedUrl(upload.filepath, 60);
+  
+      if (error) throw error;
+  
+      setViewUrl(data.signedUrl);
+      setShowViewModal(true);
+    } catch (error) {
+      console.error('Error viewing document:', error);
+      toast.error('Failed to view document');
+    }
+  };
+  
+  // Handle upload button click
+  const handleUploadClick = (director: Director, documentId: string) => {
+    if (!director || !documentId) {
+      toast.error('Invalid upload parameters');
+      return;
+    }
+    setSelectedDirectorUpload(director);
+    setSelectedDocument(documents.find(d => d.id === documentId) || null);
+    setShowUploadModal(true);
+  };
+  
+  // Handle extraction button click
+  const handleExtractClick = (document: Document, upload: Upload) => {
+    if (!document || !upload) {
+      toast.error('Invalid extraction parameters');
+      return;
+    }
+    setSelectedExtractDocument(document);
+    setSelectedExtractUpload(upload);
+    setShowExtractModal(true);
+  };
+  
+  // Handle extraction completion
+  const handleExtractComplete = async (extractedData: ExtractedData) => {
+    try {
+      if (!selectedExtractUpload?.id) {
+        throw new Error('No upload selected');
+      }
+  
+      const { error } = await supabase
+        .from('acc_portal_directors_documents')
+        .update({ extracted_details: extractedData })
+        .eq('id', selectedExtractUpload.id);
+  
+      if (error) throw error;
+  
+      queryClient.invalidateQueries(['uploads']);
+      setShowExtractModal(false);
+      setSelectedExtractDocument(null);
+      setSelectedExtractUpload(null);
+      toast.success('Details extracted successfully');
+    } catch (error) {
+      console.error('Extraction error:', error);
+      toast.error('Failed to save extracted details');
+    }
+  };
+  
   return (
     <div className="flex overflow-hidden">
       <Toaster position="top-right" />
