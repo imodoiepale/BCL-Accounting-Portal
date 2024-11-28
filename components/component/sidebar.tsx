@@ -26,13 +26,11 @@ const adminNavItems = [
   { href: "/mail", icon: Mail, label: "Mail" },
   { href: "/admin/registry", icon: User2Icon, label: "Registry" },
   { href: "/admin/overallview", icon: LayoutDashboardIcon, label: "Overall TableView" },
-  { href: "/admin/documents/kyc", icon: FileIcon, label: "Kyc Documents" },
-  { href: "/admin/documents/monthly", icon: FileIcon, label: "Monthly Documents" },
   { href: "/admin/companies", icon: User2Icon, label: "Companies" },
   {
     href: "/admin/documents",
     icon: FileIcon,
-    label: "Document Management",
+    label: "KYC Document Management",
     children: [
       { href: "/admin/documents/company-kyc", icon: FileIcon, label: "Company KYC Documents" },
       { href: "/admin/documents/directors_docs", icon: FileIcon, label: "Director KYC Documents" },
