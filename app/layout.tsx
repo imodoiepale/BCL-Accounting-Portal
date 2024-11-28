@@ -8,6 +8,7 @@ import { Navbar } from '@/components/component/navbar'
 import { Toaster } from 'sonner'
 import { usePathname } from 'next/navigation'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { DayPicker } from 'react-day-picker';
 
 const inter = Inter({ subsets: ["latin"] })
 const queryClient = new QueryClient()
