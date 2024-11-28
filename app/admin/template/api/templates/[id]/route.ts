@@ -119,14 +119,11 @@ const templates: Templates = {
   },
 }
 
-export type Params = { id: string }
-
-
 export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: { id: string } }
 ) {
-  const { id } = params;
+  const { id } = context.params;
   const template = templates[id];
 
   if (!template) {
