@@ -123,7 +123,29 @@ export function PettyCashManager() {
               Manage your company's petty cash, branches, users, accounts, and transactions.
             </CardDescription>
           </CardHeader>
-          <SettingsDialog />
+          {/* <SettingsDialog /> */}
+          <SettingsDialog 
+        processedSections={[]}
+        helperColumnConfigs={{
+          calculation: {},
+          reference: {}
+        }}
+        visibility={{
+          sections: {},
+          categories: {},
+          subcategories: {}
+        }}
+        helperColumns={{
+          calculation: {},
+          reference: {}
+        }}
+        onHelperColumnChange={() => {}}
+        mainTabs={[]}
+        mainSections={{}}
+        mainSubsections={{}}
+        onStructureChange={() => {}}
+        onVisibilityChange={() => {}}
+      />
         </Card>
 
 
