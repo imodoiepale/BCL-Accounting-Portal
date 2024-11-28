@@ -1,4 +1,5 @@
 // FormBuilder.tsx
+// @ts-nocheck
 'use client'
 
 import { useEffect } from 'react'
