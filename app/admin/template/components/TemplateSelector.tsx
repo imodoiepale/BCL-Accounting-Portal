@@ -15,15 +15,15 @@ export default function TemplateSelector() {
   const { setSelectedTemplate } = useTemplateStore()
   const [localSelectedTemplate, setLocalSelectedTemplate] = useState('')
 
-  const handleTemplateChange = async (value: string) => {
-    setLocalSelectedTemplate(value)
+  // const handleTemplateChange = async (value: string) => {
+  //   setLocalSelectedTemplate(value)
 
-    const response = await fetch(`/admin/template/api/templates/${value}`)
-    if (response.ok) {
-      const templateData = await response.json()
-      setSelectedTemplate(templateData)
-    }
-  }
+  //   const response = await fetch(`/admin/template/api/templates/${value}`)
+  //   if (response.ok) {
+  //     const templateData = await response.json()
+  //     setSelectedTemplate(templateData)
+  //   }
+  // }
 
   return (
     <div className="mb-6">
