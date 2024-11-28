@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from '@/lib/supabaseClient';
 import { Input } from "@/components/ui/input";
-import { Eye, DownloadIcon, UploadIcon } from 'lucide-react';
+import { Eye, DownloadIcon, UploadIcon, Search, ArrowUpDown } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import toast, { Toaster } from 'react-hot-toast';
 import { DocumentActions } from './DocumentComponents';
@@ -48,7 +48,14 @@ interface ExtractedData {
   [key: string]: any;
 }
 
+interface AdvancedSearchFields {
+  company_name?: string;
+  director_name?: string;
+  status?: 'missing' | 'completed' | '';
+}
+
 export default function DirectorsKycDocumentDetails() {
+  // Basic state
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
@@ -60,8 +67,16 @@ export default function DirectorsKycDocumentDetails() {
   const [showExtractModal, setShowExtractModal] = useState(false);
   const [selectedExtractDocument, setSelectedExtractDocument] = useState<Document | null>(null);
   const [selectedExtractUpload, setSelectedExtractUpload] = useState<Upload | null>(null);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'company_name', direction: 'asc' });
   const [isLoading, setIsLoading] = useState(false);
+
+  // Advanced search state
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [advancedSearchFields, setAdvancedSearchFields] = useState<AdvancedSearchFields>({
+    company_name: '',
+    director_name: '',
+    status: ''
+  });
 
   const queryClient = useQueryClient();
   const parentRef = useRef<HTMLDivElement>(null);
@@ -135,243 +150,173 @@ export default function DirectorsKycDocumentDetails() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Query for documents
+  // Query for documents and uploads
   const { data: documents = [], isLoading: isLoadingDocuments } = useQuery({
     queryKey: ['documents'],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('acc_portal_kyc')
-          .select('*')
-          .eq('category', 'directors-docs');
-
-        if (error) throw error;
-        return data || [];
-      } catch (error) {
-        console.error('Error fetching documents:', error);
-        toast.error('Failed to load documents');
-        return [];
-      }
-    },
-    staleTime: 1000 * 60 * 5,
+      const { data, error } = await supabase
+        .from('acc_portal_kyc')
+        .select('*')
+        .eq('category', 'directors-docs');
+      if (error) throw error;
+      return data || [];
+    }
   });
 
-  // Query for uploads
   const { data: uploads = [], isLoading: isLoadingUploads } = useQuery({
     queryKey: ['uploads'],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('acc_portal_directors_documents')
-          .select('*');
-
-        if (error) throw error;
-        return data || [];
-      } catch (error) {
-        console.error('Error fetching uploads:', error);
-        toast.error('Failed to load uploads');
-        return [];
-      }
-    },
-    staleTime: 1000 * 60 * 5,
+      const { data, error } = await supabase
+        .from('acc_portal_directors_documents')
+        .select('*');
+      if (error) throw error;
+      return data || [];
+    }
   });
 
-  // Update fields mutation
+  // Status counting function
+  const getStatusCounts = () => {
+    let missing = 0;
+    let completed = 0;
+
+    Object.values(directorsByCompany).flat().forEach(director => {
+      const hasUpload = uploads.some(u =>
+        u.kyc_document_id === selectedDocument?.id &&
+        u.userid === director.id.toString()
+      );
+      
+      if (hasUpload) {
+        completed++;
+      } else {
+        missing++;
+      }
+    });
+
+    return { missing, completed };
+  };
+
+  // Enhanced filter function
+  const filterCompanies = (companies: any[]) => {
+    return companies.filter(company => {
+      const companyDirectors = directorsByCompany[company.id] || [];
+      const hasMatchingDirector = companyDirectors.some(director => {
+        const directorName = `${director.first_name || ''} ${director.last_name || ''}`.toLowerCase();
+        return directorName.includes((advancedSearchFields.director_name || '').toLowerCase());
+      });
+
+      // Status filtering
+      let matchesStatus = true;
+      if (advancedSearchFields.status) {
+        const directorStatuses = companyDirectors.map(director => {
+          const hasUpload = uploads.some(u =>
+            u.kyc_document_id === selectedDocument?.id &&
+            u.userid === director.id.toString()
+          );
+          return hasUpload ? 'completed' : 'missing';
+        });
+
+        matchesStatus = directorStatuses.includes(advancedSearchFields.status);
+      }
+
+      return (
+        company.company_name.toLowerCase().includes((advancedSearchFields.company_name || '').toLowerCase()) &&
+        hasMatchingDirector &&
+        matchesStatus
+      );
+    });
+  };
+
+  // Sort function
+  const sortCompanies = (companies: any[]) => {
+    return [...companies].sort((a, b) => {
+      const aValue = a[sortConfig.key]?.toString().toLowerCase() || '';
+      const bValue = b[sortConfig.key]?.toString().toLowerCase() || '';
+      
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  // Mutations
   const updateFieldsMutation = useMutation({
     mutationFn: async ({ documentId, fields }) => {
-      if (!documentId) throw new Error('Document ID is required');
-
       const { error } = await supabase
         .from('acc_portal_kyc')
         .update({ fields })
         .eq('id', documentId);
-
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['documents']);
       toast.success('Fields updated successfully');
-    },
-    onError: (error) => {
-      console.error('Error updating fields:', error);
-      toast.error('Failed to update fields');
     }
   });
 
-  // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async ({ directorId, documentId, file, extractOnUpload, onProgress }) => {
-      if (!directorId || !documentId) {
-        throw new Error('Missing required parameters');
-      }
-
+      setIsLoading(true);
       try {
-        setIsLoading(true);
-        onProgress?.('Uploading file...');
-
         const timestamp = new Date().getTime();
         const fileName = `directors/${directorId}/${documentId}/${timestamp}_${file.name}`;
-
-        const { data: fileData, error: fileError } = await supabase
-          .storage
+        
+        onProgress?.('Uploading file...');
+        
+        const { data: fileData, error: uploadError } = await supabase.storage
           .from('kyc-documents')
           .upload(fileName, file);
-
-        if (fileError) throw fileError;
+        
+        if (uploadError) throw uploadError;
 
         const uploadData = {
           userid: directorId.toString(),
           kyc_document_id: documentId,
           filepath: fileData.path,
-          issue_date: new Date().toISOString(),
+          issue_date: new Date().toISOString()
         };
 
-        const { data: uploadResult, error } = await supabase
+        const { data: uploadResult, error: insertError } = await supabase
           .from('acc_portal_directors_documents')
           .insert(uploadData)
           .select()
           .single();
 
-        if (error) throw error;
+        if (insertError) throw insertError;
 
         if (extractOnUpload) {
-          const selectedDoc = documents.find(d => d.id === documentId);
-          if (!selectedDoc) {
-            throw new Error('Document not found');
-          }
-          setSelectedExtractDocument(selectedDoc);
+          setSelectedExtractDocument(documents.find(d => d.id === documentId) || null);
           setSelectedExtractUpload(uploadResult);
           setShowExtractModal(true);
         }
 
         return uploadResult;
-      } catch (error) {
-        console.error('Upload error:', error);
-        throw error;
       } finally {
         setIsLoading(false);
       }
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries(['uploads']);
-      if (!data.extracted_details) {
-        setShowUploadModal(false);
-        toast.success('Document uploaded successfully');
-      }
+      setShowUploadModal(false);
+      toast.success('Document uploaded successfully');
     },
     onError: (error) => {
-      toast.error('Failed to upload document');
+      toast.error('Upload failed');
       console.error('Upload error:', error);
     }
   });
-
-  // Handlers
-  const handleCancelExtraction = () => {
-    setShowExtractModal(false);
-    setSelectedExtractDocument(null);
-    setSelectedExtractUpload(null);
-  };
-
-  const handleExtractComplete = async (extractedData: ExtractedData) => {
-    try {
-      if (!selectedExtractUpload?.id) {
-        throw new Error('No upload selected');
-      }
-
-      const { error } = await supabase
-        .from('acc_portal_directors_documents')
-        .update({ extracted_details: extractedData })
-        .eq('id', selectedExtractUpload.id);
-
-      if (error) throw error;
-
-      queryClient.invalidateQueries(['uploads']);
-      setShowExtractModal(false);
-      toast.success('Details extracted successfully');
-    } catch (error) {
-      console.error('Extraction error:', error);
-      toast.error('Failed to save extracted details');
-    }
-  };
-
-  const handleUploadClick = (director: Director, documentId: string) => {
-    if (!director || !documentId) {
-      toast.error('Invalid upload parameters');
-      return;
-    }
-    setSelectedDirectorUpload(director);
-    setSelectedDocument(documents.find(d => d.id === documentId) || null);
-    setShowUploadModal(true);
-  };
-
-  const handleViewDocument = async (document: Document, director: Director) => {
-    try {
-      const upload = uploads.find(u =>
-        u.kyc_document_id === document.id &&
-        u.userid === director.id.toString()
-      );
-
-      if (!upload) {
-        toast.error('Document not found');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .storage
-        .from('kyc-documents')
-        .createSignedUrl(upload.filepath, 60);
-
-      if (error) throw error;
-
-      setViewUrl(data.signedUrl);
-      setShowViewModal(true);
-    } catch (error) {
-      console.error('Error viewing document:', error);
-      toast.error('Failed to view document');
-    }
-  };
-
-  const handleExtractClick = (document: Document, upload: Upload) => {
-    if (!document || !upload) {
-      toast.error('Invalid extraction parameters');
-      return;
-    }
-    setSelectedExtractDocument(document);
-    setSelectedExtractUpload(upload);
-    setShowExtractModal(true);
-  };
-
-  const handleSort = (key: string) => {
-    const direction = sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc';
-    setSortConfig({ key, direction });
-  };
-
-  // Sorting companies
-  const sortedCompanies = React.useMemo(() => {
-    if (!sortConfig.key) return companies;
-
-    return [...companies].sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) {
-        return sortConfig.direction === 'asc' ? -1 : 1;
-      }
-      if (a[sortConfig.key] > b[sortConfig.key]) {
-        return sortConfig.direction === 'asc' ? 1 : -1;
-      }
-      return 0;
-    });
-  }, [companies, sortConfig]);
 
   // Loading state
   if (isLoadingDirectors || isLoadingCompanies || isLoadingDocuments || isLoadingUploads) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2">Loading...</p>
-        </div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <span className="ml-2">Loading...</span>
       </div>
     );
   }
+
+  const filteredAndSortedCompanies = sortCompanies(filterCompanies(companies));
+  const statusCounts = getStatusCounts();
 
   return (
     <div className="flex overflow-hidden">
@@ -395,10 +340,11 @@ export default function DirectorsKycDocumentDetails() {
             {documents.map((doc) => (
               <li
                 key={doc.id}
-                className={`px-2 py-1 rounded flex items-center justify-between text-xs ${selectedDocument?.id === doc.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-gray-100'
-                  }`}
+                className={`px-2 py-1 rounded flex items-center justify-between text-xs ${
+                  selectedDocument?.id === doc.id
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-gray-100'
+                }`}
               >
                 <span
                   className="cursor-pointer flex-1"
@@ -426,9 +372,75 @@ export default function DirectorsKycDocumentDetails() {
       <div className="flex-1 flex flex-col h-[800px] overflow-hidden">
         {selectedDocument ? (
           <div className="flex flex-col h-full">
-            <h2 className="text-sm font-bold p-2 border-b">
-              {selectedDocument.name} - Details
-            </h2>
+            <div className="p-2 border-b space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold">
+                  {selectedDocument.name} - Details
+                </h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                  className="text-xs"
+                >
+                  <Search className="h-3 w-3 mr-1" />
+                  {showAdvancedSearch ? 'Hide Search' : 'Advanced Search'}
+                </Button>
+              </div>
+
+              {showAdvancedSearch && (
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder="Company Name..."
+                    className="text-xs"
+                    value={advancedSearchFields.company_name}
+                    onChange={(e) => setAdvancedSearchFields(prev => ({
+                      ...prev,
+                      company_name: e.target.value
+                    }))}
+                  />
+                  <Input
+                    type="text"
+                    placeholder="Director Name..."
+                    className="text-xs"
+                    value={advancedSearchFields.director_name}
+                    onChange={(e) => setAdvancedSearchFields(prev => ({
+                      ...prev,
+                      director_name: e.target.value
+                    }))}
+                  />
+                  <select
+                    className="text-xs border rounded px-2"
+                    value={advancedSearchFields.status}
+                    onChange={(e) => setAdvancedSearchFields(prev => ({
+                      ...prev,
+                      status: e.target.value as 'missing' | 'completed' | ''
+                    }))}
+                  >
+                    <option value="">All Status</option>
+                    <option value="missing">Missing</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Status Count Row - continued */}
+              <div className="flex gap-4 text-xs">
+                <div className="flex items-center gap-2 bg-red-50 px-3 py-1 rounded">
+                  <span className="font-medium">Missing Directors Documents:</span>
+                  <span className="text-red-500 font-bold">{statusCounts.missing}</span>
+                </div>
+                <div className="flex items-center gap-2 bg-green-50 px-3 py-1 rounded">
+                  <span className="font-medium">Uploaded Directors Documents:</span>
+                  <span className="text-green-500 font-bold">{statusCounts.completed}</span>
+                </div>
+                <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded">
+                  <span className="font-medium">Total Directors Documents:</span>
+                  <span className="text-blue-500 font-bold">{statusCounts.missing + statusCounts.completed}</span>
+                </div>
+              </div>
+            </div>
 
             <div className="overflow-auto flex-1">
               <Card>
@@ -438,14 +450,17 @@ export default function DirectorsKycDocumentDetails() {
                       <TableHead className="sticky top-0 left-0 bg-blue-50 z-10 border-r border-gray-300 w-[50px]">#</TableHead>
                       <TableHead
                         className="sticky top-0 left-0 bg-blue-50 z-10 cursor-pointer border-r border-gray-300"
-                        onClick={() => handleSort('company_name')}
+                        onClick={() => setSortConfig({
+                          key: 'company_name',
+                          direction: sortConfig.key === 'company_name' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                        })}
                       >
-                        Company
-                        {sortConfig.key === 'company_name' && (
-                          <span className="ml-1">
-                            {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                          </span>
-                        )}
+                        <div className="flex items-center">
+                          Company
+                          <ArrowUpDown className={`ml-1 h-3 w-3 transition-transform ${
+                            sortConfig.key === 'company_name' && sortConfig.direction === 'desc' ? 'rotate-180' : ''
+                          }`} />
+                        </div>
                       </TableHead>
                       <TableHead className="sticky top-0 bg-blue-50 z-10 border-r border-gray-300">Directors</TableHead>
                       <TableHead className="sticky top-0 bg-blue-50 z-10 border-r border-gray-300 text-center w-[100px]">
@@ -462,114 +477,108 @@ export default function DirectorsKycDocumentDetails() {
                     </TableRow>
                   </TableHeader>
                   <TableBody className="text-[11px]">
-                    {sortedCompanies.map((company, index) => {
+                    {filteredAndSortedCompanies.map((company, index) => {
                       const companyDirectors = directorsByCompany[company.id] || [];
+                      return companyDirectors.map((director, directorIndex) => {
+                        const hasUpload = uploads.some(u =>
+                          u.kyc_document_id === selectedDocument?.id &&
+                          u.userid === director.id.toString()
+                        );
 
-                      return companyDirectors.map((director, directorIndex) => (
-                        <TableRow
-                          key={`${company.id}-${director.id}`}
-                          className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-300`}
-                        >
-                          {/* Render row number and company name only for first director */}
-                          {directorIndex === 0 && (
-                            <>
-                              <TableCell
-                                className="font-medium sticky left-0 bg-inherit border-r border-gray-300 text-center"
-                                rowSpan={companyDirectors.length}
-                              >
-                                {index + 1}
-                              </TableCell>
-                              <TableCell
-                                className="font-medium sticky left-0 bg-inherit border-r border-gray-300"
-                                rowSpan={companyDirectors.length}
-                              >
-                                {company.company_name}
-                              </TableCell>
-                            </>
-                          )}
-
-                          {/* Director Cell */}
-                          <TableCell className="border-r border-gray-300 text-center">
-                            <div className="flex items-center justify-between p-1">
-                              <span className="text-left">
-                                {director.full_name || `${director.first_name || ''} ${director.last_name || ''}`}
-                              </span>
-                            </div>
-                          </TableCell>
-
-                          {/* Actions Cell */}
-                          <TableCell className="border-r border-gray-300 text-center">
-                            <div className="flex justify-center space-x-1 text-[10px]">
-                              {uploads.some(u =>
-                                u.kyc_document_id === selectedDocument?.id &&
-                                u.userid === director.id.toString()
-                              ) ? (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => handleViewDocument(selectedDocument, director)}
-                                    title="View Document"
-                                    disabled={isLoading}
-                                  >
-                                    <Eye className="h-3 w-3 text-blue-500" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() =>
-                                      handleExtractClick(
-                                        selectedDocument,
-                                        uploads.find(
-                                          u =>
-                                            u.kyc_document_id === selectedDocument.id &&
-                                            u.userid === director.id.toString()
-                                        )!
-                                      )
-                                    }
-                                    title="Extract Details"
-                                    disabled={isLoading}
-                                  >
-                                    <DownloadIcon className="h-3 w-3 text-green-500" />
-                                  </Button>
-                                </>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => handleUploadClick(director, selectedDocument?.id)}
-                                  title="Upload Document"
-                                  disabled={isLoading}
+                        return (
+                          <TableRow
+                            key={`${company.id}-${director.id}`}
+                            className={`${
+                              index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                            } border-b border-gray-300 ${
+                              hasUpload ? 'bg-green-50/30' : 'bg-red-50/20'
+                            }`}
+                          >
+                            {directorIndex === 0 && (
+                              <>
+                                <TableCell
+                                  className="font-medium sticky left-0 bg-inherit border-r border-gray-300 text-center"
+                                  rowSpan={companyDirectors.length}
                                 >
-                                  <UploadIcon className="h-3 w-3 text-orange-500" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-
-                          {/* Extracted Details Cells */}
-                          {selectedDocument.fields?.map((field) => (
-                            <TableCell
-                              key={field.id}
-                              className="text-center border-l border-gray-300"
-                            >
-                              {(() => {
-                                const upload = uploads.find(
-                                  u =>
-                                    u.kyc_document_id === selectedDocument.id &&
-                                    u.userid === director.id.toString()
-                                );
-                                return (
-                                  <span>{upload?.extracted_details?.[field.name] || '-'}</span>
-                                );
-                              })()}
+                                  {index + 1}
+                                </TableCell>
+                                <TableCell
+                                  className="font-medium sticky left-0 bg-inherit border-r border-gray-300"
+                                  rowSpan={companyDirectors.length}
+                                >
+                                  {company.company_name}
+                                </TableCell>
+                              </>
+                            )}
+                            
+                            <TableCell className="border-r border-gray-300">
+                              {director.full_name || `${director.first_name || ''} ${director.last_name || ''}`}
                             </TableCell>
-                          ))}
-                        </TableRow>
-                      ));
+
+                            <TableCell className="border-r border-gray-300 text-center">
+                              <div className="flex justify-center space-x-1">
+                                {hasUpload ? (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={() => handleViewDocument(selectedDocument, director)}
+                                      disabled={isLoading}
+                                    >
+                                      <Eye className="h-3 w-3 text-blue-500" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={() => {
+                                        const upload = uploads.find(u =>
+                                          u.kyc_document_id === selectedDocument.id &&
+                                          u.userid === director.id.toString()
+                                        );
+                                        if (upload) {
+                                          handleExtractClick(selectedDocument, upload);
+                                        }
+                                      }}
+                                      disabled={isLoading}
+                                    >
+                                      <DownloadIcon className="h-3 w-3 text-green-500" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => handleUploadClick(director, selectedDocument?.id)}
+                                    disabled={isLoading}
+                                  >
+                                    <UploadIcon className="h-3 w-3 text-orange-500" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+
+                            {selectedDocument.fields?.map((field) => {
+                              const upload = uploads.find(u =>
+                                u.kyc_document_id === selectedDocument.id &&
+                                u.userid === director.id.toString()
+                              );
+                              return (
+                                <TableCell
+                                  key={field.id}
+                                  className="text-center border-l border-gray-300"
+                                >
+                                  <span className="truncate">
+                                    {upload?.extracted_details?.[field.name] || '-'}
+                                  </span>
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        );
+                      });
                     })}
                   </TableBody>
                 </Table>
@@ -606,7 +615,6 @@ export default function DirectorsKycDocumentDetails() {
         />
       )}
 
-
       {showViewModal && viewUrl && (
         <ViewModal
           url={viewUrl}
@@ -634,7 +642,11 @@ export default function DirectorsKycDocumentDetails() {
       {showExtractModal && selectedExtractDocument && selectedExtractUpload && (
         <ExtractDetailsModal
           isOpen={showExtractModal}
-          onClose={handleCancelExtraction}
+          onClose={() => {
+            setShowExtractModal(false);
+            setSelectedExtractDocument(null);
+            setSelectedExtractUpload(null);
+          }}
           document={selectedExtractDocument}
           upload={selectedExtractUpload}
           onSubmit={handleExtractComplete}
