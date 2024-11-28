@@ -12,6 +12,9 @@ import { Card } from '@/components/ui/card';
 import toast, { Toaster } from 'react-hot-toast';
 import { DocumentActions } from './DocumentComponents';
 import { UploadModal, ViewModal, AddFieldsDialog, ExtractDetailsModal } from './DocumentModals';
+import { Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
+
 
 interface Director {
   id: bigint;
@@ -47,7 +50,10 @@ interface Document {
 interface ExtractedData {
   [key: string]: any;
 }
-
+interface SortConfig {
+  key: string;
+  direction: 'asc' | 'desc';
+}
 interface AdvancedSearchFields {
   company_name?: string;
   director_name?: string;
@@ -184,7 +190,7 @@ export default function DirectorsKycDocumentDetails() {
         u.kyc_document_id === selectedDocument?.id &&
         u.userid === director.id.toString()
       );
-      
+
       if (hasUpload) {
         completed++;
       } else {
@@ -193,6 +199,57 @@ export default function DirectorsKycDocumentDetails() {
     });
 
     return { missing, completed };
+  };
+
+
+  const handleExportToExcel = () => {
+    if (!selectedDocument || !filteredAndSortedCompanies.length) {
+      toast.error('No data to export');
+      return;
+    }
+
+    try {
+      // Prepare data for export
+      const exportData = filteredAndSortedCompanies.flatMap(company => {
+        const companyDirectors = directorsByCompany[company.id] || [];
+        return companyDirectors.map(director => {
+          const upload = uploads.find(u =>
+            u.kyc_document_id === selectedDocument.id &&
+            u.userid === director.id.toString()
+          );
+
+          // Base data
+          const rowData: any = {
+            'Company Name': company.company_name,
+            'Director Name': director.full_name || `${director.first_name || ''} ${director.last_name || ''}`,
+            'Status': upload ? 'Completed' : 'Missing'
+          };
+
+          // Add extracted fields
+          selectedDocument.fields?.forEach(field => {
+            rowData[field.name] = upload?.extracted_details?.[field.name] || '-';
+          });
+
+          return rowData;
+        });
+      });
+
+      // Create worksheet
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'KYC Documents');
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `kyc_documents_${selectedDocument.name}_${timestamp}.xlsx`;
+
+      // Save file
+      XLSX.writeFile(wb, filename);
+      toast.success('Export completed successfully');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export data');
+    }
   };
 
   // Enhanced filter function
@@ -231,7 +288,7 @@ export default function DirectorsKycDocumentDetails() {
     return [...companies].sort((a, b) => {
       const aValue = a[sortConfig.key]?.toString().toLowerCase() || '';
       const bValue = b[sortConfig.key]?.toString().toLowerCase() || '';
-      
+
       if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
       if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
@@ -259,13 +316,13 @@ export default function DirectorsKycDocumentDetails() {
       try {
         const timestamp = new Date().getTime();
         const fileName = `directors/${directorId}/${documentId}/${timestamp}_${file.name}`;
-        
+
         onProgress?.('Uploading file...');
-        
+
         const { data: fileData, error: uploadError } = await supabase.storage
           .from('kyc-documents')
           .upload(fileName, file);
-        
+
         if (uploadError) throw uploadError;
 
         const uploadData = {
@@ -319,6 +376,47 @@ export default function DirectorsKycDocumentDetails() {
   const statusCounts = getStatusCounts();
 
 
+  const handleSort = (key: string) => {
+    setSortConfig({
+      key,
+      direction: sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+    });
+  };
+
+  const sortDirectors = (directors: Director[]) => {
+    if (sortConfig.key !== 'director_name') return directors;
+
+    return [...directors].sort((a, b) => {
+      const aName = a.full_name || `${a.first_name || ''} ${a.last_name || ''}`;
+      const bName = b.full_name || `${b.first_name || ''} ${b.last_name || ''}`;
+
+      return sortConfig.direction === 'asc'
+        ? aName.localeCompare(bName)
+        : bName.localeCompare(aName);
+    });
+  };
+
+  const sortByStatus = (directors: Director[]) => {
+    if (sortConfig.key !== 'status') return directors;
+
+    return [...directors].sort((a, b) => {
+      const aHasUpload = uploads.some(u =>
+        u.kyc_document_id === selectedDocument?.id &&
+        u.userid === a.id.toString()
+      );
+      const bHasUpload = uploads.some(u =>
+        u.kyc_document_id === selectedDocument?.id &&
+        u.userid === b.id.toString()
+      );
+
+      if (aHasUpload === bHasUpload) return 0;
+      if (sortConfig.direction === 'asc') {
+        return aHasUpload ? 1 : -1;
+      }
+      return aHasUpload ? -1 : 1;
+    });
+  };
+
 
   const handleViewDocument = async (document: Document, director: Director) => {
     try {
@@ -326,19 +424,19 @@ export default function DirectorsKycDocumentDetails() {
         u.kyc_document_id === document.id &&
         u.userid === director.id.toString()
       );
-  
+
       if (!upload) {
         toast.error('Document not found');
         return;
       }
-  
+
       const { data, error } = await supabase
         .storage
         .from('kyc-documents')
         .createSignedUrl(upload.filepath, 60);
-  
+
       if (error) throw error;
-  
+
       setViewUrl(data.signedUrl);
       setShowViewModal(true);
     } catch (error) {
@@ -346,7 +444,7 @@ export default function DirectorsKycDocumentDetails() {
       toast.error('Failed to view document');
     }
   };
-  
+
   // Handle upload button click
   const handleUploadClick = (director: Director, documentId: string) => {
     if (!director || !documentId) {
@@ -357,7 +455,7 @@ export default function DirectorsKycDocumentDetails() {
     setSelectedDocument(documents.find(d => d.id === documentId) || null);
     setShowUploadModal(true);
   };
-  
+
   // Handle extraction button click
   const handleExtractClick = (document: Document, upload: Upload) => {
     if (!document || !upload) {
@@ -368,21 +466,21 @@ export default function DirectorsKycDocumentDetails() {
     setSelectedExtractUpload(upload);
     setShowExtractModal(true);
   };
-  
+
   // Handle extraction completion
   const handleExtractComplete = async (extractedData: ExtractedData) => {
     try {
       if (!selectedExtractUpload?.id) {
         throw new Error('No upload selected');
       }
-  
+
       const { error } = await supabase
         .from('acc_portal_directors_documents')
         .update({ extracted_details: extractedData })
         .eq('id', selectedExtractUpload.id);
-  
+
       if (error) throw error;
-  
+
       queryClient.invalidateQueries(['uploads']);
       setShowExtractModal(false);
       setSelectedExtractDocument(null);
@@ -393,7 +491,7 @@ export default function DirectorsKycDocumentDetails() {
       toast.error('Failed to save extracted details');
     }
   };
-  
+
   return (
     <div className="flex overflow-hidden">
       <Toaster position="top-right" />
@@ -416,11 +514,10 @@ export default function DirectorsKycDocumentDetails() {
             {documents.map((doc) => (
               <li
                 key={doc.id}
-                className={`px-2 py-1 rounded flex items-center justify-between text-xs ${
-                  selectedDocument?.id === doc.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'hover:bg-gray-100'
-                }`}
+                className={`px-2 py-1 rounded flex items-center justify-between text-xs ${selectedDocument?.id === doc.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-gray-100'
+                  }`}
               >
                 <span
                   className="cursor-pointer flex-1"
@@ -453,15 +550,27 @@ export default function DirectorsKycDocumentDetails() {
                 <h2 className="text-sm font-bold">
                   {selectedDocument.name} - Details
                 </h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                  className="text-xs"
-                >
-                  <Search className="h-3 w-3 mr-1" />
-                  {showAdvancedSearch ? 'Hide Search' : 'Advanced Search'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportToExcel}
+                    className="text-xs"
+                    disabled={!selectedDocument || filteredAndSortedCompanies.length === 0}
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Export to Excel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                    className="text-xs"
+                  >
+                    <Search className="h-3 w-3 mr-1" />
+                    {showAdvancedSearch ? 'Hide Search' : 'Advanced Search'}
+                  </Button>
+                </div>
               </div>
 
               {showAdvancedSearch && (
@@ -526,16 +635,32 @@ export default function DirectorsKycDocumentDetails() {
                       <TableHead className="sticky top-0 left-0 bg-blue-50 z-10 border-r border-gray-300 w-[50px]">#</TableHead>
                       <TableHead
                         className="sticky top-0 left-0 bg-blue-50 z-10 cursor-pointer border-r border-gray-300"
-                        onClick={() => setSortConfig({
-                          key: 'company_name',
-                          direction: sortConfig.key === 'company_name' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                        })}
+                        onClick={() => handleSort('company_name')}
                       >
                         <div className="flex items-center">
                           Company
-                          <ArrowUpDown className={`ml-1 h-3 w-3 transition-transform ${
-                            sortConfig.key === 'company_name' && sortConfig.direction === 'desc' ? 'rotate-180' : ''
-                          }`} />
+                          <ArrowUpDown className={`ml-1 h-3 w-3 transition-transform ${sortConfig.key === 'company_name' && sortConfig.direction === 'desc' ? 'rotate-180' : ''
+                            }`} />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="sticky top-0 bg-blue-50 z-10 border-r border-gray-300 cursor-pointer"
+                        onClick={() => handleSort('director_name')}
+                      >
+                        <div className="flex items-center">
+                          Directors
+                          <ArrowUpDown className={`ml-1 h-3 w-3 transition-transform ${sortConfig.key === 'director_name' && sortConfig.direction === 'desc' ? 'rotate-180' : ''
+                            }`} />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="sticky top-0 bg-blue-50 z-10 border-r border-gray-300 text-center w-[100px] cursor-pointer"
+                        onClick={() => handleSort('status')}
+                      >
+                        <div className="flex items-center justify-center">
+                          Actions
+                          <ArrowUpDown className={`ml-1 h-3 w-3 transition-transform ${sortConfig.key === 'status' && sortConfig.direction === 'desc' ? 'rotate-180' : ''
+                            }`} />
                         </div>
                       </TableHead>
                       <TableHead className="sticky top-0 bg-blue-50 z-10 border-r border-gray-300">Directors</TableHead>
@@ -554,8 +679,9 @@ export default function DirectorsKycDocumentDetails() {
                   </TableHeader>
                   <TableBody className="text-[11px]">
                     {filteredAndSortedCompanies.map((company, index) => {
-                      const companyDirectors = directorsByCompany[company.id] || [];
+                      const companyDirectors = sortByStatus(sortDirectors(directorsByCompany[company.id] || []));
                       return companyDirectors.map((director, directorIndex) => {
+
                         const hasUpload = uploads.some(u =>
                           u.kyc_document_id === selectedDocument?.id &&
                           u.userid === director.id.toString()
@@ -564,11 +690,9 @@ export default function DirectorsKycDocumentDetails() {
                         return (
                           <TableRow
                             key={`${company.id}-${director.id}`}
-                            className={`${
-                              index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                            } border-b border-gray-300 ${
-                              hasUpload ? 'bg-green-50/30' : 'bg-red-50/20'
-                            }`}
+                            className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                              } border-b border-gray-300 ${hasUpload ? 'bg-green-50/30' : 'bg-red-50/20'
+                              }`}
                           >
                             {directorIndex === 0 && (
                               <>
@@ -586,7 +710,7 @@ export default function DirectorsKycDocumentDetails() {
                                 </TableCell>
                               </>
                             )}
-                            
+
                             <TableCell className="border-r border-gray-300">
                               {director.full_name || `${director.first_name || ''} ${director.last_name || ''}`}
                             </TableCell>
