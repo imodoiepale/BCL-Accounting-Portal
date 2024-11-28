@@ -558,7 +558,7 @@ export default function DirectorsKycDocumentDetails() {
                     className="text-xs"
                     disabled={!selectedDocument || filteredAndSortedCompanies.length === 0}
                   >
-                    <Download className="h-3 w-3 mr-1" />
+                    <Download className="h-3 w-3 mr-1 text-green-600" />
                     Export to Excel
                   </Button>
                   <Button
