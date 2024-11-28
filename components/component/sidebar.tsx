@@ -30,7 +30,7 @@ const adminNavItems = [
   {
     href: "/admin/documents",
     icon: FileIcon,
-    label: "Document Management",
+    label: "KYC Document Management",
     children: [
       { href: "/admin/documents/company-kyc", icon: FileIcon, label: "Company KYC Documents" },
       { href: "/admin/documents/directors_docs", icon: FileIcon, label: "Director KYC Documents" },
