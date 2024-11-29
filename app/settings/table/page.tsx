@@ -1,118 +1,89 @@
 // @ts-nocheck
+
 "use client";
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash, Settings, Edit2, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Trash, Settings, Edit2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+// Define types for the component
+interface ProcessedSection {
+    name: string;
+    label: string;
+    isSeparator?: boolean;
+    categorizedFields?: Array<{
+        category: string;
+        isSeparator?: boolean;
+        fields: Array<{
+            name: string;
+            label: string;
+            type?: string;
+        }>;
+    }>;
+}
+
+interface HelperColumnConfig {
+    label: string;
+    description: string;
+    bgColor?: string;
+}
+
+interface HelperColumnConfigs {
+    calculation: Record<string, HelperColumnConfig>;
+    reference: Record<string, HelperColumnConfig>;
+}
+
+interface VisibilitySettings {
+    sections: Record<string, boolean>;
+    categories: Record<string, boolean>;
+    subcategories: Record<string, boolean>;
+}
+
+interface HelperColumns {
+    calculation: Record<string, boolean>;
+    reference: Record<string, boolean>;
+}
 
 interface SettingsDialogProps {
-    processedSections: any[]; // Replace 'any' with proper type
-    helperColumnConfigs: {
-        calculation: Record<string, any>;
-        reference: Record<string, any>;
-    };
-    visibility: {
-        sections: Record<string, boolean>;
-        categories: Record<string, boolean>;
-        subcategories: Record<string, boolean>;
-    };
-    helperColumns: {
-        calculation: Record<string, boolean>;
-        reference: Record<string, boolean>;
-    };
+    processedSections: ProcessedSection[];
+    helperColumnConfigs: HelperColumnConfigs;
+    visibility: VisibilitySettings;
+    helperColumns: HelperColumns;
     onHelperColumnChange: (type: string, id: string) => void;
-    mainTabs: string[];
-    mainSections: any;
-    mainSubsections: any;
+    mainTabs?: string[];
+    mainSections?: Record<string, any>;
+    mainSubsections?: Record<string, any>;
     onStructureChange: () => void;
     onVisibilityChange: (type: string, id: string, value: boolean) => void;
 }
 
-
-interface StructureItem {
-    id: number;
-    section: string;
-    subsection: string;
-    table_name: string;
-    column_mappings: Record<string, string>;
-    column_order: Record<string, number>;
-    Tabs: string;
-    table_names: Record<string, string[]>;
-}
-
-
-interface Tab {
-    name: string;
-    sections: Section[];
-}
-
-interface Section {
-    name: string;
-    subsections: Subsection[];
-}
-
-interface Subsection {
-    name: string;
-    tables: string[];
-}
-
-// Add these helper functions
-const toColumnName = (displayName: string) => {
-    return displayName
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '') // Remove special characters
-        .replace(/\s+/g, '_') // Replace spaces with underscores
-        .trim();
-};
-
-// Add this interface
-interface TableColumn {
-    column_name: string;
-    data_type: string;
-}
-interface NewStructure {
-    section: string;
-    subsection: string;
-    table_name: string;
-    Tabs: string;
-    column_mappings: Record<string, string>;
-    isNewTab: boolean;
-    isNewSection: boolean;
-    isNewSubsection: boolean;
-    table_names: string[];
-}
-
-interface SectionFields {
-    [section: string]: {
-        fields: string[];
-        subsections: {
-            [subsection: string]: string[];
-        };
-    };
-}
-
-
-// Helper function to parse JSON safely
-const safeJSONParse = (jsonString: string, fallback: any = {}) => {
+// Helper functions
+const safeJSONParse = (jsonString: string | Record<string, any>, fallback: any = {}) => {
     try {
         return typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
     } catch (error) {
         return fallback;
     }
+};
+
+const toColumnName = (displayName: string): string => {
+    return displayName
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, '_')
+        .trim();
 };
 
 // Helper function to process sections and subsections
@@ -181,8 +152,8 @@ const processStructureData = (data: any[]) => {
 };
 
 
-export default function SettingsDialog({
-    processedSections = [], // Provide default empty array
+const SettingsDialog: React.FC<SettingsDialogProps> = ({
+    processedSections = [],
     helperColumnConfigs = { calculation: {}, reference: {} },
     visibility = { sections: {}, categories: {}, subcategories: {} },
     helperColumns = { calculation: {}, reference: {} },
@@ -192,7 +163,7 @@ export default function SettingsDialog({
     mainSubsections = {},
     onStructureChange,
     onVisibilityChange,
-}: SettingsDialogProps) {
+}) => {
     const [isOpen, setIsOpen] = useState(false);
     const [structure, setStructure] = useState<StructureItem[]>([]);
     const [uniqueTabs, setUniqueTabs] = useState<string[]>([]);
