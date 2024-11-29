@@ -20,7 +20,7 @@ import { InsurancePolicy } from "@/components/component/InsurancePolicy";
 import { KYCDocumentsList } from "@/components/component/kycDocumentsList";
 import { DirectorsDocumentsList } from "@/components/component/DirectorsDocumentsList";
 import { supabase } from '@/lib/supabaseClient';
-import DirectorsDocs from '../documents/company-kyc/directors';
+// import DirectorsDocs from '../documents/company-kyc/directors';
 import { formFields } from './onboarding/formFields'; 
 
 // import { usePathname } from 'next/navigation';
@@ -708,7 +708,7 @@ const TableSummary = ({ data }) => {
                 </TabsContent>
                 <TabsContent value="director-docs">
                   {/* <DirectorsDocumentsList selectedUserId={company.userid} /> */}
-<DirectorsDocs/>
+{/* <DirectorsDocs/> */}
                 </TabsContent>
                 <TabsContent value="supplier-docs">
                   <KYCDocumentsList category="suppliers-docs" selectedUserId={company.userid} />
