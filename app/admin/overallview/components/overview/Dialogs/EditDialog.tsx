@@ -40,6 +40,8 @@ export const EditFieldDialog: React.FC<EditFieldDialogProps> = ({
     editingField
   });
 
+  if (!editingField) return null;
+
   return (
     <Dialog open={editFieldDialogOpen} onOpenChange={setEditFieldDialogOpen}>
       <DialogContent className="max-w-2xl">

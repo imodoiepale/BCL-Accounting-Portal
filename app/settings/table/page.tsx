@@ -18,29 +18,42 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-
 interface SettingsDialogProps {
-    processedSections: any[]; // Replace 'any' with proper type
+    processedSections: Array<{
+      name: string;
+      label: string;
+      isSeparator?: boolean;
+      categorizedFields?: Array<{
+        category: string;
+        isSeparator?: boolean;
+        fields: Array<{
+          name: string;
+          label: string;
+          type?: string;
+        }>;
+      }>;
+    }>;
     helperColumnConfigs: {
-        calculation: Record<string, any>;
-        reference: Record<string, any>;
+      calculation: Record<string, any>;
+      reference: Record<string, any>;
     };
     visibility: {
-        sections: Record<string, boolean>;
-        categories: Record<string, boolean>;
-        subcategories: Record<string, boolean>;
+      sections: Record<string, boolean>;
+      categories: Record<string, boolean>;
+      subcategories: Record<string, boolean>;
     };
     helperColumns: {
-        calculation: Record<string, boolean>;
-        reference: Record<string, boolean>;
+      calculation: Record<string, boolean>;
+      reference: Record<string, boolean>;
     };
     onHelperColumnChange: (type: string, id: string) => void;
     mainTabs: string[];
-    mainSections: any;
-    mainSubsections: any;
+    mainSections: Record<string, any>;
+    mainSubsections: Record<string, any>;
     onStructureChange: () => void;
     onVisibilityChange: (type: string, id: string, value: boolean) => void;
-}
+  }
+  
 
 
 interface StructureItem {
