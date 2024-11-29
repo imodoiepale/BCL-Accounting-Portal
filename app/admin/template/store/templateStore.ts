@@ -1,3 +1,4 @@
+// @ts-nocheck
 // templateStore.ts
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabaseClient'

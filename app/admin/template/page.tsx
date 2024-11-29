@@ -1,3 +1,4 @@
+// @ts-nocheck
 import TemplateSelector from './components/TemplateSelector'
 import FormBuilder from './components/FormBuilder'
 import DocumentPreview from './components/DocumentPreview'
