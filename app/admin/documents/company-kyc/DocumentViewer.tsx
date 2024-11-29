@@ -11,6 +11,7 @@ interface DocumentViewerProps {
     filename: string;
     uploadDate: Date;
     issueDate?: Date;
+    
     expiryDate?: Date;
   }>;
   onClose: () => void;
