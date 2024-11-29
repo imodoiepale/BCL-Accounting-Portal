@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Plus, Trash, Settings, Edit2, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash, Settings, Edit2, X, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -411,13 +411,6 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
     }
   }, [structure]);
 
-  // // Call this in useEffect after fetching structure
-  // useEffect(() => {
-  //   if (structure.length > 0) {
-  //     generateIndices(structure);
-  //   }
-  // }, [structure, uniqueTabs]);
-
   const handleAddStructure = async () => {
     try {
       if (!newStructure.Tabs || !newStructure.section) {
@@ -516,7 +509,6 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
     }
   };
 
-  // Add useEffect for section/subsection changes
   useEffect(() => {
     if (newStructure.section && !newStructure.isNewSection) {
       fetchSectionFields(newStructure.section);
@@ -533,7 +525,6 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
     }
   }, [newStructure.subsection, sectionFields, newStructure.section]);
 
-  // Add useEffect to load initial visibility settings
   useEffect(() => {
     const loadVisibilitySettings = async () => {
       try {
@@ -557,7 +548,7 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
 
     loadVisibilitySettings();
   }, [currentStructure.id]);
-  // Add useEffect to initialize visibility settings based on structure
+
   useEffect(() => {
     if (structure.length > 0 && selectedTab) {
       const current = structure.find(item => item.Tabs === selectedTab);
@@ -567,7 +558,6 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
     }
   }, [structure, selectedTab]);
 
-  // Add bulk visibility controls
   const toggleAllVisibility = async (type: string, value: boolean) => {
     try {
       const newSettings = {
@@ -692,8 +682,6 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
     );
   };
 
-
-  // Define the callback function
   const fetchSectionsCallback = async (tab: string) => {
     await fetchExistingSectionsAndSubsections(
       tab,
@@ -729,6 +717,7 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
       processColumnMappings
     );
   };
+  
   const OrderControls = ({ currentOrder, onMoveUp, onMoveDown }) => (
     <div className="flex gap-1">
       <Button
@@ -749,6 +738,7 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
       </Button>
     </div>
   );
+
   const handleReorder = async (type: 'tab' | 'section' | 'subsection' | 'column', id: string, direction: 'up' | 'down') => {
     const items = type === 'tab' ? uniqueTabs :
       type === 'section' ? structure.find(s => s.Tabs === selectedTab)?.sections :
@@ -790,6 +780,7 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
       await fetchStructure(activeMainTab);
     }
   };
+
   const handleOrderSubmit = async () => {
     try {
       const { error } = await supabase
@@ -828,6 +819,7 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
       toast.error('Failed to update order');
     }
   };
+  
   const fetchStructureWithOrder = async () => {
     const { data, error } = await supabase
       .from('profile_category_table_mapping_2')
@@ -1149,7 +1141,9 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
                                 selectedSection,
                                 selectedSubsection,
                                 setEditingField,
-                                setEditFieldDialogOpen
+                                setEditFieldDialogOpen,
+                                supabase,
+                                fetchStructure
                               )
                             }
                             handleDeleteField={(key) => handleDeleteField(
@@ -1162,6 +1156,7 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
                               fetchStructure
                           )}
                             toggleVisibility={toggleVisibility}
+                            structure={structure}
                           />
                         </div>
                       ) : (
@@ -1431,9 +1426,11 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
                   <div className="space-y-4">
                     {/* Global controls */}
                     <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-semibold">Visibility Settings</h3>
+                      <h3 className="text-lg font-semibold text-gray-900">Visibility Settings</h3>
                       <div className="flex gap-2">
                         <Button
+                          variant="outline"
+                          className="hover:bg-gray-100"
                           onClick={async () => {
                             const updatedSettings = {
                               ...visibilityState,
@@ -1447,9 +1444,12 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
                             onStructureChange();
                           }}
                         >
+                          <Eye className="h-4 w-4 mr-2" />
                           Show All
                         </Button>
                         <Button
+                          variant="outline"
+                          className="hover:bg-gray-100"
                           onClick={async () => {
                             const updatedSettings = {
                               ...visibilityState,
@@ -1463,204 +1463,213 @@ export function SettingsDialog({ onStructureChange, activeMainTab, processedSect
                             onStructureChange();
                           }}
                         >
+                          <EyeOff className="h-4 w-4 mr-2" />
                           Hide All
                         </Button>
                       </div>
                     </div>
 
                     {/* Structure tree with visibility controls */}
-                    {mappingData?.structure?.sections.map((section, sectionIndex) => (
-                      <div key={section.name} className="border rounded-lg p-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <h4 className="font-medium">{section.name}</h4>
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={async () => {
-                                  await updateOrder(
-                                    mappingData.id,
-                                    'sections',
-                                    [{
-                                      id: section.name,
-                                      order: sectionIndex > 0 ? sectionIndex - 1 : 0
-                                    }]
-                                  );
-                                  onStructureChange();
-                                }}
-                                disabled={sectionIndex === 0}
-                              >
-                                <ChevronUp className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={async () => {
-                                  await updateOrder(
-                                    mappingData.id,
-                                    'sections',
-                                    [{
-                                      id: section.name,
-                                      order: sectionIndex + 1
-                                    }]
-                                  );
-                                  onStructureChange();
-                                }}
-                                disabled={sectionIndex === mappingData.structure.sections.length - 1}
-                              >
-                                <ChevronDown className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                          <Switch
-                            checked={visibilityState.sections[section.name] !== false}
-                            onCheckedChange={async (checked) => {
-                              await updateVisibility(mappingData.id, 'sections', section.name, checked);
-                              setVisibilityState(prev => ({
-                                ...prev,
-                                sections: {
-                                  ...prev.sections,
-                                  [section.name]: checked
-                                }
-                              }));
-                              onStructureChange();
-                            }}
-                          />
-                        </div>
-
-                        {/* Subsections */}
-                        <div className="pl-4 space-y-2">
-                          {section.subsections.map((subsection, subsectionIndex) => (
-                            <div key={subsection.name} className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                  <span>{subsection.name}</span>
-                                  <div className="flex gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={async () => {
-                                        await updateOrder(
-                                          mappingData.id,
-                                          'subsections',
-                                          [{
-                                            id: subsection.name,
-                                            order: subsectionIndex > 0 ? subsectionIndex - 1 : 0
-                                          }]
-                                        );
-                                        onStructureChange();
-                                      }}
-                                      disabled={subsectionIndex === 0}
-                                    >
-                                      <ChevronUp className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={async () => {
-                                        await updateOrder(
-                                          mappingData.id,
-                                          'subsections',
-                                          [{
-                                            id: subsection.name,
-                                            order: subsectionIndex + 1
-                                          }]
-                                        );
-                                        onStructureChange();
-                                      }}
-                                      disabled={subsectionIndex === section.subsections.length - 1}
-                                    >
-                                      <ChevronDown className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                                <Switch
-                                  checked={visibilityState.subsections[subsection.name] !== false}
-                                  onCheckedChange={async (checked) => {
-                                    await updateVisibility(mappingData.id, 'subsections', subsection.name, checked);
-                                    setVisibilityState(prev => ({
-                                      ...prev,
-                                      subsections: {
-                                        ...prev.subsections,
-                                        [subsection.name]: checked
-                                      }
-                                    }));
+                    <div className="space-y-4">
+                      {mappingData?.structure?.sections.map((section, sectionIndex) => (
+                        <div key={section.name} className="border rounded-lg p-4 space-y-4 bg-white shadow-sm hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <h4 className="font-medium text-gray-900">{section.name}</h4>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="hover:bg-gray-100"
+                                  onClick={async () => {
+                                    await updateOrder(
+                                      mappingData.id,
+                                      'sections',
+                                      [{
+                                        id: section.name,
+                                        order: sectionIndex > 0 ? sectionIndex - 1 : 0
+                                      }]
+                                    );
                                     onStructureChange();
                                   }}
-                                />
-                              </div>
-
-                              {/* Fields */}
-                              <div className="pl-4 space-y-2">
-                                {subsection.fields.map((field, fieldIndex) => {
-                                  const fieldKey = `${field.table}.${field.name}`;
-                                  return (
-                                    <div key={fieldKey} className="flex items-center justify-between">
-                                      <div className="flex items-center gap-4">
-                                        <span>{field.display}</span>
-                                        <div className="flex gap-1">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={async () => {
-                                              await updateOrder(
-                                                mappingData.id,
-                                                'fields',
-                                                [{
-                                                  id: fieldKey,
-                                                  order: fieldIndex > 0 ? fieldIndex - 1 : 0
-                                                }]
-                                              );
-                                              onStructureChange();
-                                            }}
-                                            disabled={fieldIndex === 0}
-                                          >
-                                            <ChevronUp className="h-4 w-4" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={async () => {
-                                              await updateOrder(
-                                                mappingData.id,
-                                                'fields',
-                                                [{
-                                                  id: fieldKey,
-                                                  order: fieldIndex + 1
-                                                }]
-                                              );
-                                              onStructureChange();
-                                            }}
-                                            disabled={fieldIndex === subsection.fields.length - 1}
-                                          >
-                                            <ChevronDown className="h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                      <Switch
-                                        checked={visibilityState.fields[fieldKey] !== false}
-                                        onCheckedChange={async (checked) => {
-                                          await updateVisibility(mappingData.id, 'fields', fieldKey, checked);
-                                          setVisibilityState(prev => ({
-                                            ...prev,
-                                            fields: {
-                                              ...prev.fields,
-                                              [fieldKey]: checked
-                                            }
-                                          }));
-                                          onStructureChange();
-                                        }}
-                                      />
-                                    </div>
-                                  );
-                                })}
+                                  disabled={sectionIndex === 0}
+                                >
+                                  <ChevronUp className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="hover:bg-gray-100"
+                                  onClick={async () => {
+                                    await updateOrder(
+                                      mappingData.id,
+                                      'sections',
+                                      [{
+                                        id: section.name,
+                                        order: sectionIndex + 1
+                                      }]
+                                    );
+                                    onStructureChange();
+                                  }}
+                                  disabled={sectionIndex === mappingData.structure.sections.length - 1}
+                                >
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
                               </div>
                             </div>
-                          ))}
+                            <Switch
+                              checked={visibilityState.sections[section.name] !== false}
+                              onCheckedChange={async (checked) => {
+                                await updateVisibility(mappingData.id, 'sections', section.name, checked);
+                                setVisibilityState(prev => ({
+                                  ...prev,
+                                  sections: {
+                                    ...prev.sections,
+                                    [section.name]: checked
+                                  }
+                                }));
+                                onStructureChange();
+                              }}
+                            />
+                          </div>
+
+                          {/* Subsections */}
+                          <div className="pl-6 space-y-3">
+                            {section.subsections.map((subsection, subsectionIndex) => (
+                              <div key={subsection.name} className="space-y-2 bg-gray-50 p-3 rounded-md">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4">
+                                    <span className="text-gray-700">{subsection.name}</span>
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="hover:bg-gray-200"
+                                        onClick={async () => {
+                                          await updateOrder(
+                                            mappingData.id,
+                                            'subsections',
+                                            [{
+                                              id: subsection.name,
+                                              order: subsectionIndex > 0 ? subsectionIndex - 1 : 0
+                                            }]
+                                          );
+                                          onStructureChange();
+                                        }}
+                                        disabled={subsectionIndex === 0}
+                                      >
+                                        <ChevronUp className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="hover:bg-gray-200"
+                                        onClick={async () => {
+                                          await updateOrder(
+                                            mappingData.id,
+                                            'subsections',
+                                            [{
+                                              id: subsection.name,
+                                              order: subsectionIndex + 1
+                                            }]
+                                          );
+                                          onStructureChange();
+                                        }}
+                                        disabled={subsectionIndex === section.subsections.length - 1}
+                                      >
+                                        <ChevronDown className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <Switch
+                                    checked={visibilityState.subsections[subsection.name] !== false}
+                                    onCheckedChange={async (checked) => {
+                                      await updateVisibility(mappingData.id, 'subsections', subsection.name, checked);
+                                      setVisibilityState(prev => ({
+                                        ...prev,
+                                        subsections: {
+                                          ...prev.subsections,
+                                          [subsection.name]: checked
+                                        }
+                                      }));
+                                      onStructureChange();
+                                    }}
+                                  />
+                                </div>
+
+                                {/* Fields */}
+                                <div className="pl-6 space-y-2">
+                                  {subsection.fields.map((field, fieldIndex) => {
+                                    const fieldKey = `${field.table}.${field.name}`;
+                                    return (
+                                      <div key={fieldKey} className="flex items-center justify-between bg-white p-2 rounded-md shadow-sm">
+                                        <div className="flex items-center gap-4">
+                                          <span className="text-sm text-gray-600">{field.display}</span>
+                                          <div className="flex gap-1">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="hover:bg-gray-100"
+                                              onClick={async () => {
+                                                await updateOrder(
+                                                  mappingData.id,
+                                                  'fields',
+                                                  [{
+                                                    id: fieldKey,
+                                                    order: fieldIndex > 0 ? fieldIndex - 1 : 0
+                                                  }]
+                                                );
+                                                onStructureChange();
+                                              }}
+                                              disabled={fieldIndex === 0}
+                                            >
+                                              <ChevronUp className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="hover:bg-gray-100"
+                                              onClick={async () => {
+                                                await updateOrder(
+                                                  mappingData.id,
+                                                  'fields',
+                                                  [{
+                                                    id: fieldKey,
+                                                    order: fieldIndex + 1
+                                                  }]
+                                                );
+                                                onStructureChange();
+                                              }}
+                                              disabled={fieldIndex === subsection.fields.length - 1}
+                                            >
+                                              <ChevronDown className="h-4 w-4" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                        <Switch
+                                          checked={visibilityState.fields[fieldKey] !== false}
+                                          onCheckedChange={async (checked) => {
+                                            await updateVisibility(mappingData.id, 'fields', fieldKey, checked);
+                                            setVisibilityState(prev => ({
+                                              ...prev,
+                                              fields: {
+                                                ...prev.fields,
+                                                [fieldKey]: checked
+                                              }
+                                            }));
+                                            onStructureChange();
+                                          }}
+                                        />
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

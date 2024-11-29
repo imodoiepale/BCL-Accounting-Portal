@@ -175,61 +175,60 @@ export  const handleAddField = async () => {
       toast.error('Failed to add field');
     }
   };
-  export const handleEditField = (
-    key: string, 
-    structure: any[], 
-    selectedTab: string,
-    selectedSection: any,
-    selectedSubsection: string,
-    setEditingField: Function,
-    setEditFieldDialogOpen: Function
-) => {
-    console.log('Edit field clicked:', { key, selectedTab, selectedSection, selectedSubsection });
+  export const handleEditField = async (
+      key: string, 
+      structure: any[], 
+      selectedTab: string,
+      selectedSection: any,
+      selectedSubsection: string,
+      setEditingField: Function,
+      setEditFieldDialogOpen: Function,    
+      fetchStructure: () => Promise<void>
+  ) => {
+      console.log('Edit field clicked:', { key, selectedTab, selectedSection, selectedSubsection });
     
-    const section = structure
-        .find(item => item.Tabs === selectedTab)
-        ?.sections
-        .find(s => s.name === selectedSection?.section);
+      const section = structure
+          .find(item => item.Tabs === selectedTab)
+          ?.sections
+          .find(s => s.name === selectedSection?.section);
 
-    const subsection = section?.subsections
-        .find(sub => sub.name === selectedSubsection);
+      const subsection = section?.subsections
+          .find(sub => sub.name === selectedSubsection);
 
-    console.log('Found subsection:', subsection);
+      console.log('Found subsection:', subsection);
 
-    if (!subsection) {
-        console.log('No matching subsection found');
-        return;
-    }
+      if (!subsection) {
+          console.log('No matching subsection found');
+          return;
+      }
 
-    // Split the key to get table and field name
-    const [table, fieldName] = key.split('-');
+      // Split the key to get table and field name
+      const [table, fieldName] = key.split('-');
     
-    // Find the field in the subsection's fields array
-    const field = subsection.fields.find(f => 
-        f.table === table && f.name === fieldName
-    );
+      // Find the field in the subsection's fields array
+      const field = subsection.fields.find(f => 
+          f.table === table && f.name === fieldName
+      );
 
-    console.log('Found field:', field);
+      console.log('Found field:', field);
     
-    if (field) {
-        const editingFieldData = {
-            key,
-            displayName: field.display,
-            tableName: field.table,
-            columnName: field.name,
-            dropdownOptions: field.dropdownOptions || [],
-            hasDropdown: field.dropdownOptions?.length > 0 ? 'yes' : 'no'
-        };
+      if (field) {
+          const editingFieldData = {
+              key,
+              displayName: field.display,
+              tableName: field.table,
+              columnName: field.name,
+              dropdownOptions: field.dropdownOptions || [],
+              hasDropdown: field.dropdownOptions?.length > 0 ? 'yes' : 'no',
+              order: field.order || 0,
+              visible: field.visible !== false
+          };
         
-        console.log('Setting editing field:', editingFieldData);
-        setEditingField(editingFieldData);
-        
-        console.log('Opening dialog...');
-        setEditFieldDialogOpen(true);
-    }
-};
-
-export const handleDeleteField = async (
+          console.log('Setting editing field:', editingFieldData);
+          setEditingField(editingFieldData);
+          setEditFieldDialogOpen(true);
+      }
+  };export const handleDeleteField = async (
   key: string,
   structure: any[],
   selectedTab: string,
@@ -238,45 +237,65 @@ export const handleDeleteField = async (
   supabase: any,
   fetchStructure: () => Promise<void>
 ) => {
-  const { data: currentData, error: fetchError } = await supabase
-      .from('profile_category_table_mapping_2')
-      .select('*')
-      .eq('Tabs', selectedTab)
-      .single();
+  try {
+      const { data: currentData, error: fetchError } = await supabase
+          .from('profile_category_table_mapping_2')
+          .select('*')
+          .eq('Tabs', selectedTab)
+          .single();
 
-  if (fetchError) throw fetchError;
+      if (fetchError) throw fetchError;
 
-  const updatedStructure = {
-      order: currentData.structure.order || {},
-      sections: currentData.structure.sections.map(section => ({
-          ...section,
-          subsections: section.subsections.map(subsection => {
-              if (subsection.name === selectedSubsection) {
-                  return {
-                      ...subsection,
-                      fields: subsection.fields.filter(field => 
-                          `${field.table}-${field.name}` !== key
-                      )
-                  };
-              }
-              return subsection;
+      const updatedStructure = {
+          order: currentData.structure.order || {},
+          sections: currentData.structure.sections.map(section => ({
+              ...section,
+              subsections: section.subsections.map(subsection => {
+                  if (subsection.name === selectedSubsection) {
+                      return {
+                          ...subsection,
+                          fields: subsection.fields.filter(field => 
+                              `${field.table}-${field.name}` !== key
+                          )
+                      };
+                  }
+                  return subsection;
+              })
+          })),
+          visibility: currentData.structure.visibility || {},
+          relationships: currentData.structure.relationships || {}
+      };
+
+      const { error: updateError } = await supabase
+          .from('profile_category_table_mapping_2')
+          .update({ 
+              structure: updatedStructure,
+              updated_at: new Date().toISOString()
           })
-      })),
-      visibility: currentData.structure.visibility || {},
-      relationships: currentData.structure.relationships || {}
-  };
+          .eq('id', currentData.id);
 
-  await supabase
-      .from('profile_category_table_mapping_2')
-      .update({ 
-          structure: updatedStructure,
-          updated_at: new Date().toISOString()
-      })
-      .eq('id', currentData.id);
+      if (updateError) throw updateError;
 
-  await fetchStructure();
-  toast.success('Field removed from mappings successfully');
+      // Wait for database update
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
+      // Refresh structure data
+      await fetchStructure();
+      
+      // Dispatch custom event for UI refresh
+      window.dispatchEvent(new CustomEvent('structure-updated'));
+      
+      // Dispatch refresh event
+      window.dispatchEvent(new CustomEvent('refreshData'));
+
+      toast.success('Field removed from mappings successfully');
+
+  } catch (error) {
+      console.error('Error removing field:', error);
+      toast.error('Failed to remove field');
+  }
 };
+
 
   export const handleCreateTable = async (tableName: string) => {
     setLoadingTable(true);
@@ -1202,4 +1221,68 @@ export const getVisibleColumns = (structure, visibilitySettings) => {
       const orderB = structure?.column_order?.columns?.[b[0]] || 0;
       return orderA - orderB;
     });
+};
+
+export const handleOrderUpdate = async (
+  sectionName: string,
+  subsectionName: string,
+  fieldName: string,
+  newOrder: number,
+  structure: any,
+  supabaseClient: any,
+  activeMainTab: string
+) => {
+  try {
+    const updatedStructure = {
+      ...structure,
+      sections: structure.sections.map(section => {
+        if (section.name === sectionName) {
+          return {
+            ...section,
+            subsections: section.subsections.map(subsection => {
+              if (subsection.name === subsectionName) {
+                // Sort fields based on new order
+                const fields = [...subsection.fields];
+                const fieldToUpdate = fields.find(f => f.name === fieldName);
+                const oldOrder = fieldToUpdate.order;
+
+                // Update orders
+                fields.forEach(field => {
+                  if (field.name === fieldName) {
+                    field.order = newOrder;
+                  } else if (
+                    (oldOrder < newOrder && field.order > oldOrder && field.order <= newOrder) ||
+                    (oldOrder > newOrder && field.order >= newOrder && field.order < oldOrder)
+                  ) {
+                    field.order += oldOrder < newOrder ? -1 : 1;
+                  }
+                });
+
+                return {
+                  ...subsection,
+                  fields: fields.sort((a, b) => a.order - b.order)
+                };
+              }
+              return subsection;
+            })
+          };
+        }
+        return section;
+      })
+    };
+
+    const { error } = await supabaseClient
+      .from('profile_category_table_mapping_2')
+      .update({ structure: updatedStructure })
+      .eq('main_tab', activeMainTab);
+
+    if (error) throw error;
+
+    window.dispatchEvent(new CustomEvent('structure-updated'));
+    toast.success('Order updated successfully');
+
+  } catch (error) {
+    console.error('Error updating order:', error);
+    toast.error('Failed to update order');
+  }
 };
