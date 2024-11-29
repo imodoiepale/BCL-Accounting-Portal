@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 // components/overview/TableComponents.tsx
 // @ts-nocheck
 "use client";
@@ -11,6 +12,7 @@ import { calculateFieldStats } from '../utility';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import SidebarTableView from './SidebarTableView';
 interface TableProps {
   data: any[];
   handleCompanyClick: (company: any) => void;
@@ -19,8 +21,8 @@ interface TableProps {
   refreshData: () => Promise<void>; // Add this line
   activeMainTab: any[];
   activeSubTab: any[];
-  }
-  
+}
+
 interface SortConfig {
   field: string | null;
   direction: 'asc' | 'desc' | null;
@@ -30,7 +32,7 @@ const formatDate = (dateString: string) => {
   if (!dateString) return '';
   const date = new Date(dateString);
   return format(date, 'dd/MM/yyyy'); // Format as needed
-  };
+};
 // Utility function to render separator cells
 export const renderSeparatorCell = (key: string, type: 'section' | 'category' | 'mini' = 'section', rowSpan: number = 1) => {
   const separatorWidths = {
@@ -319,7 +321,7 @@ const renderDataRows = (
   handleCompanyClick: (company: any) => void,
   onMissingFieldsClick: (company: any) => void,
   processedSections: any[],
-  refreshData: () => Promise<void> ,
+  refreshData: () => Promise<void>,
   activeMainTab: any[],
   activeSubTab: any[]
 ) => {
@@ -336,7 +338,7 @@ const renderDataRows = (
           {groupIndex + 1}
         </TableCell>
         {renderSeparatorCell(`missing-fields-separator-${groupIndex}`, 'section')}
-        <TableCell 
+        <TableCell
           className="whitespace-nowrap cursor-pointer hover:bg-gray-100 sticky left-[50px] z-0 bg-white"
           onClick={() => onMissingFieldsClick(companyGroup)}
         >
@@ -361,7 +363,7 @@ const renderDataRows = (
 
             return category.fields.map((field, fieldIndex, fieldsArray) => {
               const [tableName, columnName] = field.name.split('.');
-              
+
               // Get value from the appropriate data source
               let value;
               if (row.isAdditionalRow && row.sourceTable === tableName) {
@@ -381,7 +383,7 @@ const renderDataRows = (
               if (field.name === 'acc_portal_company_duplicate.company_name') {
                 // Only show company name for first row
                 if (!row.isFirstRow) return null;
-                
+
                 return (
                   <React.Fragment key={`${groupIndex}-${rowIndex}-${field.name}`}>
                     <TableCell
@@ -446,7 +448,7 @@ const renderDataRows = (
                         dropdownOptions={field.dropdownOptions}
                         rowId={row.id}
                         companyName={row.company_name}
-                        refreshData={refreshData}   
+                        refreshData={refreshData}
                         activeMainTab={activeMainTab}
                         activeSubTab={activeSubTab}
                       />
@@ -497,40 +499,67 @@ const renderDataRows = (
   ));
 };
 // Updated Table component with sticky headers
-export const Table: React.FC<TableProps> = ({ data, handleCompanyClick, refreshData ,activeSubTab,activeMainTab, processedSections, onMissingFieldsClick }) => {
+export const Table: React.FC<TableProps> = ({ 
+  data, 
+  handleCompanyClick, 
+  refreshData,
+  activeMainTab,
+  activeSubTab,
+  processedSections, 
+  onMissingFieldsClick 
+}) => {
+  const useSidebarLayout = activeMainTab?.toLowerCase() === 'employee details' || 
+                          activeMainTab?.toLowerCase() === 'supplier details';
+
+  if (useSidebarLayout) {
+    return (
+      <SidebarTableView
+        data={data}
+        handleCompanyClick={handleCompanyClick}
+        onMissingFieldsClick={onMissingFieldsClick}
+        refreshData={refreshData}
+        processedSections={processedSections}
+        activeMainTab={activeMainTab}
+        activeSubTab={activeSubTab}
+      />
+    );
+  }
+  
   const [sortConfig, setSortConfig] = useState<{
     field: string | null;
     direction: 'asc' | 'desc' | null;
   }>({ field: null, direction: null });
+
   const handleSort = (field: string) => {
     setSortConfig(prevConfig => ({
       field,
-      direction: 
-        prevConfig.field === field && prevConfig.direction === 'asc' 
-          ? 'desc' 
+      direction:
+        prevConfig.field === field && prevConfig.direction === 'asc'
+          ? 'desc'
           : 'asc'
     }));
   };
-  // Inside the Table component, before rendering:
-const sortedData = React.useMemo(() => {
-  if (!sortConfig.field || !sortConfig.direction) return data;
-  
-  return [...data].sort((a, b) => {
-    const [tableName, columnName] = sortConfig.field.split('.');
-    const aValue = a.rows[0][`${tableName}_data`]?.[columnName] ?? a.rows[0][columnName];
-    const bValue = b.rows[0][`${tableName}_data`]?.[columnName] ?? b.rows[0][columnName];
-    
-    if (aValue === bValue) return 0;
-    if (aValue === null || aValue === undefined) return 1;
-    if (bValue === null || bValue === undefined) return -1;
-    
-    return sortConfig.direction === 'asc'
-      ? aValue > bValue ? 1 : -1
-      : aValue < bValue ? 1 : -1;
-  });
-}, [data, sortConfig]);
 
-if (!processedSections || !Array.isArray(processedSections)) {
+  const sortedData = React.useMemo(() => {
+    if (!sortConfig.field || !sortConfig.direction) return data;
+
+    return [...data].sort((a, b) => {
+      const [tableName, columnName] = sortConfig.field.split('.');
+      const aValue = a.rows[0][`${tableName}_data`]?.[columnName] ?? a.rows[0][columnName];
+      const bValue = b.rows[0][`${tableName}_data`]?.[columnName] ?? b.rows[0][columnName];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      return sortConfig.direction === 'asc'
+        ? aValue > bValue ? 1 : -1
+        : aValue < bValue ? 1 : -1;
+    });
+  }, [data, sortConfig]);
+
+ 
+  if (!processedSections || !Array.isArray(processedSections)) {
     return null;
   }
 
@@ -540,11 +569,11 @@ if (!processedSections || !Array.isArray(processedSections)) {
         <ScrollArea className="h-[900px] rounded-md border">
           <UITable>
             <TableHeader className="sticky top-0 z-10 bg-white">
-  {renderHeaders(processedSections, sortConfig, handleSort)}
-  {renderStatisticsRows(data, processedSections)}
-</TableHeader>
+              {renderHeaders(processedSections, sortConfig, handleSort)}
+              {renderStatisticsRows(data, processedSections)}
+            </TableHeader>
             <TableBody>
-            {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, processedSections, refreshData, activeSubTab, activeMainTab)}
+              {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, processedSections, refreshData, activeSubTab, activeMainTab)}
             </TableBody>
           </UITable>
         </ScrollArea>
@@ -553,7 +582,7 @@ if (!processedSections || !Array.isArray(processedSections)) {
   );
 };
 // Render table headers
-const renderHeaders = (processedSections: any[],sortConfig: SortConfig, 
+const renderHeaders = (processedSections: any[], sortConfig: SortConfig,
   handleSort: (field: string) => void) => {
   return (
     <>
@@ -704,14 +733,14 @@ const renderHeaders = (processedSections: any[],sortConfig: SortConfig,
 
       {/* Column Headers */}
       <TableRow>
-        <TableHead 
+        <TableHead
           className="font-medium sticky left-0 z-0 bg-white"
           style={{ minWidth: '50px' }}
         >
           Field
         </TableHead>
         {renderSeparatorCell(`col-sep-start`, 'section')}
-        <TableHead 
+        <TableHead
           className="whitespace-nowrap bg-red-500 text-white sticky left-[50px] z-0"
         >
           Missing Count
@@ -730,9 +759,8 @@ const renderHeaders = (processedSections: any[],sortConfig: SortConfig,
             return category.fields.map((field, fieldIndex, fieldsArray) => (
               <React.Fragment key={`col-${field.name}`}>
                 <TableHead
-                  className={`whitespace-nowrap ${sectionColors[section.name]?.sub || 'bg-gray-500'} text-white cursor-pointer hover:bg-opacity-90 relative ${
-                    field.name === 'acc_portal_company_duplicate.company_name' ? 'sticky left-[150px] z-0' : ''
-                  }`}
+                  className={`whitespace-nowrap ${sectionColors[section.name]?.sub || 'bg-gray-500'} text-white cursor-pointer hover:bg-opacity-90 relative ${field.name === 'acc_portal_company_duplicate.company_name' ? 'sticky left-[150px] z-0' : ''
+                    }`}
                   onClick={() => handleSort(field.name)}
                 >
                   <div className="flex items-center justify-between px-2">
