@@ -92,6 +92,27 @@ export const persistColumnOrder = async (newOrder: string[], currentStructure: a
     toast.error('Failed to save column order');
   }
 };
+export const fetchStructure = async () => {
+  const { data, error } = await supabase
+    .from('profile_category_table_mapping_2')
+    .select('*');
+
+  if (error) throw error;
+
+  return data.map(item => ({
+    ...item,
+    sections: item.structure.sections.map(section => ({
+      ...section,
+      subsections: section.subsections.map(subsection => ({
+        ...subsection,
+        fields: subsection.fields.map(field => ({
+          ...field,
+          dropdownOptions: field.dropdownOptions || []
+        }))
+      }))
+    }))
+  }));
+};
 
 export const DraggableColumns = ({
   columnMappings,
@@ -101,7 +122,10 @@ export const DraggableColumns = ({
   onDragEnd,
   handleEditField,
   handleDeleteField,
-  toggleVisibility
+  toggleVisibility,
+  structure,
+  handleOrderUpdate,
+  activeMainTab
 }) => {
   const mappings = columnMappings || {};
   const visibility = visibilitySettings?.columns || {};
@@ -117,6 +141,16 @@ export const DraggableColumns = ({
       });
   }, [mappings, visibility, order]);
 
+  const getDropdownOptions = (tableName: string, columnName: string) => {
+    const field = structure
+      ?.flatMap(item => item.sections)
+      ?.flatMap(section => section.subsections)
+      ?.flatMap(subsection => subsection.fields)
+      ?.find(field => field.table === tableName && field.name === columnName);
+
+    return field?.dropdownOptions || [];
+  };
+
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <Droppable droppableId="columns" direction="vertical">
@@ -125,7 +159,7 @@ export const DraggableColumns = ({
             <table className="w-full">
               <thead>
                 <tr className="grid grid-cols-[60px,1fr,1fr,1fr,1fr,120px] gap-2 p-2 bg-gray-50">
-                  <th>#</th>
+                <th>Order</th>
                   <th>Display Name</th>
                   <th>Table Name</th>
                   <th>Options</th>
@@ -153,7 +187,7 @@ export const DraggableColumns = ({
                           <td>{value}</td>
                           <td>{tableName}</td>
                           <td>
-                            {dropdowns?.[key]?.map((option, idx) => (
+                            {getDropdownOptions(tableName, columnName).map((option, idx) => (
                               <span key={idx} className="mr-1 px-2 py-1 bg-gray-100 rounded text-sm">
                                 {option}
                               </span>
