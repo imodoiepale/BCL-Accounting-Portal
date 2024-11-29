@@ -183,6 +183,92 @@ const DocumentActions = ({ onView, onUpload, onDownload, documentCount = 0 }) =>
   );
 };
 
+const handleViewDocuments = async (document: Document, company: Company) => {
+  const relevantUploads = uploads.filter(u => 
+    u.kyc_document_id === document.id && 
+    u.userid === company.id.toString()
+  );
+
+  if (relevantUploads.length === 0) {
+    toast.error('No documents found');
+    return;
+  }
+
+  try {
+    const documentPreviews = await Promise.all(
+      relevantUploads.map(async (upload) => {
+        const { data, error } = await supabase
+          .storage
+          .from('kyc-documents')
+          .createSignedUrl(upload.filepath, 60);
+
+        if (error) throw error;
+
+        return {
+          id: upload.id,
+          url: data.signedUrl,
+          filename: upload.filepath.split('/').pop() || 'document',
+          uploadDate: new Date(upload.created_at),
+          issueDate: upload.issue_date ? new Date(upload.issue_date) : undefined,
+          expiryDate: upload.expiry_date ? new Date(upload.expiry_date) : undefined,
+        };
+      })
+    );
+
+    setViewDocuments(documentPreviews);
+    setShowViewModal(true);
+  } catch (error) {
+    console.error('Error viewing documents:', error);
+    toast.error('Failed to load documents');
+  }
+};
+
+const handleMultiUpload = async (files: UploadFile[]) => {
+  if (!selectedCompany || !selectedDocument) {
+    toast.error('Missing company or document information');
+    return;
+  }
+
+  try {
+    await Promise.all(
+      files.map(async ({ file, issueDate, expiryDate }) => {
+        const timestamp = new Date().getTime();
+        const fileName = `${selectedCompany.id}/${selectedDocument.id}/${timestamp}_${file.name}`;
+        
+        // Upload file
+        const { data: fileData, error: fileError } = await supabase
+          .storage
+          .from('kyc-documents')
+          .upload(fileName, file);
+
+        if (fileError) throw fileError;
+
+        // Create upload record
+        const uploadData = {
+          userid: selectedCompany.id.toString(),
+          kyc_document_id: selectedDocument.id,
+          filepath: fileData.path,
+          issue_date: issueDate || null,
+          expiry_date: expiryDate || null,
+        };
+
+        const { error } = await supabase
+          .from('acc_portal_kyc_uploads')
+          .insert(uploadData);
+
+        if (error) throw error;
+      })
+    );
+
+    queryClient.invalidateQueries({ queryKey: ['uploads'] });
+    setShowUploadModal(false);
+    toast.success('Documents uploaded successfully');
+  } catch (error) {
+    console.error('Upload error:', error);
+    toast.error('Failed to upload documents');
+  }
+};
+
 const MissingDocumentsModal = ({ missingDocuments, onClose, onUpload }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

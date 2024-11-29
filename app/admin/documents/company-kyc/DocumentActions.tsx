@@ -17,6 +17,14 @@ interface DocumentViewerProps {
   onClose: () => void;
 }
 
+
+interface DocumentActionsProps {
+  onView: () => void;
+  onUpload: () => void;
+  onDownload: () => void;
+  hasDocuments: boolean;
+}
+
 // Document Viewer Component for multiple documents
 const DocumentViewer: React.FC<DocumentViewerProps> = ({ documents, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -75,34 +83,41 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ documents, onClose }) =
 };
 
 // Modified Document Actions Component
-export const DocumentActions = ({ onView, onUpload, onDownload, documents = [] }: {
-  onView: () => void;
-  onUpload: () => void;
-  onDownload: () => void;
-  documents?: any[];
-}) => {
-  const [showDropdown, setShowDropdown] = useState(false);
 
+export const DocumentActions: React.FC<DocumentActionsProps> = ({
+  onView,
+  onUpload,
+  onDownload,
+  hasDocuments
+}) => {
   return (
-    <div className="relative">
-      <button onClick={() => onView()} className="text-blue-600 hover:text-blue-800 mr-2">
-        <Eye className="w-4 h-4" />
-      </button>
+    <div className="relative flex items-center space-x-2">
+      {hasDocuments && (
+        <button 
+          onClick={onView} 
+          className="text-blue-600 hover:text-blue-800"
+          title="View Documents"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="text-gray-600 hover:text-gray-800">
-            <MoreVertical className="w-4 h-4" />
-          </button>
+          <Button variant="ghost" className="h-8 w-8 p-0">
+            <MoreVertical className="h-4 w-4" />
+          </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
+        <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={onUpload}>
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="h-4 w-4 mr-2" />
             Add Document
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onDownload}>
-            <Download className="w-4 h-4 mr-2" />
-            Download
-          </DropdownMenuItem>
+          {hasDocuments && (
+            <DropdownMenuItem onClick={onDownload}>
+              <Download className="h-4 w-4 mr-2" />
+              Download All
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
