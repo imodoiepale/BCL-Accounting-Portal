@@ -109,228 +109,243 @@ export const groupDataByCategory = (fields: any[]) => {
     return acc;
   }, {});
 };
-export const handleExport = async (activeMainTab: string, activeSubTab: string) => {
-    try {
-        // Get all companies
-        const { data: companies, error: companiesError } = await supabase
-            .from('acc_portal_company_duplicate')
-            .select('*')
-            .order('company_name');
+  export const handleExport = async (activeMainTab: string, activeSubTab: string) => {
+      try {
+          // Get all companies
+          const { data: companies, error: companiesError } = await supabase
+              .from('acc_portal_company_duplicate')
+              .select('*')
+              .order('company_name');
 
-        if (companiesError) throw companiesError;
+          if (companiesError) throw companiesError;
 
-        // Get table structure from profile_category_table_mapping
-        const { data: mappings, error: mappingError } = await supabase
-            .from('profile_category_table_mapping')
-            .select('*')
-            .eq('Tabs', activeSubTab)
-            .eq('main_tab', activeMainTab);
+          // Get table structure from profile_category_table_mapping_2
+          const { data: mappings, error: mappingError } = await supabase
+              .from('profile_category_table_mapping_2')
+              .select('*')
+              .eq('Tabs', activeSubTab)
+              .eq('main_tab', activeMainTab);
 
-        if (mappingError) throw mappingError;
+          if (mappingError) throw mappingError;
 
-        const columnMappings = safeJSONParse(mappings[0].column_mappings, {});
-        const tableNames = safeJSONParse(mappings[0].table_names, {});
+          const structure = mappings[0].structure;
+          const fields = [];
+
+          // Extract fields from structure
+          structure.sections.forEach(section => {
+              section.subsections.forEach(subsection => {
+                  subsection.fields.forEach(field => {
+                      fields.push({
+                          name: field.name,
+                          display: field.display
+                      });
+                  });
+              });
+          });
+
+          // Get data from acc_portal_company_duplicate
+          const { data: tableData, error: tableError } = await supabase
+              .from('acc_portal_company_duplicate')
+              .select('*');
         
-        // Get all relevant tables' data
-        const allTables = new Set(Object.values(tableNames).flat());
-        const tableData = {};
+          if (tableError) throw tableError;
 
-        for (const table of allTables) {
-            const { data, error } = await supabase
-                .from(table)
-                .select('*');
+          // Prepare worksheet data
+          const wsData = [];
+        
+          // Create header row with company names
+          const headerRow = ['Fields'];
+          companies.forEach(company => {
+              headerRow.push(company.company_name);
+          });
+          wsData.push(headerRow);
+
+          // Add data rows for each field
+          fields.forEach(field => {
+              const row = [field.display];
+
+              companies.forEach(company => {
+                  const record = tableData.find(record => record.id === company.id);
+                  row.push(record ? record[field.name] || '' : '');
+              });
             
-            if (error) throw error;
-            tableData[table] = data || [];
-        }
+              wsData.push(row);
+          });
 
-        // Prepare worksheet data
-        const wsData = [];
+          // Create and download Excel file
+          const wb = XLSX.utils.book_new();
+          const ws = XLSX.utils.aoa_to_sheet(wsData);
         
-        // Create header row with company names
-        const headerRow = ['Fields'];
-        companies.forEach(company => {
-            const companyRecords = Object.values(tableData).flatMap(tableRows => 
-                tableRows.filter(row => row.company_id === company.id)
-            );
-            const recordCount = Math.max(1, companyRecords.length);
-            for (let i = 0; i < recordCount; i++) {
-                headerRow.push(company.company_name);
-            }
-        });
-        wsData.push(headerRow);
-
-        // Add data rows for each field
-        Object.entries(columnMappings).forEach(([fieldKey, fieldLabel]) => {
-            const [tableName, columnName] = fieldKey.split('.');
-            const row = [fieldLabel];
-
-            companies.forEach(company => {
-                const records = tableData[tableName]?.filter(
-                    record => record.company_id === company.id
-                ) || [null];
-
-                if (records.length === 0) {
-                    row.push(''); // Empty value for companies with no records
-                } else {
-                    records.forEach(record => {
-                        row.push(record ? record[columnName] || '' : '');
-                    });
-                }
-            });
-            
-            wsData.push(row);
-        });
-
-        // Create and download Excel file
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
+          XLSX.utils.book_append_sheet(wb, ws, 'Data');
+          const wbout = XLSX.write(wb, { type: 'binary', bookType: 'xlsx' });
         
-        XLSX.utils.book_append_sheet(wb, ws, 'Data');
-        const wbout = XLSX.write(wb, { type: 'binary', bookType: 'xlsx' });
-        
-        // Create download link
-        const blob = new Blob([s2ab(wbout)], { type: 'application/octet-stream' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${activeMainTab}_${activeSubTab}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+          // Create download link
+          const blob = new Blob([s2ab(wbout)], { type: 'application/octet-stream' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${activeMainTab}_${activeSubTab}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
 
-        toast.success('Export completed successfully');
-    } catch (error) {
-        console.error('Export error:', error);
-        toast.error('Failed to export data');
-    }
-};
+          toast.success('Export completed successfully');
+          return { wsData, tableData, companies, fields };
+      } catch (error) {
+          console.error('Export error:', error);
+          toast.error('Failed to export data');
+          throw error;
+      }
+  };
 
-export const handleImport = async (file: File, activeMainTab: string, activeSubTab: string) => {
-    try {
-        // Read the Excel file
-        const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data);
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+  export const handleImport = async (file: File, activeMainTab: string, activeSubTab: string) => {
+      try {
+          const data = await file.arrayBuffer();
+          const workbook = XLSX.read(data);
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-        if (rows.length < 2) {
-            toast.error('File is empty or invalid');
-            return;
-        }
+          if (rows.length < 2) {
+              toast.error('File is empty or invalid');
+              return;
+          }
 
-        // Get mapping information
-        const { data: mappings, error: mappingError } = await supabase
-            .from('profile_category_table_mapping')
-            .select('*')
-            .eq('Tabs', activeSubTab)
-            .eq('main_tab', activeMainTab);
+          const { data: mappings, error: mappingError } = await supabase
+              .from('profile_category_table_mapping_2')
+              .select('*')
+              .eq('Tabs', activeSubTab)
+              .eq('main_tab', activeMainTab);
 
-        if (mappingError) throw mappingError;
+          if (mappingError) throw mappingError;
 
-        const columnMappings = safeJSONParse(mappings[0].column_mappings, {});
-        const tableNames = safeJSONParse(mappings[0].table_names, {});
+          const structure = mappings[0].structure;
+          const fieldMapping = {};
+          const tableMapping = {};
 
-        // Create reverse mapping for field labels to column names
-        const fieldMapping = Object.entries(columnMappings).reduce((acc, [key, label]) => {
-            acc[label.toString()] = key;
-            return acc;
-        }, {});
+          structure.sections.forEach(section => {
+              section.subsections.forEach(subsection => {
+                  subsection.fields.forEach(field => {
+                      fieldMapping[field.display] = {
+                          name: field.name,
+                          table: field.table
+                      };
+                      if (!tableMapping[field.table]) {
+                          tableMapping[field.table] = [];
+                      }
+                      tableMapping[field.table].push(field.name);
+                  });
+              });
+          });
 
-        // Get all companies to map names to IDs
-        const { data: companies, error: companiesError } = await supabase
-            .from('acc_portal_company_duplicate')
-            .select('id, company_name');
+          const { data: companies, error: companiesError } = await supabase
+              .from('acc_portal_company_duplicate')
+              .select('id, company_name');
 
-        if (companiesError) throw companiesError;
+          if (companiesError) throw companiesError;
 
-        const companyMap = companies.reduce((acc, company) => {
-            acc[company.company_name.toLowerCase()] = { id: company.id, name: company.company_name };
-            return acc;
-        }, {});
+          const companyMap = companies.reduce((acc, company) => {
+              acc[company.company_name.toLowerCase()] = { id: company.id, name: company.company_name };
+              return acc;
+          }, {});
 
-        // Process each column (company) in the spreadsheet
-        const headerRow = rows[0];
-        const dataToInsert = new Map(); // Map to store data by table name
+          const headerRow = rows[0];
+          const dataToUpdate = new Map();
 
-        for (let colIndex = 1; colIndex < headerRow.length; colIndex++) {
-            const companyName = headerRow[colIndex]?.toString().toLowerCase();
-            const company = companyMap[companyName];
+          for (let colIndex = 1; colIndex < headerRow.length; colIndex++) {
+              const companyName = headerRow[colIndex]?.toString().toLowerCase();
+              const company = companyMap[companyName];
 
-            if (!company) {
-                console.warn(`Company not found: ${headerRow[colIndex]}`);
-                continue;
-            }
+              if (!company) {
+                  console.warn(`Company not found: ${headerRow[colIndex]}`);
+                  continue;
+              }
 
-            // Create data object for each field
-            const recordData = { company_id: company.id, company_name: company.name };
+              const recordData = { company_name: company.name };
 
-            for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
-                const fieldLabel = rows[rowIndex][0];
-                const fieldKey = fieldMapping[fieldLabel];
-                const value = rows[rowIndex][colIndex];
+              for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+                  const fieldLabel = rows[rowIndex][0];
+                  const field = fieldMapping[fieldLabel];
+                  const value = rows[rowIndex][colIndex];
 
-                if (fieldKey) {
-                    const [tableName, columnName] = fieldKey.split('.');
+                  if (field && value !== undefined && value !== null && value !== '') {
+                      const { table, name } = field;
                     
-                    if (!dataToInsert.has(tableName)) {
-                        dataToInsert.set(tableName, []);
-                    }
+                      if (!dataToUpdate.has(table)) {
+                          dataToUpdate.set(table, []);
+                      }
 
-                    // Add or update record
-                    const existingRecord = recordData[tableName] || {};
-                    existingRecord[columnName] = value;
-                    recordData[tableName] = existingRecord;
-                }
-            }
+                      const existingRecord = recordData[table] || {};
+                      existingRecord[name] = value;
+                      recordData[table] = existingRecord;
+                  }
+              }
 
-            // Add records to respective tables with company_name
-            for (const [tableName, record] of Object.entries(recordData)) {
-                if (tableName !== 'company_id' && tableName !== 'company_name') {
-                    dataToInsert.get(tableName).push({
+              for (const [tableName, record] of Object.entries(recordData)) {
+                  if (tableName !== 'company_name' && Object.keys(record).length > 0) {
+                    const recordToUpdate = tableName === 'acc_portal_company_duplicate' 
+                    ? {
+                        ...record,
+                        company_name: company.name
+                      }
+                    : {
                         ...record,
                         company_id: company.id,
                         company_name: company.name
-                    });
-                }
-            }
-        }
+                      };
+                
+                      dataToUpdate.get(tableName)?.push(recordToUpdate);
+                  }
+              }
+          }
 
-        // Insert data into respective tables
-        for (const [tableName, records] of dataToInsert) {
-            if (records.length === 0) continue;
+          console.log('Data to update:', Object.fromEntries(dataToUpdate));
 
-            // First delete existing records for these companies
-            const companyIds = [...new Set(records.map(r => r.company_id))];
-            
-            const { error: deleteError } = await supabase
-                .from(tableName)
-                .delete()
-                .in('company_id', companyIds);
+          const updatePromises = [];
+          for (const [tableName, records] of dataToUpdate) {
+              if (records.length === 0) continue;
 
-            if (deleteError) throw deleteError;
+              console.log(`Processing ${records.length} records for table ${tableName}`);
+              
+              for (const record of records) {
+                  let queryPromise;
+                  // For acc_portal_company_duplicate table
+                  if (record.company_name) {
+                      const { data: existingRecord } = await supabase
+                          .from(tableName)
+                          .select()
+                          .eq('company_id', record.company_id)
+                          .single();
 
-            // Insert new records with company_name
-            const { error: insertError } = await supabase
-                .from(tableName)
-                .insert(records.map(record => ({
-                    ...record,
-                    company_name: record.company_name // Ensure company_name is included
-                })));
+                      if (existingRecord) {
+                          queryPromise = supabase
+                              .from(tableName)
+                              .update(record)
+                              .eq('company_id', record.company_id)
+                              .select();
+                      } else {
+                          queryPromise = supabase
+                              .from(tableName)
+                              .insert(record)
+                              .select();
+                      }
+                      
+                      updatePromises.push(queryPromise);
+                  }
+              }
+          }
 
-            if (insertError) throw insertError;
-        }
+          console.log(`Executing ${updatePromises.length} update operations`);
+          const results = await Promise.all(updatePromises);
+          console.log('Update results:', results);
 
-        toast.success('Import completed successfully');
-        window.dispatchEvent(new Event('refreshData'));
-    } catch (error) {
-        console.error('Import error:', error);
-        toast.error('Failed to import data');
-    }
-};
-// Helper function to convert string to array buffer
-function s2ab(s: string) {
+          toast.success('Import completed successfully');
+          window.dispatchEvent(new Event('refreshData'));
+      } catch (error) {
+          console.error('Import error:', error);
+          toast.error('Failed to import data');
+      }
+  };function s2ab(s: string) {
     const buf = new ArrayBuffer(s.length);
     const view = new Uint8Array(buf);
     for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
