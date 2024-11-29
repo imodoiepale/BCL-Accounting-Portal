@@ -126,7 +126,6 @@ export const DraggableColumns = ({
               <thead>
                 <tr className="grid grid-cols-[60px,1fr,1fr,1fr,1fr,120px] gap-2 p-2 bg-gray-50">
                   <th>#</th>
-                  <th>Column Name</th>
                   <th>Display Name</th>
                   <th>Table Name</th>
                   <th>Options</th>
@@ -149,10 +148,8 @@ export const DraggableColumns = ({
                             }`}
                         >
                           <td className="flex items-center">
-                            <DragHandle />
                             <span className="ml-2">{index + 1}</span>
                           </td>
-                          <td>{columnName}</td>
                           <td>{value}</td>
                           <td>{tableName}</td>
                           <td>

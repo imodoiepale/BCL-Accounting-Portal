@@ -15,6 +15,8 @@ interface EditableCellProps {
     companyId?: number | string; // Add this line
     className?: string;
     field: any;
+    activeMainTab: string;
+    activeSubTab: string;
 }
 export const EditableCell = ({
     value: initialValue,
@@ -26,6 +28,8 @@ export const EditableCell = ({
     companyId,
     className,
     field,
+    activeMainTab,
+    activeSubTab,
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(initialValue);
@@ -36,43 +40,56 @@ export const EditableCell = ({
     useEffect(() => {
         setEditValue(initialValue);
     }, [initialValue]);
-
+    
     const fetchDropdownOptions = async () => {
         try {
             console.log('Fetching dropdown options for:', fieldName);
+            const [tableName, columnName] = fieldName.split('.');
+            
             const { data, error } = await supabase
-                .from('profile_category_table_mapping')
-                .select('field_dropdowns');
-
-            if (error) {
-                console.error('Error fetching dropdowns:', error);
-                return;
-            }
-
-            // Combine and parse all field_dropdowns
-            const allDropdowns = data.reduce((acc, curr) => {
-                try {
-                    const dropdowns = typeof curr.field_dropdowns === 'string'
-                        ? JSON.parse(curr.field_dropdowns)
-                        : curr.field_dropdowns;
-                    return { ...acc, ...dropdowns };
-                } catch (error) {
-                    console.error('Error parsing dropdowns:', error);
-                    return acc;
+                .from('profile_category_table_mapping_2')
+                .select('*');
+    
+            if (error) throw error;
+    
+            // Find all relevant structures
+            const matchingStructures = data.filter(item => 
+                item.structure?.sections?.some(section =>
+                    section.subsections?.some(subsection =>
+                        subsection.fields?.some(field =>
+                            field.table === tableName && 
+                            field.name === columnName
+                        )
+                    )
+                )
+            );
+    
+            // Get the field with dropdown options
+            for (const structure of matchingStructures) {
+                const field = structure.structure.sections
+                    .flatMap(section => section.subsections)
+                    .flatMap(subsection => subsection.fields)
+                    .find(field => 
+                        field.table === tableName && 
+                        field.name === columnName
+                    );
+    
+                if (field?.dropdownOptions?.length > 0) {
+                    console.log('Found dropdown options:', field.dropdownOptions);
+                    setDropdownOptions(field.dropdownOptions);
+                    return;
                 }
-            }, {});
-
-            const options = allDropdowns[fieldName];
-            if (Array.isArray(options) && options.length > 0) {
-                setDropdownOptions(options);
-            } else {
-                setDropdownOptions([]);
             }
+    
+            setDropdownOptions([]);
+    
         } catch (error) {
             console.error('Error in fetchDropdownOptions:', error);
-            toast.error('Failed to fetch dropdown options');
+            setDropdownOptions([]);
         }
     };
+    
+    
     // Helper function to parse table names
     const parseTableNames = (mappings) => {
         return mappings.reduce((acc, mapping) => {
@@ -104,8 +121,8 @@ export const EditableCell = ({
                 const today = new Date();
                 const [tableName, columnName] = fieldName.split('.');
                 let changedValues = { [columnName]: editValue };
-
-                // Handle effective date fields
+    
+                // Define effective date fields and their corresponding status/flag fields
                 const effectiveDateFields = {
                     'acc_client_effective_to': {
                         status: 'acc_client_status',
@@ -124,54 +141,39 @@ export const EditableCell = ({
                         flag: 'cps_sheria_client'
                     }
                 };
-
-                if (fieldName in effectiveDateFields) {
+                
+                // Check if current field is an effective date field
+                if (columnName in effectiveDateFields) {
                     const effectiveDate = new Date(editValue);
-                    const { status, flag } = effectiveDateFields[fieldName];
-                    changedValues[status] = effectiveDate > today ? 'Active' : 'Inactive';
-                    changedValues[flag] = effectiveDate > today ? 'Yes' : 'No';
+                    const { status, flag } = effectiveDateFields[columnName];
+                    
+                    // Update status and flag based on date comparison
+                    changedValues[status] = effectiveDate >= today ? 'Active' : 'Inactive';
+                    changedValues[flag] = effectiveDate >= today ? 'Yes' : 'No';
                 }
-
-                const { data: mappings, error: mappingError } = await supabase
-                    .from('profile_category_table_mapping')
-                    .select('*');
-
-                if (mappingError) throw mappingError;
-
-                const allTableNames = parseTableNames(mappings);
-
-                if (allTableNames.includes(tableName)) {
-                    const query = supabase
-                        .from(tableName)
-                        .update(changedValues);
-
-                    // Primary update condition using the source table's ID
-                    if (rowId) {
-                        query.eq('id', rowId);
-                    }
-
-                    const { error: updateError } = await query;
-
-                    if (updateError) throw updateError;
-
-                    console.log(`Updated field ${fieldName} in table: ${tableName} with ID: ${rowId}`);
-                    setEditValue(editValue);
-                    onSave(editValue);
-                    await refreshData(); 
-                    setIsEditing(false);
-                    toast.success('Updated successfully');
-                } else {
-                    toast.error(`Table "${tableName}" not found`);
-                }
+    
+                const { error: updateError } = await supabase
+                    .from(tableName)
+                    .update(changedValues)
+                    .eq('id', rowId);
+    
+                if (updateError) throw updateError;
+    
+                setEditValue(editValue);
+                onSave(editValue);
+                await refreshData();
+                setIsEditing(false);
+                toast.success('Updated successfully');
             } catch (error) {
                 console.error('Error during update operation:', error);
-                toast.error('Update failed: ' + (error.message || 'Unexpected error'));
+                toast.error('Update failed');
                 setEditValue(initialValue);
             }
         } else {
             setIsEditing(false);
         }
     };
+    
 
     const handleDoubleClick = async () => {
         console.log('Double clicked field:', fieldName);
