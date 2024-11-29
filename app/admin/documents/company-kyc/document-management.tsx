@@ -283,7 +283,7 @@ const MissingDocumentsModal = ({ missingDocuments, onClose, onUpload }) => {
         >
           <X className="w-5 h-5" />
         </button>
-        <h2 className="text-lg font-semibold mb-4">Missing Documents</h2>
+        <h2 className="text-lg  font-semibold mb-4">Missing Documents</h2>
         <div className="max-h-[70vh] overflow-y-auto">
           <ul>
             {missingDocuments.map(doc => (
@@ -975,7 +975,7 @@ const DocumentManagement = () => {
                           setMissingDocuments(missingDocs);
                           setShowMissingDocumentsModal(true);
                         }}
-                        className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 text-sm"
+                        className="px-3 py-1 bg-white text-red-600 rounded-md hover:bg-blue-100 text-sm"
                       >
                         {calculateMissingDocuments(company.id)}
                       </button>
