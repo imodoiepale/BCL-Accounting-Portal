@@ -34,6 +34,8 @@ const adminNavItems = [
     children: [
       { href: "/admin/documents/company-kyc", icon: FileIcon, label: "Company KYC Documents" },
       { href: "/admin/documents/directors_docs", icon: FileIcon, label: "Director KYC Documents" },
+      { href: "/admin/documents/suppliers_doc", icon: FileIcon, label: "Suppliers KYC Documents" },
+      { href: "/admin/documents/bank_kyc", icon: FileIcon, label: "Bank KYC Documents" },
       { href: "/admin/documents/others", icon: FileIcon, label: "Other Documents" }
     ]
   },
@@ -138,7 +140,7 @@ export function Sidebar() {
         ${isExpanded ? '' : 'justify-center'}
       `}>
         {isExpanded && (
-          <span className="text-xl font-semibold text-gray-800">BCL Portal</span>
+          <span className="text-xl font-semibold text-blue-800">BCL Portal</span>
         )}
       </div>
 

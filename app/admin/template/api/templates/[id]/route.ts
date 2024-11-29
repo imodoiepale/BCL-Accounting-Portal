@@ -128,7 +128,7 @@ export async function GET(
 
   if (!template) {
     return NextResponse.json(
-      { error: 'Template not found' }, 
+      { error: 'Template not found' },
       { status: 404 }
     );
   }
