@@ -55,7 +55,6 @@ interface SettingsDialogProps {
   }
   
 
-
 interface StructureItem {
     id: number;
     section: string;
@@ -2139,4 +2138,3 @@ export default function SettingsDialog({
         </>
     );
 }
-export default SettingsDialog;
