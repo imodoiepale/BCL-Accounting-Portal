@@ -2139,3 +2139,4 @@ export default function SettingsDialog({
         </>
     );
 }
+export default SettingsDialog;
