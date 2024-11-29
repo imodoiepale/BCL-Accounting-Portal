@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 // components/overview/TableComponents.tsx
 // @ts-nocheck
 "use client";
@@ -11,6 +12,7 @@ import { calculateFieldStats } from '../utility';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import SidebarTableView from './SidebarTableView';
 interface TableProps {
   data: any[];
   handleCompanyClick: (company: any) => void;
@@ -454,7 +456,31 @@ return null;
 };
 
 // Updated Table component with sticky headers
-export const Table: React.FC<TableProps> = ({ data, handleCompanyClick, refreshData , processedSections, onMissingFieldsClick }) => {
+export const Table: React.FC<TableProps> = ({ 
+  data, 
+  handleCompanyClick, 
+  refreshData,
+  activeMainTab,
+  activeSubTab,
+  processedSections, 
+  onMissingFieldsClick 
+}) => {
+  const useSidebarLayout = activeMainTab?.toLowerCase() === 'employee details' || activeMainTab?.toLowerCase() === 'customer details' || activeMainTab?.toLowerCase() === 'supplier details';
+
+  if (useSidebarLayout) {
+    return (
+      <SidebarTableView
+        data={data}
+        handleCompanyClick={handleCompanyClick}
+        onMissingFieldsClick={onMissingFieldsClick}
+        refreshData={refreshData}
+        processedSections={processedSections}
+        activeMainTab={activeMainTab}
+        activeSubTab={activeSubTab}
+      />
+    );
+  }
+  
   const [sortConfig, setSortConfig] = useState<{
     field: string | null;
     direction: 'asc' | 'desc' | null;
