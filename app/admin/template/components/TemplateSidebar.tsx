@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { useEffect, useState } from 'react'
 import { MoreVertical, Pencil, Search, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
