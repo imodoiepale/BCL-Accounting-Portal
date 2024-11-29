@@ -508,7 +508,29 @@ const OverallView = () => {
 
                         {/* Import/Export buttons */}
                         <div className="flex gap-2">
-                            <SettingsDialog />
+                            {/* <SettingsDialog /> */}
+                            <SettingsDialog
+                                processedSections={[]}
+                                helperColumnConfigs={{
+                                    calculation: {},
+                                    reference: {}
+                                }}
+                                visibility={{
+                                    sections: {},
+                                    categories: {},
+                                    subcategories: {}
+                                }}
+                                helperColumns={{
+                                    calculation: {},
+                                    reference: {}
+                                }}
+                                onHelperColumnChange={() => { }}
+                                mainTabs={[]}
+                                mainSections={{}}
+                                mainSubsections={{}}
+                                onStructureChange={() => { }}
+                                onVisibilityChange={() => { }}
+                            />
                             <Button
                                 onClick={() => setIsImportDialogOpen(true)}
                                 className="flex items-center gap-2"
