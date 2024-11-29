@@ -1,13 +1,15 @@
 // @ts-nocheck
 'use client'
 
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from '@/lib/supabaseClient';
 import { Input } from "@/components/ui/input";
-import { Eye, DownloadIcon, UploadIcon } from 'lucide-react';
+import { Eye, DownloadIcon, UploadIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import toast, { Toaster } from 'react-hot-toast';
 import { DocumentActions } from './DocumentComponents';
@@ -17,6 +19,7 @@ import {
   saveExtractedData,
   validateExtractedData
 } from '@/lib/extractionUtils';
+
 
 interface Upload {
   id: string;
@@ -37,12 +40,17 @@ interface Company {
 interface Document {
   id: string;
   name: string;
+  category: string;
   fields?: Array<{
     id: string;
     name: string;
     type: string;
   }>;
   last_extracted_details?: Record<string, any>;
+}
+
+interface CategoryState {
+  [key: string]: boolean;
 }
 
 export default function CompanyKycDocumentDetails() {
@@ -58,8 +66,10 @@ export default function CompanyKycDocumentDetails() {
   const [selectedExtractDocument, setSelectedExtractDocument] = useState<Document | null>(null);
   const [selectedExtractUpload, setSelectedExtractUpload] = useState<Upload | null>(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [isExtracting, setIsExtracting] = useState(false);
-
+  const [expandedCategories, setExpandedCategories] = useState({
+    'sheria-docs': false,
+    'kra-docs': false,
+  });
 
   const queryClient = useQueryClient();
   const parentRef = useRef<HTMLDivElement>(null);
@@ -85,17 +95,31 @@ export default function CompanyKycDocumentDetails() {
     },
     staleTime: 1000 * 60 * 5,
   });
+  
+ 
 
-  const { data: documents = [], isLoading: isLoadingDocuments } = useQuery({
+
+  const { data: documents = {}, isLoading: isLoadingDocuments } = useQuery({
     queryKey: ['documents'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('acc_portal_kyc')
         .select('*')
-        .eq('category', 'company-docs');
+        .eq('category', 'company-docs'); // Keep the main category filter
 
       if (error) throw error;
-      return data || [];
+
+      // Group documents by subcategory
+      const groupedDocs = data.reduce((acc, doc) => {
+        const category = doc.subcategory === 'EMPTY' ? 'general' : doc.subcategory;
+        if (!acc[category]) {
+          acc[category] = [];
+        }
+        acc[category].push(doc);
+        return acc;
+      }, {});
+
+      return groupedDocs;
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -135,7 +159,6 @@ export default function CompanyKycDocumentDetails() {
     mutationFn: async ({ companyId, documentId, file, extractOnUpload, onProgress }) => {
       try {
         onProgress?.('Uploading file...');
-
         const timestamp = new Date().getTime();
         const fileName = `${companyId}/${documentId}/${timestamp}_${file.name}`;
 
@@ -160,9 +183,10 @@ export default function CompanyKycDocumentDetails() {
 
         if (error) throw error;
 
-        // If extractOnUpload is true, show extraction modal
         if (extractOnUpload) {
-          setSelectedExtractDocument(documents.find(d => d.id === documentId));
+          setSelectedExtractDocument(Object.values(documents)
+            .flat()
+            .find(d => d.id === documentId));
           setSelectedExtractUpload(uploadResult);
           setShowExtractModal(true);
           return uploadResult;
@@ -187,9 +211,6 @@ export default function CompanyKycDocumentDetails() {
     }
   });
 
-
-
-
   const extractionMutation = useMutation({
     mutationFn: async ({ uploadId, extractedData, documentId }) => {
       if (!uploadId || !documentId) {
@@ -201,8 +222,10 @@ export default function CompanyKycDocumentDetails() {
         return acc;
       }, {});
 
-      // First validate the data
-      const document = documents.find(d => d.id === documentId);
+      const document = Object.values(documents)
+        .flat()
+        .find(d => d.id === documentId);
+      
       if (document && !validateExtractedData(sanitizedData, document.fields || [])) {
         throw new Error('Invalid extracted data format');
       }
@@ -243,6 +266,12 @@ export default function CompanyKycDocumentDetails() {
     }
   });
 
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
 
   const handleExtractComplete = async (extractedData: any) => {
     try {
@@ -254,7 +283,6 @@ export default function CompanyKycDocumentDetails() {
         extractedData
       });
 
-      // Close both modals if this was from an upload
       setShowUploadModal(false);
       setShowExtractModal(false);
 
@@ -266,14 +294,11 @@ export default function CompanyKycDocumentDetails() {
 
   const handleCancelExtraction = () => {
     setShowExtractModal(false);
-    // If this was from an upload, we need to delete the upload
     if (uploadMutation.isSuccess && selectedExtractUpload) {
-      // Delete the uploaded file
       supabase.storage
         .from('kyc-documents')
         .remove([selectedExtractUpload.filepath])
         .then(() => {
-          // Delete the upload record
           supabase
             .from('acc_portal_kyc_uploads')
             .delete()
@@ -324,11 +349,6 @@ export default function CompanyKycDocumentDetails() {
     setShowExtractModal(true);
   };
 
-  const handleSort = (key: string) => {
-    const direction = sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc';
-    setSortConfig({ key, direction });
-  };
-
   const sortedCompanies = React.useMemo(() => {
     if (!sortConfig.key) return companies;
     return [...companies].sort((a, b) => {
@@ -342,65 +362,175 @@ export default function CompanyKycDocumentDetails() {
     });
   }, [companies, sortConfig]);
 
+  const renderSidebar = () => (
+    <div className="w-1/5 min-w-[200px] border-r overflow-hidden flex flex-col">
+      <div className="p-2">
+        <h2 className="text-sm font-bold mb-2">Documents</h2>
+        <Input
+          type="text"
+          placeholder="Search documents..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="mb-2 h-8 text-xs"
+        />
+      </div>
+
+      <div ref={parentRef} className="overflow-y-auto flex-1">
+        {isLoadingDocuments ? (
+          <div className="p-2 text-xs">Loading documents...</div>
+        ) : (
+          <div className="space-y-2">
+            {/* General Documents (EMPTY subcategory) */}
+            {documents['general'] && documents['general'].length > 0 && (
+              <div className="border-b last:border-b-0">
+                <div
+                  className="flex items-center px-2 py-1 cursor-pointer hover:bg-gray-50"
+                  onClick={() => toggleCategory('general')}
+                >
+                  {expandedCategories['general'] ? (
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 mr-1" />
+                  )}
+                  <span className="text-xs font-semibold">
+                    General Documents
+                  </span>
+                </div>
+                {expandedCategories['general'] && (
+                  <ul className="pl-6">
+                    {documents['general'].map((doc) => (
+                      <DocumentItem
+                        key={doc.id}
+                        document={doc}
+                        isSelected={selectedDocument?.id === doc.id}
+                        onSelect={() => setSelectedDocument(doc)}
+                        onAddField={() => {
+                          setSelectedDocument(doc);
+                          setIsAddFieldOpen(true);
+                        }}
+                        onUpdateFields={updateFieldsMutation.mutate}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Sheria Documents */}
+            {documents['sheria-docs'] && documents['sheria-docs'].length > 0 && (
+              <div className="border-b last:border-b-0">
+                <div
+                  className="flex items-center px-2 py-1 cursor-pointer hover:bg-gray-50"
+                  onClick={() => toggleCategory('sheria-docs')}
+                >
+                  {expandedCategories['sheria-docs'] ? (
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 mr-1" />
+                  )}
+                  <span className="text-xm font-semibold text-blue-800">
+                    Sheria Documents
+                  </span>
+                </div>
+                {expandedCategories['sheria-docs'] && (
+                  <ul className="pl-6">
+                    {documents['sheria-docs'].map((doc) => (
+                      <DocumentItem
+                        key={doc.id}
+                        document={doc}
+                        isSelected={selectedDocument?.id === doc.id}
+                        onSelect={() => setSelectedDocument(doc)}
+                        onAddField={() => {
+                          setSelectedDocument(doc);
+                          setIsAddFieldOpen(true);
+                        }}
+                        onUpdateFields={updateFieldsMutation.mutate}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* KRA Documents */}
+            {documents['kra-docs'] && documents['kra-docs'].length > 0 && (
+              <div className="border-b last:border-b-0">
+                <div
+                  className="flex items-center px-2 py-1 cursor-pointer hover:bg-gray-50"
+                  onClick={() => toggleCategory('kra-docs')}
+                >
+                  {expandedCategories['kra-docs'] ? (
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 mr-1" />
+                  )}
+                  <span className="text-xm font-semibold text-blue-800">
+                    KRA Documents
+                  </span>
+                </div>
+                {expandedCategories['kra-docs'] && (
+                  <ul className="pl-6">
+                    {documents['kra-docs'].map((doc) => (
+                      <DocumentItem
+                        key={doc.id}
+                        document={doc}
+                        isSelected={selectedDocument?.id === doc.id}
+                        onSelect={() => setSelectedDocument(doc)}
+                        onAddField={() => {
+                          setSelectedDocument(doc);
+                          setIsAddFieldOpen(true);
+                        }}
+                        onUpdateFields={updateFieldsMutation.mutate}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const DocumentItem = ({ document, isSelected, onSelect, onAddField, onUpdateFields }) => (
+    <li
+      className={`px-2 py-1 rounded flex items-center justify-between text-xs ${
+        isSelected
+          ? 'bg-primary text-primary-foreground'
+          : 'hover:bg-gray-100'
+      }`}
+    >
+      <span
+        className="cursor-pointer flex-1"
+        onClick={onSelect}
+      >
+        {document.name}
+      </span>
+      <DocumentActions
+        document={document}
+        onAddField={onAddField}
+        onUpdateFields={(documentId, fields) => {
+          onUpdateFields({ documentId, fields });
+        }}
+      />
+    </li>
+  );
+
   return (
     <div className="flex overflow-hidden">
       <Toaster position="top-right" />
+      
+      {renderSidebar()}
 
-      {/* Left sidebar - Documents List */}
-      <div className="w-1/5 min-w-[200px] border-r overflow-hidden flex flex-col">
-        <div className="p-2">
-          <h2 className="text-sm font-bold mb-2">Documents</h2>
-          <Input
-            type="text"
-            placeholder="Search documents..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="mb-2 h-8 text-xs"
-          />
-        </div>
-
-        <div ref={parentRef} className="overflow-y-auto flex-1">
-          {isLoadingDocuments ? (
-            <div className="p-2 text-xs">Loading documents...</div>
-          ) : (
-            <ul>
-              {documents.map((doc) => (
-                <li
-                  key={doc.id}
-                  className={`px-2 py-1 rounded flex items-center justify-between text-xs ${selectedDocument?.id === doc.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-gray-100'
-                    }`}
-                >
-                  <span
-                    className="cursor-pointer flex-1"
-                    onClick={() => setSelectedDocument(doc)}
-                  >
-                    {doc.name}
-                  </span>
-                  <DocumentActions
-                    document={doc}
-                    onAddField={() => {
-                      setSelectedDocument(doc);
-                      setIsAddFieldOpen(true);
-                    }}
-                    onUpdateFields={(documentId, fields) => {
-                      updateFieldsMutation.mutate({ documentId, fields });
-                    }}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-
-      {/* Right side - Company Fields Table */}
       <div className="flex-1 flex flex-col h-[800px] overflow-hidden">
         {selectedDocument ? (
           <div className="flex flex-col h-full">
             <h2 className="text-sm font-bold p-2 border-b">
               {selectedDocument.name} - Details
+              <span className="ml-2 text-xs font-normal text-gray-500 capitalize">
+                ({selectedDocument.category.replace('-docs', ' Documents')})
+              </span>
             </h2>
 
             <div className="overflow-auto flex-1">
@@ -475,7 +605,6 @@ export default function CompanyKycDocumentDetails() {
                               >
                                 <UploadIcon className="h-4 w-4 text-orange-500" />
                               </Button>
-                              
                             )}
                           </div>
                         </TableCell>
