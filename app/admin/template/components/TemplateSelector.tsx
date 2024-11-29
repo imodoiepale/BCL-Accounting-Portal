@@ -28,7 +28,8 @@ export default function TemplateSelector() {
   return (
     <div className="mb-6">
       <h2 className="text-xl font-semibold mb-2">Select a Template</h2>
-      <Select onValueChange={handleTemplateChange} value={localSelectedTemplate}>
+      {/* <Select onValueChange={handleTemplateChange} value={localSelectedTemplate}> */}
+      <Select value={localSelectedTemplate}>
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Choose a template" />
         </SelectTrigger>
