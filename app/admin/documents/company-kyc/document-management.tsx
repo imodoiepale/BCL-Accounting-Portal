@@ -69,8 +69,12 @@ interface ViewModalProps {
   url: string | null;
   setShowViewModal: (show: boolean) => void;
 }
+
 const DocumentViewer: React.FC<{ documents: any[]; onClose: () => void }> = ({ documents, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const sortedDocs = [...documents].sort((a, b) =>
     new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()
   );
@@ -184,8 +188,8 @@ const DocumentActions = ({ onView, onUpload, onDownload, documentCount = 0 }) =>
 };
 
 const handleViewDocuments = async (document: Document, company: Company) => {
-  const relevantUploads = uploads.filter(u => 
-    u.kyc_document_id === document.id && 
+  const relevantUploads = uploads.filter(u =>
+    u.kyc_document_id === document.id &&
     u.userid === company.id.toString()
   );
 
@@ -234,7 +238,7 @@ const handleMultiUpload = async (files: UploadFile[]) => {
       files.map(async ({ file, issueDate, expiryDate }) => {
         const timestamp = new Date().getTime();
         const fileName = `${selectedCompany.id}/${selectedDocument.id}/${timestamp}_${file.name}`;
-        
+
         // Upload file
         const { data: fileData, error: fileError } = await supabase
           .storage
@@ -987,8 +991,9 @@ const DocumentManagement = () => {
                                 u.userid === company.id.toString()
                               ) ? (
                                 <DocumentActions
+                                  hasDocuments={true}
                                   onView={() => handleViewDocument(doc, company)}
-                                  onUpdate={() => {
+                                  onUpload={() => {
                                     setSelectedCompany(company);
                                     setSelectedDocument(doc);
                                     setShowUploadModal(true);
@@ -996,16 +1001,18 @@ const DocumentManagement = () => {
                                   onDownload={() => handleDownloadDocument(doc, company)}
                                 />
                               ) : (
-                                <button
-                                  onClick={() => {
-                                    setSelectedCompany(company);
-                                    setSelectedDocument(doc);
-                                    setShowUploadModal(true);
-                                  }}
-                                  className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 text-sm"
-                                >
-                                  Upload
-                                </button>
+                                <div className="flex justify-center space-x-2">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedCompany(company);
+                                      setSelectedDocument(doc);
+                                      setShowUploadModal(true);
+                                    }}
+                                    className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 text-sm inline-flex items-center"
+                                  >
+                                    <Plus className="w-4 h-4 mr-1" />
+                                  </button>
+                                </div>
                               )}
                             </td>
                           )}
