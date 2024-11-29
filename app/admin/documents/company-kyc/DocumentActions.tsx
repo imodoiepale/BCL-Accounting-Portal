@@ -82,7 +82,6 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ documents, onClose }) =
   );
 };
 
-// Modified Document Actions Component
 
 export const DocumentActions: React.FC<DocumentActionsProps> = ({
   onView,
