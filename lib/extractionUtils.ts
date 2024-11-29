@@ -115,7 +115,8 @@ export const performExtraction = async (
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'Qwen/Qwen2-VL-72B-Instruct',
+        model: 'Qwen/Qwen2-VL-7B-Instruct',
+        
         messages: [
           {
             role: 'system',
@@ -128,9 +129,9 @@ export const performExtraction = async (
             content
           }
         ],
-        max_tokens: 512,
-        temperature: 0.1,
-        top_p: 0.01,
+        max_tokens: 2048,
+        temperature: 0.7,
+        top_p: 0.9,
         stream: false
       }),
     });
