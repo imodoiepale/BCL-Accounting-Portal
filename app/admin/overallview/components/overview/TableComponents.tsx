@@ -17,6 +17,8 @@ interface TableProps {
   onMissingFieldsClick: (company: any) => void;
   processedSections: any[];
   refreshData: () => Promise<void>; // Add this line
+  activeMainTab: any[];
+  activeSubTab: any[];
   }
   
 interface SortConfig {
@@ -317,7 +319,9 @@ const renderDataRows = (
   handleCompanyClick: (company: any) => void,
   onMissingFieldsClick: (company: any) => void,
   processedSections: any[],
-  refreshData: () => Promise<void> 
+  refreshData: () => Promise<void> ,
+  activeMainTab: any[],
+  activeSubTab: any[]
 ) => {
   return data.map((companyGroup, groupIndex) => (
     companyGroup.rows.map((row, rowIndex) => (
@@ -408,6 +412,8 @@ const renderDataRows = (
                         companyName={row.company_name}
                         className="hover:text-primary"
                         refreshData={refreshData}
+                        activeMainTab={activeMainTab}
+                        activeSubTab={activeSubTab}
                       />
                     </TableCell>
                   </React.Fragment>
@@ -440,7 +446,9 @@ const renderDataRows = (
                         dropdownOptions={field.dropdownOptions}
                         rowId={row.id}
                         companyName={row.company_name}
-                        refreshData={refreshData}
+                        refreshData={refreshData}   
+                        activeMainTab={activeMainTab}
+                        activeSubTab={activeSubTab}
                       />
                     </TableCell>
                   </React.Fragment>
@@ -472,6 +480,8 @@ const renderDataRows = (
                       rowId={row.id}
                       companyName={row.company_name}
                       refreshData={refreshData}
+                      activeMainTab={activeMainTab}
+                      activeSubTab={activeSubTab}
                     />
                   </TableCell>
                   {fieldIndex < fieldsArray.length - 1 &&
@@ -487,7 +497,7 @@ const renderDataRows = (
   ));
 };
 // Updated Table component with sticky headers
-export const Table: React.FC<TableProps> = ({ data, handleCompanyClick, refreshData , processedSections, onMissingFieldsClick }) => {
+export const Table: React.FC<TableProps> = ({ data, handleCompanyClick, refreshData ,activeSubTab,activeMainTab, processedSections, onMissingFieldsClick }) => {
   const [sortConfig, setSortConfig] = useState<{
     field: string | null;
     direction: 'asc' | 'desc' | null;
@@ -534,7 +544,7 @@ if (!processedSections || !Array.isArray(processedSections)) {
   {renderStatisticsRows(data, processedSections)}
 </TableHeader>
             <TableBody>
-            {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, processedSections, refreshData)}
+            {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, processedSections, refreshData, activeSubTab, activeMainTab)}
             </TableBody>
           </UITable>
         </ScrollArea>

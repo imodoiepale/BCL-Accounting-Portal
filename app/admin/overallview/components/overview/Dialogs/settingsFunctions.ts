@@ -229,39 +229,54 @@ export  const handleAddField = async () => {
     }
 };
 
-  export const handleDeleteField = async (key: string) => {
-    if (!selectedSection) return;
+export const handleDeleteField = async (
+  key: string,
+  structure: any[],
+  selectedTab: string,
+  selectedSection: any,
+  selectedSubsection: string,
+  supabase: any,
+  fetchStructure: () => Promise<void>
+) => {
+  const { data: currentData, error: fetchError } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('*')
+      .eq('Tabs', selectedTab)
+      .single();
 
-    try {
-      // Delete column mapping
-      const { error: deleteError } = await supabase.rpc('delete_column_mapping_overalltable', {
-        p_table_name: selectedSection.table_name,
-        p_column_name: key
-      });
+  if (fetchError) throw fetchError;
 
-      if (deleteError) throw deleteError;
-
-      // Refresh the table columns
-      await fetchTableColumns(selectedSection.table_name);
-
-      // Refresh the selected section to get updated mappings
-      const { data: updatedSection } = await supabase
-        .from('profile_category_table_mapping')
-        .select('*')
-        .eq('id', selectedSection.id)
-        .single();
-
-      if (updatedSection) {
-        setSelectedSection(updatedSection);
-      }
-
-      toast.success('Field removed successfully');
-
-    } catch (error) {
-      console.error('Error removing field:', error);
-      toast.error('Failed to remove field');
-    }
+  const updatedStructure = {
+      order: currentData.structure.order || {},
+      sections: currentData.structure.sections.map(section => ({
+          ...section,
+          subsections: section.subsections.map(subsection => {
+              if (subsection.name === selectedSubsection) {
+                  return {
+                      ...subsection,
+                      fields: subsection.fields.filter(field => 
+                          `${field.table}-${field.name}` !== key
+                      )
+                  };
+              }
+              return subsection;
+          })
+      })),
+      visibility: currentData.structure.visibility || {},
+      relationships: currentData.structure.relationships || {}
   };
+
+  await supabase
+      .from('profile_category_table_mapping_2')
+      .update({ 
+          structure: updatedStructure,
+          updated_at: new Date().toISOString()
+      })
+      .eq('id', currentData.id);
+
+  await fetchStructure();
+  toast.success('Field removed from mappings successfully');
+};
 
   export const handleCreateTable = async (tableName: string) => {
     setLoadingTable(true);
@@ -387,12 +402,22 @@ export  const handleAddField = async () => {
         }
       }
   
+      // Fetch fresh data after updates
+      const { data: freshData, error: refreshError } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('*');
+  
+      if (refreshError) throw refreshError;
+  
       toast.success(`${type} updated successfully`);
+      return freshData;
     } catch (error) {
       console.error('Update error:', error);
       toast.error(`Failed to update ${type}`);
+      throw error;
     }
   };
+  
   // Add this function to generate indices
   export const generateIndices = (structure: any[]) => {
     const indexMapping = {
@@ -452,7 +477,7 @@ export  const handleAddField = async () => {
 export const handleTabSelection = async (
   tabValue: string,
   isNewStructure: boolean,
-  supabaseClient: any,
+  supabase: any,
   stateSetters: {
     setExistingSections: (sections: string[]) => void;
     setExistingSubsections: (subsections: Record<string, string[]>) => void;
@@ -490,7 +515,7 @@ export const handleTabSelection = async (
     const processedTabValue = typeof tabValue === 'object' ? tabValue?.name || '' : tabValue;
     setSelectedTab(processedTabValue);
 
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from('profile_category_table_mapping_2')
       .select('structure')
       .eq('Tabs', processedTabValue)
@@ -567,7 +592,7 @@ export const mergeAndProcessStructure = (data: any) => {
 
 export const handleSectionSelection = async (
   sectionValue: string,
-  supabaseClient: any,
+  supabase: any,
   setNewStructure: (value: any) => void,
   setSelectedTables: (tables: string[]) => void,
   setSelectedTableFields: (fields: any) => void,
@@ -584,7 +609,7 @@ export const handleSectionSelection = async (
       return;
     }
 
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from('profile_category_table_mapping')
       .select('*')
       .filter('sections_sections', 'cs', `{"${sectionValue}": true}`);
@@ -645,7 +670,7 @@ export const handleSectionSelection = async (
 
 export const handleSubsectionSelection = async (
   subsectionValue: string,
-  supabaseClient: any,
+  supabase: any,
   setNewStructure: (value: any) => void,
   setSelectedTables: (tables: string[]) => void,
   setSelectedTableFields: (fields: any) => void,
@@ -723,66 +748,83 @@ export const handleSubsectionSelection = async (
   }
 };
 
-export const handleAddExistingFields = async () => {
+export const handleAddExistingFields = async (
+  selectedTableFields: { [table: string]: string[] },
+  selectedTab: string,
+  selectedSection: any,
+  selectedSubsection: string,
+  structure: any[],
+  supabase: any,
+  fetchStructure: () => Promise<void>,
+  setAddFieldDialogOpen: (open: boolean) => void
+) => {
   try {
     if (Object.keys(selectedTableFields).length === 0) {
       toast.error('Please select at least one field');
       return;
     }
 
-    const currentStructure = structure.find(item =>
-      item.Tabs === selectedTab &&
-      item.sections_sections &&
-      Object.keys(item.sections_sections).includes(selectedSection.section) &&
-      item.sections_subsections &&
-      item.sections_subsections[selectedSection.section] === selectedSubsection
-    );
-
-    if (!currentStructure) {
+    const currentItem = structure.find(item => item.Tabs === selectedTab);
+    if (!currentItem) {
       toast.error('No matching structure found');
       return;
     }
 
-    const existingMappings = typeof currentStructure.column_mappings === 'string'
-      ? JSON.parse(currentStructure.column_mappings)
-      : currentStructure.column_mappings || {};
+    const section = currentItem.sections.find(
+      s => s.name === selectedSection?.section
+    );
+    if (!section) {
+      throw new Error('Section not found');
+    }
 
-    const updatedMappings = { ...existingMappings };
-    const updatedTableNames = typeof currentStructure.table_names === 'string'
-      ? JSON.parse(currentStructure.table_names)
-      : currentStructure.table_names || {};
+    const subsection = section.subsections.find(
+      sub => sub.name === selectedSubsection
+    );
+    if (!subsection) {
+      throw new Error('Subsection not found');
+    }
 
-    Object.entries(selectedTableFields).forEach(([table, fields]) => {
-      fields.forEach(field => {
-        const key = `${table}.${field}`;
-        if (!updatedMappings[key]) {
-          updatedMappings[key] = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        }
-      });
-
-      if (!updatedTableNames[selectedSection.section]) {
-        updatedTableNames[selectedSection.section] = [];
-      }
-      if (!updatedTableNames[selectedSection.section].includes(table)) {
-        updatedTableNames[selectedSection.section].push(table);
-      }
-    });
+    // Create updated structure
+    const updatedStructure = {
+      order: currentItem.order || {},
+      sections: currentItem.sections.map(sect => ({
+        ...sect,
+        subsections: sect.subsections.map(sub => {
+          if (sub.name === selectedSubsection) {
+            const newFields = Object.entries(selectedTableFields).flatMap(([table, fields]) =>
+              fields.map((field, index) => ({
+                name: field,
+                display: field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                table: table,
+                order: sub.fields.length + index + 1,
+                visible: true,
+                dropdownOptions: []
+              }))
+            );
+            return {
+              ...sub,
+              fields: [...sub.fields, ...newFields],
+              tables: [...new Set([...sub.tables, ...Object.keys(selectedTableFields)])]
+            };
+          }
+          return sub;
+        })
+      })),
+      visibility: currentItem.visibility || {},
+      relationships: currentItem.relationships || {}
+    };
 
     const { error } = await supabase
-      .from('profile_category_table_mapping')
-      .update({
-        column_mappings: updatedMappings,
-        table_names: updatedTableNames,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', currentStructure.id);
+      .from('profile_category_table_mapping_2')
+      .update({ structure: updatedStructure })
+      .eq('id', currentItem.id);
 
     if (error) throw error;
 
     await fetchStructure();
     setAddFieldDialogOpen(false);
-    resetAddFieldState();
     toast.success('Fields added successfully');
+
   } catch (error) {
     console.error('Error adding existing fields:', error);
     toast.error('Failed to add fields');
@@ -795,65 +837,89 @@ export const handleSaveFieldEdit = async (
   selectedTab: string,
   selectedSection: any,
   selectedSubsection: string,
-  supabaseClient: any,
-  fetchStructure: () => Promise<void>
+  supabase: any,
+  fetchStructure: () => Promise<void>,
+  setEditFieldDialogOpen: (open: boolean) => void
 ) => {
   try {
     const currentItem = structure.find(item => item.Tabs === selectedTab);
-    if (!currentItem || !currentItem.id) {
+    if (!currentItem) {
       throw new Error('Invalid structure ID');
     }
 
+    const section = currentItem.sections.find(
+      s => s.name === selectedSection?.section
+    );
+    if (!section) {
+      throw new Error('Section not found');
+    }
+
+    const subsection = section.subsections.find(
+      sub => sub.name === selectedSubsection
+    );
+    if (!subsection) {
+      throw new Error('Subsection not found');
+    }
+
+    const [tableName, fieldName] = editingField.key.split('-');
+
     const updatedStructure = {
-      order: currentItem.structure.order,
-      sections: currentItem.structure.sections.map(section => {
-        if (section.name === selectedSection?.section) {
-          return {
-            ...section,
-            subsections: section.subsections.map(subsection => {
-              if (subsection.name === selectedSubsection) {
-                return {
-                  ...subsection,
-                  fields: subsection.fields.map(field => {
-                    if (`${field.table}.${field.name}` === editingField.key) {
-                      return {
-                        ...field,
-                        display: editingField.displayName,
-                        dropdownOptions: editingField.hasDropdown === 'yes' ? editingField.dropdownOptions : []
-                      };
-                    }
-                    return field;
-                  })
-                };
-              }
-              return subsection;
-            })
-          };
-        }
-        return section;
-      }),
-      visibility: currentItem.structure.visibility,
-      relationships: currentItem.structure.relationships
+      order: currentItem.order || {},
+      sections: currentItem.sections.map(section => ({
+        ...section,
+        subsections: section.subsections.map(sub => ({
+          ...sub,
+          fields: sub.fields.map(field => {
+            if (field.table === tableName && field.name === fieldName) {
+              return {
+                ...field,
+                display: editingField.displayName,
+                dropdownOptions: editingField.hasDropdown === 'yes' ? editingField.dropdownOptions : [],
+                order: field.order,
+                table: field.table,
+                name: field.name,
+                visible: field.visible
+              };
+            }
+            return field;
+          })
+        }))
+      })),
+      visibility: currentItem.visibility || {},
+      relationships: currentItem.relationships || {}
     };
 
-    const { error } = await supabaseClient
+    console.log('Updating structure:', updatedStructure);
+
+    const { error } = await supabase
       .from('profile_category_table_mapping_2')
       .update({ structure: updatedStructure })
       .eq('id', currentItem.id);
 
     if (error) throw error;
+    
+    // First close the dialog
+    setEditFieldDialogOpen(false);
+
+    // Wait a brief moment to ensure the update has propagated
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Refresh the data
     await fetchStructure();
     toast.success('Field updated successfully');
+
+    // After all operations are complete, force a refresh of the page data
+    window.dispatchEvent(new CustomEvent('structure-updated'));
+
   } catch (error) {
     console.error('Error updating field:', error);
     toast.error('Failed to update field');
   }
 };
 
-
 export const fetchExistingSectionsAndSubsections = async (
   tab: string,
-  supabaseClient: any,
+  supabase: any,
   stateSetters: {
     setExistingSections: (sections: string[]) => void;
     setExistingSubsections: (subsections: Record<string, string[]>) => void;
@@ -862,7 +928,7 @@ export const fetchExistingSectionsAndSubsections = async (
   const { setExistingSections, setExistingSubsections } = stateSetters;
   
   try {
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from('profile_category_table_mapping')
       .select('sections_sections, sections_subsections')
       .eq('Tabs', tab);
