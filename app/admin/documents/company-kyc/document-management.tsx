@@ -1010,7 +1010,7 @@ const DocumentManagement = () => {
                                     }}
                                     className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 text-sm inline-flex items-center"
                                   >
-                                    <Plus className="w-4 h-4 mr-1" />
+                                    upload
                                   </button>
                                 </div>
                               )}
