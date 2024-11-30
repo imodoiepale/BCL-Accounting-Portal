@@ -1,231 +1,165 @@
-import React, { useState } from 'react';
-import { X, Loader2, Eye, Edit2 } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { X, Upload } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
 import { toast } from 'react-hot-toast';
 
+interface UploadFile {
+  file: File;
+  issueDate?: string;
+  expiryDate?: string;
+}
+
 interface UploadModalProps {
-    selectedCompany: { company_name: string } | null;
-    selectedDocument: { name: string, document_type: string } | null;
-    uploadData: { 
-        issueDate: string; 
-        expiryDate: string; 
-        file: File | null;
-        extractOnUpload?: boolean;
-    };
-    setUploadData: React.Dispatch<React.SetStateAction<any>>;
-    handleUpload: (e: React.FormEvent) => Promise<void>;
-    setShowUploadModal: React.Dispatch<React.SetStateAction<boolean>>;
-    uploadMutation: { 
-        isLoading: boolean;
-        status?: string;
-        progress?: string;
-    };
+  selectedCompany: { id: number; company_name: string } | null;
+  selectedDocument: { id: string; name: string; document_type: string } | null;
+  onUpload: (files: UploadFile[]) => Promise<void>;
+  onClose: () => void;
 }
 
 export const UploadModal: React.FC<UploadModalProps> = ({
-    selectedCompany,
-    selectedDocument,
-    uploadData,
-    setUploadData,
-    handleUpload,
-    setShowUploadModal,
-    uploadMutation,
+  selectedCompany,
+  selectedDocument,
+  onUpload,
+  onClose
 }) => {
-    const [showPreview, setShowPreview] = useState(false);
-    const [extractedData, setExtractedData] = useState<any>(null);
+  const [files, setFiles] = useState<UploadFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
-    const handleSubmitWithExtraction = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!uploadData.file) {
-            toast.error('Please select a file');
-            return;
-        }
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    const newFiles = acceptedFiles.map(file => ({
+      file,
+      issueDate: '',
+      expiryDate: ''
+    }));
+    setFiles(prev => [...prev, ...newFiles]);
+  }, []);
 
-        if (uploadData.extractOnUpload) {
-            try {
-                // Show preview first if extraction is enabled
-                setShowPreview(true);
-                const formData = new FormData();
-                formData.append('file', uploadData.file);
-                
-                // Simulate extraction preview (replace with actual API call)
-                setTimeout(() => {
-                    setExtractedData({
-                        // Sample extracted data structure
-                        documentNumber: "ABC123",
-                        issuedBy: "Sample Authority",
-                        // Add other relevant fields
-                    });
-                }, 1500);
-                
-                return;
-            } catch (error) {
-                console.error('Preview extraction failed:', error);
-                toast.error('Failed to preview extracted data');
-            }
-        }
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png']
+    }
+  });
 
-        // If no extraction or preview confirmed, proceed with upload
-        handleUpload(e);
-    };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (files.length === 0) {
+      toast.error('Please add at least one file');
+      return;
+    }
 
-    const renderUploadForm = () => (
-        <form onSubmit={handleSubmitWithExtraction} className="space-y-4">
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Issue Date
-                </label>
-                <input
-                    type="date"
-                    required
-                    className="w-full px-3 py-2 border rounded-md"
-                    value={uploadData.issueDate}
-                    onChange={(e) =>
-                        setUploadData((prev: any) => ({ ...prev, issueDate: e.target.value }))
-                    }
-                />
-            </div>
+    try {
+      setIsUploading(true);
+      await onUpload(files);
+      onClose();
+      toast.success('Documents uploaded successfully');
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload documents');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
-            {selectedDocument?.document_type === 'renewal' && (
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Expiry Date
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateDates = (index: number, field: 'issueDate' | 'expiryDate', value: string) => {
+    setFiles(prev => prev.map((file, i) => 
+      i === index ? { ...file, [field]: value } : file
+    ));
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Upload Documents</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {selectedCompany && selectedDocument && (
+            <p className="text-sm text-gray-600">
+              Uploading for {selectedCompany.company_name} - {selectedDocument.name}
+            </p>
+          )}
+
+          <div
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+              ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
+          >
+            <input {...getInputProps()} />
+            <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+            <p className="text-sm text-gray-600">
+              {isDragActive
+                ? "Drop the files here"
+                : "Drag & drop files here, or click to select"}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Supported formats: PDF, JPG, PNG
+            </p>
+          </div>
+
+          <div className="max-h-[40vh] overflow-y-auto space-y-4">
+            {files.map((file, index) => (
+              <div key={index} className="border rounded-lg p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-medium truncate">{file.file.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFile(index)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      Issue Date (Optional)
                     </label>
                     <input
-                        type="date"
-                        required
-                        className="w-full px-3 py-2 border rounded-md"
-                        value={uploadData.expiryDate}
-                        min={uploadData.issueDate}
-                        onChange={(e) =>
-                            setUploadData((prev: any) => ({ ...prev, expiryDate: e.target.value }))
-                        }
+                      type="date"
+                      className="w-full px-3 py-2 border rounded-md"
+                      value={file.issueDate}
+                      onChange={(e) => updateDates(index, 'issueDate', e.target.value)}
                     />
-                </div>
-            )}
-
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Upload File
-                </label>
-                <input
-                    type="file"
-                    required
-                    className="w-full px-3 py-2 border rounded-md"
-                    onChange={(e) => {
-                        const file = e.target.files ? e.target.files[0] : null;
-                        if (file && !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
-                            toast.error('Please upload a valid document or image file');
-                            return;
-                        }
-                        setUploadData((prev: any) => ({
-                            ...prev,
-                            file: file,
-                        }));
-                    }}
-                />
-            </div>
-
-            <div className="flex items-center space-x-2">
-                <input
-                    type="checkbox"
-                    id="extractOnUpload"
-                    checked={uploadData.extractOnUpload}
-                    onChange={(e) =>
-                        setUploadData((prev: any) => ({
-                            ...prev,
-                            extractOnUpload: e.target.checked,
-                        }))
-                    }
-                    className="rounded border-gray-300"
-                />
-                <label htmlFor="extractOnUpload" className="text-sm text-gray-600">
-                    Extract details from document
-                </label>
-            </div>
-
-            {uploadMutation.isLoading && (
-                <div className="space-y-2">
-                    <div className="flex items-center justify-center space-x-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                        <span className="text-sm text-gray-600">{uploadMutation.progress}</span>
+                  </div>
+                  {selectedDocument?.document_type === 'renewal' && (
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">
+                        Expiry Date (Optional)
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full px-3 py-2 border rounded-md"
+                        value={file.expiryDate}
+                        onChange={(e) => updateDates(index, 'expiryDate', e.target.value)}
+                        min={file.issueDate}
+                      />
                     </div>
+                  )}
                 </div>
-            )}
+              </div>
+            ))}
+          </div>
 
-            <button
-                type="submit"
-                disabled={uploadMutation.isLoading}
-                className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-            >
-                {uploadMutation.isLoading ? 'Processing...' : 'Continue'}
-            </button>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isUploading || files.length === 0}>
+              {isUploading ? 'Uploading...' : `Upload ${files.length} Document${files.length !== 1 ? 's' : ''}`}
+            </Button>
+          </DialogFooter>
         </form>
-    );
-
-    const renderExtractionPreview = () => (
-        <div className="space-y-4">
-            <div className="border rounded-lg p-4 bg-gray-50">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-sm font-medium">Extracted Details Preview</h3>
-                    <button
-                        onClick={() => setShowPreview(false)}
-                        className="text-blue-600 text-sm hover:text-blue-700"
-                    >
-                        <Edit2 className="w-4 h-4" />
-                    </button>
-                </div>
-                {extractedData ? (
-                    <div className="space-y-2">
-                        {Object.entries(extractedData).map(([key, value]) => (
-                            <div key={key} className="flex justify-between">
-                                <span className="text-sm text-gray-600">{key}:</span>
-                                <span className="text-sm font-medium">{value as string}</span>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                    </div>
-                )}
-            </div>
-
-            <div className="flex space-x-2">
-                <button
-                    onClick={() => setShowPreview(false)}
-                    className="flex-1 px-4 py-2 border rounded-md hover:bg-gray-50"
-                >
-                    Back
-                </button>
-                <button
-                    onClick={(e: any) => handleUpload(e)}
-                    className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                >
-                    Confirm & Upload
-                </button>
-            </div>
-        </div>
-    );
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-[500px] relative">
-                <button
-                    onClick={() => setShowUploadModal(false)}
-                    className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-                >
-                    <X className="w-5 h-5" />
-                </button>
-
-                <h2 className="text-xl font-semibold mb-4">Upload Document</h2>
-                {selectedCompany && selectedDocument && (
-                    <p className="text-sm text-gray-600 mb-4">
-                        Uploading for {selectedCompany.company_name} - {selectedDocument.name}
-                    </p>
-                )}
-
-                {showPreview ? renderExtractionPreview() : renderUploadForm()}
-            </div>
-        </div>
-    );
+      </DialogContent>
+    </Dialog>
+  );
 };

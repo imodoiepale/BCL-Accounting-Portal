@@ -2,13 +2,22 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FileDown, Upload, X, ChevronUp, ChevronDown, Eye, Download, MoreVertical } from 'lucide-react';
+import { FileDown, Upload, X, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Eye, Plus, Download, MoreVertical } from 'lucide-react';
+
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+
 import { format, differenceInDays } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { toast, Toaster } from 'react-hot-toast';
 import { UploadModal } from './UploadModal';
 import { SettingsModal } from './SettingsModal';
+
 
 interface Company {
   id: number;
@@ -37,6 +46,21 @@ interface Upload {
   issue_date: Date;
   expiry_date?: Date;
 }
+interface DocumentUpload {
+  id: string;
+  userid: string;
+  kyc_document_id: string;
+  filepath: string;
+  issue_date?: string;
+  expiry_date?: string;
+  upload_date: string;
+}
+
+interface UploadFile {
+  file: File;
+  issueDate?: string;
+  expiryDate?: string;
+}
 
 type SortField = 'company' | 'issueDate' | 'expiryDate' | 'daysLeft' | 'status' | '#';
 type SortDirection = 'asc' | 'desc';
@@ -45,6 +69,69 @@ interface ViewModalProps {
   url: string | null;
   setShowViewModal: (show: boolean) => void;
 }
+
+const DocumentViewer: React.FC<{ documents: any[]; onClose: () => void }> = ({ documents, onClose }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const sortedDocs = [...documents].sort((a, b) =>
+    new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()
+  );
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-4 w-11/12 h-5/6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <div className="flex flex-col h-full">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">
+              Document {currentIndex + 1} of {documents.length}
+            </h2>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
+                disabled={currentIndex === 0}
+                className="p-1 hover:bg-gray-100 rounded-full disabled:opacity-50"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setCurrentIndex(prev => Math.min(documents.length - 1, prev + 1))}
+                disabled={currentIndex === documents.length - 1}
+                className="p-1 hover:bg-gray-100 rounded-full disabled:opacity-50"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 mb-4">
+            <iframe src={sortedDocs[currentIndex].url} className="w-full h-full" title={`Document ${currentIndex + 1}`} />
+          </div>
+          <div className="grid grid-cols-6 gap-2 overflow-x-auto p-2 bg-gray-50 rounded-lg">
+            {sortedDocs.map((doc, index) => (
+              <div
+                key={doc.id}
+                onClick={() => setCurrentIndex(index)}
+                className={`cursor-pointer p-2 border rounded ${index === currentIndex ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                  }`}
+              >
+                <div className="text-xs text-center">Document {index + 1}</div>
+                <div className="text-xs text-gray-500 text-center">
+                  {format(new Date(doc.uploadDate), 'dd/MM/yyyy')}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ViewModal: React.FC<ViewModalProps> = ({ url, setShowViewModal }) => {
   if (!url) return null;
@@ -59,56 +146,131 @@ const ViewModal: React.FC<ViewModalProps> = ({ url, setShowViewModal }) => {
           <X className="w-5 h-5" />
         </button>
         <div className="w-full h-full">
-          <iframe src={url} className="w-full h-full" />
+          <iframe src={url} className="w-full h-full" title="Document Viewer" />
         </div>
       </div>
     </div>
   );
 };
 
-const DocumentActions = ({ onView, onUpdate, onDownload }) => {
-  const [showDropdown, setShowDropdown] = useState(false);
-  
+const DocumentActions = ({ onView, onUpload, onDownload, documentCount = 0 }) => {
   return (
     <div className="relative">
-      <button onClick={() => onView()} className="text-blue-600 hover:text-blue-800 mr-2">
-        <Eye className="w-4 h-4" />
-      </button>
-      <button
-        onClick={() => setShowDropdown(!showDropdown)}
-        className="text-gray-600 hover:text-gray-800"
-      >
-        <MoreVertical className="w-4 h-4" />
-      </button>
-      
-      {showDropdown && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50">
-          <div className="py-1">
-            <button
-              onClick={() => {
-                onUpdate();
-                setShowDropdown(false);
-              }}
-              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Update
-            </button>
-            <button
-              onClick={() => {
-                onDownload();
-                setShowDropdown(false);
-              }}
-              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </button>
-          </div>
+      <button onClick={onView} className="text-blue-600 hover:text-blue-800 mr-2">
+        <div className="relative">
+          <Eye className="w-4 h-4" />
+          {documentCount > 1 && (
+            <span className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+              {documentCount}
+            </span>
+          )}
         </div>
-      )}
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="text-gray-600 hover:text-gray-800">
+            <MoreVertical className="w-4 h-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={onUpload}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Document
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onDownload}>
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
+};
+
+const handleViewDocuments = async (document: Document, company: Company) => {
+  const relevantUploads = uploads.filter(u =>
+    u.kyc_document_id === document.id &&
+    u.userid === company.id.toString()
+  );
+
+  if (relevantUploads.length === 0) {
+    toast.error('No documents found');
+    return;
+  }
+
+  try {
+    const documentPreviews = await Promise.all(
+      relevantUploads.map(async (upload) => {
+        const { data, error } = await supabase
+          .storage
+          .from('kyc-documents')
+          .createSignedUrl(upload.filepath, 60);
+
+        if (error) throw error;
+
+        return {
+          id: upload.id,
+          url: data.signedUrl,
+          filename: upload.filepath.split('/').pop() || 'document',
+          uploadDate: new Date(upload.created_at),
+          issueDate: upload.issue_date ? new Date(upload.issue_date) : undefined,
+          expiryDate: upload.expiry_date ? new Date(upload.expiry_date) : undefined,
+        };
+      })
+    );
+
+    setViewDocuments(documentPreviews);
+    setShowViewModal(true);
+  } catch (error) {
+    console.error('Error viewing documents:', error);
+    toast.error('Failed to load documents');
+  }
+};
+
+const handleMultiUpload = async (files: UploadFile[]) => {
+  if (!selectedCompany || !selectedDocument) {
+    toast.error('Missing company or document information');
+    return;
+  }
+
+  try {
+    await Promise.all(
+      files.map(async ({ file, issueDate, expiryDate }) => {
+        const timestamp = new Date().getTime();
+        const fileName = `${selectedCompany.id}/${selectedDocument.id}/${timestamp}_${file.name}`;
+
+        // Upload file
+        const { data: fileData, error: fileError } = await supabase
+          .storage
+          .from('kyc-documents')
+          .upload(fileName, file);
+
+        if (fileError) throw fileError;
+
+        // Create upload record
+        const uploadData = {
+          userid: selectedCompany.id.toString(),
+          kyc_document_id: selectedDocument.id,
+          filepath: fileData.path,
+          issue_date: issueDate || null,
+          expiry_date: expiryDate || null,
+        };
+
+        const { error } = await supabase
+          .from('acc_portal_kyc_uploads')
+          .insert(uploadData);
+
+        if (error) throw error;
+      })
+    );
+
+    queryClient.invalidateQueries({ queryKey: ['uploads'] });
+    setShowUploadModal(false);
+    toast.success('Documents uploaded successfully');
+  } catch (error) {
+    console.error('Upload error:', error);
+    toast.error('Failed to upload documents');
+  }
 };
 
 const MissingDocumentsModal = ({ missingDocuments, onClose, onUpload }) => {
@@ -121,7 +283,7 @@ const MissingDocumentsModal = ({ missingDocuments, onClose, onUpload }) => {
         >
           <X className="w-5 h-5" />
         </button>
-        <h2 className="text-lg font-semibold mb-4">Missing Documents</h2>
+        <h2 className="text-lg  font-semibold mb-4">Missing Documents</h2>
         <div className="max-h-[70vh] overflow-y-auto">
           <ul>
             {missingDocuments.map(doc => (
@@ -162,6 +324,16 @@ const DocumentManagement = () => {
   const [showMissingDocumentsModal, setShowMissingDocumentsModal] = useState(false);
   const [missingDocuments, setMissingDocuments] = useState<Document[]>([]);
 
+
+  const [viewDocuments, setViewDocuments] = useState<Array<{
+    id: string;
+    url: string;
+    uploadDate: Date;
+    issueDate?: string;
+    expiryDate?: string;
+  }>>([]);
+  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+
   // Fetch Companies
   const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<Company[]>({
     queryKey: ['companies', searchTerm],
@@ -170,7 +342,7 @@ const DocumentManagement = () => {
         .from('acc_portal_company_duplicate')
         .select('*')
         .ilike('company_name', `%${searchTerm}%`);
-      
+
       if (error) throw error;
       return data || [];
     },
@@ -209,7 +381,7 @@ const DocumentManagement = () => {
       const { data, error } = await supabase
         .from('acc_portal_kyc_uploads')
         .select('*');
-      
+
       if (error) throw error;
       return data || [];
     }
@@ -220,98 +392,104 @@ const DocumentManagement = () => {
     mutationFn: async ({
       companyId,
       documentId,
-      file,
-      issueDate,
-      expiryDate
+      files
     }: {
       companyId: number;
       documentId: string;
-      file: File;
-      issueDate: string;
-      expiryDate?: string;
+      files: UploadFile[];
     }) => {
-      try {
-        // Upload file with timestamp to ensure uniqueness
-        const timestamp = new Date().getTime();
-        const fileName = `${companyId}/${documentId}/${timestamp}_${file.name}`;
-        const { data: fileData, error: fileError } = await supabase
-          .storage
-          .from('kyc-documents')
-          .upload(fileName, file);
+      const results = [];
 
-        if (fileError) throw fileError;
+      for (const fileData of files) {
+        try {
+          const timestamp = new Date().getTime();
+          const fileName = `${companyId}/${documentId}/${timestamp}_${fileData.file.name}`;
+          const { data: uploadedFile, error: fileError } = await supabase
+            .storage
+            .from('kyc-documents')
+            .upload(fileName, fileData.file);
 
-        // Create upload record
-        const uploadData = {
-          userid: companyId.toString(),
-          kyc_document_id: documentId,
-          filepath: fileData.path,
-          issue_date: issueDate,
-          expiry_date: expiryDate || null
-        };
+          if (fileError) throw fileError;
 
-        // Insert new record
-        const { data, error } = await supabase
-          .from('acc_portal_kyc_uploads')
-          .insert(uploadData)
-          .select()
-          .single();
+          const uploadData = {
+            userid: companyId.toString(),
+            kyc_document_id: documentId,
+            filepath: uploadedFile.path,
+            issue_date: fileData.issueDate || null,
+            expiry_date: fileData.expiryDate || null,
+            upload_date: new Date().toISOString()
+          };
 
-        if (error) throw error;
-        return data;
-      } catch (error) {
-        console.error('Upload error:', error);
-        toast.error('Failed to upload document');
-        throw error;
+          const { data, error } = await supabase
+            .from('acc_portal_kyc_uploads')
+            .insert(uploadData)
+            .select()
+            .single();
+
+          if (error) throw error;
+          results.push(data);
+        } catch (error) {
+          console.error('Upload error:', error);
+          toast.error(`Failed to upload ${fileData.file.name}`);
+        }
       }
+
+      return results;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['uploads'] });
       setShowUploadModal(false);
-      toast.success('Document uploaded successfully');
-      setUploadData({
-        issueDate: '',
-        expiryDate: '',
-        file: null,
-      });
+      toast.success('Documents uploaded successfully');
     },
     onError: (error) => {
-      toast.error('Failed to upload document');
+      toast.error('Failed to upload one or more documents');
       console.error('Upload error:', error);
     }
   });
 
   // Document Actions Handlers
   const handleViewDocument = async (document: Document, company: Company) => {
-    const upload = uploads.find(u => 
-      u.kyc_document_id === document.id && 
+    const documentUploads = uploads.filter(u =>
+      u.kyc_document_id === document.id &&
       u.userid === company.id.toString()
     );
 
-    if (!upload) {
-      toast.error('Document not found');
+    if (!documentUploads.length) {
+      toast.error('No documents found');
       return;
     }
 
     try {
-      const { data, error } = await supabase
-        .storage
-        .from('kyc-documents')
-        .createSignedUrl(upload.filepath, 60);
+      const documentUrls = await Promise.all(
+        documentUploads.map(async (upload) => {
+          const { data, error } = await supabase
+            .storage
+            .from('kyc-documents')
+            .createSignedUrl(upload.filepath, 60);
 
-      if (error) throw error;
+          if (error) throw error;
 
-      setViewUrl(data.signedUrl);
-      setShowViewModal(true);
+          return {
+            id: upload.id,
+            url: data.signedUrl,
+            uploadDate: upload.upload_date,
+            issueDate: upload.issue_date,
+            expiryDate: upload.expiry_date
+          };
+        })
+      );
+
+      setViewDocuments(documentUrls);
+      setShowDocumentViewer(true);
     } catch (error) {
-      console.error('Error viewing document:', error);
-      toast.error('Failed to view document');
+      console.error('Error viewing documents:', error);
+      toast.error('Failed to load documents');
     }
   };
 
   const handleDownloadDocument = async (document: Document, company: Company) => {
-    const upload = uploads.find(u => 
-      u.kyc_document_id === document.id && 
+    const upload = uploads.find(u =>
+      u.kyc_document_id === document.id &&
       u.userid === company.id.toString()
     );
 
@@ -448,7 +626,7 @@ const DocumentManagement = () => {
   const calculateStats = (documents: Document[]) => {
     return documents.map(doc => {
       const total = companies.length;
-      const complete = uploads.filter(u => 
+      const complete = uploads.filter(u =>
         u.kyc_document_id === doc.id
       ).length;
       const pending = total - complete;
@@ -461,9 +639,51 @@ const DocumentManagement = () => {
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return <ChevronUp className="w-4 h-4 text-gray-300" />;
-    return sortDirection === 'asc' ? 
-      <ChevronUp className="w-4 h-4 text-blue-600" /> : 
+    return sortDirection === 'asc' ?
+      <ChevronUp className="w-4 h-4 text-blue-600" /> :
       <ChevronDown className="w-4 h-4 text-blue-600" />;
+  };
+
+  const DocumentActionCell = ({
+    company,
+    document,
+    uploads,
+    onView,
+    onUpload,
+    onDownload
+  }) => {
+    const documentUploads = uploads.filter(u =>
+      u.kyc_document_id === document.id &&
+      u.userid === company.id.toString()
+    )
+
+    return (
+      <div className="flex items-center justify-center">
+        {documentUploads.length > 0 ? (
+          <DocumentActions
+            onView={() => onView(document, company)}
+            onUpload={() => {
+              setSelectedCompany(company);
+              setSelectedDocument(document);
+              setShowUploadModal(true);
+            }}
+            onDownload={() => onDownload(document, company)}
+            documentCount={documentUploads.length}
+          />
+        ) : (
+          <button
+            onClick={() => {
+              setSelectedCompany(company);
+              setSelectedDocument(document);
+              setShowUploadModal(true);
+            }}
+            className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 text-sm"
+          >
+            Upload
+          </button>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -475,9 +695,8 @@ const DocumentManagement = () => {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-md text-sm ${
-                activeTab === tab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
-              }`}
+              className={`px-4 py-2 rounded-md text-sm ${activeTab === tab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
+                }`}
             >
               {tab}
             </button>
@@ -661,7 +880,7 @@ const DocumentManagement = () => {
                     </React.Fragment>
                   ))}
                 </tr>
-                
+
                 {/* Pending Stats Row */}
                 <tr className="bg-gray-50">
                   <td className="p-2 border border-gray-300 font-semibold text-orange-600 text-sm">Missing</td>
@@ -748,32 +967,33 @@ const DocumentManagement = () => {
                     <td className="p-2 border border-gray-300 text-center font-medium text-sm">
                       <button
                         onClick={() => {
-                          const missingDocs = documents.filter(doc => 
-                            !uploads.some(upload => 
+                          const missingDocs = documents.filter(doc =>
+                            !uploads.some(upload =>
                               upload.kyc_document_id === doc.id && upload.userid === company.id.toString()
                             )
                           );
                           setMissingDocuments(missingDocs);
                           setShowMissingDocumentsModal(true);
                         }}
-                        className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 text-sm"
+                        className="px-3 py-1 bg-white text-red-600 rounded-md hover:bg-blue-100 text-sm"
                       >
                         {calculateMissingDocuments(company.id)}
                       </button>
                     </td>
-                    
+
                     {documents.map((doc) => (
                       visibleColumns[doc.id]?.visible && (
                         <React.Fragment key={`${company.id}-${doc.id}`}>
                           {visibleColumns[doc.id]?.subColumns.upload && (
                             <td className="p-2 border border-gray-300 text-center text-sm">
-                              {uploads.find(u => 
-                                u.kyc_document_id === doc.id && 
+                              {uploads.find(u =>
+                                u.kyc_document_id === doc.id &&
                                 u.userid === company.id.toString()
                               ) ? (
                                 <DocumentActions
+                                  hasDocuments={true}
                                   onView={() => handleViewDocument(doc, company)}
-                                  onUpdate={() => {
+                                  onUpload={() => {
                                     setSelectedCompany(company);
                                     setSelectedDocument(doc);
                                     setShowUploadModal(true);
@@ -781,16 +1001,18 @@ const DocumentManagement = () => {
                                   onDownload={() => handleDownloadDocument(doc, company)}
                                 />
                               ) : (
-                                <button
-                                  onClick={() => {
-                                    setSelectedCompany(company);
-                                    setSelectedDocument(doc);
-                                    setShowUploadModal(true);
-                                  }}
-                                  className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 text-sm"
-                                >
-                                  Upload
-                                </button>
+                                <div className="flex justify-center space-x-2">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedCompany(company);
+                                      setSelectedDocument(doc);
+                                      setShowUploadModal(true);
+                                    }}
+                                    className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 text-sm inline-flex items-center"
+                                  >
+                                    upload
+                                  </button>
+                                </div>
                               )}
                             </td>
                           )}
@@ -798,12 +1020,12 @@ const DocumentManagement = () => {
                           {visibleColumns[doc.id]?.subColumns.issueDate && (
                             <td className="p-2 border border-gray-300 text-center text-gray-600 text-sm">
                               {(() => {
-                                const upload = uploads.find(u => 
-                                  u.kyc_document_id === doc.id && 
+                                const upload = uploads.find(u =>
+                                  u.kyc_document_id === doc.id &&
                                   u.userid === company.id.toString()
                                 );
-                                return upload?.issue_date ? 
-                                  format(new Date(upload.issue_date), 'dd/MM/yyyy') : 
+                                return upload?.issue_date ?
+                                  format(new Date(upload.issue_date), 'dd/MM/yyyy') :
                                   '-';
                               })()}
                             </td>
@@ -815,12 +1037,12 @@ const DocumentManagement = () => {
                                 if (doc.document_type === 'one-off') {
                                   return 'No Expiry';
                                 }
-                                const upload = uploads.find(u => 
-                                  u.kyc_document_id === doc.id && 
+                                const upload = uploads.find(u =>
+                                  u.kyc_document_id === doc.id &&
                                   u.userid === company.id.toString()
                                 );
-                                return upload?.expiry_date ? 
-                                  format(new Date(upload.expiry_date), 'dd/MM/yyyy') : 
+                                return upload?.expiry_date ?
+                                  format(new Date(upload.expiry_date), 'dd/MM/yyyy') :
                                   '?';
                               })()}
                             </td>
@@ -832,21 +1054,21 @@ const DocumentManagement = () => {
                                 if (doc.document_type === 'one-off') {
                                   return 'N/A';
                                 }
-                                const upload = uploads.find(u => 
-                                  u.kyc_document_id === doc.id && 
+                                const upload = uploads.find(u =>
+                                  u.kyc_document_id === doc.id &&
                                   u.userid === company.id.toString()
                                 );
-                                return upload?.expiry_date ? 
-                                  differenceInDays(new Date(upload.expiry_date), new Date()) : 
+                                return upload?.expiry_date ?
+                                  differenceInDays(new Date(upload.expiry_date), new Date()) :
                                   '-';
                               })()}
                             </td>
                           )}
                           {visibleColumns[doc.id]?.subColumns.status && (
                             <td className="p-2 border border-gray-300 text-center text-sm">
-                              {(() => {    
-                                const upload = uploads.find(u => 
-                                  u.kyc_document_id === doc.id && 
+                              {(() => {
+                                const upload = uploads.find(u =>
+                                  u.kyc_document_id === doc.id &&
                                   u.userid === company.id.toString()
                                 );
 
@@ -866,8 +1088,8 @@ const DocumentManagement = () => {
                                   );
                                 }
 
-                                const daysLeft = upload.expiry_date ? 
-                                  differenceInDays(new Date(upload.expiry_date), new Date()) : 
+                                const daysLeft = upload.expiry_date ?
+                                  differenceInDays(new Date(upload.expiry_date), new Date()) :
                                   null;
 
                                 if (daysLeft === null) return '-';
@@ -907,21 +1129,30 @@ const DocumentManagement = () => {
         </div>
       )}
 
-      {/* View Modal */}
-      {showViewModal && (
-        <ViewModal url={viewUrl} setShowViewModal={setShowViewModal} />
+      {showDocumentViewer && (
+        <DocumentViewer
+          documents={viewDocuments}
+          onClose={() => {
+            setShowDocumentViewer(false);
+            setViewDocuments([]);
+          }}
+        />
       )}
-
       {/* Upload Modal */}
       {showUploadModal && (
         <UploadModal
           selectedCompany={selectedCompany}
           selectedDocument={selectedDocument}
-          uploadData={uploadData}
-          setUploadData={setUploadData}
-          handleUpload={handleUpload}
-          setShowUploadModal={setShowUploadModal}
-          uploadMutation={uploadMutation}
+          onUpload={async (files) => {
+            if (!selectedCompany || !selectedDocument) return;
+            await uploadMutation.mutateAsync({
+              companyId: selectedCompany.id,
+              documentId: selectedDocument.id,
+              files
+            });
+          }}
+          onClose={() => setShowUploadModal(false)}
+          isUploading={uploadMutation.isLoading}
         />
       )}
 
