@@ -537,8 +537,7 @@ const OverallView: React.FC = () => {
     return (
         <div className="h-screen flex flex-col">
             <Tabs defaultValue={mainTabs[0]} onValueChange={handleMainTabChange} className="h-full flex flex-col">
-                <TabsList className="w-full grid grid-cols-5 bg-gray-100 rounded-lg p-1">
-                    {mainTabs.map(tab => (
+            <TabsList className="w-full grid-cols-[repeat(auto-fit,minmax(0,1fr))] grid bg-gray-100 rounded-lg p-1">    {mainTabs.map(tab => (
                         <TabsTrigger
                             key={tab}
                             value={tab}
