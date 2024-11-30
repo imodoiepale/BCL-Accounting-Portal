@@ -508,8 +508,7 @@ export const Table: React.FC<TableProps> = ({
   processedSections, 
   onMissingFieldsClick 
 }) => {
-  const useSidebarLayout = activeMainTab?.toLowerCase() === 'employee details' || 
-                          activeMainTab?.toLowerCase() === 'supplier details';
+  const useSidebarLayout = activeMainTab?.toLowerCase() === 'employee details' || activeMainTab?.toLowerCase() === 'customer details' || activeMainTab?.toLowerCase() === 'supplier details';
 
   if (useSidebarLayout) {
     return (
