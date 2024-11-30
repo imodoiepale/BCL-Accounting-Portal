@@ -42,7 +42,7 @@ const adminNavItems = [
   { href: "/admin/template", icon: FileIcon, label: "Templates" },
   { href: "/admin/reports", icon: FileIcon, label: "Report Management" },
   { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings" },
-  { label: "Table Settings", href: "/settings/table", icon: SettingsIcon },
+  // { label: "Table Settings", href: "/settings/table", icon: SettingsIcon },
   { href: "/admin/onboarding", icon: UserPlusIcon, label: "Onboarding" },
 ];
 
