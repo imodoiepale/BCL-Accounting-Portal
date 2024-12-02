@@ -606,9 +606,9 @@ export default function CompanyKycDocumentDetails() {
                 <Button
                   variant="outline"
                   onClick={exportToExcel}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 text-white bg-green-600"
                 >
-                  <Download className="h-4 w-4" />
+                  <Download className="h-4 w-4 text-white" />
                   Export to Excel
                 </Button>
               </div>
