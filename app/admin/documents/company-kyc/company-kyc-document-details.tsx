@@ -1,15 +1,22 @@
 // @ts-nocheck
 'use client'
 
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from '@/lib/supabaseClient';
 import { Input } from "@/components/ui/input";
-import { Eye, DownloadIcon, UploadIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { 
+  Eye, 
+  DownloadIcon, 
+  UploadIcon, 
+  ChevronDown, 
+  ChevronRight, 
+  ChevronUp, 
+  Download,
+  Search 
+} from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import toast, { Toaster } from 'react-hot-toast';
 import { DocumentActions } from './DocumentComponents';
@@ -19,7 +26,6 @@ import {
   saveExtractedData,
   validateExtractedData
 } from '@/lib/extractionUtils';
-
 
 interface Upload {
   id: string;
@@ -49,12 +55,10 @@ interface Document {
   last_extracted_details?: Record<string, any>;
 }
 
-interface CategoryState {
-  [key: string]: boolean;
-}
-
 export default function CompanyKycDocumentDetails() {
+  // State Management
   const [searchTerm, setSearchTerm] = useState('');
+  const [companySearch, setCompanySearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [isAddFieldOpen, setIsAddFieldOpen] = useState(false);
@@ -65,8 +69,10 @@ export default function CompanyKycDocumentDetails() {
   const [showExtractModal, setShowExtractModal] = useState(false);
   const [selectedExtractDocument, setSelectedExtractDocument] = useState<Document | null>(null);
   const [selectedExtractUpload, setSelectedExtractUpload] = useState<Upload | null>(null);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [expandedCategories, setExpandedCategories] = useState({
+    'general': false,
     'sheria-docs': false,
     'kra-docs': false,
   });
@@ -74,6 +80,7 @@ export default function CompanyKycDocumentDetails() {
   const queryClient = useQueryClient();
   const parentRef = useRef<HTMLDivElement>(null);
 
+  // Debounced Search Effect
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -81,6 +88,7 @@ export default function CompanyKycDocumentDetails() {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
+  // Data Fetching with React Query
   const { data: companies = [], isLoading: isLoadingCompanies } = useQuery({
     queryKey: ['companies', debouncedSearch],
     queryFn: async () => {
@@ -95,9 +103,6 @@ export default function CompanyKycDocumentDetails() {
     },
     staleTime: 1000 * 60 * 5,
   });
-  
- 
-
 
   const { data: documents = {}, isLoading: isLoadingDocuments } = useQuery({
     queryKey: ['documents'],
@@ -105,7 +110,7 @@ export default function CompanyKycDocumentDetails() {
       const { data, error } = await supabase
         .from('acc_portal_kyc')
         .select('*')
-        .eq('category', 'company-docs'); // Keep the main category filter
+        .eq('category', 'company-docs');
 
       if (error) throw error;
 
@@ -137,6 +142,7 @@ export default function CompanyKycDocumentDetails() {
     staleTime: 1000 * 60 * 5,
   });
 
+  // Mutations
   const updateFieldsMutation = useMutation({
     mutationFn: async ({ documentId, fields }) => {
       const { data, error } = await supabase
@@ -266,6 +272,7 @@ export default function CompanyKycDocumentDetails() {
     }
   });
 
+  // Utility Functions
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => ({
       ...prev,
@@ -273,6 +280,68 @@ export default function CompanyKycDocumentDetails() {
     }));
   };
 
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const exportToExcel = () => {
+    if (!selectedDocument || !companies.length) return;
+
+    const headers = ['#', 'Company', ...selectedDocument.fields?.map(f => f.name) || []];
+    const rows = getFilteredAndSortedCompanies().map((company, index) => {
+      const upload = uploads.find(u =>
+        u.kyc_document_id === selectedDocument?.id &&
+        u.userid === company.id.toString()
+      );
+
+      return [
+        index + 1,
+        company.company_name,
+        ...(selectedDocument.fields?.map(field => 
+          upload?.extracted_details?.[field.name] || '-'
+        ) || [])
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${selectedDocument.name}_export.csv`;
+    link.click();
+  };
+
+  const getFilteredAndSortedCompanies = () => {
+    let filtered = companies.filter(company =>
+      company.company_name.toLowerCase().includes(companySearch.toLowerCase())
+    );
+
+    if (sortColumn === '#') {
+      filtered = [...filtered].sort((a, b) => {
+        const aIndex = companies.indexOf(a);
+        const bIndex = companies.indexOf(b);
+        return sortDirection === 'asc' ? aIndex - bIndex : bIndex - aIndex;
+      });
+    } else if (sortColumn === 'Company') {
+      filtered = [...filtered].sort((a, b) => {
+        const comparison = a.company_name.localeCompare(b.company_name);
+        return sortDirection === 'asc' ? comparison : -comparison;
+      });
+    }
+
+    return filtered;
+  };
+
+  // Event Handlers
   const handleExtractComplete = async (extractedData: any) => {
     try {
       if (!selectedExtractDocument || !selectedExtractUpload) return;
@@ -349,30 +418,45 @@ export default function CompanyKycDocumentDetails() {
     setShowExtractModal(true);
   };
 
-  const sortedCompanies = React.useMemo(() => {
-    if (!sortConfig.key) return companies;
-    return [...companies].sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) {
-        return sortConfig.direction === 'asc' ? -1 : 1;
-      }
-      if (a[sortConfig.key] > b[sortConfig.key]) {
-        return sortConfig.direction === 'asc' ? 1 : -1;
-      }
-      return 0;
-    });
-  }, [companies, sortConfig]);
+  // Sidebar Component
+  const DocumentItem = ({ document, isSelected, onSelect, onAddField, onUpdateFields }) => (
+    <li
+      className={`px-2 py-1 rounded flex items-center justify-between text-xs ${
+        isSelected
+          ? 'bg-primary text-primary-foreground'
+          : 'hover:bg-gray-100'
+      }`}
+    >
+      <span
+        className="cursor-pointer flex-1"
+        onClick={onSelect}
+      >
+        {document.name}
+      </span>
+      <DocumentActions
+        document={document}
+        onAddField={onAddField}
+        onUpdateFields={(documentId, fields) => {
+          onUpdateFields({ documentId, fields });
+        }}
+      />
+    </li>
+  );
 
   const renderSidebar = () => (
     <div className="w-1/5 min-w-[200px] border-r overflow-hidden flex flex-col">
       <div className="p-2">
-        <h2 className="text-sm font-bold mb-2">Documents</h2>
-        <Input
-          type="text"
-          placeholder="Search documents..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="mb-2 h-8 text-xs"
-        />
+        <h2 className="text-sm font-bold mb-2">Documents </h2>
+        <div className="relative">
+          <Input
+            type="text"
+            placeholder="Search documents..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="mb-2 h-8 text-xs pl-8"
+          />
+          <Search className="h-4 w-4 absolute left-2 top-2 text-gray-400" />
+        </div>
       </div>
 
       <div ref={parentRef} className="overflow-y-auto flex-1">
@@ -380,7 +464,7 @@ export default function CompanyKycDocumentDetails() {
           <div className="p-2 text-xs">Loading documents...</div>
         ) : (
           <div className="space-y-2">
-            {/* General Documents (EMPTY subcategory) */}
+            {/* General Documents */}
             {documents['general'] && documents['general'].length > 0 && (
               <div className="border-b last:border-b-0">
                 <div
@@ -392,9 +476,7 @@ export default function CompanyKycDocumentDetails() {
                   ) : (
                     <ChevronRight className="h-4 w-4 mr-1" />
                   )}
-                  <span className="text-xs font-semibold">
-                    General Documents
-                  </span>
+                  <span className="text-xs font-semibold">General Documents</span>
                 </div>
                 {expandedCategories['general'] && (
                   <ul className="pl-6">
@@ -493,30 +575,7 @@ export default function CompanyKycDocumentDetails() {
     </div>
   );
 
-  const DocumentItem = ({ document, isSelected, onSelect, onAddField, onUpdateFields }) => (
-    <li
-      className={`px-2 py-1 rounded flex items-center justify-between text-xs ${
-        isSelected
-          ? 'bg-primary text-primary-foreground'
-          : 'hover:bg-gray-100'
-      }`}
-    >
-      <span
-        className="cursor-pointer flex-1"
-        onClick={onSelect}
-      >
-        {document.name}
-      </span>
-      <DocumentActions
-        document={document}
-        onAddField={onAddField}
-        onUpdateFields={(documentId, fields) => {
-          onUpdateFields({ documentId, fields });
-        }}
-      />
-    </li>
-  );
-
+  // Main Component Render
   return (
     <div className="flex overflow-hidden">
       <Toaster position="top-right" />
@@ -526,26 +585,67 @@ export default function CompanyKycDocumentDetails() {
       <div className="flex-1 flex flex-col h-[800px] overflow-hidden">
         {selectedDocument ? (
           <div className="flex flex-col h-full">
-            <h2 className="text-sm font-bold p-2 border-b">
-              {selectedDocument.name} - Details
-              <span className="ml-2 text-xs font-normal text-gray-500 capitalize">
-                ({selectedDocument.category.replace('-docs', ' Documents')})
-              </span>
-            </h2>
+            <div className="p-2 border-b space-y-2">
+              <h2 className="text-sm font-bold">
+                {selectedDocument.name} - Details
+                <span className="ml-2 text-xs font-normal text-gray-500 capitalize">
+                  ({selectedDocument.category.replace('-docs', ' Documents')})
+                </span>
+              </h2>
+              <div className="flex justify-between items-center gap-2">
+                <div className="relative flex-1 max-w-xs">
+                  <Input
+                    type="text"
+                    placeholder="Search companies..."
+                    value={companySearch}
+                    onChange={(e) => setCompanySearch(e.target.value)}
+                    className="pl-8"
+                  />
+                  <Search className="h-4 w-4 absolute left-2 top-2 text-gray-400" />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={exportToExcel}
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Export to Excel
+                </Button>
+              </div>
+            </div>
 
             <div className="overflow-auto flex-1">
               <Card>
                 <Table>
                   <TableHeader>
                     <TableRow className="text-[11px] bg-blue-100">
-                      <TableHead className="sticky top-0 left-0 bg-blue-100 z-10">#</TableHead>
-                      <TableHead className="sticky top-0 left-0 bg-blue-100 z-10">Company</TableHead>
+                      <TableHead 
+                        className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer"
+                        onClick={() => handleSort('#')}
+                      >
+                        <div className="flex items-center">
+                          #
+                          {sortColumn === '#' && (
+                            sortDirection === 'asc' ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />
+                          )}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer"
+                        onClick={() => handleSort('Company')}
+                      >
+                        <div className="flex items-center">
+                          Company
+                          {sortColumn === 'Company' && (
+                            sortDirection === 'asc' ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />
+                          )}
+                        </div>
+                      </TableHead>
                       <TableHead className="sticky top-0 bg-blue-100 z-10">Actions</TableHead>
                       {selectedDocument.fields?.map((field) => (
                         <TableHead
                           key={field.id}
-                          className="text-center sticky top-0 bg-blue-100 z-10 cursor-pointer"
-                          onClick={() => handleSort(field.name)}
+                          className="text-center sticky top-0 bg-blue-100 z-10"
                         >
                           {field.name}
                         </TableHead>
@@ -553,7 +653,7 @@ export default function CompanyKycDocumentDetails() {
                     </TableRow>
                   </TableHeader>
                   <TableBody className="text-[11px]">
-                    {sortedCompanies.map((company, index) => (
+                    {getFilteredAndSortedCompanies().map((company, index) => (
                       <TableRow key={company.id}>
                         <TableCell className="font-medium sticky left-0 bg-white">
                           {index + 1}
@@ -598,9 +698,7 @@ export default function CompanyKycDocumentDetails() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() =>
-                                  handleUploadClick(company.id, selectedDocument.id)
-                                }
+                                onClick={() => handleUploadClick(company.id, selectedDocument.id)}
                                 title="Upload Document"
                               >
                                 <UploadIcon className="h-4 w-4 text-orange-500" />
