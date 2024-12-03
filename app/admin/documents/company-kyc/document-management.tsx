@@ -699,8 +699,8 @@ const DocumentManagement = () => {
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-md text-sm ${activeTab === tab
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700'
                 }`}
             >
               {tab}
@@ -756,11 +756,11 @@ const DocumentManagement = () => {
           <div className="overflow-auto max-h-[70vh] max-w-full">
             <table className="w-full text-sm border-collapse min-w-[1500px]">
               {/* Table Header */}
-              <thead className="sticky top-0 bg-white">
+              <thead className="sticky top-0 bg-white z-20">
                 <tr className="bg-gray-100">
-                  {/* Index Column */}
                   <th
-                    className="p-2 border border-gray-300 font-semibold text-gray-700 sticky left-0 bg-gray-100 z-20 text-sm"
+                    className="p-2 border border-gray-300 font-semibold text-gray-700 sticky left-0 bg-gray-100 z-30 text-sm cursor-pointer"
+                    style={{ minWidth: '50px' }}
                     rowSpan={2}
                     onClick={() => handleSort('#')}
                   >
@@ -770,9 +770,9 @@ const DocumentManagement = () => {
                     </div>
                   </th>
 
-                  {/* Company Column */}
                   <th
-                    className="p-2 border border-gray-300 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 sticky left-[50px] bg-gray-100 z-20 text-sm"
+                    className="p-2 border border-gray-300 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 sticky left-[50px] bg-gray-100 z-30 text-sm"
+                    style={{ minWidth: '200px' }}
                     rowSpan={2}
                     onClick={() => handleSort('company')}
                   >
@@ -780,9 +780,6 @@ const DocumentManagement = () => {
                       Company
                       <span className="relative group">
                         <span className="ml-1 text-xs text-gray-500">({companies.length})</span>
-                        <span className="absolute left-0 w-auto p-2 m-2 min-w-max rounded-md shadow-md text-white bg-gray-800 text-xs font-bold transition-opacity duration-300 opacity-0 group-hover:opacity-100">
-                          {`${companies.length} total companies`}
-                        </span>
                       </span>
                       <SortIcon field="company" />
                     </div>
