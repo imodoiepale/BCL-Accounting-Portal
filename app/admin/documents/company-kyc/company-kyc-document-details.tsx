@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from '@/lib/supabaseClient';
 import { Input } from "@/components/ui/input";
-import { 
-  Eye, 
-  DownloadIcon, 
-  UploadIcon, 
-  ChevronDown, 
-  ChevronRight, 
-  ChevronUp, 
+import {
+  Eye,
+  DownloadIcon,
+  UploadIcon,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
   Download,
-  Search 
+  Search
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import toast, { Toaster } from 'react-hot-toast';
@@ -231,7 +231,7 @@ export default function CompanyKycDocumentDetails() {
       const document = Object.values(documents)
         .flat()
         .find(d => d.id === documentId);
-      
+
       if (document && !validateExtractedData(sanitizedData, document.fields || [])) {
         throw new Error('Invalid extracted data format');
       }
@@ -302,7 +302,7 @@ export default function CompanyKycDocumentDetails() {
       return [
         index + 1,
         company.company_name,
-        ...(selectedDocument.fields?.map(field => 
+        ...(selectedDocument.fields?.map(field =>
           upload?.extracted_details?.[field.name] || '-'
         ) || [])
       ];
@@ -421,11 +421,10 @@ export default function CompanyKycDocumentDetails() {
   // Sidebar Component
   const DocumentItem = ({ document, isSelected, onSelect, onAddField, onUpdateFields }) => (
     <li
-      className={`px-2 py-1 rounded flex items-center justify-between text-xs ${
-        isSelected
-          ? 'bg-primary text-primary-foreground'
-          : 'hover:bg-gray-100'
-      }`}
+      className={`px-2 py-1 rounded flex items-center justify-between text-xs ${isSelected
+        ? 'bg-primary text-primary-foreground'
+        : 'hover:bg-gray-100'
+        }`}
     >
       <span
         className="cursor-pointer flex-1"
@@ -579,19 +578,49 @@ export default function CompanyKycDocumentDetails() {
   return (
     <div className="flex overflow-hidden">
       <Toaster position="top-right" />
-      
+
       {renderSidebar()}
 
       <div className="flex-1 flex flex-col h-[800px] overflow-hidden">
         {selectedDocument ? (
           <div className="flex flex-col h-full">
             <div className="p-2 border-b space-y-2">
-              <h2 className="text-sm font-bold">
-                {selectedDocument.name} - Details
-                <span className="ml-2 text-xs font-normal text-gray-500 capitalize">
-                  ({selectedDocument.category.replace('-docs', ' Documents')})
-                </span>
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold">
+                  {selectedDocument.name} - Details
+                  <span className="ml-2 text-xs font-normal text-gray-500 capitalize">
+                    ({selectedDocument.category.replace('-docs', ' Documents')})
+                  </span>
+                </h2>
+
+                {/* Compact Document Statistics */}
+                <div className="flex gap-3">
+                  <div className="flex items-center text-xs">
+                    <div className="bg-blue-50 px-2 py-1 rounded">
+                      <span className="text-blue-600 font-medium">Total Company Documents: </span>
+                      <span className="text-blue-700 font-bold">{companies.length}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center text-xs">
+                    <div className="bg-green-50 px-2 py-1 rounded">
+                      <span className="text-green-600 font-medium">Total Uploaded Company Documents: </span>
+                      <span className="text-green-700 font-bold">
+                        {uploads.filter(u => u.kyc_document_id === selectedDocument.id).length}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center text-xs">
+                    <div className="bg-orange-50 px-2 py-1 rounded">
+                      <span className="text-orange-600 font-medium">Missing Company Documents: </span>
+                      <span className="text-orange-700 font-bold">
+                        {companies.length - uploads.filter(u => u.kyc_document_id === selectedDocument.id).length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Search and Export controls */}
               <div className="flex justify-between items-center gap-2">
                 <div className="relative flex-1 max-w-xs">
                   <Input
@@ -606,9 +635,9 @@ export default function CompanyKycDocumentDetails() {
                 <Button
                   variant="outline"
                   onClick={exportToExcel}
-                  className="flex items-center gap-2 text-white bg-green-600"
+                  className="flex items-center gap-2"
                 >
-                  <Download className="h-4 w-4 text-white" />
+                  <Download className="h-4 w-4" />
                   Export to Excel
                 </Button>
               </div>
@@ -619,7 +648,7 @@ export default function CompanyKycDocumentDetails() {
                 <Table>
                   <TableHeader>
                     <TableRow className="text-[11px] bg-blue-100">
-                      <TableHead 
+                      <TableHead
                         className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer"
                         onClick={() => handleSort('#')}
                       >
@@ -630,7 +659,7 @@ export default function CompanyKycDocumentDetails() {
                           )}
                         </div>
                       </TableHead>
-                      <TableHead 
+                      <TableHead
                         className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer"
                         onClick={() => handleSort('Company')}
                       >
