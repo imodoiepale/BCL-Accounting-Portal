@@ -746,7 +746,7 @@ export default function CompanyKycDocumentDetails() {
                         onClick={() => handleSort('#')}
                       >
                         <div className="flex items-center">
-                          #
+                        ⇅#
                           {sortColumn === '#' && (
                             sortDirection === 'asc' ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />
                           )}
@@ -757,7 +757,7 @@ export default function CompanyKycDocumentDetails() {
                         onClick={() => handleSort('Company')}
                       >
                         <div className="flex items-center">
-                          Company
+                          ⇅ Company
                           {sortColumn === 'Company' && (
                             sortDirection === 'asc' ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />
                           )}
