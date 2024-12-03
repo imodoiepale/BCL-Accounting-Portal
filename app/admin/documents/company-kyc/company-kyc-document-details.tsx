@@ -222,28 +222,115 @@ export default function CompanyKycDocumentDetails() {
       if (!uploadId || !documentId) {
         throw new Error('Upload ID or Document ID is undefined');
       }
-
+  
       const sanitizedData = Object.entries(extractedData).reduce((acc, [key, value]) => {
         acc[key] = value === '' ? null : value;
         return acc;
       }, {});
-
+  
+      // Find date fields in extracted data
+      let issueDate = null;
+      let expiryDate = null;
+  
+      // Function to parse and validate date
+      const parseDate = (dateStr) => {
+        if (!dateStr) return null;
+        
+        try {
+          // First, try to parse as ISO date
+          const date = new Date(dateStr);
+          if (!isNaN(date.getTime())) {
+            return date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+          }
+          
+          // If that fails, try different date formats
+          const formats = [
+            /(\d{2})[-/](\d{2})[-/](\d{4})/, // DD-MM-YYYY or DD/MM/YYYY
+            /(\d{4})[-/](\d{2})[-/](\d{2})/, // YYYY-MM-DD or YYYY/MM/DD
+            /(\d{2})[-/](\d{2})[-/](\d{2})/, // DD-MM-YY or DD/MM/YY
+          ];
+  
+          for (const format of formats) {
+            const match = dateStr.match(format);
+            if (match) {
+              const [_, first, second, third] = match;
+              if (first.length === 4) { // YYYY-MM-DD
+                const date = new Date(parseInt(first), parseInt(second) - 1, parseInt(third));
+                return date.toISOString().split('T')[0];
+              } else { // DD-MM-YYYY
+                const date = new Date(parseInt(third), parseInt(second) - 1, parseInt(first));
+                return date.toISOString().split('T')[0];
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Date parsing error:', error);
+        }
+        return null;
+      };
+  
+      // Check for common date field names
+      for (const [key, value] of Object.entries(sanitizedData)) {
+        const lowerKey = key.toLowerCase();
+        
+        // Check for issue date variants
+        if (
+          lowerKey.includes('issue') ||
+          lowerKey.includes('start') ||
+          lowerKey === 'w.i.f' ||
+          lowerKey === 'wif' ||
+          lowerKey === 'date_of_issue' ||
+          lowerKey === 'issue_date' ||
+          lowerKey === 'registration_date'
+        ) {
+          const parsedDate = parseDate(value);
+          if (parsedDate) {
+            issueDate = parsedDate;
+          }
+        }
+        
+        // Check for expiry date variants
+        if (
+          lowerKey.includes('expiry') ||
+          lowerKey.includes('expiration') ||
+          lowerKey.includes('end') ||
+          lowerKey === 'w.i.t' ||
+          lowerKey === 'wit' ||
+          lowerKey === 'valid_until' ||
+          lowerKey === 'valid_to' ||
+          lowerKey === 'expiry_date'
+        ) {
+          const parsedDate = parseDate(value);
+          if (parsedDate) {
+            expiryDate = parsedDate;
+          }
+        }
+      }
+  
       const document = Object.values(documents)
         .flat()
         .find(d => d.id === documentId);
-
+  
       if (document && !validateExtractedData(sanitizedData, document.fields || [])) {
         throw new Error('Invalid extracted data format');
       }
-
+  
+      // Log the dates being saved
+      console.log('Saving dates:', { issueDate, expiryDate });
+  
+      // Update the upload with both extracted details and dates
       const [uploadUpdate, documentUpdate] = await Promise.all([
         supabase
           .from('acc_portal_kyc_uploads')
-          .update({ extracted_details: sanitizedData })
+          .update({
+            extracted_details: sanitizedData,
+            issue_date: issueDate,
+            expiry_date: expiryDate,
+          })
           .eq('id', uploadId)
           .select()
           .single(),
-
+  
         supabase
           .from('acc_portal_kyc')
           .update({ last_extracted_details: sanitizedData })
@@ -251,10 +338,16 @@ export default function CompanyKycDocumentDetails() {
           .select()
           .single()
       ]);
-
-      if (uploadUpdate.error) throw uploadUpdate.error;
-      if (documentUpdate.error) throw documentUpdate.error;
-
+  
+      if (uploadUpdate.error) {
+        console.error('Upload update error:', uploadUpdate.error);
+        throw uploadUpdate.error;
+      }
+      if (documentUpdate.error) {
+        console.error('Document update error:', documentUpdate.error);
+        throw documentUpdate.error;
+      }
+  
       return {
         upload: uploadUpdate.data,
         document: documentUpdate.data
