@@ -71,12 +71,15 @@ export const ViewModal: React.FC<ViewModalProps> = ({ url, onClose }) => {
 
     return (
         <Dialog open={!!url} onOpenChange={onClose}>
-            <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogContent className="max-w-4xl max-h-[90vh]" aria-describedby="view-document-description">
                 <DialogHeader>
                     <DialogTitle>Document Preview</DialogTitle>
+                    <p id="view-document-description" className="text-sm text-muted-foreground">
+                        Preview the uploaded document
+                    </p>
                 </DialogHeader>
                 <div className="flex-1 min-h-[500px]">
-                    <iframe src={url} className="w-full h-full" />
+                    <iframe src={url} className="w-full h-full" title="Document Preview" />
                 </div>
             </DialogContent>
         </Dialog>
@@ -97,22 +100,64 @@ export const ExtractDetailsModal: React.FC<ExtractDetailsModalProps> = ({
     const [originalData, setOriginalData] = useState({});
     const [editedData, setEditedData] = useState({});
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [viewUrl, setViewUrl] = useState<string | null>(null); // Add this state
 
     useEffect(() => {
         if (isOpen && upload) {
             const getSignedUrl = async () => {
                 setIsLoading(true);
                 try {
+                    // Get signed URL for the uploaded file
                     const { data, error } = await supabase
                         .storage
                         .from('kyc-documents')
                         .createSignedUrl(upload.filepath, 60);
 
                     if (error) throw error;
-                    const extracted = await performExtraction(data.signedUrl, document);
+
+                    // Set the file URL for display
+                    setViewUrl(data.signedUrl);
+
+                    // Determine file type from filepath
+                    const isFileType = (type: string) => upload.filepath.toLowerCase().endsWith(type);
+                    const fileType = isFileType('.pdf') ? 'application/pdf' :
+                        isFileType('.png') ? 'image/png' :
+                        isFileType('.jpg') || isFileType('.jpeg') ? 'image/jpeg' :
+                        'application/octet-stream';
+
+                    let imageUrl = data.signedUrl;
+
+                    // If PDF, convert to PNG for extraction
+                    if (fileType === 'application/pdf') {
+                        const pdfResponse = await fetch(data.signedUrl);
+                        const pdfBlob = await pdfResponse.blob();
+
+                        // Use pdf.js to convert PDF to PNG
+                        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+                        const loadingTask = pdfjsLib.getDocument({ data: await pdfBlob.arrayBuffer() });
+                        const pdf = await loadingTask.promise;
+                        const page = await pdf.getPage(1);
+
+                        const viewport = page.getViewport({ scale: 2.0 });
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+
+                        await page.render({
+                            canvasContext: context,
+                            viewport: viewport
+                        }).promise;
+
+                        // Get PNG data URL for extraction
+                        imageUrl = canvas.toDataURL('image/png');
+                    }
+
+                    // Perform extraction using the appropriate URL
+                    const extracted = await performExtraction(imageUrl, document);
                     setOriginalData(extracted);
                     setEditedData(extracted);
-                    setExtractedData(extracted);
+
                 } catch (error) {
                     console.error('Error during extraction:', error);
                     toast.error('Failed to extract details');
@@ -124,6 +169,16 @@ export const ExtractDetailsModal: React.FC<ExtractDetailsModalProps> = ({
             getSignedUrl();
         }
     }, [isOpen, upload, document]);
+
+    // Add cleanup on modal close
+    useEffect(() => {
+        if (!isOpen) {
+            setViewUrl(null);
+            setEditedData({});
+            setOriginalData({});
+        }
+    }, [isOpen]);
+
 
     const handleFieldEdit = (fieldName: string, value: any) => {
         setEditedData(prev => ({
@@ -202,10 +257,15 @@ export const ExtractDetailsModal: React.FC<ExtractDetailsModalProps> = ({
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onClose}>
-                <DialogContent className="max-w-5xl h-[80vh]">
+                <DialogContent className="max-w-7xl h-[90vh]">
                     <DialogHeader>
                         <DialogTitle className="flex justify-between items-center">
-                            <span>Document Details Extraction</span>
+                            <div>
+                                <span>Document Details Extraction</span>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    {document.name}
+                                </p>
+                            </div>
                             {!isLoading && (
                                 <div className="flex space-x-2">
                                     <Button
@@ -226,91 +286,105 @@ export const ExtractDetailsModal: React.FC<ExtractDetailsModalProps> = ({
                             )}
                         </DialogTitle>
                     </DialogHeader>
-
+    
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                             <p className="text-sm text-muted-foreground">Extracting document details...</p>
                         </div>
                     ) : (
-                        <div className="space-y-4 overflow-y-auto max-h-[calc(80vh-8rem)] pr-4">
-                            {previewMode ? (
-                                // Preview Mode
-                                <div className="space-y-6">
-                                    <div className="bg-muted p-4 rounded-lg">
-                                        <h3 className="text-sm font-medium mb-4">Extracted Details Preview</h3>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            {document.fields?.map((field) => (
-                                                <div key={field.id} className="space-y-1">
-                                                    <label className="text-sm font-medium text-muted-foreground">
-                                                        {field.name}
-                                                    </label>
-                                                    <div className="p-2 bg-background rounded border">
-                                                        {editedData[field.name] || '-'}
+                        <div className="flex gap-4 h-[calc(90vh-8rem)]">
+                            {/* Document Preview Section */}
+                            <div className="w-1/2 border rounded-lg overflow-hidden">
+                                {viewUrl && (
+                                    <iframe 
+                                        src={viewUrl} 
+                                        className="w-full h-full"
+                                        title="Document Preview"
+                                    />
+                                )}
+                            </div>
+    
+                            {/* Extraction Details Section */}
+                            <div className="w-1/2 overflow-y-auto">
+                                {previewMode ? (
+                                    // Preview Mode
+                                    <div className="space-y-6">
+                                        <div className="bg-muted p-4 rounded-lg">
+                                            <h3 className="text-sm font-medium mb-4">Extracted Details Preview</h3>
+                                            <div className="grid grid-cols-1 gap-4">
+                                                {document.fields?.map((field) => (
+                                                    <div key={field.id} className="space-y-1">
+                                                        <label className="text-sm font-medium text-muted-foreground">
+                                                            {field.name}
+                                                        </label>
+                                                        <div className="p-2 bg-background rounded border">
+                                                            {editedData[field.name] || '-'}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <div className="flex justify-between w-full">
-                                            <Button variant="outline" onClick={() => setPreviewMode(false)}>
-                                                Edit Details
-                                            </Button>
-                                            <Button onClick={handleSave}>Save Details</Button>
-                                        </div>
-                                    </DialogFooter>
-                                </div>
-                            ) : (
-                                // Edit Mode
-                                <div className="space-y-6">
-                                    <div className="bg-muted p-4 rounded-lg">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <h3 className="text-sm font-medium">Edit Extracted Details</h3>
-                                            <Button variant="outline" size="sm" onClick={handleReset}>
-                                                Reset to Original
-                                            </Button>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            {document.fields?.map((field) => (
-                                                <div key={field.id} className="space-y-2">
-                                                    <label className="text-sm font-medium text-muted-foreground">
-                                                        {field.name}
-                                                    </label>
-                                                    <Input
-                                                        type={field.type === 'date' ? 'date' : field.type === 'number' ? 'number' : 'text'}
-                                                        value={editedData[field.name] || ''}
-                                                        onChange={(e) => handleFieldEdit(field.name, e.target.value)}
-                                                        className={`${
-                                                            editedData[field.name] !== originalData[field.name]
-                                                                ? 'border-yellow-500'
-                                                                : ''
-                                                        }`}
-                                                    />
-                                                    {editedData[field.name] !== originalData[field.name] && (
-                                                        <p className="text-xs text-yellow-600">
-                                                            Original: {originalData[field.name] || '-'}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <div className="flex justify-between w-full">
-                                            <Button variant="outline" onClick={() => setPreviewMode(true)}>
-                                                Back to Preview
-                                            </Button>
-                                            <div className="space-x-2">
-                                                <Button variant="outline" onClick={handleReset}>
-                                                    Reset Changes
+                                        <DialogFooter>
+                                            <div className="flex justify-between w-full">
+                                                <Button variant="outline" onClick={() => setPreviewMode(false)}>
+                                                    Edit Details
                                                 </Button>
                                                 <Button onClick={handleSave}>Save Details</Button>
                                             </div>
+                                        </DialogFooter>
+                                    </div>
+                                ) : (
+                                    // Edit Mode
+                                    <div className="space-y-6">
+                                        <div className="bg-muted p-4 rounded-lg">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="text-sm font-medium">Edit Extracted Details</h3>
+                                                <Button variant="outline" size="sm" onClick={handleReset}>
+                                                    Reset to Original
+                                                </Button>
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-4">
+                                                {document.fields?.map((field) => (
+                                                    <div key={field.id} className="space-y-2">
+                                                        <label className="text-sm font-medium text-muted-foreground">
+                                                            {field.name}
+                                                        </label>
+                                                        <Input
+                                                            type={field.type === 'date' ? 'date' : field.type === 'number' ? 'number' : 'text'}
+                                                            value={editedData[field.name] || ''}
+                                                            onChange={(e) => handleFieldEdit(field.name, e.target.value)}
+                                                            className={`${
+                                                                editedData[field.name] !== originalData[field.name]
+                                                                    ? 'border-yellow-500'
+                                                                    : ''
+                                                            }`}
+                                                        />
+                                                        {editedData[field.name] !== originalData[field.name] && (
+                                                            <p className="text-xs text-yellow-600">
+                                                                Original: {originalData[field.name] || '-'}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </DialogFooter>
-                                </div>
-                            )}
+                                        <DialogFooter>
+                                            <div className="flex justify-between w-full">
+                                                <Button variant="outline" onClick={() => setPreviewMode(true)}>
+                                                    Back to Preview
+                                                </Button>
+                                                <div className="space-x-2">
+                                                    <Button variant="outline" onClick={handleReset}>
+                                                        Reset Changes
+                                                    </Button>
+                                                    <Button onClick={handleSave}>Save Details</Button>
+                                                </div>
+                                            </div>
+                                        </DialogFooter>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </DialogContent>
@@ -366,10 +440,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     };
 
     return (
+
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent>
+            <DialogContent aria-describedby="upload-document-description">
                 <DialogHeader>
                     <DialogTitle>Upload Document</DialogTitle>
+                    <p id="upload-document-description" className="text-sm text-muted-foreground">
+                        Upload a {document?.name} for {company.company_name}
+                    </p>
                 </DialogHeader>
                 <form onSubmit={handleSubmit}>
                     <div className="space-y-4">
@@ -438,7 +516,7 @@ export const AddFieldsDialog: React.FC<AddFieldsDialogProps> = ({
 
     const validateField = (field: { id: string; name: string; type: string }) => {
         const fieldErrors: { [key: string]: string } = {};
-        
+
         if (!field.name.trim()) {
             fieldErrors[field.id] = 'Field name is required';
         } else if (!/^[a-zA-Z0-9_]+$/.test(field.name)) {
@@ -452,7 +530,7 @@ export const AddFieldsDialog: React.FC<AddFieldsDialogProps> = ({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // Validate all fields
         const allErrors: { [key: string]: string } = {};
         fields.forEach(field => {
@@ -507,7 +585,7 @@ export const AddFieldsDialog: React.FC<AddFieldsDialogProps> = ({
             f.id === id ? { ...f, [field]: value } : f
         );
         setFields(newFields);
-        
+
         // Validate the changed field
         if (field === 'name') {
             const fieldToValidate = newFields.find(f => f.id === id);
