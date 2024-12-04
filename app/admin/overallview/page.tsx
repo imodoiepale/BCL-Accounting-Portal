@@ -317,121 +317,117 @@ const OverallView: React.FC = () => {
 
     // Update the processTabSections function in OverallView.tsx
 
-    const processTabSections = useMemo(() => (activeMainTab: string, activeSubTab: string) => {  // Initialize with default columns
-        const processedSections = [
-            {
-                name: 'index',
-                label: 'Index',
-                categorizedFields: []
-            },
-            {
-                isSeparator: true,
-                name: 'company-name-separator'
-            },
-            {
-                name: '',
-                label: '',
-                categorizedFields: [{
-                    category: '',
-                    fields: [{
-                        name: 'acc_portal_company_duplicate.company_name',
-                        label: 'Company Name',
-                        table: 'acc_portal_company_duplicate',
-                        column: 'company_name',
-                        subCategory: 'Company Info'
-                    }]
-                }]
-            }
-        ];
-
-        // Add the index field if not in company details tab
-        if (activeMainTab.toLowerCase() !== 'company details') {
-            processedSections[2].categorizedFields[0].fields.push({
-                name: 'acc_portal_company_duplicate.index',
-                label: 'Index',
-                table: 'acc_portal_company_duplicate',
-                column: 'index',
-                subCategory: 'Company Info'
-            });
+const processTabSections = useMemo(() => (activeMainTab: string, activeSubTab: string) => {
+    const isSpecialView = ['employee details', 'customer details', 'supplier details'].includes(activeMainTab?.toLowerCase());
+    
+    // Initialize with basic columns
+    const processedSections = [
+        {
+            name: 'index',
+            label: 'Index',
+            categorizedFields: []
+        },
+        {
+            isSeparator: true,
+            name: 'company-name-separator'
         }
+    ];
 
-        const relevantMapping = structure.find(item =>
-            item?.Tabs === activeSubTab  &&
-            item?.main_tab === activeMainTab
-        );
+    // Only add default columns if not in special view
+    if (!isSpecialView) {
+        processedSections.push({
+            name: '',
+            label: '',
+            categorizedFields: [{
+                category: '',
+                fields: [{
+                    name: 'acc_portal_company_duplicate.company_name',
+                    label: 'Company Name',
+                    table: 'acc_portal_company_duplicate',
+                    column: 'company_name',
+                    subCategory: 'Company Info'
+                }, {
+                    name: 'acc_portal_company_duplicate.index',
+                    label: 'Index',
+                    table: 'acc_portal_company_duplicate',
+                    column: 'index',
+                    subCategory: 'Company Info'
+                }]
+            }]
+        });
+    }
 
-        if (relevantMapping?.structure?.sections) {
-            const { sections } = relevantMapping.structure;
+    const relevantMapping = structure.find(item =>
+        item?.Tabs === activeSubTab &&
+        item?.main_tab === activeMainTab
+    );
 
-            // Process each section
-            sections.forEach((section, index) => {
-                // Only check visibility if it's explicitly set to false
-                if (visibilityState.sections[section.name] === false) return;
+    if (relevantMapping?.structure?.sections) {
+        const { sections } = relevantMapping.structure;
 
-                if (section?.subsections) {
-                    const processedSubsections = [];
+        // Process each section
+        sections.forEach((section, index) => {
+            if (visibilityState.sections[section.name] === false) return;
 
-                    section.subsections.forEach(subsection => {
-                        // Only check visibility if it's explicitly set to false
-                        if (visibilityState.subsections[subsection.name] === false) return;
+            if (section?.subsections) {
+                const processedSubsections = [];
 
-                        let fields = subsection?.fields
-                            ?.filter(field => {
-                                const fieldKey = `${field.table}.${field.name}`;
-                                // Only filter out if explicitly set to false
-                                return visibilityState.fields[fieldKey] !== false;
-                            })
-                            .map(field => ({
-                                name: `${field.table}.${field.name}`,
-                                label: field.display,
-                                table: field.table,
-                                column: field.name,
-                                dropdownOptions: field.dropdownOptions || [],
-                                subCategory: subsection.name
-                            })) || [];
+                section.subsections.forEach(subsection => {
+                    if (visibilityState.subsections[subsection.name] === false) return;
 
-                        // Sort fields by order if available
-                        if (fields.length > 0) {
-                            fields = fields.sort((a, b) => {
-                                const orderA = orderState.fields[`${a.table}.${a.column}`] || 0;
-                                const orderB = orderState.fields[`${b.table}.${b.column}`] || 0;
-                                return orderA - orderB;
-                            });
+                    let fields = subsection?.fields
+                        ?.filter(field => {
+                            const fieldKey = `${field.table}.${field.name}`;
+                            return visibilityState.fields[fieldKey] !== false;
+                        })
+                        .map(field => ({
+                            name: `${field.table}.${field.name}`,
+                            label: field.display,
+                            table: field.table,
+                            column: field.name,
+                            dropdownOptions: field.dropdownOptions || [],
+                            subCategory: subsection.name
+                        })) || [];
 
-                            processedSubsections.push({
-                                category: subsection.name,
-                                fields: fields
-                            });
-                        }
-                    });
-
-                    if (processedSubsections.length > 0) {
-                        processedSections.push({
-                            name: section.name,
-                            label: section.name,
-                            categorizedFields: processedSubsections
+                    if (fields.length > 0) {
+                        fields = fields.sort((a, b) => {
+                            const orderA = orderState.fields[`${a.table}.${a.column}`] || 0;
+                            const orderB = orderState.fields[`${b.table}.${b.column}`] || 0;
+                            return orderA - orderB;
                         });
 
-                        // Add separator after each section except the last one
-                        if (index < sections.length - 1) {
-                            processedSections.push({
-                                isSeparator: true,
-                                name: `${section.name}-separator`
-                            });
-                        }
+                        processedSubsections.push({
+                            category: subsection.name,
+                            fields: fields
+                        });
+                    }
+                });
+
+                if (processedSubsections.length > 0) {
+                    processedSections.push({
+                        name: section.name,
+                        label: section.name,
+                        categorizedFields: processedSubsections
+                    });
+
+                    if (index < sections.length - 1) {
+                        processedSections.push({
+                            isSeparator: true,
+                            name: `${section.name}-separator`
+                        });
                     }
                 }
-            });
-        }
-
-        // Sort sections by order if available
-        return processedSections.sort((a, b) => {
-            if (a.isSeparator || b.isSeparator) return 0;
-            const orderA = orderState.sections[a.name] || 0;
-            const orderB = orderState.sections[b.name] || 0;
-            return orderA - orderB;
+            }
         });
-    }, [structure, visibilityState, orderState, activeMainTab, activeSubTab]);
+    }
+
+    return processedSections.sort((a, b) => {
+        if (a.isSeparator || b.isSeparator) return 0;
+        const orderA = orderState.sections[a.name] || 0;
+        const orderB = orderState.sections[b.name] || 0;
+        return orderA - orderB;
+    });
+}, [structure, visibilityState, orderState, activeMainTab, activeSubTab]);
 
 
     // Add this useEffect to initialize visibility and order states when structure changes
