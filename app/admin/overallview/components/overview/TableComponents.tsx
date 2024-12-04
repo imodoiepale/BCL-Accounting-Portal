@@ -564,7 +564,7 @@ export const Table: React.FC<TableProps> = ({
 
   return (
     <Card>
-      <CardContent className="p-0">
+      <CardContent className="p-0 h-[900px]">
         <ScrollArea className="h-[900px] rounded-md border">
           <UITable>
             <TableHeader className="sticky top-0 z-10 bg-white">
