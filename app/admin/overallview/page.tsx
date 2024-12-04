@@ -531,7 +531,7 @@ const processTabSections = useMemo(() => (activeMainTab: string, activeSubTab: s
     };
 
     return (
-        <div className="h-screen flex flex-col">
+        <div className="h-[1100px] flex flex-col">
             <Tabs defaultValue={mainTabs[0]} onValueChange={handleMainTabChange} className="h-full flex flex-col">
             <TabsList className="w-full grid-cols-[repeat(auto-fit,minmax(0,1fr))] grid bg-gray-100 rounded-lg p-1">    {mainTabs.map(tab => (
                         <TabsTrigger
@@ -603,9 +603,9 @@ const processTabSections = useMemo(() => (activeMainTab: string, activeSubTab: s
                                         value={activeSubTab}
                                         className="h-full data-[state=active]:flex-1"
                                     >
-                                        <Card className="h-full flex flex-col">
+                                        <Card className="h-[890px] flex flex-col">
                                             <CardContent className="flex-1 p-0 overflow-hidden">
-                                                <div className="h-full overflow-auto">
+                                                <div className="h-[890px] overflow-auto">
                                                     <div className="min-w-max">
                                                         <Table
                                                             data={data}
