@@ -1,22 +1,31 @@
 import React, { useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Plus, Edit2, Settings, Trash2, Upload, Eye } from 'lucide-react';
+import { MoreVertical, Plus, Edit2, Settings, Trash2, Upload, Eye, ChevronDown, ChevronRight } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import toast from 'react-hot-toast';
 
-// Type Definitions
+// Enhanced Type Definitions
 interface Field {
   id: string;
   name: string;
+  type: string;
+  isArray?: boolean;
+  parentField?: string;
+  arrayConfig?: {
+    maxItems?: number;
+    fields?: Field[];
+  };
 }
 
 interface Document {
   id: string;
   name: string;
   fields?: Field[];
+  category?: string;
 }
 
 interface Company {
@@ -29,45 +38,13 @@ interface Upload {
   userid: string;
   kyc_document_id: string;
   filepath: string;
-  issue_date?: Date;
-  expiry_date?: Date;
-  created_at: Date;
+  issue_date?: string;
+  expiry_date?: string;
+  created_at: string;
+  extracted_details?: any;
 }
 
-// Utility Functions
-export const generateId = (): string => crypto.randomUUID();
-
-export const sanitizeFieldName = (name: string): string => {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '');
-};
-
-export const isFieldNameUnique = (
-  name: string, 
-  fields: Field[], 
-  excludeId?: string
-): boolean => {
-  return !fields.some(
-    field => field.name.toLowerCase() === name.toLowerCase() && field.id !== excludeId
-  );
-};
-
-export const extractDetailsFromText = (text: string, fields: Field[]) => {
-  const extracted: Record<string, string> = {};
-  fields.forEach(field => {
-    const regex = new RegExp(`${field.name}[:\\s]+([^\\n]+)`, 'i');
-    const match = text.match(regex);
-    if (match) {
-      extracted[field.name] = match[1].trim();
-    }
-  });
-  return extracted;
-};
-
-// Document Actions Component
+// Enhanced Document Actions Component
 export const DocumentActions: React.FC<{
   document: Document;
   onUpdateFields: (documentId: string, fields: Field[]) => void;
@@ -75,44 +52,51 @@ export const DocumentActions: React.FC<{
   const [isManageFieldsOpen, setIsManageFieldsOpen] = useState(false);
   const [fields, setFields] = useState<Field[]>(document.fields || []);
   const [pasteInput, setPasteInput] = useState('');
+  const [showArrayConfig, setShowArrayConfig] = useState<string | null>(null);
 
-  const handleFieldChange = useCallback((id: string, value: string) => {
+  const handleFieldChange = useCallback((id: string, value: string, type: 'name' | 'type' = 'name') => {
     setFields(prevFields =>
-      prevFields.map(field => 
-        field.id === id ? { ...field, name: value } : field
-      )
+      prevFields.map(field => {
+        if (field.id === id) {
+          const updatedField = { ...field, [type]: value };
+          if (type === 'type' && value === 'array' && !field.arrayConfig) {
+            updatedField.isArray = true;
+            updatedField.arrayConfig = {
+              maxItems: 10,
+              fields: []
+            };
+          }
+          return updatedField;
+        }
+        return field;
+      })
     );
   }, []);
 
-  const handleDeleteField = useCallback((id: string) => {
-    setFields(prevFields => prevFields.filter(field => field.id !== id));
+  const handleAddArrayField = useCallback((parentId: string) => {
+    setFields(prevFields =>
+      prevFields.map(field => {
+        if (field.id === parentId && field.arrayConfig) {
+          return {
+            ...field,
+            arrayConfig: {
+              ...field.arrayConfig,
+              fields: [
+                ...(field.arrayConfig.fields || []),
+                {
+                  id: crypto.randomUUID(),
+                  name: '',
+                  type: 'text',
+                  parentField: parentId
+                }
+              ]
+            }
+          };
+        }
+        return field;
+      })
+    );
   }, []);
-
-  const handleAddField = useCallback(() => {
-    const newField = { id: generateId(), name: '' };
-    setFields(prevFields => [...prevFields, newField]);
-  }, []);
-
-  const handlePasteFields = useCallback(() => {
-    const pastedFields = pasteInput
-      .split('\n')
-      .filter(field => field.trim() !== '')
-      .map(field => ({
-        id: generateId(),
-        name: field.trim()
-      }));
-
-    setFields(prevFields => [...prevFields, ...pastedFields]);
-    setPasteInput('');
-    toast.success(`Added ${pastedFields.length} new fields`);
-  }, [pasteInput]);
-
-  const handleSaveChanges = useCallback(() => {
-    const filteredFields = fields.filter(field => field.name.trim() !== '');
-    onUpdateFields(document.id, filteredFields);
-    setIsManageFieldsOpen(false);
-    toast.success('Fields updated successfully');
-  }, [document.id, fields, onUpdateFields]);
 
   return (
     <>
@@ -122,7 +106,7 @@ export const DocumentActions: React.FC<{
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[180px]">
+        <DropdownMenuContent align="end" className="w-[200px]">
           <DropdownMenuItem onClick={() => setIsManageFieldsOpen(true)}>
             <Settings className="mr-2 h-4 w-4" />
             Manage Fields
@@ -135,65 +119,202 @@ export const DocumentActions: React.FC<{
       </DropdownMenu>
 
       <Dialog open={isManageFieldsOpen} onOpenChange={setIsManageFieldsOpen}>
-        <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+        <DialogContent className="max-w-5xl h-[90vh]">
           <DialogHeader>
-            <DialogTitle>Manage Fields for {document.name}</DialogTitle>
+            <DialogTitle className="text-xl">
+              Manage Fields for {document.name}
+              <span className="ml-2 text-sm text-muted-foreground">
+                {document.category}
+              </span>
+            </DialogTitle>
           </DialogHeader>
-          <div className="flex flex-row gap-4 h-full">
-            {/* Fields List */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-4 border-r">
-              {fields.map((field) => (
-                <div 
-                  key={field.id} 
-                  className="flex gap-2 items-center bg-gray-50 rounded-lg p-3"
-                >
-                  <Input
-                    value={field.name}
-                    onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                    placeholder="Enter field name"
-                    className="flex-1"
-                  />
+          <div className="flex gap-6 h-full max-h-[calc(90vh-10rem)] mt-4">
+            <div className="flex-1 overflow-y-auto space-y-4">
+              <Card>
+                <CardHeader className="py-3">
+                  <h3 className="text-sm font-semibold">Document Fields</h3>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {fields.map((field) => (
+                    <div key={field.id} className="space-y-3">
+                      <div className="flex gap-3 items-start bg-gray-50 rounded-lg p-4">
+                        <div className="flex-1 space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Field Name</label>
+                          <Input
+                            value={field.name}
+                            onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                            placeholder="Enter field name"
+                          />
+                        </div>
+                        <div className="w-1/3 space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Type</label>
+                          <select
+                            value={field.type || 'text'}
+                            onChange={(e) => handleFieldChange(field.id, e.target.value, 'type')}
+                            className="w-full mt-1 border rounded-md p-2"
+                          >
+                            <option value="text">Text</option>
+                            <option value="number">Number</option>
+                            <option value="date">Date</option>
+                            <option value="email">Email</option>
+                            <option value="phone">Phone</option>
+                            <option value="array">Array</option>
+                            <option value="object">Object</option>
+                          </select>
+                        </div>
+                        <div className="flex gap-2 pt-8">
+                          {field.type === 'array' && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowArrayConfig(field.id)}
+                            >
+                              Configure Array
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setFields(prev => prev.filter(f => f.id !== field.id));
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {field.type === 'array' && showArrayConfig === field.id && (
+                        <div className="ml-6 pl-4 border-l-2 border-gray-200 space-y-3">
+                          <h4 className="text-sm font-medium text-gray-700">Array Item Fields</h4>
+                          {field.arrayConfig?.fields?.map((subField) => (
+                            <div key={subField.id} className="flex gap-3 bg-white rounded-lg p-3">
+                              <Input
+                                value={subField.name}
+                                onChange={(e) => {
+                                  setFields(prev =>
+                                    prev.map(f =>
+                                      f.id === field.id
+                                        ? {
+                                          ...f,
+                                          arrayConfig: {
+                                            ...f.arrayConfig!,
+                                            fields: f.arrayConfig!.fields!.map(sf =>
+                                              sf.id === subField.id
+                                                ? { ...sf, name: e.target.value }
+                                                : sf
+                                            )
+                                          }
+                                        }
+                                        : f
+                                    )
+                                  );
+                                }}
+                                placeholder="Enter array item field name"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setFields(prev =>
+                                    prev.map(f =>
+                                      f.id === field.id
+                                        ? {
+                                          ...f,
+                                          arrayConfig: {
+                                            ...f.arrayConfig!,
+                                            fields: f.arrayConfig!.fields!.filter(
+                                              sf => sf.id !== subField.id
+                                            )
+                                          }
+                                        }
+                                        : f
+                                    )
+                                  );
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleAddArrayField(field.id)}
+                          >
+                            Add Array Item Field
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
                   <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteField(field.id)}
+                    variant="outline"
+                    className="w-full mt-4"
+                    onClick={() => {
+                      setFields(prev => [
+                        ...prev,
+                        { id: crypto.randomUUID(), name: '', type: 'text' }
+                      ]);
+                    }}
                   >
-                    <Trash2 className="h-4 w-4 text-red-500" />
+                    <Plus className="mr-2 h-4 w-4" /> Add Field
                   </Button>
-                </div>
-              ))}
-              <Button 
-                variant="outline" 
-                className="w-full mt-4" 
-                onClick={handleAddField}
-              >
-                <Plus className="mr-2 h-4 w-4" /> Add Field
-              </Button>
+                </CardContent>
+              </Card>
             </div>
 
-            {/* Paste Fields Section */}
-            <div className="w-1/3 flex flex-col">
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold mb-2">Paste Fields</h3>
-                <textarea
-                  value={pasteInput}
-                  onChange={(e) => setPasteInput(e.target.value)}
-                  placeholder="Paste field names here (one per line)"
-                  className="w-full h-40 p-2 border rounded-md"
-                />
-              </div>
-              <Button 
-                onClick={handlePasteFields}
-                disabled={!pasteInput.trim()}
-                className="w-full"
-              >
-                Add Pasted Fields
-              </Button>
+            <div className="w-1/3">
+              <Card>
+                <CardHeader className="py-3">
+                  <h3 className="text-sm font-semibold">Paste Multiple Fields</h3>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <textarea
+                    value={pasteInput}
+                    onChange={(e) => setPasteInput(e.target.value)}
+                    placeholder="Paste field names here (one per line)"
+                    className="w-full h-48 p-3 text-sm border rounded-md"
+                  />
+                  <Button
+                    onClick={() => {
+                      const newFields = pasteInput
+                        .split('\n')
+                        .filter(Boolean)
+                        .map(name => ({
+                          id: crypto.randomUUID(),
+                          name: name.trim(),
+                          type: 'text'
+                        }));
+                      setFields(prev => [...prev, ...newFields]);
+                      setPasteInput('');
+                      toast.success(`Added ${newFields.length} new fields`);
+                    }}
+                    disabled={!pasteInput.trim()}
+                    className="w-full"
+                  >
+                    Add Pasted Fields
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={handleSaveChanges}>Save Changes</Button>
+            <Button
+              onClick={() => {
+                const validFields = fields.filter(f => f.name.trim());
+                onUpdateFields(document.id, validFields);
+                setIsManageFieldsOpen(false);
+                toast.success('Fields updated successfully');
+              }}
+            >
+              Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -201,121 +322,4 @@ export const DocumentActions: React.FC<{
   );
 };
 
-// Document Action Cell Component
-export const DocumentActionCell: React.FC<{
-  company: Company;
-  document: Document;
-  upload?: Upload;
-  onView: (document: Document, company: Company) => void;
-  onUpload: (companyId: number, documentId: string) => void;
-  onExtract: (document: Document, upload: Upload) => void;
-}> = ({ 
-  company, 
-  document, 
-  upload, 
-  onView, 
-  onUpload, 
-  onExtract 
-}) => {
-  return (
-    <div className="flex items-center justify-center">
-      <div className="flex justify-center space-x-2">
-        {upload ? (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onView(document, company)}
-              title="View Document"
-            >
-              <Eye className="h-4 w-4 text-blue-500" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onExtract(document, upload)}
-              title="Extract Details"
-            >
-              <Settings className="h-4 w-4 text-green-500" />
-            </Button>
-          </>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onUpload(company.id, document.id)}
-            title="Upload Document"
-          >
-            <Upload className="h-4 w-4 text-orange-500" />
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-};
 
-// Document Management Table Component
-export const DocumentManagementTable: React.FC<{
-  companies: Company[];
-  documents: Document[];
-  uploads: Upload[];
-  onUpdateFields: (documentId: string, fields: Field[]) => void;
-  onView: (document: Document, company: Company) => void;
-  onUpload: (companyId: number, documentId: string) => void;
-  onExtract: (document: Document, upload: Upload) => void;
-}> = ({
-  companies,
-  documents,
-  uploads,
-  onUpdateFields,
-  onView,
-  onUpload,
-  onExtract
-}) => {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Document Name</TableHead>
-          <TableHead>Company</TableHead>
-          <TableHead>Fields</TableHead>
-          <TableHead className="text-center">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {documents.map(document => {
-          const company = companies.find(c => c.id === Number(document.id));
-          const upload = uploads.find(u => u.id === document.id);
-          
-          return (
-            <TableRow key={document.id}>
-              <TableCell>{document.name}</TableCell>
-              <TableCell>{company?.company_name || 'N/A'}</TableCell>
-              <TableCell>
-                {document.fields?.map(field => field.name).join(', ') || 'No fields'}
-              </TableCell>
-              <TableCell className="text-center">
-                <div className="flex items-center justify-center space-x-2">
-                  <DocumentActions 
-                    document={document} 
-                    onUpdateFields={onUpdateFields} 
-                  />
-                  <DocumentActionCell
-                    company={company!}
-                    document={document}
-                    upload={upload}
-                    onView={onView}
-                    onUpload={onUpload}
-                    onExtract={onExtract}
-                  />
-                </div>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
-  );
-};
-
-export default DocumentManagementTable;
