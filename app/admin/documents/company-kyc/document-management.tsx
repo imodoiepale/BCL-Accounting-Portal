@@ -9,6 +9,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileIcon } from 'lucide-react';
@@ -18,6 +19,14 @@ import { supabase } from '@/lib/supabaseClient';
 import { toast, Toaster } from 'react-hot-toast';
 import { UploadModal } from './UploadModal';
 import { SettingsModal } from './SettingsModal';
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 
 // Interfaces
@@ -104,83 +113,149 @@ const parseDate = (dateValue: any): Date | null => {
   return null;
 };
 // DocumentViewer Component
-// DocumentViewer Component (replace the existing one)
-const DocumentViewer: React.FC<{ documents: any[]; onClose: () => void }> = ({ documents, onClose }) => {
+const DocumentViewer: React.FC<{
+  documents: any[];
+  onClose: () => void;
+  onUpdateDocumentType?: (docId: string, type: 'recent' | 'past') => Promise<void>;
+}> = ({ documents, onClose, onUpdateDocumentType }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const sortedDocs = [...documents].sort((a, b) =>
     new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()
   );
 
+  const getFilenameFromPath = (filepath: string) => {
+    return filepath.split('/').pop() || 'Unnamed Document';
+  };
+
+  const handleDocumentTypeChange = async (docId: string, type: 'recent' | 'past') => {
+    try {
+      if (onUpdateDocumentType) {
+        await onUpdateDocumentType(docId, type);
+      }
+    } catch (error) {
+      toast.error('Failed to update document type');
+    }
+  };
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-[95vw] w-[1400px] max-h-[90vh] h-[800px]">
+        <DialogHeader className="px-6 py-4">
           <DialogTitle className="flex justify-between items-center">
-            <span>Document Preview ({currentIndex + 1}/{documents.length})</span>
+            <div className="flex flex-col">
+              <span>Document Preview ({currentIndex + 1}/{documents.length})</span>
+              <span className="text-sm text-gray-500 mt-1">
+                {getFilenameFromPath(sortedDocs[currentIndex].filepath)}
+              </span>
+            </div>
             <div className="flex items-center space-x-2">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
                 disabled={currentIndex === 0}
-                className="hover:bg-violet-50 p-1 rounded border border-gray-300"
+                className="hover:bg-violet-50"
               >
                 <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentIndex(prev => Math.min(documents.length - 1, prev + 1))}
                 disabled={currentIndex === documents.length - 1}
-                className="hover:bg-violet-50 p-1 rounded border border-gray-300"
+                className="hover:bg-violet-50"
               >
                 <ChevronRight className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </DialogTitle>
         </DialogHeader>
-
-        <div className="flex flex-col space-y-4">
-          <div className="flex-1 min-h-[500px] border rounded-lg">
-            <iframe 
-              src={sortedDocs[currentIndex].url} 
-              className="w-full h-full rounded-lg"
-              title={`Document ${currentIndex + 1}`}
+  
+        <div className="flex gap-4 h-[calc(100%-80px)] p-6">
+          <div className="w-[300px] flex flex-col border-r pr-4">
+            <ScrollArea className="flex-1">
+              <div className="space-y-3">
+                {sortedDocs.map((doc, index) => (
+                  <div
+                    key={doc.id}
+                    className={`cursor-pointer p-3 border rounded-lg transition-all ${
+                      index === currentIndex ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-200'
+                    }`}
+                    onClick={() => setCurrentIndex(index)}
+                  >
+                    <div className="flex items-center gap-2 mb-2 relative group">
+                      <FileIcon className="h-4 w-4 text-violet-500 flex-shrink-0" />
+                      <span className="text-sm font-medium truncate">
+                        {getFilenameFromPath(doc.filepath)}
+                      </span>
+                      <div className="absolute left-0 -bottom-8 hidden group-hover:block z-50">
+                        <div className="bg-gray-900 text-white text-xs rounded-md py-1 px-2 whitespace-nowrap">
+                          {getFilenameFromPath(doc.filepath)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Select
+                        defaultValue={doc.documentType || 'recent'}
+                        onValueChange={(value) => handleDocumentTypeChange(doc.id, value as 'recent' | 'past')}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="recent" className="text-xs">
+                            <span className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                              Recent Document
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="past" className="text-xs">
+                            <span className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                              Past Document
+                            </span>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="space-y-1 mt-2">
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          <span className="font-medium">Uploaded:</span>
+                          {format(new Date(doc.uploadDate), 'dd/MM/yyyy')}
+                        </div>
+                        {doc.issueDate && (
+                          <div className="text-xs text-gray-500 flex items-center gap-1">
+                            <span className="font-medium">Issued:</span>
+                            {format(new Date(doc.issueDate), 'dd/MM/yyyy')}
+                          </div>
+                        )}
+                        {doc.expiryDate && (
+                          <div className="text-xs text-gray-500 flex items-center gap-1">
+                            <span className="font-medium">Expires:</span>
+                            {format(new Date(doc.expiryDate), 'dd/MM/yyyy')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+  
+          <div className="flex-1 border rounded-lg overflow-hidden">
+            <iframe
+              src={sortedDocs[currentIndex].url}
+              className="w-full h-full"
+              title={getFilenameFromPath(sortedDocs[currentIndex].filepath)}
             />
           </div>
-
-          <ScrollArea className="w-full" orientation="horizontal">
-            <div className="flex space-x-2 p-2">
-              {sortedDocs.map((doc, index) => (
-                <div
-                  key={doc.id}
-                  className={`flex-shrink-0 cursor-pointer p-3 border rounded-lg transition-all min-w-[150px] ${
-                    index === currentIndex ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-200'
-                  }`}
-                  onClick={() => setCurrentIndex(index)}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileIcon className="h-4 w-4 text-violet-500" />
-                    <span className="text-sm font-medium truncate">Document {index + 1}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className={`text-xs px-2 py-1 rounded-full w-fit ${
-                      doc.documentType === 'recent' 
-                        ? 'bg-emerald-100 text-emerald-700' 
-                        : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {doc.documentType === 'recent' ? 'Recent' : 'Past'}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {format(new Date(doc.uploadDate), 'dd/MM/yyyy')}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
         </div>
       </DialogContent>
     </Dialog>
   );
+  
+  // You can remove the ViewModal component since it's being replaced by the DialogViewer
 };
-
 // ViewModal Component
 const ViewModal: React.FC<ViewModalProps> = ({ url, setShowViewModal }) => {
   if (!url) return null;
@@ -601,6 +676,31 @@ const DocumentManagement = () => {
     }
   };
 
+
+  const handleUpdateDocumentType = async (docId: string, type: 'recent' | 'past') => {
+    try {
+      const { error } = await supabase
+        .from('acc_portal_kyc_uploads')
+        .update({ document_type: type })
+        .eq('id', docId);
+
+      if (error) throw error;
+
+      // Update the local state
+      setViewDocuments(prev =>
+        prev.map(doc =>
+          doc.id === docId ? { ...doc, documentType: type } : doc
+        )
+      );
+
+      toast.success('Document type updated successfully');
+    } catch (error) {
+      console.error('Error updating document type:', error);
+      toast.error('Failed to update document type');
+      throw error;
+    }
+  };
+
   const handleViewDocument = async (document: Document, company: Company) => {
     const documentUploads = uploads.filter(u =>
       u.kyc_document_id === document.id &&
@@ -613,7 +713,7 @@ const DocumentManagement = () => {
     }
 
     try {
-      const documentUrls = await Promise.all(
+      const documentPreviews = await Promise.all(
         documentUploads.map(async (upload) => {
           const { data, error } = await supabase
             .storage
@@ -625,20 +725,23 @@ const DocumentManagement = () => {
           return {
             id: upload.id,
             url: data.signedUrl,
+            filepath: upload.filepath,
             uploadDate: upload.upload_date,
             issueDate: upload.issue_date,
-            expiryDate: upload.expiry_date
+            expiryDate: upload.expiry_date,
+            documentType: upload.document_type || 'recent'
           };
         })
       );
 
-      setViewDocuments(documentUrls);
+      setViewDocuments(documentPreviews);
       setShowDocumentViewer(true);
     } catch (error) {
       console.error('Error viewing documents:', error);
       toast.error('Failed to load documents');
     }
   };
+
 
   const handleDownloadDocument = async (document: Document, company: Company) => {
     const upload = uploads.find(u =>
@@ -1273,6 +1376,7 @@ const DocumentManagement = () => {
             setShowDocumentViewer(false);
             setViewDocuments([]);
           }}
+          onUpdateDocumentType={handleUpdateDocumentType}
         />
       )}
 
