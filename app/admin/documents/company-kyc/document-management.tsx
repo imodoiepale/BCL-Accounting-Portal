@@ -9,12 +9,16 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { FileIcon } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { toast, Toaster } from 'react-hot-toast';
 import { UploadModal } from './UploadModal';
 import { SettingsModal } from './SettingsModal';
+
 
 // Interfaces
 interface Company {
@@ -100,6 +104,7 @@ const parseDate = (dateValue: any): Date | null => {
   return null;
 };
 // DocumentViewer Component
+// DocumentViewer Component (replace the existing one)
 const DocumentViewer: React.FC<{ documents: any[]; onClose: () => void }> = ({ documents, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const sortedDocs = [...documents].sort((a, b) =>
@@ -107,56 +112,72 @@ const DocumentViewer: React.FC<{ documents: any[]; onClose: () => void }> = ({ d
   );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-4 w-11/12 h-5/6 relative">
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-        >
-          <X className="w-5 h-5" />
-        </button>
-        <div className="flex flex-col h-full">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">
-              Document {currentIndex + 1} of {documents.length}
-            </h2>
-            <div className="flex space-x-2">
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogHeader>
+          <DialogTitle className="flex justify-between items-center">
+            <span>Document Preview ({currentIndex + 1}/{documents.length})</span>
+            <div className="flex items-center space-x-2">
               <button
                 onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
                 disabled={currentIndex === 0}
-                className="p-1 hover:bg-gray-100 rounded-full disabled:opacity-50"
+                className="hover:bg-violet-50 p-1 rounded border border-gray-300"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setCurrentIndex(prev => Math.min(documents.length - 1, prev + 1))}
                 disabled={currentIndex === documents.length - 1}
-                className="p-1 hover:bg-gray-100 rounded-full disabled:opacity-50"
+                className="hover:bg-violet-50 p-1 rounded border border-gray-300"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-col space-y-4">
+          <div className="flex-1 min-h-[500px] border rounded-lg">
+            <iframe 
+              src={sortedDocs[currentIndex].url} 
+              className="w-full h-full rounded-lg"
+              title={`Document ${currentIndex + 1}`}
+            />
           </div>
-          <div className="flex-1 mb-4">
-            <iframe src={sortedDocs[currentIndex].url} className="w-full h-full" title={`Document ${currentIndex + 1}`} />
-          </div>
-          <div className="grid grid-cols-6 gap-2 overflow-x-auto p-2 bg-gray-50 rounded-lg">
-            {sortedDocs.map((doc, index) => (
-              <div
-                key={doc.id}
-                onClick={() => setCurrentIndex(index)}
-                className={`cursor-pointer p-2 border rounded ${index === currentIndex ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
-              >
-                <div className="text-xs text-center">Document {index + 1}</div>
-                <div className="text-xs text-gray-500 text-center">
-                  {format(new Date(doc.uploadDate), 'dd/MM/yyyy')}
+
+          <ScrollArea className="w-full" orientation="horizontal">
+            <div className="flex space-x-2 p-2">
+              {sortedDocs.map((doc, index) => (
+                <div
+                  key={doc.id}
+                  className={`flex-shrink-0 cursor-pointer p-3 border rounded-lg transition-all min-w-[150px] ${
+                    index === currentIndex ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-200'
+                  }`}
+                  onClick={() => setCurrentIndex(index)}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileIcon className="h-4 w-4 text-violet-500" />
+                    <span className="text-sm font-medium truncate">Document {index + 1}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className={`text-xs px-2 py-1 rounded-full w-fit ${
+                      doc.documentType === 'recent' 
+                        ? 'bg-emerald-100 text-emerald-700' 
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {doc.documentType === 'recent' ? 'Recent' : 'Past'}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {format(new Date(doc.uploadDate), 'dd/MM/yyyy')}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </ScrollArea>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
