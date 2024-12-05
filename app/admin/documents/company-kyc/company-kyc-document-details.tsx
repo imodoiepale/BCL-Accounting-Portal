@@ -776,9 +776,9 @@ export default function CompanyKycDocumentDetails() {
               <Card>
                 <Table>
                   <TableHeader>
-                    <TableRow className="text-[11px] bg-blue-100">
+                    <TableRow className="text-[11px] bg-blue-100 border-b border-gray-200">
                       <TableHead
-                        className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer"
+                        className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer border-r border-gray-200"
                         onClick={() => handleSort('#')}
                       >
                         <div className="flex items-center">
@@ -789,7 +789,7 @@ export default function CompanyKycDocumentDetails() {
                         </div>
                       </TableHead>
                       <TableHead
-                        className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer"
+                        className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer border-r border-gray-200"
                         onClick={() => handleSort('Company')}
                       >
                         <div className="flex items-center">
@@ -799,11 +799,11 @@ export default function CompanyKycDocumentDetails() {
                           )}
                         </div>
                       </TableHead>
-                      <TableHead className="sticky top-0 bg-blue-100 z-10">Actions</TableHead>
+                      <TableHead className="sticky top-0 bg-blue-100 z-10 border-r border-gray-200">Actions</TableHead>
                       {selectedDocument.fields?.map((field) => (
                         <TableHead
                           key={field.id}
-                          className="text-center sticky top-0 bg-blue-100 z-10"
+                          className="text-center sticky top-0 bg-blue-100 z-10 border-r border-gray-200 last:border-r-0"
                         >
                           {field.name}
                         </TableHead>
@@ -812,14 +812,17 @@ export default function CompanyKycDocumentDetails() {
                   </TableHeader>
                   <TableBody className="text-[11px]">
                     {getFilteredAndSortedCompanies().map((company, index) => (
-                      <TableRow key={company.id}>
-                        <TableCell className="font-medium sticky left-0 bg-white">
+                      <TableRow 
+                        key={company.id} 
+                        className="border-b border-gray-100 hover:bg-gray-50"
+                      >
+                        <TableCell className="font-medium sticky left-0 bg-white border-r border-gray-100">
                           {index + 1}
                         </TableCell>
-                        <TableCell className="font-medium sticky left-0 bg-white">
+                        <TableCell className="font-medium sticky left-0 bg-white border-r border-gray-100">
                           {company.company_name}
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center border-r border-gray-100">
                           <div className="flex justify-center space-x-2">
                             {uploads.some(u =>
                               u.kyc_document_id === selectedDocument.id &&
@@ -864,14 +867,19 @@ export default function CompanyKycDocumentDetails() {
                             )}
                           </div>
                         </TableCell>
-                        {selectedDocument.fields?.map((field) => {
+                        {selectedDocument.fields?.map((field, fieldIndex) => {
                           const upload = uploads.find(
                             u =>
                               u.kyc_document_id === selectedDocument.id &&
                               u.userid === company.id.toString()
                           );
                           return (
-                            <TableCell key={field.id} className="text-center">
+                            <TableCell 
+                              key={field.id} 
+                              className={`text-center border-r border-gray-100 ${
+                                fieldIndex === selectedDocument.fields.length - 1 ? 'last:border-r-0' : ''
+                              }`}
+                            >
                               {renderFieldValue(
                                 field,
                                 upload?.extracted_details?.[field.name]
