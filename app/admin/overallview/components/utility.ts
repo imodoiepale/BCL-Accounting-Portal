@@ -359,7 +359,7 @@ export const calculateFieldStats = (fieldName: string, data: any[]) => {
       if (group.rows && group.rows[0] && fieldName in group.rows[0]) {
         total++;
         const value = group.rows[0][fieldName];
-        if (value !== null && value !== undefined && value !== '') {
+        if (value !== null && value !== undefined && value.toString().trim() !== '') {
           completed++;
         }
       }

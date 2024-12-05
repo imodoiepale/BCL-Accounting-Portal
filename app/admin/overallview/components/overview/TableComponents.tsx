@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import SidebarTableView from './SidebarTableView';
+import { Lock, LockOpen } from 'lucide-react';
 interface TableProps {
   data: any[];
   handleCompanyClick: (company: any) => void;
@@ -95,8 +96,6 @@ const categoryColors = {
   'Acc': { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' }
 };
 
-// Add these functions at the top of TableComponents.tsx
-
 // Calculate missing fields for a specific row
 const calculateMissingFieldsForRow = (row: any, processedSections: any[]) => {
   let missingCount = 0;
@@ -167,12 +166,12 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
       {/* Total Row */}
       <TableRow className="bg-blue-50">
         <TableHead className="font-semibold text-blue-900 text-start">Total</TableHead>
+        <TableHead className='font-medium bg-green-100 text-white'></TableHead>
         {renderSeparatorCell(`total-first-separator`, 'section')}
         <TableCell className="text-center font-medium text-blue-700">
           {data.reduce((sum, companyGroup) =>
             sum + calculateMissingFieldsForRow(companyGroup.rows[0], processedSections), 0)}
         </TableCell>
-
         {processedSections.slice(1).map((section, sectionIndex) => {
           if (section.isSeparator) {
             return renderSeparatorCell(
@@ -212,6 +211,7 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
       {/* Completed Row */}
       <TableRow className="bg-green-50">
         <TableHead className="font-semibold text-green-900 text-start">Completed</TableHead>
+        <TableHead className='font-medium bg-green-100 text-white'></TableHead>
         {renderSeparatorCell(`completed-first-separator`, 'section')}
         <TableCell className="text-center font-medium text-green-700">
           {data.reduce((sum, companyGroup) => {
@@ -229,7 +229,6 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
             return sum + (totalFields - missingFields);
           }, 0)}
         </TableCell>
-
         {processedSections.slice(1).map((section, sectionIndex) => {
           if (section.isSeparator) {
             return renderSeparatorCell(
@@ -269,12 +268,12 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
       {/* Pending Row */}
       <TableRow className="bg-red-50">
         <TableHead className="font-semibold text-red-900 text-start">Pending</TableHead>
+        <TableHead className='font-medium bg-green-100 text-white'></TableHead>
         {renderSeparatorCell(`pending-first-separator`, 'section')}
         <TableCell className="text-center font-medium text-red-700">
           {data.reduce((sum, companyGroup) =>
             sum + calculateMissingFieldsForRow(companyGroup.rows[0], processedSections), 0)}
         </TableCell>
-
         {processedSections.slice(1).map((section, sectionIndex) => {
           if (section.isSeparator) {
             return renderSeparatorCell(
@@ -314,6 +313,30 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
   );
 };
 
+const handleToggleRowLock = async (rowId) => {
+  const newLockedRows = {
+    ...lockedRows,
+    [rowId]: !lockedRows[rowId]
+  };
+  setLockedRows(newLockedRows);
+
+  try {
+    const { error } = await supabase
+      .from('row_verifications')
+      .upsert({
+        row_id: rowId,
+        is_verified: newLockedRows[rowId],
+        verified_at: new Date().toISOString()
+      });
+
+    if (error) throw error;
+    toast.success(`Row ${newLockedRows[rowId] ? 'verified' : 'unverified'}`);
+  } catch (error) {
+    console.error('Error updating row verification:', error);
+    toast.error('Row verification update failed');
+  }
+};
+
 // Render data rows
 const renderDataRows = (
   data: any[],
@@ -321,6 +344,8 @@ const renderDataRows = (
   onMissingFieldsClick: (company: any) => void,
   processedSections: any[],
   refreshData: () => Promise<void>,
+  lockedRows: Record<string, boolean>,
+  lockedColumns: Record<string, boolean>,
   activeMainTab: any[],
   activeSubTab: any[]
 ) => {
@@ -332,6 +357,15 @@ const renderDataRows = (
       >
         <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white">
           {groupIndex + 1}
+        </TableCell>
+        <TableCell
+          className="w-10 cursor-pointer hover:bg-gray-100"
+          onClick={() => handleToggleRowLock(row.id)}
+        >
+          {lockedRows[row.id] ?
+            <Lock className="h-4 w-4 text-green-600" /> :
+            <LockOpen className="h-4 w-4 text-gray-400" />
+          }
         </TableCell>
         {renderSeparatorCell(`missing-fields-separator-${groupIndex}-${rowIndex}`, 'section')}
         <TableCell
@@ -407,6 +441,7 @@ const renderDataRows = (
                         refreshData={refreshData}
                         activeMainTab={activeMainTab}
                         activeSubTab={activeSubTab}
+                        disabled={lockedColumns[field.name] || lockedRows[row.id]}
                       />
                     </TableCell>
                   </React.Fragment>
@@ -440,6 +475,7 @@ const renderDataRows = (
                       refreshData={refreshData}
                       activeMainTab={activeMainTab}
                       activeSubTab={activeSubTab}
+                      disabled={lockedColumns[field.name] || lockedRows[row.id]}
                     />
                   </TableCell>
                   {fieldIndex < fieldsArray.length - 1 &&
@@ -457,7 +493,6 @@ const renderDataRows = (
     ))
   ));
 };
-
 // Updated Table component with sticky headers
 export const Table: React.FC<TableProps> = ({
   data,
@@ -466,9 +501,11 @@ export const Table: React.FC<TableProps> = ({
   activeMainTab,
   activeSubTab,
   processedSections,
-  onMissingFieldsClick
+  onMissingFieldsClick,
 }) => {
   const useSidebarLayout = activeMainTab?.toLowerCase() === 'employee details' || activeMainTab?.toLowerCase() === 'customer details' || activeMainTab?.toLowerCase() === 'supplier details';
+  const [lockedColumns, setLockedColumns] = useState({});
+  const [lockedRows, setLockedRows] = useState({});
 
   if (useSidebarLayout) {
     return (
@@ -517,6 +554,62 @@ export const Table: React.FC<TableProps> = ({
     });
   }, [data, sortConfig]);
 
+  const handleVerification = async (type: 'field' | 'row' | 'section', id: string, mainTab: string, subTab: string) => {
+    try {
+      const { data: currentMapping } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('structure')
+        .eq('main_tab', mainTab)
+        .eq('Tabs', subTab)
+        .single();
+  
+      if (!currentMapping) return;
+  
+      let updatedStructure = {...currentMapping.structure};
+  
+      if (type === 'field') {
+        // Update field verification
+        updatedStructure.sections = updatedStructure.sections.map(section => ({
+          ...section,
+          subsections: section.subsections.map(subsection => ({
+            ...subsection,
+            fields: subsection.fields.map(field => 
+              field.name === id ? {
+                ...field,
+                verification: {
+                  is_verified: !field.verification?.is_verified,
+                  verified_at: new Date().toISOString(),
+                  verified_by: 'current_user' // Replace with actual user
+                }
+              } : field
+            )
+          }))
+        }));
+      }
+  
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({ structure: updatedStructure })
+        .eq('main_tab', mainTab)
+        .eq('Tabs', subTab);
+  
+      if (error) throw error;
+      toast.success(`${type} verification updated`);
+    } catch (error) {
+      console.error('Verification error:', error);
+      toast.error('Verification update failed');
+    }
+  };
+  
+  // Update column lock handler
+  const handleToggleColumnLock = async (columnName: string) => {
+    const newLockedColumns = {
+      ...lockedColumns,
+      [columnName]: !lockedColumns[columnName]
+    };
+    setLockedColumns(newLockedColumns);
+    await handleVerification('field', columnName, activeMainTab, activeSubTab);
+  };
 
   if (!processedSections || !Array.isArray(processedSections)) {
     return null;
@@ -528,11 +621,17 @@ export const Table: React.FC<TableProps> = ({
         <ScrollArea className="h-[900px] rounded-md border">
           <UITable>
             <TableHeader className="sticky top-0 z-10 bg-white">
-              {renderHeaders(processedSections, sortConfig, handleSort)}
+              {renderHeaders(
+                processedSections,
+                sortConfig,
+                handleSort,
+                handleToggleColumnLock,
+                lockedColumns
+              )}
               {renderStatisticsRows(data, processedSections)}
             </TableHeader>
             <TableBody>
-              {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, processedSections, refreshData, activeSubTab, activeMainTab)}
+              {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, processedSections, refreshData, activeSubTab, activeMainTab, lockedRows, handleToggleRowLock)}
             </TableBody>
           </UITable>
         </ScrollArea>
@@ -540,14 +639,28 @@ export const Table: React.FC<TableProps> = ({
     </Card>
   );
 };
+
+const renderVerificationHeader = () => (
+  <TableHead className="w-10 bg-gray-100">
+    <div className="flex justify-center">
+      <Lock className="h-4 w-4 text-gray-500" />
+    </div>
+  </TableHead>
+);
 // Render table headers
-const renderHeaders = (processedSections: any[], sortConfig: SortConfig,
-  handleSort: (field: string) => void) => {
+const renderHeaders = (
+  processedSections: any[],
+  sortConfig: SortConfig,
+  handleSort: (field: string) => void,
+  handleToggleColumnLock: (columnName: string) => void,
+  lockedColumns: Record<string, boolean>
+) => {
   return (
     <>
       {/* Section Reference Row */}
       <TableRow className="bg-yellow-50">
         <TableHead key="sec-ref-head" className="font-medium">Sec REF</TableHead>
+        <TableHead></TableHead>
         {renderSeparatorCell(`sec-ref-sep-start-${Date.now()}`, 'section')}
         <TableHead key="sec-ref-0" className="text-center font-medium bg-yellow-50 border-b border-yellow-200">0</TableHead>
         {renderSeparatorCell(`sec-ref-sep-end-${Date.now()}`, 'section')}
@@ -574,6 +687,7 @@ const renderHeaders = (processedSections: any[], sortConfig: SortConfig,
       {/* Section Headers */}
       <TableRow>
         <TableHead key="section-head" className="font-medium bg-blue-600 text-white">Section</TableHead>
+        <TableHead className='font-medium bg-green-600 text-white'>Verify</TableHead>
         {renderSeparatorCell(`section-sep-start-${Date.now()}`, 'section')}
         <TableHead key="section-missing" className="text-center text-white bg-red-600">Missing Fields</TableHead>
         {renderSeparatorCell(`section-sep-end-${Date.now()}`, 'section')}
@@ -602,6 +716,7 @@ const renderHeaders = (processedSections: any[], sortConfig: SortConfig,
       {/* Category Headers */}
       <TableRow>
         <TableHead key="subsection-head" className="font-medium">Subsection</TableHead>
+        <TableHead className='font-medium bg-green-100 text-white'></TableHead>
         {renderSeparatorCell(`cat-sep-start-${Date.now()}`, 'section')}
         <TableHead key="subsection-row" className="text-center bg-red-50 text-red-700">Per Row</TableHead>
         {renderSeparatorCell(`cat-sep-end-${Date.now()}`, 'section')}
@@ -653,10 +768,10 @@ const renderHeaders = (processedSections: any[], sortConfig: SortConfig,
         })}
       </TableRow>
 
-
       {/* Column Reference Row */}
       <TableRow className="bg-yellow-50">
         <TableHead className="font-medium">CLM REF</TableHead>
+        <TableHead className='font-medium bg-green-100 text-white'></TableHead>
         {renderSeparatorCell(`col-ref-sep-start`, 'section')}
         <TableHead className="text-center font-medium bg-yellow-50 border-b border-yellow-200">-</TableHead>
         {renderSeparatorCell(`col-ref-sep-end`, 'section')}
@@ -692,6 +807,40 @@ const renderHeaders = (processedSections: any[], sortConfig: SortConfig,
         })()}
       </TableRow>
 
+      {/* Column Headers with Lock */}
+      <TableRow>
+        <TableHead className="font-medium">Lock</TableHead>
+        <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+        {renderSeparatorCell(`lock-sep-start-${Date.now()}`, 'section')}
+        <TableHead className="text-center">-</TableHead>
+        {renderSeparatorCell(`lock-sep-end-${Date.now()}`, 'section')}
+        {processedSections.slice(1).map((section, sectionIndex) => {
+          return section.categorizedFields?.map((category, catIndex) => {
+            if (category.isSeparator) {
+              return renderSeparatorCell(`lock-cat-${sectionIndex}-${catIndex}-${Date.now()}`, 'category');
+            }
+            return category.fields.map((field, fieldIndex, fieldsArray) => (
+              <React.Fragment key={`lock-${field.name}`}>
+                <TableCell
+                  className="w-10 cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleToggleColumnLock(field.name)}
+                >
+                  {lockedColumns[field.name] ?
+                    <Lock className="h-4 w-4 text-green-600" /> :
+                    <LockOpen className="h-4 w-4 text-gray-400" />
+                  }
+                </TableCell>
+                {fieldIndex < fieldsArray.length - 1 &&
+                  field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                  renderSeparatorCell(
+                    `lock-separator-${sectionIndex}-${catIndex}-${fieldIndex}-${Date.now()}`,
+                    'mini'
+                  )}
+              </React.Fragment>
+            ));
+          });
+        })}
+      </TableRow>
       {/* Column Headers */}
       <TableRow>
         <TableHead
@@ -700,6 +849,8 @@ const renderHeaders = (processedSections: any[], sortConfig: SortConfig,
         >
           Field
         </TableHead>
+        <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+
         {renderSeparatorCell(`col-sep-start`, 'section')}
         <TableHead
           className="whitespace-nowrap bg-red-500 text-white sticky left-[50px] z-0"
@@ -746,8 +897,8 @@ const renderHeaders = (processedSections: any[], sortConfig: SortConfig,
       </TableRow>
     </>
   );
-
-};// Export table components and utilities
+};
+// Export table components and utilities
 export const TableComponents = {
   renderSeparatorCell,
   renderHeaders,
