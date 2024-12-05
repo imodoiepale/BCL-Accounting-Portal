@@ -30,7 +30,7 @@ export const SidebarTableView = ({
     bankDetails: { main: 'bg-amber-600', sub: 'bg-amber-500', cell: 'bg-amber-50' },
     employeeDetails: { main: 'bg-rose-600', sub: 'bg-rose-500', cell: 'bg-rose-50' }
   };
-  
+
   const categoryColors = {
     'General Information': { bg: 'bg-blue-100', text: 'text-slate-700', border: 'border-slate-200' },
     'Bcl take over Details': { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
@@ -61,12 +61,12 @@ export const SidebarTableView = ({
     'Acc': { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' }
   };
 
-  
+
   const filteredCompanies = data
-    .filter(company => 
+    .filter(company =>
       company.company.company_name.toLowerCase().includes(searchTerm.toLowerCase())
     )
-    .sort((a, b) => 
+    .sort((a, b) =>
       a.company.company_name.localeCompare(b.company.company_name)
     );
 
@@ -190,11 +190,11 @@ export const SidebarTableView = ({
               >
                 {category.category}
               </TableHead>
-              
+
             );
           })
         )}
-         {renderSeparatorCell(`cat-sep-end`, 'section')}
+        {renderSeparatorCell(`cat-sep-end`, 'section')}
       </TableRow>
 
       {/* Field Headers */}
@@ -267,26 +267,26 @@ export const SidebarTableView = ({
                           <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white">
                             {rowIndex + 1}
                           </TableCell>
-                          
+
                           {/* Separator */}
                           {renderSeparatorCell(`row-sep-start-${rowIndex}`, 'section')}
-                          
+
                           {/* Missing Fields */}
-                          <TableCell 
+                          <TableCell
                             className="whitespace-nowrap cursor-pointer hover:bg-gray-100 sticky left-[50px] z-0 bg-white"
                             onClick={() => onMissingFieldsClick(selectedCompanyData)}
                           >
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-red-600">
                                 {calculateMissingFields(row)}
-                                
+
                               </span>
                               <span className="text-black">Missing Fields</span>
                             </div>
                           </TableCell>
 
                           {/* Field Values */}
-                          {processedSections.slice(1).map((section, sIndex) => 
+                          {processedSections.slice(1).map((section, sIndex) =>
                             section.categorizedFields?.map((category) =>
                               category.fields?.map((field, fIndex) => {
                                 const [tableName, columnName] = field.name.split('.');

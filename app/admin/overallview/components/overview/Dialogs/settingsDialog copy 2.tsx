@@ -1,55 +1,102 @@
-// SettingsDialog.tsx
 // @ts-nocheck 
 "use client";
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Settings, Edit2, X, ChevronDown, ChevronUp, Eye, EyeOff, Trash } from 'lucide-react';
+import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Plus, Trash, Settings, Edit2, X, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from '@/lib/supabaseClient';
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Switch } from '@/components/ui/switch';
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
+import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
 import { EditFieldDialog } from './EditDialog';
 import { MultiSelectDialog } from './MultiselectDialog';
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
-import { useStructureState, useVisibilityState, useTableState, useFormState, processStructureForUI } from './settingsState';
-import { fetchTableColumns, fetchTables, getColumnOrder, safeJSONParse, handleSaveFieldEdit, processColumnMappings, fetchExistingSectionsAndSubsections, handleSaveVisibilitySettings, generateIndices, isVisible, getVisibleColumns, handleAddNewField,  handleNameUpdate, handleUpdateSection, handleCreateTable, handleDeleteField, handleEditField, handleAddField, toColumnName, handleAddExistingFields, handleSectionSelection } from './settingsFunctions';
-import { handleAddStructure, handleTabSelect, handleVisibilitySettings, handleReorder, fetchSectionFields } from './SettingsHandlers';
-import { DraggableColumns } from './DragOder';
-import { updateVisibility, updateOrder, getVisibilityState, getOrderState, type VisibilitySettings, type OrderSettings } from './visibilityHandler';
+import { fetchTableColumns, fetchTables, getColumnOrder, safeJSONParse, handleSaveFieldEdit, processColumnMappings,  fetchExistingSectionsAndSubsections, handleSaveVisibilitySettings, generateIndices, isVisible, getVisibleColumns, handleTabSelection, handleAddNewField, handleSectionSelection, handleNameUpdate, handleUpdateSection, handleCreateTable, handleDeleteField, handleEditField, handleAddField, toColumnName, handleSubsectionSelection, handleAddExistingFields, processStructureForUI, mergeAndProcessStructure } from './settingsFunctions';
+import { DraggableColumns, DragHandle, onDragEnd, persistColumnOrder } from './DragOder';
+import {
+  updateVisibility,
+  updateOrder,
+  getVisibilityState,
+  getOrderState,
+  type VisibilitySettings,
+  type OrderSettings
+} from './visibilityHandler';
+
 
 interface SettingsDialogProps {
+  mainTabs: string[];
+  mainSections: string[];
+  mainSubsections: string[];
   onStructureChange: () => void;
   activeMainTab: string;
-  processedSections?: any[];
+  activeSubTab: string;
+  subTabs: string[];
+  processedSections: any[];
+  visibilityState: VisibilitySettings;
+  orderState: OrderSettings;
+  onVisibilityChange: (state: VisibilitySettings) => void;
+  onOrderChange: (state: OrderSettings) => void;
+}
+interface ColumnOrder {
+  order: {
+    tabs: { [key: string]: number },
+    sections: { [key: string]: number },
+    subsections: { [key: string]: number },
+    columns: { [key: string]: number }
+  },
+  visibility: {
+    tabs: { [key: string]: boolean },
+    sections: { [key: string]: boolean },
+    subsections: { [key: string]: boolean },
+    columns: { [key: string]: boolean }
+  }
 }
 
-export function SettingsDialog({ 
-  onStructureChange, 
-  activeMainTab, 
-  processedSections = [] 
-}: SettingsDialogProps) {
-  // Dialog state
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [editing, setEditing] = React.useState(false);
-  const [showNewTableDialog, setShowNewTableDialog] = React.useState(false);
-  const [addFieldDialogOpen, setAddFieldDialogOpen] = React.useState(false);
-  const [showMultiSelectDialog, setShowMultiSelectDialog] = React.useState(false);
-  const [editFieldDialogOpen, setEditFieldDialogOpen] = React.useState(false); 
-  const [existingSections, setExistingSections] = useState<string[]>([]);
-  const [existingSubsections, setExistingSubsections] = useState<Record<string, string[]>>({});  
-  const [sectionVisibility, setSectionVisibility] = useState<Record<string, boolean>>({});
-  const [categoryVisibility, setCategoryVisibility] = useState<Record<string, boolean>>({});
-  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
-  const { structure, mappingData, uniqueTabs, setUniqueTabs, selectedTab, selectedSection, selectedSubsection, setSelectedTab, setSelectedSection, setSelectedSubsection, fetchStructure} = useStructureState(supabase, activeMainTab);
-  const { visibilityState, orderState, setVisibilityState, setOrderState} = useVisibilityState();
-  const { tables, tableColumns,newTableName, setNewTableName,loadingTable, setLoadingTable, selectedTables, selectedTableFields, setTables, setTableColumns, setSelectedTables, setSelectedTableFields} = useTableState();
-  const { newStructure, editingField, addFieldState, setNewStructure, setEditingField, setAddFieldState, currentStructure, setCurrentStructure, sectionFields, setSectionFields,} = useFormState();
-  const [processedStructure, setProcessedStructure] = useState(processStructureForUI(mappingData?.structure)); 
-  const [isNewStructure, setIsNewStructure] = useState(false);
+interface SectionFields {
+  [section: string]: {
+    fields: string[];
+    subsections: {
+      [subsection: string]: string[];
+    };
+  };
+}
+interface VisibilitySettings {
+  tabs: { [key: string]: boolean };
+  sections: { [key: string]: boolean };
+  subsections: { [key: string]: boolean };
+  columns: { [key: string]: boolean };
+}
+
+interface ColumnOrderState {
+  columns: string[];
+  visibility: Record<string, boolean>;
+}
+
+export function SettingsDialog({ onStructureChange, activeMainTab, processedSections = [] }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const [currentStructure, setCurrentStructure] = useState({
+    id: '',
+    sections_sections: {},
+    sections_subsections: {},
+    column_mappings: {},
+    column_order: {},
+    Tabs: '',
+    table_names: {}
+  });
+  const [editing, setEditing] = useState(false);
+  const [newField, setNewField] = useState({ key: '', value: '' });
+  const [mainSections, setMainSections] = useState<string[]>([]);
+  const [mainSubsections, setMainSubsections] = useState<string[]>([]);
+  const [selectedFields, setSelectedFields] = useState<string[]>([]);
+  const [showNewTableDialog, setShowNewTableDialog] = useState(false);
+  const [newTableName, setNewTableName] = useState('');
+  const [loadingTable, setLoadingTable] = useState(false);
+  const [addFieldDialogOpen, setAddFieldDialogOpen] = useState(false);
+  const [showMultiSelectDialog, setShowMultiSelectDialog] = useState(false);
   const [indexMapping, setIndexMapping] = useState<{
     tabs: { [key: string]: number },
     sections: { [key: string]: string },
@@ -59,189 +106,171 @@ export function SettingsDialog({
     sections: {},
     subsections: {}
   });
-  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>({
-    columns: [],
-    visibility: {}
-  });
+
+  const resetAddFieldState = () => {
+    setAddFieldState({
+      displayName: '',
+      selectedTables: [],
+      selectedFields: {},
+      selectedTab: 'new',
+      newFieldTable: '',
+      hasDropdown: 'no',
+      dropdownOptions: []
+    });
+  };
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [editFieldDialogOpen, setEditFieldDialogOpen] = useState(false);
+
+  const resetNewStructure = () => {
+    setNewStructure({
+      section: '',
+      subsection: '',
+      table_name: '',
+      Tabs: '',
+      column_mappings: {},
+      isNewTab: false,
+      isNewSection: false,
+      isNewSubsection: false,
+      table_names: []
+    });
+    setSelectedTables([]);
+    setSelectedTableFields({});
+  };
   const [editedNames, setEditedNames] = useState({
     tab: '',
     section: '',
     subsection: ''
   });
+
   const [visibilitySettings, setVisibilitySettings] = useState<VisibilitySettings>({
     tabs: {},
     sections: {},
     subsections: {},
     fields: {}
   });
-  // Effect hooks
-  useEffect(() => { 
-    if (activeMainTab) {
-      fetchStructure();
-    }
-  }, [activeMainTab]);
 
-  useEffect(() => {
-    if (mappingData?.structure) {
-      setProcessedStructure(processStructureForUI(mappingData.structure));
-    }
-  }, [mappingData]);
+  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>({
+    columns: [],
+    visibility: {}
+  });
 
-  useEffect(() => {
-    if (structure && structure.length > 0) {
-      const currentStructure = structure.find(item => item.Tabs === selectedTab);
-      if (currentStructure) {
-        setColumnOrder({
-          columns: getColumnOrder(currentStructure),
-          visibility: currentStructure.column_order?.visibility?.columns || {}
-        });
-      }
-    }
-  }, [structure, selectedTab]);
+  const [mainTabs, setMainTabs] = useState<string[]>([]);
+  const [subTabs, setSubTabs] = useState<string[]>([]);
+
   
-  useEffect(() => {
-    if (mappingData?.structure) {
-      setVisibilityState(getVisibilityState(mappingData.structure));
-      setOrderState(getOrderState(mappingData.structure));
-    }
-  }, [mappingData]);
+  const fetchStructure = useCallback(async (activeMainTab: string) => {
+    try {
+      const { data: mappings, error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('*')
+        .eq('main_tab', activeMainTab)
+        .order('created_at');
 
-  useEffect(() => {
-    const handleStructureUpdate = () => {
-      fetchStructure(activeMainTab);
-    };
+      if (error) throw error;
+      setMappingData(mappings[0]);
 
-    window.addEventListener('structure-updated', handleStructureUpdate);
+      // Process and merge the structure
+      const processedStructure = mappings.map(mapping => {
+        const structure = mapping.structure || {};
+        const mergedStructure = mergeAndProcessStructure(structure);
 
-    return () => {
-      window.removeEventListener('structure-updated', handleStructureUpdate);
-    };
-  }, [activeMainTab, fetchStructure]);
+        return {
+          id: mapping.id,
+          Tabs: mapping.Tabs,
+          sections: mergedStructure.sections,
+          column_mappings: mergedStructure.column_mappings || {},
+          column_order: mergedStructure.order || {},
+          visibility: mergedStructure.visibility || {},
+          table_names: mergedStructure.table_names || {}
+        };
+      });
 
-  useEffect(() => {
-    fetchTables();
-  }, []);
+      setStructure(processedStructure);
+      setMappingData(mappings[0]);
 
-  useEffect(() => {
-    const fetchTablesAndColumns = async () => {
-      const fetchedTables = await fetchTables();
-      setTables(fetchedTables);
-
-      // Fetch columns for each table
-      const columnsPromises = fetchedTables.map(table => fetchTableColumns(table));
-      const allColumns = await Promise.all(columnsPromises);
-      setTableColumns(allColumns.flat());
-    };
-
-    fetchTablesAndColumns();
-  }, []);
-
-  useEffect(() => {
-    if (activeMainTab && setExistingSections && setExistingSubsections) {
-      fetchExistingSectionsAndSubsections(
-        activeMainTab,
-        supabase,
-        setExistingSections,
-        setExistingSubsections
-      );
-    }
-  }, [activeMainTab]);
-  
-  useEffect(() => {
-    if (structure && structure.length > 0) {
-      const tabs = [...new Set(structure.map(item => item.Tabs))];
+      // Extract unique tabs
+      const tabs = [...new Set(mappings.map(m => m.Tabs))];
       setUniqueTabs(tabs);
-    }
-  }, [structure]);
 
-  useEffect(() => {
-    if (newStructure.section && !newStructure.isNewSection) {
-      fetchSectionFields(newStructure.section);
-    }
-  }, [newStructure.section]);
+      // Extract sections and subsections
+      const sectionsSet = new Set();
+      const subsectionsMap = {};
 
-  useEffect(() => {
-    if (newStructure.section && newStructure.subsection && !newStructure.isNewSubsection) {
-      const subsectionFields = sectionFields[newStructure.section]?.subsections[newStructure.subsection] || [];
-      setSelectedTableFields(prevFields => ({
-        ...prevFields,
-        [newStructure.section]: subsectionFields
-      }));
-    }
-  }, [newStructure.subsection, sectionFields, newStructure.section]);
+      processedStructure.forEach(item => {
+        item.sections.forEach(section => {
+          sectionsSet.add(section.name);
 
-  useEffect(() => {
-    const loadVisibilitySettings = async () => {
-      try {
-        if (!currentStructure?.id) return;
-        
-        const { data, error } = await supabase
-          .from('profile_category_table_mapping_2')
-          .select('structure')
-          .eq('id', currentStructure.id)
-          .single();
+          if (!subsectionsMap[section.name]) {
+            subsectionsMap[section.name] = new Set();
+          }
 
-        if (error) throw error;
+          section.subsections.forEach(subsection => {
+            subsectionsMap[section.name].add(subsection.name);
+          });
+        });
+      });
 
-        if (data?.structure?.visibility) {
-          setSectionVisibility(data.structure.visibility.sections || {});
-          setCategoryVisibility(data.structure.visibility.categories || {});
-          setColumnVisibility(data.structure.visibility.columns || {});
-        }
-      } catch (error) {
-        console.error('Error loading visibility settings:', error);
+      setExistingSections(Array.from(sectionsSet));
+      const processedSubsections = {};
+      Object.keys(subsectionsMap).forEach(section => {
+        processedSubsections[section] = Array.from(subsectionsMap[section]);
+      });
+      setExistingSubsections(processedSubsections);
+
+      // Set visibility settings
+      const visibilityState = {
+        tabs: {},
+        sections: {},
+        subsections: {},
+        columns: {}
+      };
+
+      processedStructure.forEach(item => {
+        Object.assign(visibilityState.tabs, item.visibility.tabs || {});
+        Object.assign(visibilityState.sections, item.visibility.sections || {});
+        Object.assign(visibilityState.subsections, item.visibility.subsections || {});
+        Object.assign(visibilityState.columns, item.visibility.columns || {});
+      });
+
+      setVisibilitySettings(visibilityState);
+
+      // Set default tab if none selected
+      if (!selectedTab && tabs.length > 0) {
+        setSelectedTab(tabs[0]);
       }
-    };
 
-    loadVisibilitySettings();
-  }, [currentStructure?.id]);
-  
-  useEffect(() => {
-    if (structure.length > 0 && selectedTab) {
-      const current = structure.find(item => item.Tabs === selectedTab);
-      if (current) {
-        setCurrentStructure(current);
-      }
+    } catch (error) {
+      console.error('Error fetching structure:', error);
+      toast.error('Failed to fetch structure');
     }
-  }, [structure, selectedTab]);
+  }, [selectedTab]);
 
-  const selectedTabIndex = uniqueTabs.indexOf(selectedTab);
-  const selectedSectionIndex = structure
-    .find(item => item.Tabs === selectedTab)
-    ?.sections.findIndex(s => s.name === selectedSection?.section) ?? -1;
+  useEffect(() => {
+    if (activeMainTab) {
+      fetchStructure(activeMainTab);
+    }
+  }, [activeMainTab]);
 
-  const handleSubsectionSelect = async (subsectionValue: string) => {
-    await handleSubsectionSelection(
-      subsectionValue,
-      supabase,
-      setNewStructure,
-      setSelectedTables,
-      setSelectedTableFields,
-      processColumnMappings
-    );
+  // In SettingsDialog component
+
+
+  const toggleAllVisibility = async (type: string, value: boolean) => {
+    try {
+      const newSettings = {
+        ...visibilitySettings,
+        [type]: Object.keys(visibilitySettings[type]).reduce((acc, key) => ({
+          ...acc,
+          [key]: value
+        }), {})
+      };
+
+      await updateVisibilitySettings(newSettings);
+    } catch (error) {
+      console.error('Error updating visibility:', error);
+      toast.error('Failed to update visibility');
+    }
   };
 
-  // Render helpers
-  const OrderControls = ({ currentOrder, onMoveUp, onMoveDown }) => (
-    <div className="flex gap-1">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onMoveUp}
-        className="h-6 w-6 p-0"
-      >
-        <ChevronUp className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onMoveDown}
-        className="h-6 w-6 p-0"
-      >
-        <ChevronDown className="h-4 w-4" />
-      </Button>
-    </div>
-  );
 
   const toggleVisibility = useCallback(async (type: string, key: string) => {
     try {
@@ -284,6 +313,130 @@ export function SettingsDialog({
       toast.error('Failed to update visibility');
     }
   }, [visibilitySettings, selectedTab, activeMainTab]);
+
+  const fetchSectionsAndSubsections = async (tab: string) => {
+    if (!tab) return; await fetchExistingSectionsAndSubsections(
+      tab,
+      supabase,
+      setExistingSections,
+      setExistingSubsections
+    );
+  };
+  const selectedTabIndex = uniqueTabs.indexOf(selectedTab);
+  const selectedSectionIndex = structure
+    .find(item => item.Tabs === selectedTab)
+    ?.sections.findIndex(s => s.name === selectedSection?.section) ?? -1;
+
+
+  const fetchSectionsCallback = async (tab: string) => {
+    await fetchExistingSectionsAndSubsections(
+      tab,
+      supabase,
+      {
+        setExistingSections,
+        setExistingSubsections
+      }
+    );
+  };
+
+  const handleSectionSelect = async (sectionValue: string) => {
+    if (!supabase) return;
+
+    await handleSectionSelection(
+      sectionValue,
+      supabase, // Pass the initialized supabase client
+      setNewStructure,
+      setSelectedTables,
+      setSelectedTableFields,
+      selectedTab,
+      processColumnMappings
+    );
+  };
+
+  const handleSubsectionSelect = async (subsectionValue: string) => {
+    await handleSubsectionSelection(
+      subsectionValue,
+      supabase,
+      setNewStructure,
+      setSelectedTables,
+      setSelectedTableFields,
+      processColumnMappings
+    );
+  };
+  
+  const OrderControls = ({ currentOrder, onMoveUp, onMoveDown }) => (
+    <div className="flex gap-1">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onMoveUp}
+        className="h-6 w-6 p-0"
+      >
+        <ChevronUp className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onMoveDown}
+        className="h-6 w-6 p-0"
+      >
+        <ChevronDown className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
+  const handleOrderSubmit = async () => {
+    try {
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({
+          structure: {
+            ...currentStructure.structure,
+            order: {
+              tabs: uniqueTabs.reduce((acc, tab, index) => ({
+                ...acc,
+                [tab]: index + 1
+              }), {}),
+              sections: structure
+                .find(item => item.Tabs === selectedTab)
+                ?.sections.reduce((acc, section, index) => ({
+                  ...acc,
+                  [section.name]: index + 1
+                }), {}),
+              subsections: structure
+                .find(item => item.Tabs === selectedTab)
+                ?.sections.find(s => s.name === selectedSection?.section)
+                ?.subsections.reduce((acc, subsection, index) => ({
+                  ...acc,
+                  [subsection.name]: index + 1
+                }), {})
+            }
+          }
+        })
+        .eq('id', currentStructure.id);
+
+      if (!error) {
+        toast.success('Order updated successfully');
+        await fetchStructure(activeMainTab);
+      }
+    } catch (error) {
+      toast.error('Failed to update order');
+    }
+  };
+  
+  const fetchStructureWithOrder = async () => {
+    const { data, error } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('*')
+      .eq('main_tab', activeMainTab)
+      .eq('Tabs', activeSubTab)
+      .single();
+
+    if (!error && data) {
+      const order = data.structure.order;
+      return order;
+    }
+  };
 
   return (
     <>
@@ -329,14 +482,7 @@ export function SettingsDialog({
                             key={tab}
                             className={`w-full text-left px-3 py-2 rounded transition-colors ${selectedTab === tab ? 'bg-primary text-white' : 'hover:bg-gray-100'
                               }`}
-                              onClick={() => handleTabSelect(tab, isNewStructure, supabase, {
-                                setExistingSections,
-                                setExistingSubsections,
-                                setNewStructure,
-                                setSelectedTab,
-                                setSelectedTables,
-                                setSelectedTableFields
-                              })}
+                            onClick={() => handleTabSelect(tab, false)}
                           >
                             <div className="flex justify-between items-center">
                               {`${tabIndex + 1}.0 ${tab}`}
@@ -685,7 +831,7 @@ export function SettingsDialog({
                     <label className="text-sm font-medium text-gray-700">Section</label>
                     <Select
                       value={newStructure.section}
-                      onValueChange={handleSectionSelection}
+                      onValueChange={handleSectionSelect}
                     >
                       <SelectTrigger className="w-full bg-white">
                         <SelectValue placeholder="Select or Create Section" />
