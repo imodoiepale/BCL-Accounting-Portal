@@ -222,34 +222,34 @@ export default function CompanyKycDocumentDetails() {
       if (!uploadId || !documentId) {
         throw new Error('Upload ID or Document ID is undefined');
       }
-  
+
       const sanitizedData = Object.entries(extractedData).reduce((acc, [key, value]) => {
         acc[key] = value === '' ? null : value;
         return acc;
       }, {});
-  
+
       // Find date fields in extracted data
       let issueDate = null;
       let expiryDate = null;
-  
+
       // Function to parse and validate date
       const parseDate = (dateStr) => {
         if (!dateStr) return null;
-        
+
         try {
           // First, try to parse as ISO date
           const date = new Date(dateStr);
           if (!isNaN(date.getTime())) {
             return date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
           }
-          
+
           // If that fails, try different date formats
           const formats = [
             /(\d{2})[-/](\d{2})[-/](\d{4})/, // DD-MM-YYYY or DD/MM/YYYY
             /(\d{4})[-/](\d{2})[-/](\d{2})/, // YYYY-MM-DD or YYYY/MM/DD
             /(\d{2})[-/](\d{2})[-/](\d{2})/, // DD-MM-YY or DD/MM/YY
           ];
-  
+
           for (const format of formats) {
             const match = dateStr.match(format);
             if (match) {
@@ -268,11 +268,11 @@ export default function CompanyKycDocumentDetails() {
         }
         return null;
       };
-  
+
       // Check for common date field names
       for (const [key, value] of Object.entries(sanitizedData)) {
         const lowerKey = key.toLowerCase();
-        
+
         // Check for issue date variants
         if (
           lowerKey.includes('issue') ||
@@ -288,7 +288,7 @@ export default function CompanyKycDocumentDetails() {
             issueDate = parsedDate;
           }
         }
-        
+
         // Check for expiry date variants
         if (
           lowerKey.includes('expiry') ||
@@ -306,18 +306,18 @@ export default function CompanyKycDocumentDetails() {
           }
         }
       }
-  
+
       const document = Object.values(documents)
         .flat()
         .find(d => d.id === documentId);
-  
+
       if (document && !validateExtractedData(sanitizedData, document.fields || [])) {
         throw new Error('Invalid extracted data format');
       }
-  
+
       // Log the dates being saved
       console.log('Saving dates:', { issueDate, expiryDate });
-  
+
       // Update the upload with both extracted details and dates
       const [uploadUpdate, documentUpdate] = await Promise.all([
         supabase
@@ -330,7 +330,7 @@ export default function CompanyKycDocumentDetails() {
           .eq('id', uploadId)
           .select()
           .single(),
-  
+
         supabase
           .from('acc_portal_kyc')
           .update({ last_extracted_details: sanitizedData })
@@ -338,7 +338,7 @@ export default function CompanyKycDocumentDetails() {
           .select()
           .single()
       ]);
-  
+
       if (uploadUpdate.error) {
         console.error('Upload update error:', uploadUpdate.error);
         throw uploadUpdate.error;
@@ -347,7 +347,7 @@ export default function CompanyKycDocumentDetails() {
         console.error('Document update error:', documentUpdate.error);
         throw documentUpdate.error;
       }
-  
+
       return {
         upload: uploadUpdate.data,
         document: documentUpdate.data
@@ -472,6 +472,42 @@ export default function CompanyKycDocumentDetails() {
         });
     }
   };
+
+  // Update the renderFieldValue function in company-kyc-document-details.tsx
+  const renderFieldValue = (field: any, value: any) => {
+    // If value is array
+    if (field.type === 'array' && Array.isArray(value)) {
+      return (
+        <div className="text-xs">
+          <span className="text-gray-600">
+            {value.length} items
+            {value.map((item, index) => (
+              <div key={index} className="pl-2 text-gray-500">
+                {Object.entries(item).map(([key, val]) => (
+                  <div key={key}>{`${key}: ${val}`}</div>
+                ))}
+              </div>
+            ))}
+          </span>
+        </div>
+      );
+    }
+
+    // If value is object but not array
+    if (field.type === 'object' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      return (
+        <div className="text-xs truncate">
+          {Object.entries(value).map(([key, val]) =>
+            <div key={key}>{`${key}: ${String(val)}`}</div>
+          )}
+        </div>
+      );
+    }
+
+    // For simple values
+    return <span className="text-xs">{value ? String(value) : '-'}</span>;
+  };
+
 
   const handleViewDocument = async (document: Document, company: Company) => {
     const upload = uploads.find(u =>
@@ -746,7 +782,7 @@ export default function CompanyKycDocumentDetails() {
                         onClick={() => handleSort('#')}
                       >
                         <div className="flex items-center">
-                        ⇅#
+                          ⇅#
                           {sortColumn === '#' && (
                             sortDirection === 'asc' ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />
                           )}
@@ -836,7 +872,10 @@ export default function CompanyKycDocumentDetails() {
                           );
                           return (
                             <TableCell key={field.id} className="text-center">
-                              <span>{upload?.extracted_details?.[field.name] || '-'}</span>
+                              {renderFieldValue(
+                                field,
+                                upload?.extracted_details?.[field.name]
+                              )}
                             </TableCell>
                           );
                         })}
