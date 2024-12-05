@@ -948,8 +948,8 @@ export const fetchExistingSectionsAndSubsections = async (
   
   try {
     const { data, error } = await supabase
-      .from('profile_category_table_mapping_2')
-      .select('structure')
+      .from('profile_category_table_mapping')
+      .select('sections_sections, sections_subsections')
       .eq('Tabs', tab);
 
     if (error) throw error;
@@ -958,22 +958,24 @@ export const fetchExistingSectionsAndSubsections = async (
     const subsectionsMap = new Map<string, Set<string>>();
     const allSubsections = new Set<string>();
 
-    if (data?.[0]?.structure?.sections) {
-      data[0].structure.sections.forEach(section => {
-        if (section?.name) {
-          sections.add(section.name);
-          if (!subsectionsMap.has(section.name)) {
-            subsectionsMap.set(section.name, new Set<string>());
-          }
-          section.subsections?.forEach(subsection => {
-            if (subsection?.name) {
-              subsectionsMap.get(section.name)?.add(subsection.name);
-              allSubsections.add(subsection.name);
+    data?.forEach(item => {
+      if (item?.structure?.sections) {
+        item.structure.sections.forEach(section => {
+          if (section?.name) {
+            sections.add(section.name);
+            if (!subsectionsMap.has(section.name)) {
+              subsectionsMap.set(section.name, new Set<string>());
             }
-          });
-        }
-      });
-    }
+            section.subsections?.forEach(subsection => {
+              if (subsection?.name) {
+                subsectionsMap.get(section.name)?.add(subsection.name);
+                allSubsections.add(subsection.name);
+              }
+            });
+          }
+        });
+      }
+    });
 
     const processedSubsections = {
       ...Object.fromEntries(
@@ -982,17 +984,15 @@ export const fetchExistingSectionsAndSubsections = async (
       all: Array.from(allSubsections)
     };
 
-    if (typeof setExistingSections === 'function') {
-      setExistingSections(Array.from(sections));
-    }
-    if (typeof setExistingSubsections === 'function') {
-      setExistingSubsections(processedSubsections);
-    }
+    setExistingSections(Array.from(sections));
+    setExistingSubsections(processedSubsections);
   } catch (error) {
     console.error('Error fetching sections and subsections:', error);
     toast.error('Failed to fetch sections and subsections');
   }
 };
+
+
 export const validateStructureData = (data: any): boolean => {
   if (!data || typeof data !== 'object') return false;
   
@@ -1038,6 +1038,46 @@ export const processColumnMappings = (mappings: Record<string, string>) => {
     result[table].push(field);
   });
   return result;
+};
+
+export const fetchSectionFields = async (section: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('structure')
+      .single();
+
+    if (error) throw error;
+
+    const fields: string[] = [];
+    const subsectionFields: Record<string, string[]> = {};
+
+    const sectionData = data.structure.sections.find(s => s.name === section);
+    if (sectionData) {
+      sectionData.subsections.forEach(subsection => {
+        subsectionFields[subsection.name] = subsection.fields.map(field => 
+          `${field.table}.${field.name}`
+        );
+        
+        // Add to overall fields list
+        subsection.fields.forEach(field => {
+          const fieldKey = `${field.table}.${field.name}`;
+          if (!fields.includes(fieldKey)) {
+            fields.push(fieldKey);
+          }
+        });
+      });
+    }
+
+    return {
+      fields,
+      subsections: subsectionFields
+    };
+  } catch (error) {
+    console.error('Error fetching section fields:', error);
+    toast.error('Failed to fetch section fields');
+    return { fields: [], subsections: {} };
+  }
 };
 
 
