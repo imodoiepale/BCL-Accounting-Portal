@@ -68,7 +68,7 @@ useEffect(() => {
   // console.log('CompanyEditDialog - Initial companyData:', companyData);
 
   if (!companyData?.company) {
-    console.log('CompanyEditDialog - No company data available');
+    // console.log('CompanyEditDialog - No company data available');
     return;
   }
 
