@@ -139,7 +139,7 @@ const DocumentViewer: React.FC<{
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] w-[1400px] max-h-[90vh] h-[800px]">
+      <DialogContent className={`max-w-[95vw] w-[1400px] max-h-[95vh] ${documents.length === 1 ? 'h-[95vh]' : 'h-[900px]'}`}>
         <DialogHeader className="px-6 py-4">
           <DialogTitle className="flex justify-between items-center">
             <div className="flex flex-col">
@@ -253,8 +253,7 @@ const DocumentViewer: React.FC<{
       </DialogContent>
     </Dialog>
   );
-  
-  // You can remove the ViewModal component since it's being replaced by the DialogViewer
+    // You can remove the ViewModal component since it's being replaced by the DialogViewer
 };
 // ViewModal Component
 const ViewModal: React.FC<ViewModalProps> = ({ url, setShowViewModal }) => {
