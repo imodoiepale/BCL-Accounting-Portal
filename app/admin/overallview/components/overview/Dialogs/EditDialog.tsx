@@ -35,10 +35,10 @@ export const EditFieldDialog: React.FC<EditFieldDialogProps> = ({
   supabase,
   fetchStructure
 }) => {
-  console.log('EditFieldDialog props:', {
-    editFieldDialogOpen,
-    editingField
-  });
+  // console.log('EditFieldDialog props:', {
+  //   editFieldDialogOpen,
+  //   editingField
+  // });
 
   if (!editingField) return null;
 

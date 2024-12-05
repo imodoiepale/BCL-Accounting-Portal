@@ -64,6 +64,7 @@
     "googleapis": "^144.0.0",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.2.4",
+    "ioredis": "^5.4.1",
     "jotai": "^2.10.2",
     "jspdf": "^2.5.2",
     "lodash": "^4.17.21",
