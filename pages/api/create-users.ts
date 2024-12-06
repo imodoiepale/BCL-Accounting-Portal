@@ -62,10 +62,10 @@ export default async function handler(
     }
     console.log('Successfully inserted user into acc_portal_clerk_users_duplicate');
 
-    console.log('Attempting to insert company into acc_portal_company_duplicate...');
+    console.log('Attempting to insert company into acc_portal_company_duplicate2...');
     // Insert company into database
     const { error: companyError } = await supabase
-  .from('acc_portal_company_duplicate')
+  .from('acc_portal_company_duplicate2')
   .upsert({
     company_name: name,
     userid: user.id,  // Add this line to link the tables
@@ -77,7 +77,7 @@ export default async function handler(
       console.error('Error inserting company:', companyError);
       throw companyError;
     }
-    console.log('Successfully inserted company into acc_portal_company_duplicate');
+    console.log('Successfully inserted company into acc_portal_company_duplicate2');
 
     return res.status(200).json({
       success: true,

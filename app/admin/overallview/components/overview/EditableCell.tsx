@@ -5,10 +5,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { Lock } from 'lucide-react';
 interface EditableCellProps {
     value: any;
     onSave: (value: any) => void;
-    refreshData: () => Promise<void>; 
+    refreshData: () => Promise<void>;
     fieldName: string;
     rowId?: number | string;
     companyName?: string;
@@ -17,11 +18,17 @@ interface EditableCellProps {
     field: any;
     activeMainTab: string;
     activeSubTab: string;
+    disabled: boolean;
+    verificationStatus?: {
+        is_verified: boolean;
+        verified_at?: string;
+        verified_by?: string;
+      };
 }
 export const EditableCell = ({
     value: initialValue,
     onSave,
-    refreshData, 
+    refreshData,
     fieldName,
     rowId,
     companyName,
@@ -30,66 +37,68 @@ export const EditableCell = ({
     field,
     activeMainTab,
     activeSubTab,
+    disabled,
+    verificationStatus
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(initialValue);
     const [dropdownOptions, setDropdownOptions] = useState([]);
     const inputRef = useRef(null);
     const [isLoading, setIsLoading] = useState(false);
+    const isDisabled = verificationStatus?.is_verified;
 
     useEffect(() => {
         setEditValue(initialValue);
     }, [initialValue]);
-    
+
     const fetchDropdownOptions = async () => {
         try {
             console.log('Fetching dropdown options for:', fieldName);
             const [tableName, columnName] = fieldName.split('.');
-            
+
             const { data, error } = await supabase
                 .from('profile_category_table_mapping_2')
                 .select('*');
-    
+
             if (error) throw error;
-    
+
             // Find all relevant structures
-            const matchingStructures = data.filter(item => 
+            const matchingStructures = data.filter(item =>
                 item.structure?.sections?.some(section =>
                     section.subsections?.some(subsection =>
                         subsection.fields?.some(field =>
-                            field.table === tableName && 
+                            field.table === tableName &&
                             field.name === columnName
                         )
                     )
                 )
             );
-    
+
             // Get the field with dropdown options
             for (const structure of matchingStructures) {
                 const field = structure.structure.sections
                     .flatMap(section => section.subsections)
                     .flatMap(subsection => subsection.fields)
-                    .find(field => 
-                        field.table === tableName && 
+                    .find(field =>
+                        field.table === tableName &&
                         field.name === columnName
                     );
-    
+
                 if (field?.dropdownOptions?.length > 0) {
                     console.log('Found dropdown options:', field.dropdownOptions);
                     setDropdownOptions(field.dropdownOptions);
                     return;
                 }
             }
-    
+
             setDropdownOptions([]);
-    
+
         } catch (error) {
             console.error('Error in fetchDropdownOptions:', error);
             setDropdownOptions([]);
         }
     };
-    
-    
+
     // Helper function to parse table names
     const parseTableNames = (mappings) => {
         return mappings.reduce((acc, mapping) => {
@@ -121,7 +130,7 @@ export const EditableCell = ({
                 const today = new Date();
                 const [tableName, columnName] = fieldName.split('.');
                 let changedValues = { [columnName]: editValue };
-    
+
                 // Define effective date fields and their corresponding status/flag fields
                 const effectiveDateFields = {
                     'acc_client_effective_to': {
@@ -141,24 +150,24 @@ export const EditableCell = ({
                         flag: 'cps_sheria_client'
                     }
                 };
-                
+
                 // Check if current field is an effective date field
                 if (columnName in effectiveDateFields) {
                     const effectiveDate = new Date(editValue);
                     const { status, flag } = effectiveDateFields[columnName];
-                    
+
                     // Update status and flag based on date comparison
                     changedValues[status] = effectiveDate >= today ? 'Active' : 'Inactive';
                     changedValues[flag] = effectiveDate >= today ? 'Yes' : 'No';
                 }
-    
+
                 const { error: updateError } = await supabase
                     .from(tableName)
                     .update(changedValues)
                     .eq('id', rowId);
-    
+
                 if (updateError) throw updateError;
-    
+
                 setEditValue(editValue);
                 onSave(editValue);
                 await refreshData();
@@ -173,9 +182,12 @@ export const EditableCell = ({
             setIsEditing(false);
         }
     };
-    
 
     const handleDoubleClick = async () => {
+        if (disabled || verificationStatus?.is_verified) {
+            return;
+        }
+
         console.log('Double clicked field:', fieldName);
         await fetchDropdownOptions();
         setIsEditing(true);
@@ -294,7 +306,6 @@ export const EditableCell = ({
             </select>
         );
     }
-
     const renderValue = () => {
         if (fieldName === 'acc_portal_company_duplicate.company_name') {
             return (
@@ -306,18 +317,89 @@ export const EditableCell = ({
                 </div>
             );
         }
-        return editValue || <span className="text-red-500 font-semibold">Missing</span>;
+        return (
+            <div className="flex items-center gap-2">
+                <span className={`${disabled ? 'text-gray-500' : ''}`}>
+                    {editValue || <span className="text-red-500 font-semibold">Missing</span>}
+                </span>
+            </div>
+        );
     };
+
+    const renderVerificationStatus = () => {
+        if (verificationStatus?.is_verified) {
+          return (
+            <div className="group relative">
+              <Lock className="h-3 w-3 text-green-500" />
+              <div className="absolute invisible group-hover:visible bg-gray-800 text-white text-xs p-2 rounded -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap z-50">
+                Verified by {verificationStatus.verified_by}
+                {verificationStatus.verified_at && 
+                  ` on ${new Date(verificationStatus.verified_at).toLocaleDateString()}`
+                }
+              </div>
+            </div>
+          );
+        }
+        return null;
+      };
+
     if (isLoading) {
         return <div className="p-2">Loading...</div>;
     }
+
     return (
-        <div
-            onDoubleClick={handleDoubleClick}
-            className={`cursor-pointer ${className}`}
-            title={editValue} // Add tooltip for full value
-        >
-            {renderValue()}
+        <div className="group relative">
+              {renderVerificationStatus()}
+            {/* Verification tooltip */}
+            {verificationStatus?.is_verified && (
+                <div className="absolute invisible group-hover:visible bg-gray-800 text-white text-xs rounded p-2 -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap z-50">
+                    Verified by {verificationStatus.verified_by}
+                    {verificationStatus.verified_at &&
+                        ` on ${new Date(verificationStatus.verified_at).toLocaleDateString()}`
+                    }
+                </div>
+            )}
+
+            <div
+                className={`
+        ${disabled ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}
+        ${className || ''} 
+      `}
+                onDoubleClick={handleDoubleClick}
+            >
+                {isEditing ? (
+                    dropdownOptions && dropdownOptions.length > 0 ? (
+                        <select
+                            ref={inputRef}
+                            value={editValue || ''}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onBlur={handleSave}
+                            className={`w-full p-2 border rounded ${className}`}
+                            disabled={disabled || verificationStatus?.is_verified}
+                        >
+                            <option value="">Select {field.label}</option>
+                            {dropdownOptions.map((option) => (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
+                        <input
+                            ref={inputRef}
+                            value={editValue || ''}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            onKeyDown={handleKeyDown}
+                            className={`m-0 p-1 h-8 ${className}`}
+                            type={field.type === 'date' ? 'date' : 'text'}
+                            disabled={disabled || verificationStatus?.is_verified}
+                        />
+                    )
+                ) : (
+                    renderValue()
+                )}
+            </div>
         </div>
     );
 };

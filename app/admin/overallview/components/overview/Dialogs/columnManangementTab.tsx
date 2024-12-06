@@ -1,212 +1,332 @@
 // columnManagementTab.tsx
 //@ts-nocheck
 "use client"
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
-import { ChevronUp, ChevronDown } from 'lucide-react';
-import {
-  updateVisibility,
-  updateOrder,
-  getVisibilityState,
-  getOrderState,
-  type VisibilitySettings,
-  type OrderSettings
-} from './visibilityHandlers';
+import { ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
+import { toast } from "sonner";
+import { motion } from 'framer-motion';
 
 interface ColumnManagementProps {
   structure: any;
   structureId: number;
   onUpdate: () => Promise<void>;
+  supabase: any;
+  activeMainTab: string;
 }
 
 export const ColumnManagement: React.FC<ColumnManagementProps> = ({
   structure,
   structureId,
-  onUpdate
+  onUpdate,
+  supabase,
+  activeMainTab
 }) => {
-  const [visibilitySettings, setVisibilitySettings] = useState<VisibilitySettings>({
-    tabs: {},
-    sections: {},
-    subsections: {},
-    fields: {}
-  });
-  const [orderSettings, setOrderSettings] = useState<OrderSettings>({
-    tabs: {},
-    sections: {},
-    subsections: {},
-    fields: {}
-  });
+  const [loading, setLoading] = useState(false);
+  const [lastMovedItem, setLastMovedItem] = useState<string | null>(null);
+  const [filteredStructure, setFilteredStructure] = useState(structure);
 
   useEffect(() => {
-    setVisibilitySettings(getVisibilityState(structure));
-    setOrderSettings(getOrderState(structure));
-  }, [structure]);
+    if (structure && activeMainTab) {
+      const filtered = {
+        ...structure,
+        sections: structure.sections.filter(section => 
+          section.mainTab === activeMainTab
+        )
+      };
+      setFilteredStructure(filtered);
+    }
+  }, [structure, activeMainTab]);
 
-  const handleVisibilityToggle = async (
-    type: 'tabs' | 'sections' | 'subsections' | 'fields',
-    key: string
+  const handleOrderChange = async (
+    type: 'sections' | 'subsections' | 'fields',
+    parentId: string,
+    itemId: string,
+    direction: 'up' | 'down'
   ) => {
-    const currentValue = visibilitySettings[type][key];
-    const success = await updateVisibility(structureId, type, key, !currentValue);
-    
-    if (success) {
-      setVisibilitySettings(prev => ({
-        ...prev,
-        [type]: {
-          ...prev[type],
-          [key]: !currentValue
-        }
-      }));
+    try {
+      setLoading(true);
+      const currentStructure = { ...filteredStructure };
+      let items;
+      let parentPath;
+
+      if (type === 'sections') {
+        items = currentStructure.sections;
+        parentPath = 'sections';
+      } else if (type === 'subsections') {
+        const section = currentStructure.sections.find(s => s.name === parentId);
+        items = section?.subsections;
+        parentPath = `sections.${currentStructure.sections.indexOf(section)}.subsections`;
+      } else {
+        const section = currentStructure.sections.find(s => 
+          s.subsections.some(sub => sub.name === parentId)
+        );
+        const subsection = section?.subsections.find(sub => sub.name === parentId);
+        items = subsection?.fields;
+        parentPath = `sections.${currentStructure.sections.indexOf(section)}.subsections.${section.subsections.indexOf(subsection)}.fields`;
+      }
+
+      if (!items) return;
+
+      const currentIndex = items.findIndex(item => 
+        type === 'fields' ? `${item.table}.${item.name}` === itemId : item.name === itemId
+      );
+      const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+      if (newIndex < 0 || newIndex >= items.length) return;
+
+      // Swap items
+      const temp = items[currentIndex];
+      items[currentIndex] = items[newIndex];
+      items[newIndex] = temp;
+
+      // Update order properties
+      items.forEach((item, index) => {
+        item.order = index + 1;
+      });
+
+      // Update database
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({
+          structure: currentStructure,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', structureId);
+
+      if (error) throw error;
+
+      // Set the moved item for highlighting
+      setLastMovedItem(itemId);
+      setTimeout(() => setLastMovedItem(null), 2000);
+
+      // Update UI and trigger table refresh
       await onUpdate();
+      window.dispatchEvent(new CustomEvent('structure-updated'));
+      window.dispatchEvent(new CustomEvent('refreshTable'));
+
+    } catch (error) {
+      console.error('Error updating order:', error);
+      toast.error('Failed to update order');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleBulkVisibilityToggle = async (
-    type: 'tabs' | 'sections' | 'subsections' | 'fields',
-    value: boolean
+  const cascadeVisibility = async (
+    currentStructure: any,
+    type: string,
+    itemId: string,
+    isVisible: boolean
   ) => {
-    const updates = Object.keys(visibilitySettings[type]).map(key =>
-      updateVisibility(structureId, type, key, value)
-    );
-    
-    await Promise.all(updates);
-    await onUpdate();
+    if (type === 'sections') {
+      const section = currentStructure.sections.find(s => s.name === itemId);
+      if (section) {
+        section.visible = isVisible;
+        section.subsections.forEach(sub => {
+          sub.visible = isVisible;
+          sub.fields.forEach(field => field.visible = isVisible);
+        });
+      }
+    } else if (type === 'subsections') {
+      const subsection = currentStructure.sections
+        .flatMap(s => s.subsections)
+        .find(sub => sub.name === itemId);
+      if (subsection) {
+        subsection.visible = isVisible;
+        subsection.fields.forEach(field => field.visible = isVisible);
+      }
+    }
   };
 
-  const handleOrderChange = async (
-    type: 'tabs' | 'sections' | 'subsections' | 'fields',
-    key: string,
-    direction: 'up' | 'down'
+  const handleVisibilityToggle = async (
+    type: 'sections' | 'subsections' | 'fields',
+    parentId: string,
+    itemId: string
   ) => {
-    const items = Object.entries(orderSettings[type])
-      .sort(([, a], [, b]) => a - b)
-      .map(([id]) => id);
-    
-    const currentIndex = items.indexOf(key);
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    
-    if (newIndex < 0 || newIndex >= items.length) return;
-    
-    const reorderedItems = [...items];
-    [reorderedItems[currentIndex], reorderedItems[newIndex]] = 
-    [reorderedItems[newIndex], reorderedItems[currentIndex]];
-    
-    const updatedOrder = reorderedItems.map((id, index) => ({
-      id,
-      order: index + 1
-    }));
-    
-    const success = await updateOrder(structureId, type, updatedOrder);
-    
-    if (success) {
-      const newOrderSettings = {
-        ...orderSettings,
-        [type]: updatedOrder.reduce((acc, { id, order }) => ({
-          ...acc,
-          [id]: order
-        }), {})
-      };
-      setOrderSettings(newOrderSettings);
+    try {
+      setLoading(true);
+      const currentStructure = { ...filteredStructure };
+      let item;
+
+      if (type === 'sections') {
+        item = currentStructure.sections.find(s => s.name === itemId);
+      } else if (type === 'subsections') {
+        const section = currentStructure.sections.find(s => s.name === parentId);
+        item = section?.subsections.find(sub => sub.name === itemId);
+      } else {
+        const section = currentStructure.sections.find(s => 
+          s.subsections.some(sub => sub.name === parentId)
+        );
+        const subsection = section?.subsections.find(sub => sub.name === parentId);
+        item = subsection?.fields.find(f => `${f.table}.${f.name}` === itemId);
+      }
+
+      if (!item) return;
+
+      const newVisibility = !item.visible;
+      item.visible = newVisibility;
+
+      // Cascade visibility changes
+      await cascadeVisibility(currentStructure, type, itemId, newVisibility);
+
+      // Update database
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({
+          structure: currentStructure,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', structureId);
+
+      if (error) throw error;
+
+      // Update UI and trigger table refresh
       await onUpdate();
+      window.dispatchEvent(new CustomEvent('structure-updated'));
+      window.dispatchEvent(new CustomEvent('refreshTable'));
+
+    } catch (error) {
+      console.error('Error updating visibility:', error);
+      toast.error('Failed to update visibility');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkVisibilityToggle = async (isVisible: boolean) => {
+    try {
+      setLoading(true);
+      const currentStructure = { ...filteredStructure };
+
+      currentStructure.sections.forEach(section => {
+        section.visible = isVisible;
+        section.subsections.forEach(subsection => {
+          subsection.visible = isVisible;
+          subsection.fields.forEach(field => {
+            field.visible = isVisible;
+          });
+        });
+      });
+
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({
+          structure: currentStructure,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', structureId);
+
+      if (error) throw error;
+
+      await onUpdate();
+      window.dispatchEvent(new CustomEvent('structure-updated'));
+      window.dispatchEvent(new CustomEvent('refreshTable'));
+
+    } catch (error) {
+      console.error('Error updating bulk visibility:', error);
+      toast.error('Failed to update visibility');
+    } finally {
+      setLoading(false);
     }
   };
 
   const renderItem = (
-    type: 'tabs' | 'sections' | 'subsections' | 'fields',
-    key: string,
-    label: string,
+    type: 'sections' | 'subsections' | 'fields',
+    parentId: string,
+    item: any,
     level: number = 0
-  ) => (
-    <div
-      key={key}
-      className={`flex items-center justify-between p-2 hover:bg-gray-50 rounded-md transition-colors ${
-        level > 0 ? `ml-${level * 4}` : ''
-      }`}
-    >
-      <span className="flex-1 font-medium text-gray-700">{label}</span>
-      <div className="flex items-center gap-3">
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleOrderChange(type, key, 'up')}
-            className="h-7 w-7 p-0 hover:bg-gray-100"
-          >
-            <ChevronUp className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleOrderChange(type, key, 'down')}
-            className="h-7 w-7 p-0 hover:bg-gray-100"
-          >
-            <ChevronDown className="h-4 w-4" />
-          </Button>
+  ) => {
+    const itemId = type === 'fields' ? `${item.table}.${item.name}` : item.name;
+    const displayName = type === 'fields' ? item.display : item.name;
+    const isHighlighted = lastMovedItem === itemId;
+
+    return (
+      <motion.div
+        key={itemId}
+        initial={isHighlighted ? { backgroundColor: '#e3f2fd' } : {}}
+        animate={isHighlighted ? { backgroundColor: '#ffffff' } : {}}
+        transition={{ duration: 2 }}
+        className={`flex items-center justify-between p-2 hover:bg-gray-50 rounded-md transition-colors ${
+          level > 0 ? `ml-${level * 4}` : ''
+        }`}
+      >
+        <span className="flex-1 font-medium text-gray-700">{displayName}</span>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleOrderChange(type, parentId, itemId, 'up')}
+              className="h-7 w-7 p-0 hover:bg-gray-100"
+              disabled={loading}
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleOrderChange(type, parentId, itemId, 'down')}
+              className="h-7 w-7 p-0 hover:bg-gray-100"
+              disabled={loading}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </div>
+          <Switch
+            checked={item.visible}
+            onCheckedChange={() => handleVisibilityToggle(type, parentId, itemId)}
+            disabled={loading}
+          />
         </div>
-        <Switch
-          checked={visibilitySettings[type][key] ?? true}
-          onCheckedChange={() => handleVisibilityToggle(type, key)}
-          className="data-[state=checked]:bg-blue-600"
-        />
-      </div>
-    </div>
-  );
+      </motion.div>
+    );
+  };
 
   return (
     <Card className="shadow-sm">
       <CardContent className="p-6">
         <div className="space-y-6">
-          {/* Global controls */}
           <div className="flex justify-between items-center mb-6 border-b pb-4">
-            <h3 className="text-xl font-semibold text-gray-800">Column Visibility Settings</h3>
+            <h3 className="text-xl font-semibold text-gray-800">Column Management - {activeMainTab}</h3>
             <div className="flex gap-3">
               <Button 
-                onClick={() => handleBulkVisibilityToggle('fields', true)}
+                onClick={() => handleBulkVisibilityToggle(true)}
+                disabled={loading}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
+                <Eye className="h-4 w-4 mr-2" />
                 Show All
               </Button>
               <Button 
-                onClick={() => handleBulkVisibilityToggle('fields', false)}
+                onClick={() => handleBulkVisibilityToggle(false)}
+                disabled={loading}
                 variant="outline"
                 className="border-gray-300 hover:bg-gray-50"
               >
+                <EyeOff className="h-4 w-4 mr-2" />
                 Hide All
               </Button>
             </div>
           </div>
 
-          {/* Sections */}
-          {structure.sections
-            .sort((a, b) => (orderSettings.sections[a.name] || 0) - (orderSettings.sections[b.name] || 0))
+          {filteredStructure.sections
+            .sort((a, b) => a.order - b.order)
             .map(section => (
               <div key={section.name} className="border rounded-lg p-4 space-y-4 bg-white shadow-sm hover:shadow-md transition-shadow">
-                {renderItem('sections', section.name, section.name)}
-
-                {/* Subsections */}
+                {renderItem('sections', '', section)}
                 <div className="pl-4 space-y-3">
                   {section.subsections
-                    .sort((a, b) => (orderSettings.subsections[a.name] || 0) - (orderSettings.subsections[b.name] || 0))
+                    .sort((a, b) => a.order - b.order)
                     .map(subsection => (
                       <div key={subsection.name} className="bg-gray-50 rounded-md p-3">
-                        {renderItem('subsections', subsection.name, subsection.name, 1)}
-
-                        {/* Fields */}
+                        {renderItem('subsections', section.name, subsection, 1)}
                         <div className="pl-4 space-y-2 mt-2">
                           {subsection.fields
-                            .sort((a, b) => {
-                              const keyA = `${a.table}.${a.name}`;
-                              const keyB = `${b.table}.${b.name}`;
-                              return (orderSettings.fields[keyA] || 0) - (orderSettings.fields[keyB] || 0);
-                            })
-                            .map(field => {
-                              const fieldKey = `${field.table}.${field.name}`;
-                              return renderItem('fields', fieldKey, field.display, 2);
-                            })}
+                            .sort((a, b) => a.order - b.order)
+                            .map(field => renderItem('fields', subsection.name, field, 2))}
                         </div>
                       </div>
                     ))}
@@ -217,4 +337,4 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
       </CardContent>
     </Card>
   );
-}
+};

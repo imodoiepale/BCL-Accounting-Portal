@@ -8,16 +8,39 @@ import { Button } from "@/components/ui/button";
 import Upload from "./upload";
 
 export default function Page() {
-  const [step, setStep] = useState(1);
-  const [companyData, setCompanyData] = useState<any>({
-    company_name: "",
-    username: "",
-    password: "",
-    uploadedData: null,
+  const [step, setStep] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedStep = localStorage.getItem('onboardingStep');
+      return savedStep ? parseInt(savedStep) : 1;
+    }
+    return 1;
   });
+  
+  const [companyData, setCompanyData] = useState<any>(() => {
+    if (typeof window !== 'undefined') {
+      const savedData = localStorage.getItem('companyData');
+      return savedData ? JSON.parse(savedData) : {
+        company_name: "",
+        username: "",
+        password: "",
+        uploadedData: null,
+      };
+    }
+    return {
+      company_name: "",
+      username: "",
+      password: "",
+      uploadedData: null,
+    };
+  });
+
   useEffect(() => {
-    console.log('Current step:', step);
+    localStorage.setItem('onboardingStep', step.toString());
   }, [step]);
+
+  useEffect(() => {
+    localStorage.setItem('companyData', JSON.stringify(companyData));
+  }, [companyData]);
 
 const handleOnboardingComplete = (data: any) => {
   console.log('Onboarding complete, data:', data);
@@ -25,8 +48,8 @@ const handleOnboardingComplete = (data: any) => {
     ...companyData, 
     name: data.name,
     username: data.username,
-    userId: data.userId, // Make sure this matches what onboarding sends
-    company_name: data.name // Add this explicitly
+    userId: data.userId,
+    company_name: data.name
   });
   console.log('Moving to step 2');
   setStep(2);
@@ -38,6 +61,12 @@ const handleOnboardingComplete = (data: any) => {
       uploadedData: data.uploadedData 
     });
     setStep(3);
+  };
+
+  const handleGoToLogin = () => {
+    localStorage.removeItem('onboardingStep');
+    localStorage.removeItem('companyData');
+    window.location.href = '/sign-in';
   };
 
   return (
@@ -106,7 +135,7 @@ const handleOnboardingComplete = (data: any) => {
               </div>
 
               <Button
-                onClick={() => window.location.href = '/sign-in'}
+                onClick={handleGoToLogin}
                 className="mt-4"
               >
                 Go to Login
