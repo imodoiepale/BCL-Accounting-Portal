@@ -84,129 +84,157 @@ const OverallView: React.FC = () => {
 
     const clientCacheUtils = {
         async get(key: string) {
-          try {
-            const response = await fetch(`/api/cache?key=${encodeURIComponent(key)}`);
-            const data = await response.json();
-            return data;
-          } catch (error) {
-            console.error('Cache get error:', error);
-            return null;
-          }
+            try {
+                const response = await fetch(`/api/cache?key=${encodeURIComponent(key)}`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Cache get error:', error);
+                return null;
+            }
         },
-      
+
         async set(key: string, data: any) {
-          try {
-            await fetch('/api/cache', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ key, data })
-            });
-          } catch (error) {
-            console.error('Cache set error:', error);
-          }
+            try {
+                await fetch('/api/cache', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, data })
+                });
+            } catch (error) {
+                console.error('Cache set error:', error);
+            }
         },
-      
+
         async invalidate(pattern: string) {
-          try {
-            await fetch(`/api/cache?pattern=${encodeURIComponent(pattern)}`, {
-              method: 'DELETE'
-            });
-          } catch (error) {
-            console.error('Cache invalidate error:', error);
-          }
+            try {
+                await fetch(`/api/cache?pattern=${encodeURIComponent(pattern)}`, {
+                    method: 'DELETE'
+                });
+            } catch (error) {
+                console.error('Cache invalidate error:', error);
+            }
         },
-      
+
         async getAllData() {
-          try {
-            const response = await fetch('/api/cache?key=all_tabs_data');
-            const data = await response.json();
-            return data;
-          } catch (error) {
-            console.error('Cache getAllData error:', error);
-            return null;
-          }
+            try {
+                const response = await fetch('/api/cache?key=all_tabs_data');
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Cache getAllData error:', error);
+                return null;
+            }
         }
-      };
-      
-      // Replace the existing cacheUtils constant with:
-      const cacheUtils = {
+    };
+
+    // Replace the existing cacheUtils constant with:
+    const cacheUtils = {
         ...clientCacheUtils,
         ...(typeof window !== 'undefined' ? window.cacheUtils : {})
-      };
+    };
+
 
     const memoizedCurrentData = useMemo(() => currentData, [currentData]);
+    useEffect(() => {
+        const initializeData = async () => {
+            try {
+                setLoading(true);
 
-    const fetchAllTabsData = useCallback(async () => {
-        try {
-            setLoading(true);
-    
-            // Just fetch all data directly from Supabase without Redis caching
-            const { data: mappings } = await supabase
-                .from('profile_category_table_mapping_2')
-                .select('*');
-    
-            // Collect all unique tables
-            const allTables = new Set(['acc_portal_company_duplicate']);
-            mappings.forEach(mapping => {
-                if (mapping?.structure?.sections) {
-                    mapping.structure.sections.forEach(section => {
-                        section.subsections?.forEach(subsection => {
-                            subsection.tables?.forEach(table => allTables.add(table));
+                // Single fetch for all data and structure
+                const { data: mappings } = await supabase
+                    .from('profile_category_table_mapping_2')
+                    .select('*')
+                    .order('main_tab')
+                    .order('Tabs');
+
+                if (!mappings) throw new Error('No data found');
+
+                // Process structure data in one pass
+                const mainTabsSet = new Set<string>();
+                const subTabsMap: { [key: string]: string[] } = {};
+                const sectionsSet = new Set<string>();
+                const subsectionsSet = new Set<string>();
+                const allTables = new Set(['acc_portal_company_duplicate']);
+
+                mappings.forEach(mapping => {
+                    if (!mapping) return;
+
+                    if (mapping.main_tab) mainTabsSet.add(mapping.main_tab);
+                    if (mapping.main_tab && mapping.Tabs) {
+                        if (!subTabsMap[mapping.main_tab]) subTabsMap[mapping.main_tab] = [];
+                        if (!subTabsMap[mapping.main_tab].includes(mapping.Tabs)) {
+                            subTabsMap[mapping.main_tab].push(mapping.Tabs);
+                        }
+                    }
+
+                    if (mapping?.structure?.sections) {
+                        mapping.structure.sections.forEach(section => {
+                            if (section?.name) sectionsSet.add(section.name);
+                            section.subsections?.forEach(subsection => {
+                                if (subsection?.name) subsectionsSet.add(subsection.name);
+                                subsection.tables?.forEach(table => allTables.add(table));
+                            });
                         });
-                    });
-                }
-            });
-    
-            // Fetch table data in parallel
-            const tableData = {};
-            await Promise.all(
-                Array.from(allTables).map(async (tableName) => {
-                    const { data } = await supabase
-                        .from(tableName)
-                        .select('*')
-                        .order('id');
-                    tableData[tableName] = data || [];
-                })
-            );
-    
-            // Process all data once and store in memory
-            const processedData = new Map();
-            mappings.forEach(mapping => {
-                const mainTab = mapping.main_tab;
-                const subTab = mapping.Tabs;
-                const key = `${mainTab}:${subTab}`;
-                
-                const tabData = processTabData(tableData, mapping);
-                processedData.set(key, tabData);
-            });
-    
-            // Store all data in memory
-            setAllData(processedData);
-            
-            // Set initial data for current tab if tabs are set
-            if (activeMainTab && activeSubTab) {
-                const key = `${activeMainTab}:${activeSubTab}`;
-                setCurrentData(processedData.get(key) || []);
+                    }
+                });
+
+                // Fetch all table data at once
+                const tableResponses = await Promise.all(
+                    Array.from(allTables).map(tableName =>
+                        supabase.from(tableName).select('*').order('id')
+                    )
+                );
+
+                const tableData = {};
+                Array.from(allTables).forEach((tableName, index) => {
+                    tableData[tableName] = tableResponses[index].data || [];
+                });
+
+                // Process all tab data at once and keep in memory
+                const processedData = new Map();
+                mappings.forEach(mapping => {
+                    const mainTab = mapping.main_tab;
+                    const subTab = mapping.Tabs;
+                    const key = `${mainTab}:${subTab}`;
+                    const tabData = processTabData(tableData, mapping);
+                    processedData.set(key, tabData);
+                });
+
+                // Set all state at once
+                const defaultMainTab = Array.from(mainTabsSet)[0] || '';
+                const defaultSubTab = subTabsMap[defaultMainTab]?.[0] || '';
+
+                setStructure(mappings);
+                setMainTabs(Array.from(mainTabsSet));
+                setSubTabs(subTabsMap);
+                setMainSections(Array.from(sectionsSet));
+                setMainSubsections(Array.from(subsectionsSet));
+                setAllData(processedData);
+                setActiveMainTab(defaultMainTab);
+                setActiveSubTab(defaultSubTab);
+                setCurrentData(processedData.get(`${defaultMainTab}:${defaultSubTab}`) || []);
+
+                setLoading(false);
+            } catch (error) {
+                console.error('Error loading data:', error);
+                setFetchError(error);
+                setLoading(false);
             }
-    
-            setLoading(false);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-            setLoading(false);
-            setFetchError(error);
-        }
+        };
+
+        initializeData();
     }, []);
-    
     // Helper function to process tab data
     const processTabData = (tableData, mapping) => {
         const companyDataMap = new Map();
-    
+
         tableData['acc_portal_company_duplicate'].forEach(company => {
             const companyName = company.company_name?.toLowerCase();
             const companyId = company.company_id;
             const mergedData = { ...company };
             const additionalRows = [];
-    
+
             // Get relevant tables for this mapping
             const relevantTables = new Set();
             if (mapping?.structure?.sections) {
@@ -216,16 +244,16 @@ const OverallView: React.FC = () => {
                     });
                 });
             }
-    
+
             // Process each relevant table
             relevantTables.forEach(tableName => {
                 if (tableName === 'acc_portal_company_duplicate') return;
-    
+
                 const relatedRecords = tableData[tableName]?.filter(record => {
-                    return record.company_name?.toLowerCase() === companyName || 
-                           record.company_id === companyId;
+                    return record.company_name?.toLowerCase() === companyName ||
+                        record.company_id === companyId;
                 });
-    
+
                 if (relatedRecords?.length) {
                     mergedData[`${tableName}_data`] = relatedRecords[0];
                     if (relatedRecords.length > 1) {
@@ -237,7 +265,7 @@ const OverallView: React.FC = () => {
                     }
                 }
             });
-    
+
             const entry = {
                 company: mergedData,
                 rows: [
@@ -246,10 +274,10 @@ const OverallView: React.FC = () => {
                 ],
                 rowSpan: 1 + additionalRows.length
             };
-    
+
             companyDataMap.set(companyName, entry);
         });
-    
+
         return Array.from(companyDataMap.values());
     };
 
@@ -258,93 +286,7 @@ const OverallView: React.FC = () => {
         dataCache.current.clear();
     }, []);
 
-    const fetchStructure = useCallback(async () => {
-        try {
-            // Check cache first
-            const cacheKey = 'structure';
-            const cachedStructure = await cacheUtils.get(cacheKey);
 
-            if (cachedStructure) {
-                setStructure(cachedStructure.structure);
-                setMainTabs(cachedStructure.mainTabs);
-                setSubTabs(cachedStructure.subTabs);
-                setMainSections(cachedStructure.mainSections);
-                setMainSubsections(cachedStructure.mainSubsections);
-                return;
-            }
-
-            const { data: mappings, error } = await supabase
-                .from('profile_category_table_mapping_2')
-                .select('*')
-                .order('main_tab')
-                .order('Tabs');
-
-            if (error) throw error;
-            if (!mappings) throw new Error('No mappings found');
-
-            // Process mappings to extract tabs, sections, etc.
-            const mainTabsSet = new Set<string>();
-            const subTabsMap: { [key: string]: string[] } = {};
-            const sectionsSet = new Set<string>();
-            const subsectionsSet = new Set<string>();
-
-            mappings.forEach(mapping => {
-                if (!mapping) return;
-
-                // Add main tab
-                if (mapping.main_tab) {
-                    mainTabsSet.add(mapping.main_tab);
-                }
-
-                // Process sub tabs
-                if (mapping.main_tab && mapping.Tabs) {
-                    if (!subTabsMap[mapping.main_tab]) {
-                        subTabsMap[mapping.main_tab] = [];
-                    }
-                    if (!subTabsMap[mapping.main_tab].includes(mapping.Tabs)) {
-                        subTabsMap[mapping.main_tab].push(mapping.Tabs);
-                    }
-                }
-
-                // Process sections and subsections
-                if (mapping.structure?.sections) {
-                    mapping.structure.sections.forEach(section => {
-                        if (section?.name) {
-                            sectionsSet.add(section.name);
-                        }
-                        if (section?.subsections) {
-                            section.subsections.forEach(subsection => {
-                                if (subsection?.name) {
-                                    subsectionsSet.add(subsection.name);
-                                }
-                            });
-                        }
-                    });
-                }
-            });
-
-            const structureData = {
-                structure: mappings,
-                mainTabs: Array.from(mainTabsSet),
-                subTabs: subTabsMap,
-                mainSections: Array.from(sectionsSet),
-                mainSubsections: Array.from(subsectionsSet)
-            };
-
-            // Cache the structure data
-            await cacheUtils.set(cacheKey, structureData);
-
-            setStructure(mappings);
-            setMainTabs(Array.from(mainTabsSet));
-            setSubTabs(subTabsMap);
-            setMainSections(Array.from(sectionsSet));
-            setMainSubsections(Array.from(subsectionsSet));
-
-        } catch (error) {
-            console.error('Error fetching structure:', error);
-            toast.error('Failed to fetch structure');
-        }
-    }, []);
 
     const handleSave = async (updatedData: any) => {
         try {
@@ -389,112 +331,59 @@ const OverallView: React.FC = () => {
     };
 
     const handleStructureUpdate = async () => {
-        await cacheUtils.invalidate('structure');
-        await cacheUtils.invalidate('data:*');
-        await fetchStructure();
-        await fetchAllData(activeMainTab, activeSubTab);
-    };
+        try {
+            setLoading(true);
 
-    useEffect(() => {
-        const initializeData = async () => {
-            try {
-                setLoading(true);
-    
-                // Fetch structure and data in parallel
-                const [structureResponse, mappingsResponse] = await Promise.all([
-                    supabase.from('profile_category_table_mapping_2').select('*').order('main_tab').order('Tabs'),
-                    supabase.from('profile_category_table_mapping_2').select('*')
-                ]);
-    
-                const mappings = mappingsResponse.data;
-                const structureMappings = structureResponse.data;
-    
-                // Process structure first
-                if (!structureMappings) throw new Error('No structure found');
-                
-                // Process structure data
-                const mainTabsSet = new Set<string>();
-                const subTabsMap: { [key: string]: string[] } = {};
-                const sectionsSet = new Set<string>();
-                const subsectionsSet = new Set<string>();
-                const allTables = new Set(['acc_portal_company_duplicate']);
-    
-                // Process mappings in one pass
-                structureMappings.forEach(mapping => {
-                    if (!mapping) return;
-    
-                    if (mapping.main_tab) {
-                        mainTabsSet.add(mapping.main_tab);
+            // Fetch new structure
+            const { data: mappings } = await supabase
+                .from('profile_category_table_mapping_2')
+                .select('*')
+                .order('main_tab')
+                .order('Tabs');
+
+            if (!mappings) throw new Error('No data found');
+
+            // Process structure data
+            const mainTabsSet = new Set<string>();
+            const subTabsMap: { [key: string]: string[] } = {};
+            const sectionsSet = new Set<string>();
+            const subsectionsSet = new Set<string>();
+
+            mappings.forEach(mapping => {
+                if (!mapping) return;
+
+                if (mapping.main_tab) mainTabsSet.add(mapping.main_tab);
+                if (mapping.main_tab && mapping.Tabs) {
+                    if (!subTabsMap[mapping.main_tab]) subTabsMap[mapping.main_tab] = [];
+                    if (!subTabsMap[mapping.main_tab].includes(mapping.Tabs)) {
+                        subTabsMap[mapping.main_tab].push(mapping.Tabs);
                     }
-    
-                    if (mapping.main_tab && mapping.Tabs) {
-                        if (!subTabsMap[mapping.main_tab]) {
-                            subTabsMap[mapping.main_tab] = [];
-                        }
-                        if (!subTabsMap[mapping.main_tab].includes(mapping.Tabs)) {
-                            subTabsMap[mapping.main_tab].push(mapping.Tabs);
-                        }
-                    }
-    
-                    if (mapping?.structure?.sections) {
-                        mapping.structure.sections.forEach(section => {
-                            if (section?.name) sectionsSet.add(section.name);
-                            section.subsections?.forEach(subsection => {
-                                if (subsection?.name) subsectionsSet.add(subsection.name);
-                                subsection.tables?.forEach(table => allTables.add(table));
-                            });
+                }
+
+                if (mapping?.structure?.sections) {
+                    mapping.structure.sections.forEach(section => {
+                        if (section?.name) sectionsSet.add(section.name);
+                        section.subsections?.forEach(subsection => {
+                            if (subsection?.name) subsectionsSet.add(subsection.name);
                         });
-                    }
-                });
-    
-                // Fetch all table data in parallel
-                const tableDataPromises = Array.from(allTables).map(tableName =>
-                    supabase.from(tableName).select('*').order('id')
-                );
-    
-                const tableResponses = await Promise.all(tableDataPromises);
-                const tableData = {};
-                Array.from(allTables).forEach((tableName, index) => {
-                    tableData[tableName] = tableResponses[index].data || [];
-                });
-    
-                // Process data for all tabs at once
-                const processedData = new Map();
-                mappings.forEach(mapping => {
-                    const mainTab = mapping.main_tab;
-                    const subTab = mapping.Tabs;
-                    const key = `${mainTab}:${subTab}`;
-                    
-                    const tabData = processTabData(tableData, mapping);
-                    processedData.set(key, tabData);
-                });
-    
-                // Set all state at once
-                setStructure(structureMappings);
-                setMainTabs(Array.from(mainTabsSet));
-                setSubTabs(subTabsMap);
-                setMainSections(Array.from(sectionsSet));
-                setMainSubsections(Array.from(subsectionsSet));
-                setAllData(processedData);
-    
-                // Set initial tab data
-                const defaultMainTab = Array.from(mainTabsSet)[0] || '';
-                const defaultSubTab = subTabsMap[defaultMainTab]?.[0] || '';
-                
-                setActiveMainTab(defaultMainTab);
-                setActiveSubTab(defaultSubTab);
-                setCurrentData(processedData.get(`${defaultMainTab}:${defaultSubTab}`) || []);
-                
-                setLoading(false);
-            } catch (error) {
-                console.error('Error initializing:', error);
-                setFetchError(error);
-                setLoading(false);
-            }
-        };
-    
-        initializeData();
-    }, []); 
+                    });
+                }
+            });
+
+            // Update structure state
+            setStructure(mappings);
+            setMainTabs(Array.from(mainTabsSet));
+            setSubTabs(subTabsMap);
+            setMainSections(Array.from(sectionsSet));
+            setMainSubsections(Array.from(subsectionsSet));
+
+            setLoading(false);
+        } catch (error) {
+            console.error('Error updating structure:', error);
+            toast.error('Failed to update structure');
+            setLoading(false);
+        }
+    };
 
     const processTabSections = useMemo(() => (activeMainTab: string, activeSubTab: string) => {
         const isSpecialView = ['employee details', 'customer details', 'supplier details'].includes(activeMainTab?.toLowerCase());
@@ -669,20 +558,20 @@ const OverallView: React.FC = () => {
 
     const handleMainTabChange = useCallback((tabValue) => {
         if (tabValue === activeMainTab) return;
-        
-        setActiveMainTab(tabValue);
+
         const newSubTab = subTabs[tabValue]?.[0] || '';
+        setActiveMainTab(tabValue);
         setActiveSubTab(newSubTab);
         setCurrentData(allData.get(`${tabValue}:${newSubTab}`) || []);
     }, [activeMainTab, subTabs, allData]);
-    
+
     const handleSubTabChange = useCallback((tabValue) => {
         if (tabValue === activeSubTab) return;
-        
+
         setActiveSubTab(tabValue);
         setCurrentData(allData.get(`${activeMainTab}:${tabValue}`) || []);
     }, [activeMainTab, activeSubTab, allData]);
-    
+
 
     if (loading || !structure.length || !mainTabs.length) {
         return (
@@ -712,7 +601,6 @@ const OverallView: React.FC = () => {
         );
     }
 
-    // Add to OverallView.tsx
     const toggleTabVisibility = async (tab: string) => {
         try {
             const { error } = await supabase
@@ -732,7 +620,9 @@ const OverallView: React.FC = () => {
                 .eq('Tabs', tab);
 
             if (error) throw error;
-            await fetchStructure();
+
+            // Call handleStructureUpdate instead of fetchStructure
+            await handleStructureUpdate();
         } catch (error) {
             console.error('Error toggling tab visibility:', error);
             toast.error('Failed to toggle tab visibility');
@@ -780,7 +670,7 @@ const OverallView: React.FC = () => {
                                 mainTabs={mainTabs}
                                 mainSections={mainSections}
                                 mainSubsections={mainSubsections}
-                                onStructureChange={fetchStructure}
+                                onStructureChange={handleStructureUpdate}
                                 activeMainTab={activeMainTab}
                                 activeSubTab={activeSubTab}
                                 subTabs={subTabs[activeMainTab] || []}
@@ -845,13 +735,10 @@ const OverallView: React.FC = () => {
                                                                 setSelectedMissingFields(company);
                                                                 setIsMissingFieldsOpen(true);
                                                             }}
-                                                            refreshData={async () => {
-                                                                await cacheUtils.invalidate('all_tabs_data');
-                                                                await fetchAllTabsData();
-                                                            }}
                                                             processedSections={processTabSections(activeMainTab, activeSubTab)}
                                                             activeMainTab={activeMainTab}
                                                             activeSubTab={activeSubTab}
+                                                            
                                                         />
                                                     </div>
                                                 </div>
