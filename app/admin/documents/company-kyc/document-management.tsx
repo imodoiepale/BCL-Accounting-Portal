@@ -317,6 +317,7 @@ const DocumentActions = ({
             <Download className="w-4 h-4 mr-2" />
             Download
           </DropdownMenuItem>
+          
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -1328,7 +1329,8 @@ const DocumentManagement = () => {
                                   expiryDate = parseDate(upload.expiry_date);
                                 }
 
-                                if (!expiryDate) return '-';
+                                if (!expiryDate)
+                                    return '-';
 
                                 const daysLeft = differenceInDays(expiryDate, new Date());
 
