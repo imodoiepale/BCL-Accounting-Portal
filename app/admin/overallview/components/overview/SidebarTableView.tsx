@@ -135,7 +135,7 @@ export const SidebarTableView = ({
             total + (cat.isSeparator ? 1 : cat.fields.length), 0);
           return (
             <TableHead
-              key={`sec-ref-${section.name}`}
+              key={`sec-ref-${index}`}
               colSpan={colSpan}
               className="text-center font-medium bg-yellow-50 border-b border-yellow-200"
             >
@@ -158,7 +158,7 @@ export const SidebarTableView = ({
             total + (cat.isSeparator ? 1 : cat.fields.length), 0);
           return (
             <TableHead
-              key={`section-${section.name}`}
+              key={`section-${index}`}
               colSpan={colSpan}
               className={`text-center text-white bg-blue-600`}
             >
@@ -190,7 +190,6 @@ export const SidebarTableView = ({
               >
                 {category.category}
               </TableHead>
-
             );
           })
         )}
@@ -203,10 +202,10 @@ export const SidebarTableView = ({
         {renderSeparatorCell(`field-sep-start`, 'section')}
         <TableHead className="whitespace-nowrap bg-red-500 text-white sticky left-[50px] z-0">Missing Count</TableHead>
         {processedSections.slice(1).map((section, sIndex) =>
-          section.categorizedFields?.map((category) =>
+          section.categorizedFields?.map((category, cIndex) =>
             category.fields?.map((field, fIndex) => (
               <TableHead
-                key={`field-${sIndex}-${fIndex}`}
+                key={`field-${sIndex}-${cIndex}-${fIndex}`}
                 className={`whitespace-nowrap font-medium bg-gray-500 text-white`}
               >
                 {field.label}
@@ -218,7 +217,6 @@ export const SidebarTableView = ({
       </TableRow>
     </TableHeader>
   );
-
   return (
     <div className="grid h-full" style={{ gridTemplateColumns: '300px 1fr' }}>
       {/* Sidebar */}

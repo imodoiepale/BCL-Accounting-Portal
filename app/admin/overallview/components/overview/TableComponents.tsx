@@ -161,9 +161,68 @@ const calculateFieldStatistics = (fieldName: string, data: any[]) => {
 };
 // Add this helper function at the top of the file
 const getTableName = (row: any): string => {
-  return row.sourceTable || 
+  return row.sourceTable ||
     Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') ||
     'acc_portal_company_duplicate';
+};
+
+const getFieldVerificationStatusFromStructure = (structure: any, tableName: string, fieldName: string) => {
+  for (const section of structure.sections) {
+    for (const subsection of section.subsections) {
+      const field = subsection.fields?.find(
+        (f: any) => f.table === tableName && f.name === fieldName
+      );
+      if (field?.verification) {
+        return field.verification;
+      }
+    }
+  }
+  return null;
+};
+
+const initializeFieldVerificationStates = async (
+  processedSections: any[],
+  activeMainTab: string,
+  activeSubTab: string,
+  setLockedColumns: (states: any) => void
+) => {
+  try {
+    const { data: mappingData } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('structure')
+      .eq('main_tab', activeMainTab)
+      .eq('Tabs', activeSubTab)
+      .single();
+
+    if (!mappingData) return;
+
+    const verificationStates = {};
+
+    // Extract verification states from structure
+    processedSections.forEach(section => {
+      if (!section.isSeparator) {
+        section.categorizedFields?.forEach(category => {
+          if (!category.isSeparator) {
+            category.fields.forEach(field => {
+              const [tableName, columnName] = field.name.split('.');
+              const verification = getFieldVerificationStatusFromStructure(
+                mappingData.structure,
+                tableName,
+                columnName
+              );
+              if (verification) {
+                verificationStates[`field_${tableName}.${columnName}`] = verification;
+              }
+            });
+          }
+        });
+      }
+    });
+
+    setLockedColumns(verificationStates);
+  } catch (error) {
+    console.error('Error initializing field verification states:', error);
+  }
 };
 
 const initializeVerificationStates = async (
@@ -173,12 +232,34 @@ const initializeVerificationStates = async (
   setLockedRows: (states: any) => void
 ) => {
   try {
-    // Get all unique tables from sections
-    const tables = new Set<string>();
+    // Get mapping data with structure
+    const { data: mappingData } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('structure')
+      .eq('main_tab', activeMainTab)
+      .eq('Tabs', activeSubTab)
+      .single();
+
     const verificationStates = {};
 
-    // Add default company table and collect other tables
-    tables.add('acc_portal_company_duplicate');
+    // Extract column verifications from structure
+    mappingData?.structure?.sections?.forEach(section => {
+      section.subsections?.forEach(subsection => {
+        subsection.fields?.forEach(field => {
+          if (field.verification?.is_verified) {
+            const fieldKey = `field_${field.table}.${field.name}`;
+            verificationStates[fieldKey] = {
+              is_verified: field.verification.is_verified,
+              verified_at: field.verification.verified_at,
+              verified_by: field.verification.verified_by
+            };
+          }
+        });
+      });
+    });
+
+    // Get row verifications
+    const tables = new Set<string>();
     processedSections.forEach(section => {
       if (!section.isSeparator) {
         section.categorizedFields?.forEach(category => {
@@ -192,60 +273,26 @@ const initializeVerificationStates = async (
       }
     });
 
-    // Fetch verification states for all tables
+    // Fetch row verification states
     await Promise.all([...tables].map(async (tableName) => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from(tableName)
         .select('id, is_verified, verification_data')
         .eq('is_verified', true);
 
-      if (error) {
-        console.error(`Error fetching verification states for ${tableName}:`, error);
-        return;
-      }
-
       if (data) {
         data.forEach(row => {
           const key = `${tableName}_${row.id}`;
-          let verificationInfo;
-          try {
-            verificationInfo = row.verification_data ?
-              JSON.parse(row.verification_data) :
-              { verified_at: new Date().toISOString(), verified_by: 'current_user' };
-          } catch (e) {
-            verificationInfo = { verified_at: new Date().toISOString(), verified_by: 'current_user' };
-          }
-
           verificationStates[key] = {
             is_verified: row.is_verified,
-            ...verificationInfo
+            verified_at: row.verification_data?.verified_at || new Date().toISOString(),
+            verified_by: row.verification_data?.verified_by || 'current_user'
           };
         });
       }
     }));
 
-    // Fetch field verifications from structure
-    const { data: mappingData } = await supabase
-      .from('profile_category_table_mapping_2')
-      .select('structure')
-      .eq('main_tab', activeMainTab)
-      .eq('Tabs', activeSubTab)
-      .single();
-
-    if (mappingData?.structure?.sections) {
-      mappingData.structure.sections.forEach(section => {
-        section.subsections?.forEach(subsection => {
-          subsection.fields?.forEach(field => {
-            if (field.verification?.is_verified) {
-              const key = `field_${field.table}.${field.name}`;
-              verificationStates[key] = field.verification;
-            }
-          });
-        });
-      });
-    }
-
-    // Update the local state
+    // Update states
     setLockedRows(verificationStates);
 
   } catch (error) {
@@ -429,7 +476,7 @@ const handleToggleRowLock = async (
 
     // Get table name from structure
     const tableName = getTableNameFromStructure(mappingData.structure, activeSubTab);
-    
+
     if (!tableName) {
       throw new Error(`Could not determine table name for subtab: ${activeSubTab}`);
     }
@@ -468,10 +515,10 @@ const handleToggleRowLock = async (
         verified_by: 'current_user'
       }
     }));
-// Add these logs in handleToggleRowLock
-console.log('Structure:', mappingData.structure);
-console.log('Active subtab:', activeSubTab);
-console.log('Determined table name:', tableName);
+    // Add these logs in handleToggleRowLock
+    console.log('Structure:', mappingData.structure);
+    console.log('Active subtab:', activeSubTab);
+    console.log('Determined table name:', tableName);
 
     toast.success(`Row ${!currentVerificationState ? 'verified' : 'unverified'}`);
     if (typeof refreshData === 'function') {
@@ -479,13 +526,12 @@ console.log('Determined table name:', tableName);
     }
     console.log('refreshData type:', typeof refreshData);
     console.log('refreshData:', refreshData);
-    
+
   } catch (error) {
     console.error('Verification error:', error);
     toast.error('Verification update failed: ' + (error as Error).message);
   }
 };
-
 
 // Render data rows
 const renderDataRows = (
@@ -501,94 +547,142 @@ const renderDataRows = (
   setLockedRows: (value: any) => void
 ) => {
   return data.map((companyGroup, groupIndex) => (
-    companyGroup.rows.map((row, rowIndex) => (
-      <TableRow
-        key={`${groupIndex}-${rowIndex}`}
-        className="hover:bg-gray-50 transition-colors"
-      >
-        <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white" style={{ width: '20px', minWidth: '20px' }} >
-          {groupIndex + 1}
-        </TableCell>
-        <TableCell
-  className="w-10 cursor-pointer hover:bg-gray-100"
-  style={{ width: '80px', minWidth: '80px' }}
-  onClick={() => {
-    // Get the table name from the row data
-    const sourceTableName = row.sourceTable || 
-      Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') ||
-      'acc_portal_company_duplicate';
-      
-    handleToggleRowLock(
-      row,
-      processedSections,
-      setLockedRows,
-      refreshData,
-      lockedRows,
-      activeMainTab, // Add these parameters
-      activeSubTab
-    );
-  }}
->
-  {lockedRows[`${row.sourceTable || 
-    Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') || 
-    'acc_portal_company_duplicate'}_${row.id || row[`${row.sourceTable || 
-    Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') || 
-    'acc_portal_company_duplicate'}_data`]?.id}`]?.is_verified ? (
-    <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
-  ) : (
-    <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
-  )}
-</TableCell>
-        {renderSeparatorCell(`missing-fields-separator-${groupIndex}-${rowIndex}`, 'section')}
-        <TableCell
-          className="whitespace-nowrap cursor-pointer hover:bg-gray-100 sticky left-[50px] z-0 bg-white"
-          style={{ width: '10px', minWidth: '10px' }}
-          onClick={() => onMissingFieldsClick(companyGroup)}
+    companyGroup.rows.map((row, rowIndex) => {
+
+      const tableName = getTableName(row);
+      const rowId = row.id || row[`${tableName}_data`]?.id;
+      const isRowVerified = lockedRows[`${tableName}_${rowId}`]?.is_verified;
+      return (
+        <TableRow
+          key={`${groupIndex}-${rowIndex}`}
+          className="hover:bg-gray-50 transition-colors"
         >
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-red-600">
-              {calculateMissingFieldsForRow(row, processedSections)}
-            </span>
-            <span className='text-black'>Missing Fields</span>
-          </div>
-        </TableCell>
+          <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white" style={{ width: '20px', minWidth: '20px' }} >
+            {groupIndex + 1}
+          </TableCell>
+          <TableCell
+            className="w-10 cursor-pointer hover:bg-gray-100"
+            style={{ width: '80px', minWidth: '80px' }}
+            onClick={() => {
+              // Get the table name from the row data
+              const sourceTableName = row.sourceTable ||
+                Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') ||
+                'acc_portal_company_duplicate';
 
-        {processedSections.slice(1).map((section, sectionIndex) => {
-          if (section.isSeparator) {
-            return renderSeparatorCell(`data-sep-${sectionIndex}-${groupIndex}-${rowIndex}`, 'section');
-          }
+              handleToggleRowLock(
+                row,
+                processedSections,
+                setLockedRows,
+                refreshData,
+                lockedRows,
+                activeMainTab, // Add these parameters
+                activeSubTab
+              );
+            }}
+          >
+            {lockedRows[`${row.sourceTable ||
+              Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') ||
+              'acc_portal_company_duplicate'}_${row.id || row[`${row.sourceTable ||
+                Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') ||
+                'acc_portal_company_duplicate'}_data`]?.id}`]?.is_verified ? (
+              <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
+            ) : (
+              <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
+            )}
+          </TableCell>
+          {renderSeparatorCell(`missing-fields-separator-${groupIndex}-${rowIndex}`, 'section')}
+          <TableCell
+            className="whitespace-nowrap cursor-pointer hover:bg-gray-100 sticky left-[50px] z-0 bg-white"
+            style={{ width: '10px', minWidth: '10px' }}
+            onClick={() => onMissingFieldsClick(companyGroup)}
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-red-600">
+                {calculateMissingFieldsForRow(row, processedSections)}
+              </span>
+              <span className='text-black'>Missing Fields</span>
+            </div>
+          </TableCell>
 
-          return section.categorizedFields?.map((category, catIndex) => {
-            if (category.isSeparator) {
-              return renderSeparatorCell(`data-cat-sep-${sectionIndex}-${catIndex}-${groupIndex}-${rowIndex}`, 'category');
+          {processedSections.slice(1).map((section, sectionIndex) => {
+            if (section.isSeparator) {
+              return renderSeparatorCell(`data-sep-${sectionIndex}-${groupIndex}-${rowIndex}`, 'section');
             }
 
-            return category.fields.map((field, fieldIndex, fieldsArray) => {
-              const [tableName, columnName] = field.name.split('.');
-
-              let value;
-              if (row.isAdditionalRow && row.sourceTable === tableName) {
-                value = row[columnName];
-              } else if (row[`${tableName}_data`]) {
-                value = row[`${tableName}_data`][columnName];
-              } else {
-                value = row[columnName];
+            return section.categorizedFields?.map((category, catIndex) => {
+              if (category.isSeparator) {
+                return renderSeparatorCell(`data-cat-sep-${sectionIndex}-${catIndex}-${groupIndex}-${rowIndex}`, 'category');
               }
 
-              if (field.type === 'date') {
-                value = formatDate(value);
-              }
+              return category.fields.map((field, fieldIndex, fieldsArray) => {
+                const [tableName, columnName] = field.name.split('.');
 
-              if (field.name === 'acc_portal_company_duplicate.company_name') {
-                if (!row.isFirstRow) return null;
+                let value;
+                if (row.isAdditionalRow && row.sourceTable === tableName) {
+                  value = row[columnName];
+                } else if (row[`${tableName}_data`]) {
+                  value = row[`${tableName}_data`][columnName];
+                } else {
+                  value = row[columnName];
+                }
+
+                if (field.type === 'date') {
+                  value = formatDate(value);
+                }
+
+                if (field.name === 'acc_portal_company_duplicate.company_name') {
+                  if (!row.isFirstRow) return null;
+
+                  return (
+                    <React.Fragment key={`${groupIndex}-${rowIndex}-${sectionIndex}-${catIndex}-company-name`}>
+                      <TableCell
+                        className="whitespace-nowrap cursor-pointer hover:text-primary sticky left-[150px] z-0"
+                        onClick={() => handleCompanyClick(companyGroup)}
+                        rowSpan={companyGroup.rowSpan}
+                      >
+                        <EditableCell
+                          value={value}
+                          onSave={async (newValue) => {
+                            if (disabled) {
+                              toast.error("This field is locked and cannot be edited");
+                              return;
+                            }
+                            try {
+                              const { error } = await supabase
+                                .from(tableName)
+                                .update({ [columnName]: newValue })
+                                .eq('id', row.id);
+
+                              if (error) throw error;
+                              window.dispatchEvent(new CustomEvent('refreshData'));
+                            } catch (error) {
+                              console.error('Error updating:', error);
+                              toast.error('Update failed');
+                            }
+                          }}
+                          fieldName={field.name}
+                          field={field}
+                          dropdownOptions={field.dropdownOptions}
+                          rowId={row.id}
+                          companyName={row.company_name}
+                          className="hover:text-primary"
+                          refreshData={refreshData}
+                          activeMainTab={activeMainTab}
+                          activeSubTab={activeSubTab}
+                          disabled={isRowVerified || lockedColumns[`field_${tableName}.${columnName}`]?.is_verified}
+                          verificationStatus={
+                            isRowVerified ? 
+                            lockedRows[`${tableName}_${rowId}`] : 
+                            lockedColumns[`field_${tableName}.${columnName}`]
+                          }  />
+                      </TableCell>
+                    </React.Fragment>
+                  );
+                }
 
                 return (
-                  <React.Fragment key={`${groupIndex}-${rowIndex}-${sectionIndex}-${catIndex}-company-name`}>
-                    <TableCell
-                      className="whitespace-nowrap cursor-pointer hover:text-primary sticky left-[150px] z-0"
-                      onClick={() => handleCompanyClick(companyGroup)}
-                      rowSpan={companyGroup.rowSpan}
-                    >
+                  <React.Fragment key={`${groupIndex}-${rowIndex}-${sectionIndex}-${catIndex}-${fieldIndex}-${field.name}`}>
+                    <TableCell className="whitespace-nowrap transition-colors">
                       <EditableCell
                         value={value}
                         onSave={async (newValue) => {
@@ -610,63 +704,32 @@ const renderDataRows = (
                         dropdownOptions={field.dropdownOptions}
                         rowId={row.id}
                         companyName={row.company_name}
-                        className="hover:text-primary"
                         refreshData={refreshData}
                         activeMainTab={activeMainTab}
                         activeSubTab={activeSubTab}
-                        disabled={lockedRows[`field_${tableName}.${columnName}`]?.is_verified || field.verification?.is_verified}
-                        verificationStatus={lockedRows[`field_${tableName}.${columnName}`] || field.verification}
+                        disabled={isRowVerified || lockedColumns[`field_${tableName}.${columnName}`]?.is_verified}
+                        verificationStatus={
+                          isRowVerified ? 
+                          lockedRows[`${tableName}_${rowId}`] : 
+                          lockedColumns[`field_${tableName}.${columnName}`]
+                        } 
                       />
                     </TableCell>
+                    {fieldIndex < fieldsArray.length - 1 &&
+                      field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                      renderSeparatorCell(
+                        `data-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}-${groupIndex}-${rowIndex}`,
+                        'mini'
+                      )}
                   </React.Fragment>
                 );
-              }
-
-              return (
-                <React.Fragment key={`${groupIndex}-${rowIndex}-${sectionIndex}-${catIndex}-${fieldIndex}-${field.name}`}>
-                  <TableCell className="whitespace-nowrap transition-colors">
-                    <EditableCell
-                      value={value}
-                      onSave={async (newValue) => {
-                        try {
-                          const { error } = await supabase
-                            .from(tableName)
-                            .update({ [columnName]: newValue })
-                            .eq('id', row.id);
-
-                          if (error) throw error;
-                          window.dispatchEvent(new CustomEvent('refreshData'));
-                        } catch (error) {
-                          console.error('Error updating:', error);
-                          toast.error('Update failed');
-                        }
-                      }}
-                      fieldName={field.name}
-                      field={field}
-                      dropdownOptions={field.dropdownOptions}
-                      rowId={row.id}
-                      companyName={row.company_name}
-                      refreshData={refreshData}
-                      activeMainTab={activeMainTab}
-                      activeSubTab={activeSubTab}
-                      disabled={lockedRows[`field_${tableName}.${columnName}`]?.is_verified || field.verification?.is_verified}
-                      verificationStatus={lockedRows[`field_${tableName}.${columnName}`] || field.verification}
-                    />
-                  </TableCell>
-                  {fieldIndex < fieldsArray.length - 1 &&
-                    field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
-                    renderSeparatorCell(
-                      `data-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}-${groupIndex}-${rowIndex}`,
-                      'mini'
-                    )}
-                </React.Fragment>
-              );
+              });
             });
-          });
-        })}
-      </TableRow>
-    ))
-  ));
+          })}
+        </TableRow>
+      )
+    }
+    )))
 };
 
 const persistVerificationStates = async (structure: any, activeMainTab: string, activeSubTab: string) => {
@@ -711,6 +774,43 @@ const getTableNameFromStructure = (structure: any, activeSubTab: string): string
   }
 };
 
+const extractFieldVerificationStatus = (structure: any, fieldName: string) => {
+  try {
+    // Iterate through sections and subsections to find the field
+    for (const section of structure.sections) {
+      for (const subsection of section.subsections) {
+        const field = subsection.fields.find(f =>
+          `${f.table}.${f.name}` === fieldName || f.name === fieldName
+        );
+
+        if (field?.verification) {
+          return {
+            is_verified: field.verification.is_verified,
+            verified_at: field.verification.verified_at,
+            verified_by: field.verification.verified_by
+          };
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Error extracting field verification:', error);
+    return null;
+  }
+};
+
+const findFieldInStructure = (structure: any, tableName: string, fieldName: string) => {
+  for (const section of structure.sections) {
+    for (const subsection of section.subsections) {
+      const field = subsection.fields?.find(
+        (f: any) => f.table === tableName && f.name === fieldName
+      );
+      if (field) return field;
+    }
+  }
+  return null;
+};
+
 // Updated Table component with sticky headers
 export const Table: React.FC<TableProps> = ({
   data,
@@ -721,15 +821,21 @@ export const Table: React.FC<TableProps> = ({
   processedSections,
   onMissingFieldsClick,
 }) => {
-  const useSidebarLayout = activeMainTab?.toLowerCase() === 'employee details' || activeMainTab?.toLowerCase() === 'customer details' || activeMainTab?.toLowerCase() === 'supplier details';
-  const [lockedColumns, setLockedColumns] = useState({});
-  const [lockedRows, setLockedRows] = useState<Record<string, any>>({});
 
+  const [sortConfig, setSortConfig] = useState<{
+    field: string | null;
+    direction: 'asc' | 'desc' | null;
+  }>({ field: null, direction: null });
+  const [lockedColumns, setLockedColumns] = useState<Record<string, any>>({});
+  const [lockedRows, setLockedRows] = useState<Record<string, any>>({});
   const [localProcessedSections, setLocalProcessedSections] = useState(processedSections);
+  const useSidebarLayout = activeMainTab?.toLowerCase() === 'employee details' || activeMainTab?.toLowerCase() === 'customer details' || activeMainTab?.toLowerCase() === 'supplier details';
 
   useEffect(() => {
     if (processedSections?.length) {
+      // Initialize both row and column verification states
       initializeVerificationStates(processedSections, activeMainTab, activeSubTab, setLockedRows);
+      initializeFieldVerificationStates(processedSections, activeMainTab, activeSubTab, setLockedColumns);
     }
   }, [processedSections, activeMainTab, activeSubTab]);
 
@@ -737,35 +843,10 @@ export const Table: React.FC<TableProps> = ({
     setLocalProcessedSections(processedSections);
   }, [processedSections]);
 
-  if (useSidebarLayout) {
-    return (
-      <SidebarTableView
-        data={data}
-        handleCompanyClick={handleCompanyClick}
-        onMissingFieldsClick={onMissingFieldsClick}
-        refreshData={refreshData}
-        processedSections={processedSections}
-        activeMainTab={activeMainTab}
-        activeSubTab={activeSubTab}
-      />
-    );
-  }
-
-  const [sortConfig, setSortConfig] = useState<{
-    field: string | null;
-    direction: 'asc' | 'desc' | null;
-  }>({ field: null, direction: null });
-
-  const handleSort = (field: string) => {
-    setSortConfig(prevConfig => ({
-      field,
-      direction:
-        prevConfig.field === field && prevConfig.direction === 'asc'
-          ? 'desc'
-          : 'asc'
-    }));
-  };
-
+  useEffect(() => {
+    console.log('lockedRows updated:', lockedRows);
+  }, [lockedRows]);
+  
   const sortedData = React.useMemo(() => {
     if (!sortConfig.field || !sortConfig.direction) return data;
 
@@ -783,6 +864,31 @@ export const Table: React.FC<TableProps> = ({
         : aValue < bValue ? 1 : -1;
     });
   }, [data, sortConfig]);
+
+
+  const handleSort = (field: string) => {
+    setSortConfig(prevConfig => ({
+      field,
+      direction:
+        prevConfig.field === field && prevConfig.direction === 'asc'
+          ? 'desc'
+          : 'asc'
+    }));
+  };
+
+  if (useSidebarLayout) {
+    return (
+      <SidebarTableView
+        data={data}
+        handleCompanyClick={handleCompanyClick}
+        onMissingFieldsClick={onMissingFieldsClick}
+        refreshData={refreshData}
+        processedSections={processedSections}
+        activeMainTab={activeMainTab}
+        activeSubTab={activeSubTab}
+      />
+    );
+  }
 
   const handleVerification = async (type: 'field' | 'row' | 'section', id: string, mainTab: string, subTab: string) => {
     try {
@@ -855,98 +961,152 @@ export const Table: React.FC<TableProps> = ({
 
   const handleToggleColumnLock = async (columnName: string) => {
     try {
-      // Get the field verification status
-      const fieldKey = `field_${columnName}`;
-      const currentVerification = lockedRows[fieldKey];
-      const newVerificationState = !currentVerification?.is_verified;
+      // Fix the field name parsing
+      let tableName, fieldName;
 
-      const [tableName, fieldName] = columnName.split('.');
+      // Handle the case where the field name contains multiple dots
+      const parts = columnName.split('.');
+      if (parts.length >= 2) {
+        tableName = parts[0];
+        // Take the last part as the field name
+        fieldName = parts[parts.length - 1];
+      } else {
+        throw new Error('Invalid column name format');
+      }
 
-      // Fetch current structure
-      const { data: mappingData, error: mappingError } = await supabase
+      console.log('Handling toggle for:', { tableName, fieldName });
+
+      // Fetch current mapping data
+      const { data: mappingData, error: fetchError } = await supabase
         .from('profile_category_table_mapping_2')
-        .select('structure')
+        .select('*')
         .eq('main_tab', activeMainTab)
         .eq('Tabs', activeSubTab)
         .single();
 
-      if (mappingError) throw mappingError;
+      if (fetchError) {
+        console.error('Error fetching mapping data:', fetchError);
+        throw fetchError;
+      }
+
+      if (!mappingData) {
+        throw new Error('No mapping data found');
+      }
+
+      // Get current verification state
+      const fieldKey = `field_${tableName}.${fieldName}`;
+      const currentVerificationState = lockedColumns[fieldKey]?.is_verified || false;
+
+      console.log('Current verification state:', currentVerificationState);
+      console.log('Current structure:', mappingData.structure);
+
+      // Create deep copy of the structure
+      const updatedStructure = JSON.parse(JSON.stringify(mappingData.structure));
+
+      // Flag to check if we found and updated the field
+      let fieldUpdated = false;
 
       // Update the field verification in the structure
-      const updatedStructure = {
-        ...mappingData.structure,
-        sections: mappingData.structure.sections.map(section => ({
-          ...section,
-          subsections: section.subsections?.map(subsection => ({
-            ...subsection,
-            fields: subsection.fields?.map(field =>
-              field.table === tableName && field.name === fieldName
-                ? {
-                  ...field,
-                  verification: {
-                    is_verified: newVerificationState,
-                    verified_at: new Date().toISOString(),
-                    verified_by: 'current_user'
-                  }
+      updatedStructure.sections = updatedStructure.sections.map(section => ({
+        ...section,
+        subsections: section.subsections?.map(subsection => ({
+          ...subsection,
+          fields: subsection.fields?.map(field => {
+            // Log each field being checked
+            console.log('Checking field:', {
+              fieldTable: field.table,
+              fieldName: field.name,
+              lookingFor: { tableName, fieldName }
+            });
+
+            if (field.table === tableName && field.name === fieldName) {
+              fieldUpdated = true;
+              console.log('Found matching field, updating verification');
+              return {
+                ...field,
+                verification: {
+                  is_verified: !currentVerificationState,
+                  verified_at: new Date().toISOString(),
+                  verified_by: 'current_user'
                 }
-                : field
-            )
-          }))
+              };
+            }
+            return field;
+          })
         }))
-      };
-
-      // Update the structure in the database
-      const { error: updateError } = await supabase
-        .from('profile_category_table_mapping_2')
-        .update({ structure: updatedStructure })
-        .eq('main_tab', activeMainTab)
-        .eq('Tabs', activeSubTab);
-
-      if (updateError) throw updateError;
-
-      // Update local state
-      setLockedRows(prev => ({
-        ...prev,
-        [fieldKey]: {
-          is_verified: newVerificationState,
-          verified_at: new Date().toISOString(),
-          verified_by: 'current_user'
-        }
       }));
 
-      // Also update localProcessedSections to reflect the change immediately
-      setLocalProcessedSections(prev =>
-        prev.map(section => ({
-          ...section,
-          categorizedFields: section.categorizedFields?.map(category => ({
-            ...category,
-            fields: category.fields?.map(field =>
-              field.name === columnName
-                ? {
-                  ...field,
-                  verification: {
-                    is_verified: newVerificationState,
-                    verified_at: new Date().toISOString(),
-                    verified_by: 'current_user'
-                  }
-                }
-                : field
+      if (!fieldUpdated) {
+        console.error('Field not found in structure. Available fields:',
+          updatedStructure.sections.flatMap(s =>
+            s.subsections?.flatMap(sub =>
+              sub.fields?.map(f => `${f.table}.${f.name}`)
             )
-          }))
-        }))
-      );
+          )
+        );
+        throw new Error(`Field ${fieldName} not found in structure for table ${tableName}`);
+      }
 
-      toast.success(`Field ${newVerificationState ? 'verified' : 'unverified'}`);
+      console.log('Updated structure:', updatedStructure);
 
-    } catch (error) {
-      console.error('Error toggling field verification:', error);
-      toast.error('Failed to update field verification');
+      // Update the database
+      const { error: updateError } = await supabase
+      .from('profile_category_table_mapping_2')
+      .update({
+        structure: {
+          ...updatedStructure,
+          order: mappingData.structure.order || {},
+          visibility: mappingData.structure.visibility || {},
+          relationships: mappingData.structure.relationships || {}
+        }
+      })
+      .eq('id', mappingData.id);
+
+    if (updateError) throw updateError;
+
+    // Update local state for column verification
+    setLockedColumns(prev => ({
+      ...prev,
+      [fieldKey]: {
+        is_verified: !currentVerificationState,
+        verified_at: new Date().toISOString(),
+        verified_by: 'current_user'
+      }
+    }));
+
+    // Also need to disable editing for all cells in this column
+    const rowKeys = Object.keys(lockedRows);
+    const updatedLockedRows = { ...lockedRows };
+    rowKeys.forEach(key => {
+      if (key.startsWith(tableName)) {
+        updatedLockedRows[key] = {
+          ...updatedLockedRows[key],
+          [`${fieldName}_locked`]: !currentVerificationState
+        };
+      }
+    });
+    setLockedRows(updatedLockedRows);
+
+    // Show success message
+    toast.success(`Column ${!currentVerificationState ? 'locked' : 'unlocked'} successfully`);
+
+    // Refresh data if needed
+    if (typeof refreshData === 'function') {
+      await refreshData();
     }
-  };
+
+  } catch (error) {
+    console.error('Error in handleToggleColumnLock:', error);
+    toast.error(`Failed to update column verification: ${(error as Error).message}`);
+  }
+};
 
   if (!processedSections || !Array.isArray(processedSections)) {
     return null;
   }
+  // In the Table component
+ 
+
 
   return (
     <Card>
@@ -974,7 +1134,6 @@ export const Table: React.FC<TableProps> = ({
   );
 };
 
-
 // Render table headers
 const renderHeaders = (
   processedSections: any[],
@@ -984,6 +1143,63 @@ const renderHeaders = (
   lockedColumns: Record<string, boolean>,
   lockedRows: Record<string, boolean>
 ) => {
+  const lockHeadersRow = (
+    <TableRow>
+      <TableHead className="font-medium">Lock</TableHead>
+      <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+      {renderSeparatorCell(`lock-sep-start-${Date.now()}`, 'section')}
+      <TableHead className="text-center">-</TableHead>
+      {renderSeparatorCell(`lock-sep-end-${Date.now()}`, 'section')}
+      {processedSections.slice(1).map((section, sectionIndex) => {
+  if (section.isSeparator) return null;
+
+  return section.categorizedFields?.map((category, catIndex) => {
+    if (category.isSeparator) {
+      return renderSeparatorCell(`lock-cat-${sectionIndex}-${catIndex}-${Date.now()}`, 'category');
+    }
+    
+    return category.fields.map((field, fieldIndex, fieldsArray) => {
+      const fieldKey = `field_${field.table}.${field.name}`;
+      const verificationStatus = lockedColumns[fieldKey];
+      const isVerified = verificationStatus?.is_verified;
+
+      return (
+        <React.Fragment key={`lock-${field.name}`}>
+          <TableCell
+            className={`w-10 cursor-pointer hover:bg-gray-100 group relative ${
+              isVerified ? 'bg-green-50' : 'bg-red-50'
+            }`}
+            onClick={() => handleToggleColumnLock(`${field.table}.${field.name}`)}
+          >
+            <div className="group relative">
+              {isVerified ? (
+                <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
+              ) : (
+                <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
+              )}
+              {verificationStatus && (
+                <div className="absolute invisible group-hover:visible bg-gray-800 text-white text-xs p-2 rounded -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap z-50">
+                  {isVerified ? 'Verified' : 'Not verified'}
+                  {verificationStatus.verified_by && ` by ${verificationStatus.verified_by}`}
+                  {verificationStatus.verified_at &&
+                    ` on ${new Date(verificationStatus.verified_at).toLocaleDateString()}`}
+                </div>
+              )}
+            </div>
+          </TableCell>
+          {fieldIndex < fieldsArray.length - 1 &&
+            field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+            renderSeparatorCell(
+              `lock-separator-${sectionIndex}-${catIndex}-${fieldIndex}-${Date.now()}`,
+              'mini'
+            )}
+        </React.Fragment>
+      );
+    });
+  });
+})}
+    </TableRow>
+  );
   return (
     <>
       {/* Section Reference Row */}
@@ -1137,52 +1353,8 @@ const renderHeaders = (
       </TableRow>
 
       {/* Column Headers with Lock */}
-      <TableRow>
-        <TableHead className="font-medium">Lock</TableHead>
-        <TableHead className='font-medium bg-green-100 text-white'></TableHead>
-        {renderSeparatorCell(`lock-sep-start-${Date.now()}`, 'section')}
-        <TableHead className="text-center">-</TableHead>
-        {renderSeparatorCell(`lock-sep-end-${Date.now()}`, 'section')}
-        {processedSections.slice(1).map((section, sectionIndex) => {
-          return section.categorizedFields?.map((category, catIndex) => {
-            if (category.isSeparator) {
-              return renderSeparatorCell(`lock-cat-${sectionIndex}-${catIndex}-${Date.now()}`, 'category');
-            }
-            return category.fields.map((field, fieldIndex, fieldsArray) => {
-              // Use the field name to check verification status from lockedRows
-              const fieldKey = `field_${field.name}`;
-              const isVerified = lockedRows[fieldKey]?.is_verified || field.verification?.is_verified;
-              const verificationInfo = lockedRows[fieldKey] || field.verification;
 
-              return (
-                <React.Fragment key={`lock-${field.name}`}>
-                  <TableCell
-                    className="w-10 cursor-pointer hover:bg-gray-100 group relative"
-                    onClick={() => handleToggleColumnLock(field.name)}
-                  >
-                    {isVerified ? (
-                      <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
-                    ) : (
-                      <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
-                    )}
-                    {isVerified && verificationInfo && (
-                      <div className="absolute invisible group-hover:visible bg-gray-800 text-white text-xs rounded p-2 -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap z-50">
-                        Verified by {verificationInfo.verified_by} on {new Date(verificationInfo.verified_at).toLocaleDateString()}
-                      </div>
-                    )}
-                  </TableCell>
-                  {fieldIndex < fieldsArray.length - 1 &&
-                    field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
-                    renderSeparatorCell(
-                      `lock-separator-${sectionIndex}-${catIndex}-${fieldIndex}-${Date.now()}`,
-                      'mini'
-                    )}
-                </React.Fragment>
-              );
-            });
-          });
-        })}
-      </TableRow>
+      {lockHeadersRow}
 
       {/* Column Headers */}
       <TableRow>
