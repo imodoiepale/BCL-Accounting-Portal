@@ -5,6 +5,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { Lock } from 'lucide-react';
 interface EditableCellProps {
     value: any;
     onSave: (value: any) => void;
@@ -17,6 +18,12 @@ interface EditableCellProps {
     field: any;
     activeMainTab: string;
     activeSubTab: string;
+    disabled: boolean;
+    verificationStatus?: {
+      is_verified: boolean;
+      verified_at: string | null;
+      verified_by: string | null;
+    };
 }
 export const EditableCell = ({
     value: initialValue,
@@ -30,6 +37,8 @@ export const EditableCell = ({
     field,
     activeMainTab,
     activeSubTab,
+    disabled,
+    verificationStatus
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(initialValue);
@@ -87,8 +96,7 @@ export const EditableCell = ({
             console.error('Error in fetchDropdownOptions:', error);
             setDropdownOptions([]);
         }
-    };
-    
+    };    
     
     // Helper function to parse table names
     const parseTableNames = (mappings) => {
@@ -172,10 +180,14 @@ export const EditableCell = ({
         } else {
             setIsEditing(false);
         }
-    };
-    
+    };    
 
     const handleDoubleClick = async () => {
+        // Don't allow editing if disabled or verified
+        if (disabled || verificationStatus?.is_verified) {
+            return;
+        }
+        
         console.log('Double clicked field:', fieldName);
         await fetchDropdownOptions();
         setIsEditing(true);
@@ -294,7 +306,6 @@ export const EditableCell = ({
             </select>
         );
     }
-
     const renderValue = () => {
         if (fieldName === 'acc_portal_company_duplicate.company_name') {
             return (
@@ -306,18 +317,80 @@ export const EditableCell = ({
                 </div>
             );
         }
-        return editValue || <span className="text-red-500 font-semibold">Missing</span>;
+        return (
+            <div className="flex items-center gap-2">
+                {verificationStatus?.is_verified && (
+                    <Lock className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                )}
+                <span className={`${disabled ? 'text-gray-500' : ''}`}>
+                    {editValue || <span className="text-red-500 font-semibold">Missing</span>}
+                </span>
+            </div>
+        );
     };
+
     if (isLoading) {
         return <div className="p-2">Loading...</div>;
     }
+    
     return (
-        <div
-            onDoubleClick={handleDoubleClick}
-            className={`cursor-pointer ${className}`}
-            title={editValue} // Add tooltip for full value
-        >
-            {renderValue()}
+        <div className="group relative">
+            {/* Verification tooltip */}
+            {verificationStatus?.is_verified && (
+                <div className="absolute invisible group-hover:visible bg-gray-800 text-white text-xs rounded p-2 -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap z-50">
+                    Verified by {verificationStatus.verified_by} 
+                    {verificationStatus.verified_at && 
+                        ` on ${new Date(verificationStatus.verified_at).toLocaleDateString()}`
+                    }
+                </div>
+            )}
+            
+            <div
+                onDoubleClick={handleDoubleClick}
+                className={`
+                    ${disabled || verificationStatus?.is_verified ? 'cursor-not-allowed' : 'cursor-pointer'} 
+                    ${className || ''} 
+                    ${disabled || verificationStatus?.is_verified ? 'opacity-75' : ''}
+                    transition-all duration-200
+                `}
+                title={disabled || verificationStatus?.is_verified ? 
+                    "This field is locked for editing" : 
+                    editValue
+                }
+            >
+                {isEditing ? (
+                    dropdownOptions && dropdownOptions.length > 0 ? (
+                        <select
+                            ref={inputRef}
+                            value={editValue || ''}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onBlur={handleSave}
+                            className={`w-full p-2 border rounded ${className}`}
+                            disabled={disabled || verificationStatus?.is_verified}
+                        >
+                            <option value="">Select {field.label}</option>
+                            {dropdownOptions.map((option) => (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
+                        <input
+                            ref={inputRef}
+                            value={editValue || ''}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            onKeyDown={handleKeyDown}
+                            className={`m-0 p-1 h-8 ${className}`}
+                            type={field.type === 'date' ? 'date' : 'text'}
+                            disabled={disabled || verificationStatus?.is_verified}
+                        />
+                    )
+                ) : (
+                    renderValue()
+                )}
+            </div>
         </div>
     );
 };
