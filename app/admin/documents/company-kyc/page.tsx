@@ -8,9 +8,9 @@ const Page = () => {
   const [activeTab, setActiveTab] = useState('KYC Docs');
 
   const tabs = [
-    { key: 'KYC Docs', label: 'KYC Docs', component: <DocumentManagement /> },
-    { key: 'KYC Document Details', label: 'KYC Document Details', component: <CompanyKycDocumentDetails /> },
-    { key: 'Document List', label: 'Document List', component: <DocumentList /> },
+    { key: 'KYC Docs', label: 'KYC Documents', component: <DocumentManagement /> },
+    { key: 'KYC Document Details', label: 'KYC Extracted Document Details', component: <CompanyKycDocumentDetails /> },
+    { key: 'Document List', label: 'KYC Document Company View', component: <DocumentList /> },
   ];
 
   return (
