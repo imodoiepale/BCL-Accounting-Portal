@@ -2,7 +2,7 @@
 // components/overview/TableComponents.tsx
 // @ts-nocheck
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table as UITable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import SidebarTableView from './SidebarTableView';
 import { Lock, LockOpen } from 'lucide-react';
+import { handleFieldVerification } from './handleFieldVerification';
 interface TableProps {
   data: any[];
   handleCompanyClick: (company: any) => void;
@@ -157,6 +158,99 @@ const calculateFieldStatistics = (fieldName: string, data: any[]) => {
   });
 
   return { total, completed, pending };
+};
+// Add this helper function at the top of the file
+const getTableName = (row: any): string => {
+  return row.sourceTable || 
+    Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') ||
+    'acc_portal_company_duplicate';
+};
+
+const initializeVerificationStates = async (
+  processedSections: any[],
+  activeMainTab: string,
+  activeSubTab: string,
+  setLockedRows: (states: any) => void
+) => {
+  try {
+    // Get all unique tables from sections
+    const tables = new Set<string>();
+    const verificationStates = {};
+
+    // Add default company table and collect other tables
+    tables.add('acc_portal_company_duplicate');
+    processedSections.forEach(section => {
+      if (!section.isSeparator) {
+        section.categorizedFields?.forEach(category => {
+          if (!category.isSeparator) {
+            category.fields.forEach(field => {
+              const [tableName] = field.name.split('.');
+              if (tableName) tables.add(tableName);
+            });
+          }
+        });
+      }
+    });
+
+    // Fetch verification states for all tables
+    await Promise.all([...tables].map(async (tableName) => {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('id, is_verified, verification_data')
+        .eq('is_verified', true);
+
+      if (error) {
+        console.error(`Error fetching verification states for ${tableName}:`, error);
+        return;
+      }
+
+      if (data) {
+        data.forEach(row => {
+          const key = `${tableName}_${row.id}`;
+          let verificationInfo;
+          try {
+            verificationInfo = row.verification_data ?
+              JSON.parse(row.verification_data) :
+              { verified_at: new Date().toISOString(), verified_by: 'current_user' };
+          } catch (e) {
+            verificationInfo = { verified_at: new Date().toISOString(), verified_by: 'current_user' };
+          }
+
+          verificationStates[key] = {
+            is_verified: row.is_verified,
+            ...verificationInfo
+          };
+        });
+      }
+    }));
+
+    // Fetch field verifications from structure
+    const { data: mappingData } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('structure')
+      .eq('main_tab', activeMainTab)
+      .eq('Tabs', activeSubTab)
+      .single();
+
+    if (mappingData?.structure?.sections) {
+      mappingData.structure.sections.forEach(section => {
+        section.subsections?.forEach(subsection => {
+          subsection.fields?.forEach(field => {
+            if (field.verification?.is_verified) {
+              const key = `field_${field.table}.${field.name}`;
+              verificationStates[key] = field.verification;
+            }
+          });
+        });
+      });
+    }
+
+    // Update the local state
+    setLockedRows(verificationStates);
+
+  } catch (error) {
+    console.error('Error initializing verification states:', error);
+  }
 };
 
 // Render statistics rows
@@ -313,29 +407,85 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
   );
 };
 
-const handleToggleRowLock = async (rowId) => {
-  const newLockedRows = {
-    ...lockedRows,
-    [rowId]: !lockedRows[rowId]
-  };
-  setLockedRows(newLockedRows);
-
+const handleToggleRowLock = async (
+  row: any,
+  processedSections: any[],
+  setLockedRows: (value: any) => void,
+  refreshData: (() => Promise<void>) | undefined, // Make optional
+  lockedRows: any[],
+  activeMainTab: string,
+  activeSubTab: string
+) => {
   try {
+    // Get the mapping data
+    const { data: mappingData, error: mappingError } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('structure')
+      .eq('main_tab', activeMainTab)
+      .eq('Tabs', activeSubTab)
+      .single();
+
+    if (mappingError) throw mappingError;
+
+    // Get table name from structure
+    const tableName = getTableNameFromStructure(mappingData.structure, activeSubTab);
+    
+    if (!tableName) {
+      throw new Error(`Could not determine table name for subtab: ${activeSubTab}`);
+    }
+
+    // Get row ID from the table data
+    const rowId = row.id || row[`${tableName}_data`]?.id;
+
+    if (!rowId) {
+      throw new Error('Row ID not found');
+    }
+
+    console.log('Using table info:', { tableName, rowId });
+
+    // Update verification status
+    const verificationKey = `${tableName}_${rowId}`;
+    const currentVerificationState = lockedRows?.[verificationKey]?.is_verified || false;
+
     const { error } = await supabase
-      .from('row_verifications')
-      .upsert({
-        row_id: rowId,
-        is_verified: newLockedRows[rowId],
-        verified_at: new Date().toISOString()
-      });
+      .from(tableName)
+      .update({
+        is_verified: !currentVerificationState,
+        verification_data: JSON.stringify({
+          verified_at: new Date().toISOString(),
+          verified_by: 'current_user'
+        })
+      })
+      .eq('id', rowId);
 
     if (error) throw error;
-    toast.success(`Row ${newLockedRows[rowId] ? 'verified' : 'unverified'}`);
+
+    setLockedRows(prev => ({
+      ...prev,
+      [verificationKey]: {
+        is_verified: !currentVerificationState,
+        verified_at: new Date().toISOString(),
+        verified_by: 'current_user'
+      }
+    }));
+// Add these logs in handleToggleRowLock
+console.log('Structure:', mappingData.structure);
+console.log('Active subtab:', activeSubTab);
+console.log('Determined table name:', tableName);
+
+    toast.success(`Row ${!currentVerificationState ? 'verified' : 'unverified'}`);
+    if (typeof refreshData === 'function') {
+      await refreshData();
+    }
+    console.log('refreshData type:', typeof refreshData);
+    console.log('refreshData:', refreshData);
+    
   } catch (error) {
-    console.error('Error updating row verification:', error);
-    toast.error('Row verification update failed');
+    console.error('Verification error:', error);
+    toast.error('Verification update failed: ' + (error as Error).message);
   }
 };
+
 
 // Render data rows
 const renderDataRows = (
@@ -347,7 +497,8 @@ const renderDataRows = (
   lockedRows: Record<string, boolean>,
   lockedColumns: Record<string, boolean>,
   activeMainTab: any[],
-  activeSubTab: any[]
+  activeSubTab: any[],
+  setLockedRows: (value: any) => void
 ) => {
   return data.map((companyGroup, groupIndex) => (
     companyGroup.rows.map((row, rowIndex) => (
@@ -355,21 +506,43 @@ const renderDataRows = (
         key={`${groupIndex}-${rowIndex}`}
         className="hover:bg-gray-50 transition-colors"
       >
-        <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white">
+        <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white" style={{ width: '20px', minWidth: '20px' }} >
           {groupIndex + 1}
         </TableCell>
         <TableCell
-          className="w-10 cursor-pointer hover:bg-gray-100"
-          onClick={() => handleToggleRowLock(row.id)}
-        >
-          {lockedRows[row.id] ?
-            <Lock className="h-4 w-4 text-green-600" /> :
-            <LockOpen className="h-4 w-4 text-gray-400" />
-          }
-        </TableCell>
+  className="w-10 cursor-pointer hover:bg-gray-100"
+  style={{ width: '80px', minWidth: '80px' }}
+  onClick={() => {
+    // Get the table name from the row data
+    const sourceTableName = row.sourceTable || 
+      Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') ||
+      'acc_portal_company_duplicate';
+      
+    handleToggleRowLock(
+      row,
+      processedSections,
+      setLockedRows,
+      refreshData,
+      lockedRows,
+      activeMainTab, // Add these parameters
+      activeSubTab
+    );
+  }}
+>
+  {lockedRows[`${row.sourceTable || 
+    Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') || 
+    'acc_portal_company_duplicate'}_${row.id || row[`${row.sourceTable || 
+    Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') || 
+    'acc_portal_company_duplicate'}_data`]?.id}`]?.is_verified ? (
+    <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
+  ) : (
+    <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
+  )}
+</TableCell>
         {renderSeparatorCell(`missing-fields-separator-${groupIndex}-${rowIndex}`, 'section')}
         <TableCell
           className="whitespace-nowrap cursor-pointer hover:bg-gray-100 sticky left-[50px] z-0 bg-white"
+          style={{ width: '10px', minWidth: '10px' }}
           onClick={() => onMissingFieldsClick(companyGroup)}
         >
           <div className="flex items-center gap-2">
@@ -441,7 +614,8 @@ const renderDataRows = (
                         refreshData={refreshData}
                         activeMainTab={activeMainTab}
                         activeSubTab={activeSubTab}
-                        disabled={lockedColumns[field.name] || lockedRows[row.id]}
+                        disabled={lockedRows[`field_${tableName}.${columnName}`]?.is_verified || field.verification?.is_verified}
+                        verificationStatus={lockedRows[`field_${tableName}.${columnName}`] || field.verification}
                       />
                     </TableCell>
                   </React.Fragment>
@@ -475,7 +649,8 @@ const renderDataRows = (
                       refreshData={refreshData}
                       activeMainTab={activeMainTab}
                       activeSubTab={activeSubTab}
-                      disabled={lockedColumns[field.name] || lockedRows[row.id]}
+                      disabled={lockedRows[`field_${tableName}.${columnName}`]?.is_verified || field.verification?.is_verified}
+                      verificationStatus={lockedRows[`field_${tableName}.${columnName}`] || field.verification}
                     />
                   </TableCell>
                   {fieldIndex < fieldsArray.length - 1 &&
@@ -493,6 +668,49 @@ const renderDataRows = (
     ))
   ));
 };
+
+const persistVerificationStates = async (structure: any, activeMainTab: string, activeSubTab: string) => {
+  try {
+    const { error } = await supabase
+      .from('profile_category_table_mapping_2')
+      .update({
+        structure: {
+          ...structure,
+          order: structure.order,
+          visibility: structure.visibility,
+          relationships: structure.relationships
+        }
+      })
+      .eq('main_tab', activeMainTab)
+      .eq('Tabs', activeSubTab);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error persisting verification states:', error);
+  }
+};
+
+const getTableNameFromStructure = (structure: any, activeSubTab: string): string => {
+  try {
+    // Find the section matching the active subtab
+    const section = structure.sections.find(
+      (s: any) => s.name === activeSubTab || s.name === "Monthy Checklist"
+    );
+
+    if (!section?.subsections?.[0]?.tables?.[0]) {
+      console.warn('No table found in structure for subtab:', activeSubTab);
+      return '';
+    }
+
+    // Return the first table from the matching section
+    return section.subsections[0].tables[0];
+
+  } catch (error) {
+    console.error('Error getting table name from structure:', error);
+    return '';
+  }
+};
+
 // Updated Table component with sticky headers
 export const Table: React.FC<TableProps> = ({
   data,
@@ -505,7 +723,19 @@ export const Table: React.FC<TableProps> = ({
 }) => {
   const useSidebarLayout = activeMainTab?.toLowerCase() === 'employee details' || activeMainTab?.toLowerCase() === 'customer details' || activeMainTab?.toLowerCase() === 'supplier details';
   const [lockedColumns, setLockedColumns] = useState({});
-  const [lockedRows, setLockedRows] = useState({});
+  const [lockedRows, setLockedRows] = useState<Record<string, any>>({});
+
+  const [localProcessedSections, setLocalProcessedSections] = useState(processedSections);
+
+  useEffect(() => {
+    if (processedSections?.length) {
+      initializeVerificationStates(processedSections, activeMainTab, activeSubTab, setLockedRows);
+    }
+  }, [processedSections, activeMainTab, activeSubTab]);
+
+  useEffect(() => {
+    setLocalProcessedSections(processedSections);
+  }, [processedSections]);
 
   if (useSidebarLayout) {
     return (
@@ -556,24 +786,28 @@ export const Table: React.FC<TableProps> = ({
 
   const handleVerification = async (type: 'field' | 'row' | 'section', id: string, mainTab: string, subTab: string) => {
     try {
+      console.log('Starting verification process:', { type, id, mainTab, subTab });
       const { data: currentMapping } = await supabase
         .from('profile_category_table_mapping_2')
         .select('structure')
         .eq('main_tab', mainTab)
         .eq('Tabs', subTab)
         .single();
-  
+
+      console.log('Current mapping:', currentMapping);
+
       if (!currentMapping) return;
-  
-      let updatedStructure = {...currentMapping.structure};
-  
+
+      let updatedStructure = { ...currentMapping.structure };
+      console.log('Initial structure:', updatedStructure);
+
       if (type === 'field') {
         // Update field verification
         updatedStructure.sections = updatedStructure.sections.map(section => ({
           ...section,
           subsections: section.subsections.map(subsection => ({
             ...subsection,
-            fields: subsection.fields.map(field => 
+            fields: subsection.fields.map(field =>
               field.name === id ? {
                 ...field,
                 verification: {
@@ -585,30 +819,129 @@ export const Table: React.FC<TableProps> = ({
             )
           }))
         }));
+
+        // Update the top-level verification status
+        updatedStructure.verification = {
+          ...updatedStructure.verification,
+          field_verified: true,
+          verified_at: new Date().toISOString(),
+          verified_by: 'current_user'
+        };
       }
-  
+
+      console.log('Updated structure:', updatedStructure);
+
       const { error } = await supabase
         .from('profile_category_table_mapping_2')
-        .update({ structure: updatedStructure })
+        .update({
+          structure: {
+            ...updatedStructure,
+            order: updatedStructure.order,
+            visibility: updatedStructure.visibility,
+            relationships: updatedStructure.relationships
+          }
+        })
         .eq('main_tab', mainTab)
         .eq('Tabs', subTab);
-  
+
       if (error) throw error;
+      console.log('Verification update successful');
       toast.success(`${type} verification updated`);
     } catch (error) {
       console.error('Verification error:', error);
       toast.error('Verification update failed');
     }
   };
-  
-  // Update column lock handler
+
   const handleToggleColumnLock = async (columnName: string) => {
-    const newLockedColumns = {
-      ...lockedColumns,
-      [columnName]: !lockedColumns[columnName]
-    };
-    setLockedColumns(newLockedColumns);
-    await handleVerification('field', columnName, activeMainTab, activeSubTab);
+    try {
+      // Get the field verification status
+      const fieldKey = `field_${columnName}`;
+      const currentVerification = lockedRows[fieldKey];
+      const newVerificationState = !currentVerification?.is_verified;
+
+      const [tableName, fieldName] = columnName.split('.');
+
+      // Fetch current structure
+      const { data: mappingData, error: mappingError } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('structure')
+        .eq('main_tab', activeMainTab)
+        .eq('Tabs', activeSubTab)
+        .single();
+
+      if (mappingError) throw mappingError;
+
+      // Update the field verification in the structure
+      const updatedStructure = {
+        ...mappingData.structure,
+        sections: mappingData.structure.sections.map(section => ({
+          ...section,
+          subsections: section.subsections?.map(subsection => ({
+            ...subsection,
+            fields: subsection.fields?.map(field =>
+              field.table === tableName && field.name === fieldName
+                ? {
+                  ...field,
+                  verification: {
+                    is_verified: newVerificationState,
+                    verified_at: new Date().toISOString(),
+                    verified_by: 'current_user'
+                  }
+                }
+                : field
+            )
+          }))
+        }))
+      };
+
+      // Update the structure in the database
+      const { error: updateError } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({ structure: updatedStructure })
+        .eq('main_tab', activeMainTab)
+        .eq('Tabs', activeSubTab);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setLockedRows(prev => ({
+        ...prev,
+        [fieldKey]: {
+          is_verified: newVerificationState,
+          verified_at: new Date().toISOString(),
+          verified_by: 'current_user'
+        }
+      }));
+
+      // Also update localProcessedSections to reflect the change immediately
+      setLocalProcessedSections(prev =>
+        prev.map(section => ({
+          ...section,
+          categorizedFields: section.categorizedFields?.map(category => ({
+            ...category,
+            fields: category.fields?.map(field =>
+              field.name === columnName
+                ? {
+                  ...field,
+                  verification: {
+                    is_verified: newVerificationState,
+                    verified_at: new Date().toISOString(),
+                    verified_by: 'current_user'
+                  }
+                }
+                : field
+            )
+          }))
+        }))
+      );
+
+      toast.success(`Field ${newVerificationState ? 'verified' : 'unverified'}`);
+
+    } catch (error) {
+      console.error('Error toggling field verification:', error);
+      toast.error('Failed to update field verification');
+    }
   };
 
   if (!processedSections || !Array.isArray(processedSections)) {
@@ -622,16 +955,17 @@ export const Table: React.FC<TableProps> = ({
           <UITable>
             <TableHeader className="sticky top-0 z-10 bg-white">
               {renderHeaders(
-                processedSections,
+                localProcessedSections,
                 sortConfig,
                 handleSort,
                 handleToggleColumnLock,
+                lockedRows,
                 lockedColumns
               )}
-              {renderStatisticsRows(data, processedSections)}
+              {renderStatisticsRows(data, localProcessedSections)}
             </TableHeader>
             <TableBody>
-              {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, processedSections, refreshData, activeSubTab, activeMainTab, lockedRows, handleToggleRowLock)}
+              {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, localProcessedSections, refreshData, lockedRows, lockedColumns, activeMainTab, activeSubTab, setLockedRows)}
             </TableBody>
           </UITable>
         </ScrollArea>
@@ -640,26 +974,21 @@ export const Table: React.FC<TableProps> = ({
   );
 };
 
-const renderVerificationHeader = () => (
-  <TableHead className="w-10 bg-gray-100">
-    <div className="flex justify-center">
-      <Lock className="h-4 w-4 text-gray-500" />
-    </div>
-  </TableHead>
-);
+
 // Render table headers
 const renderHeaders = (
   processedSections: any[],
   sortConfig: SortConfig,
   handleSort: (field: string) => void,
   handleToggleColumnLock: (columnName: string) => void,
-  lockedColumns: Record<string, boolean>
+  lockedColumns: Record<string, boolean>,
+  lockedRows: Record<string, boolean>
 ) => {
   return (
     <>
       {/* Section Reference Row */}
       <TableRow className="bg-yellow-50">
-        <TableHead key="sec-ref-head" className="font-medium">Sec REF</TableHead>
+        <TableHead key="sec-ref-head" className="font-medium" style={{ width: '20px', minWidth: '20px' }}>Sec REF</TableHead>
         <TableHead></TableHead>
         {renderSeparatorCell(`sec-ref-sep-start-${Date.now()}`, 'section')}
         <TableHead key="sec-ref-0" className="text-center font-medium bg-yellow-50 border-b border-yellow-200">0</TableHead>
@@ -819,28 +1148,42 @@ const renderHeaders = (
             if (category.isSeparator) {
               return renderSeparatorCell(`lock-cat-${sectionIndex}-${catIndex}-${Date.now()}`, 'category');
             }
-            return category.fields.map((field, fieldIndex, fieldsArray) => (
-              <React.Fragment key={`lock-${field.name}`}>
-                <TableCell
-                  className="w-10 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleToggleColumnLock(field.name)}
-                >
-                  {lockedColumns[field.name] ?
-                    <Lock className="h-4 w-4 text-green-600" /> :
-                    <LockOpen className="h-4 w-4 text-gray-400" />
-                  }
-                </TableCell>
-                {fieldIndex < fieldsArray.length - 1 &&
-                  field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
-                  renderSeparatorCell(
-                    `lock-separator-${sectionIndex}-${catIndex}-${fieldIndex}-${Date.now()}`,
-                    'mini'
-                  )}
-              </React.Fragment>
-            ));
+            return category.fields.map((field, fieldIndex, fieldsArray) => {
+              // Use the field name to check verification status from lockedRows
+              const fieldKey = `field_${field.name}`;
+              const isVerified = lockedRows[fieldKey]?.is_verified || field.verification?.is_verified;
+              const verificationInfo = lockedRows[fieldKey] || field.verification;
+
+              return (
+                <React.Fragment key={`lock-${field.name}`}>
+                  <TableCell
+                    className="w-10 cursor-pointer hover:bg-gray-100 group relative"
+                    onClick={() => handleToggleColumnLock(field.name)}
+                  >
+                    {isVerified ? (
+                      <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
+                    ) : (
+                      <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
+                    )}
+                    {isVerified && verificationInfo && (
+                      <div className="absolute invisible group-hover:visible bg-gray-800 text-white text-xs rounded p-2 -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap z-50">
+                        Verified by {verificationInfo.verified_by} on {new Date(verificationInfo.verified_at).toLocaleDateString()}
+                      </div>
+                    )}
+                  </TableCell>
+                  {fieldIndex < fieldsArray.length - 1 &&
+                    field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                    renderSeparatorCell(
+                      `lock-separator-${sectionIndex}-${catIndex}-${fieldIndex}-${Date.now()}`,
+                      'mini'
+                    )}
+                </React.Fragment>
+              );
+            });
           });
         })}
       </TableRow>
+
       {/* Column Headers */}
       <TableRow>
         <TableHead
