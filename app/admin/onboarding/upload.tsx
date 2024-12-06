@@ -541,7 +541,7 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                                                           <Input 
                                                             {...formField}
                                                             type={field.type}
-                                                            placeholder={`Enter ${field.display}`}
+                                                            // placeholder={`Enter ${field.display}`}
                                                           />
                                                         )}
                                                       </FormControl>
