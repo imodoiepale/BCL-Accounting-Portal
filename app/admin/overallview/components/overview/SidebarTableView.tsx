@@ -1,6 +1,6 @@
 // @ts-nocheck 
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect  } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ export const SidebarTableView = ({
 }) => {
   const [selectedCompanyIndex, setSelectedCompanyIndex] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filteredData, setFilteredData] = useState(data);
 
   const sectionColors = {
     index: { main: 'bg-gray-600', sub: 'bg-gray-500', cell: 'bg-gray-50' },
@@ -61,6 +62,21 @@ export const SidebarTableView = ({
     'Acc': { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' }
   };
 
+  useEffect(() => {
+    // Filter and process data based on the active tab
+    const processData = () => {
+      if (!data) return [];
+      
+      const filtered = data.filter(item => {
+        const searchable = item.company?.company_name?.toLowerCase() || '';
+        return searchable.includes(searchTerm.toLowerCase());
+      });
+
+      return filtered;
+    };
+
+    setFilteredData(processData());
+  }, [data, searchTerm, activeMainTab]);
 
   const filteredCompanies = data
     .filter(company =>
@@ -217,6 +233,7 @@ export const SidebarTableView = ({
       </TableRow>
     </TableHeader>
   );
+
   return (
     <div className="grid h-full" style={{ gridTemplateColumns: '300px 1fr' }}>
       {/* Sidebar */}
