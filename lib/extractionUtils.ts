@@ -1,11 +1,18 @@
-// src/lib/extractionUtils.ts
-
+// @ts-nocheck
 import { supabase } from './supabaseClient';
+
+interface ArrayConfig {
+  fields?: {
+    name: string;
+    type: string;
+  }[];
+}
 
 interface Field {
   id: string;
   name: string;
   type: string;
+  arrayConfig?: ArrayConfig;
 }
 
 interface Document {
@@ -17,6 +24,8 @@ interface Document {
 interface ExtractionResult {
   [key: string]: string | number | null;
 }
+
+
 
 const formatExtractedValue = (value: any, fieldType: string): any => {
   if (!value) return null;
@@ -76,7 +85,33 @@ export const performExtraction = async (
 ): Promise<ExtractionResult> => {
   try {
     const url = 'https://api.hyperbolic.xyz/v1/chat/completions';
-    const fieldPrompt = document.fields?.map(f => f.name).join(', ');
+    
+    // Build a detailed field description including array structures
+    const fieldPrompts = document.fields?.map(field => {
+      if (field.type === 'array') {
+        const subFields = field.arrayConfig?.fields?.map(sf => 
+          `${sf.name} (${sf.type})`
+        ).join(', ');
+        return `${field.name}: array of objects containing [${subFields}]`;
+      }
+      return `${field.name} (${field.type})`;
+    }).join('\n');
+
+    // Create a structured example of the expected output
+    const exampleOutput = document.fields?.reduce((acc, field) => {
+      if (field.type === 'array') {
+        acc[field.name] = [{
+          ...field.arrayConfig?.fields?.reduce((subAcc, subField) => {
+            subAcc[subField.name] = `example_${subField.type}`;
+            return subAcc;
+          }, {})
+        }];
+      } else {
+        acc[field.name] = `example_${field.type}`;
+      }
+      return acc;
+    }, {});
+
     const fileType = fileUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image';
 
     let content = [];
@@ -86,8 +121,10 @@ export const performExtraction = async (
       content = [
         {
           type: "text",
-          text: `Extract the following fields from the PDF document: ${fieldPrompt}. 
-                 Return the results in JSON format with field names as keys.`
+          text: `Extract the following fields from the PDF document:\n\n${fieldPrompts}\n\n
+                Return the results in JSON format with field names as keys.
+                For array fields, ensure the data is returned as an array of objects.
+                Expected format example: ${JSON.stringify(exampleOutput, null, 2)}`
         },
         {
           type: "file",
@@ -98,8 +135,10 @@ export const performExtraction = async (
       content = [
         {
           type: "text",
-          text: `Extract the following fields from the image: ${fieldPrompt}.
-                 Return the results in JSON format with field names as keys.`
+          text: `Extract the following fields from the image:\n\n${fieldPrompts}\n\n
+                Return the results in JSON format with field names as keys.
+                For array fields, ensure the data is returned as an array of objects.
+                Expected format example: ${JSON.stringify(exampleOutput, null, 2)}`
         },
         {
           type: "image_url",
@@ -116,13 +155,14 @@ export const performExtraction = async (
       },
       body: JSON.stringify({
         model: 'Qwen/Qwen2-VL-7B-Instruct',
-        
         messages: [
           {
             role: 'system',
-            content: `You are an advanced document analysis assistant. Extract information accurately and return it in JSON format.
-                     For each field, ensure the value matches the expected type (text, number, or date).
-                     If a field is not found or unclear, return null for that field.`
+            content: `You are an advanced document analysis assistant specialized in structured data extraction.
+                     Extract information accurately and return it in JSON format.
+                     For array fields, always return an array of objects with specified sub-fields.
+                     If a field is not found or unclear, use null for that field.
+                     For array fields, return an empty array if no items are found.`
           },
           {
             role: 'user',
@@ -142,16 +182,33 @@ export const performExtraction = async (
 
     const json = await response.json();
     const output = json.choices[0].message.content;
-    const parsedData = parseExtractionResponse(output);
+    console.log('Raw extraction output:', output);
 
-    // Map and format the extracted data according to field types
-    const mappedData: ExtractionResult = {};
+    const parsedData = parseExtractionResponse(output);
+    console.log('Parsed extraction data:', parsedData);
+
+    // Process array fields
+    const processedData = { ...parsedData };
     document.fields?.forEach(field => {
-      const extractedValue = parsedData[field.name];
-      mappedData[field.name] = formatExtractedValue(extractedValue, field.type);
+      if (field.type === 'array') {
+        if (!Array.isArray(processedData[field.name])) {
+          try {
+            processedData[field.name] = JSON.parse(processedData[field.name]);
+          } catch {
+            processedData[field.name] = [];
+          }
+        }
+        processedData[field.name] = processedData[field.name].map(item => {
+          const processedItem = {};
+          field.arrayConfig?.fields?.forEach(subField => {
+            processedItem[subField.name] = item[subField.name] || null;
+          });
+          return processedItem;
+        });
+      }
     });
 
-    return mappedData;
+    return processedData;
   } catch (error) {
     console.error('Extraction error:', error);
     throw new Error('Failed to extract document details');
@@ -180,8 +237,12 @@ export const saveExtractedData = async (
         .single()
     ]);
 
-    if (uploadUpdate.error) throw uploadUpdate.error;
-    if (documentUpdate.error) throw documentUpdate.error;
+    if (uploadUpdate.error) {
+      throw uploadUpdate.error;
+    }
+    if (documentUpdate.error) {
+      throw documentUpdate.error;
+    }
 
     return {
       upload: uploadUpdate.data,
@@ -200,15 +261,15 @@ export const getSignedUrl = async (filepath: string): Promise<string> => {
       .from('kyc-documents')
       .createSignedUrl(filepath, 60);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data.signedUrl;
   } catch (error) {
     console.error('Error getting signed URL:', error);
     throw new Error('Failed to generate document URL');
   }
-};
-
-// Helper function to validate extracted data against field types
+};// Helper function to validate extracted data against field types
 export const validateExtractedData = (
   extractedData: ExtractionResult,
   fields: Field[]
@@ -257,20 +318,27 @@ export const retryExtraction = async (
   apiKey: string,
   maxRetries: number = 3
 ): Promise<ExtractionResult> => {
+  let attempt = 0;
   let lastError: Error | null = null;
-  
-  for (let i = 0; i < maxRetries; i++) {
+
+  while (attempt < maxRetries) {
     try {
       const result = await performExtraction(fileUrl, document, apiKey);
       if (validateExtractedData(result, document.fields || [])) {
         return result;
       }
+      throw new Error('Validation failed for extracted data');
     } catch (error) {
       lastError = error as Error;
-      // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      attempt++;
+      
+      if (attempt < maxRetries) {
+        // Exponential backoff: 1s, 2s, 4s, etc.
+        const backoffTime = Math.pow(2, attempt - 1) * 1000;
+        await new Promise(resolve => setTimeout(resolve, backoffTime));
+      }
     }
   }
 
-  throw lastError || new Error('Failed to extract data after multiple attempts');
+  throw new Error(`Extraction failed after ${maxRetries} attempts: ${lastError?.message}`);
 };

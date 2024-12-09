@@ -8,6 +8,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from '@/lib/supabaseClient';
 import { Input } from "@/components/ui/input";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   Eye,
   DownloadIcon,
   UploadIcon,
@@ -472,42 +478,56 @@ export default function CompanyKycDocumentDetails() {
         });
     }
   };
+// In your company-kyc-document-details.tsx file, update the renderFieldValue function:
 
-  // Update the renderFieldValue function in company-kyc-document-details.tsx
-  const renderFieldValue = (field: any, value: any) => {
-    // If value is array
-    if (field.type === 'array' && Array.isArray(value)) {
+const renderFieldValue = (field: any, value: any) => {
+  // If value is array
+  if (field.type === 'array' && Array.isArray(value)) {
       return (
-        <div className="text-xs">
-          <span className="text-gray-600">
-            {value.length} items
-            {value.map((item, index) => (
-              <div key={index} className="pl-2 text-gray-500">
-                {Object.entries(item).map(([key, val]) => (
-                  <div key={key}>{`${key}: ${val}`}</div>
-                ))}
-              </div>
-            ))}
-          </span>
-        </div>
+          <div className="min-w-[200px]">
+              <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="items" className="border-none">
+                      <AccordionTrigger className="text-xs py-1 hover:no-underline">
+                          <span className="text-blue-600">{value.length} items</span>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                          <div className="space-y-2 pt-2">
+                              {value.map((item, index) => (
+                                  <div key={index} className="bg-gray-50 p-2 rounded text-xs">
+                                      <div className="font-medium mb-1">Item {index + 1}</div>
+                                      {field.arrayConfig?.fields?.map(subField => (
+                                          <div key={subField.id} className="flex justify-between py-0.5">
+                                              <span className="text-gray-600 mr-2">{subField.name}:</span>
+                                              <span className="text-gray-900">{item[subField.name] || '-'}</span>
+                                          </div>
+                                      ))}
+                                  </div>
+                              ))}
+                          </div>
+                      </AccordionContent>
+                  </AccordionItem>
+              </Accordion>
+          </div>
       );
-    }
+  }
 
-    // If value is object but not array
-    if (field.type === 'object' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+  // If value is object but not array
+  if (field.type === 'object' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
       return (
-        <div className="text-xs truncate">
-          {Object.entries(value).map(([key, val]) =>
-            <div key={key}>{`${key}: ${String(val)}`}</div>
-          )}
-        </div>
+          <div className="text-xs">
+              {Object.entries(value).map(([key, val]) => (
+                  <div key={key} className="flex justify-between py-0.5">
+                      <span className="text-gray-600 mr-2">{key}:</span>
+                      <span>{String(val)}</span>
+                  </div>
+              ))}
+          </div>
       );
-    }
+  }
 
-    // For simple values
-    return <span className="text-xs">{value ? String(value) : '-'}</span>;
-  };
-
+  // For simple values
+  return <span className="text-xs">{value ? String(value) : '-'}</span>;
+};
 
   const handleViewDocument = async (document: Document, company: Company) => {
     const upload = uploads.find(u =>
