@@ -478,56 +478,56 @@ export default function CompanyKycDocumentDetails() {
         });
     }
   };
-// In your company-kyc-document-details.tsx file, update the renderFieldValue function:
+  // In your company-kyc-document-details.tsx file, update the renderFieldValue function:
 
-const renderFieldValue = (field: any, value: any) => {
-  // If value is array
-  if (field.type === 'array' && Array.isArray(value)) {
+  const renderFieldValue = (field: any, value: any) => {
+    // If value is array
+    if (field.type === 'array' && Array.isArray(value)) {
       return (
-          <div className="min-w-[200px]">
-              <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value="items" className="border-none">
-                      <AccordionTrigger className="text-xs py-1 hover:no-underline">
-                          <span className="text-blue-600">{value.length} items</span>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                          <div className="space-y-2 pt-2">
-                              {value.map((item, index) => (
-                                  <div key={index} className="bg-gray-50 p-2 rounded text-xs">
-                                      <div className="font-medium mb-1">Item {index + 1}</div>
-                                      {field.arrayConfig?.fields?.map(subField => (
-                                          <div key={subField.id} className="flex justify-between py-0.5">
-                                              <span className="text-gray-600 mr-2">{subField.name}:</span>
-                                              <span className="text-gray-900">{item[subField.name] || '-'}</span>
-                                          </div>
-                                      ))}
-                                  </div>
-                              ))}
-                          </div>
-                      </AccordionContent>
-                  </AccordionItem>
-              </Accordion>
-          </div>
+        <div className="min-w-[200px]">
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="items" className="border-none">
+              <AccordionTrigger className="text-xs py-1 hover:no-underline">
+                <span className="text-blue-600">{value.length} items</span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-2 pt-2">
+                  {value.map((item, index) => (
+                    <div key={index} className="bg-gray-50 p-2 rounded text-xs">
+                      <div className="font-medium mb-1">Item {index + 1}</div>
+                      {field.arrayConfig?.fields?.map(subField => (
+                        <div key={subField.id} className="flex justify-between py-0.5">
+                          <span className="text-gray-600 mr-2">{subField.name}:</span>
+                          <span className="text-gray-900">{item[subField.name] || '-'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
       );
-  }
+    }
 
-  // If value is object but not array
-  if (field.type === 'object' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    // If value is object but not array
+    if (field.type === 'object' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
       return (
-          <div className="text-xs">
-              {Object.entries(value).map(([key, val]) => (
-                  <div key={key} className="flex justify-between py-0.5">
-                      <span className="text-gray-600 mr-2">{key}:</span>
-                      <span>{String(val)}</span>
-                  </div>
-              ))}
-          </div>
+        <div className="text-xs">
+          {Object.entries(value).map(([key, val]) => (
+            <div key={key} className="flex justify-between py-0.5">
+              <span className="text-gray-600 mr-2">{key}:</span>
+              <span>{String(val)}</span>
+            </div>
+          ))}
+        </div>
       );
-  }
+    }
 
-  // For simple values
-  return <span className="text-xs">{value ? String(value) : '-'}</span>;
-};
+    // For simple values
+    return <span className="text-xs">{value ? String(value) : '-'}</span>;
+  };
 
   const handleViewDocument = async (document: Document, company: Company) => {
     const upload = uploads.find(u =>
@@ -831,84 +831,148 @@ const renderFieldValue = (field: any, value: any) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody className="text-[11px]">
-                    {getFilteredAndSortedCompanies().map((company, index) => (
-                      <TableRow 
-                        key={company.id} 
-                        className="border-b border-gray-100 hover:bg-gray-50"
-                      >
-                        <TableCell className="font-medium sticky left-0 bg-white border-r border-gray-100">
-                          {index + 1}
-                        </TableCell>
-                        <TableCell className="font-medium sticky left-0 bg-white border-r border-gray-100">
-                          {company.company_name}
-                        </TableCell>
-                        <TableCell className="text-center border-r border-gray-100">
-                          <div className="flex justify-center space-x-2">
-                            {uploads.some(u =>
-                              u.kyc_document_id === selectedDocument.id &&
-                              u.userid === company.id.toString()
-                            ) ? (
-                              <>
+                    {getFilteredAndSortedCompanies().map((company, companyIndex) => {
+                      const companyUploads = uploads.filter(u =>
+                        u.kyc_document_id === selectedDocument?.id &&
+                        u.userid === company.id.toString()
+                      );
+
+                      const rows = [];
+
+                      // Main company row with first document or upload button
+                      rows.push(
+                        <TableRow
+                          key={company.id}
+                          className="border-b border-gray-100 hover:bg-gray-50"
+                        >
+                          <TableCell
+                            className="font-medium sticky left-0 bg-white border-r border-gray-100"
+                            rowSpan={Math.max(1, companyUploads.length)}
+                          >
+                            {companyIndex + 1}
+                          </TableCell>
+                          <TableCell
+                            className="font-medium sticky left-0 bg-white border-r border-gray-100"
+                            rowSpan={Math.max(1, companyUploads.length)}
+                          >
+                            {company.company_name}
+                          </TableCell>
+
+                          {companyUploads.length === 0 ? (
+                            <>
+                              <TableCell className="text-center border-r border-gray-100">
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleViewDocument(selectedDocument, company)}
-                                  title="View Document"
+                                  onClick={() => handleUploadClick(company.id, selectedDocument.id)}
+                                  title="Upload Document"
                                 >
-                                  <Eye className="h-4 w-4 text-blue-500" />
+                                  <UploadIcon className="h-4 w-4 text-orange-500" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() =>
-                                    handleExtractClick(
-                                      selectedDocument,
-                                      uploads.find(
-                                        u =>
-                                          u.kyc_document_id === selectedDocument.id &&
-                                          u.userid === company.id.toString()
-                                      )
-                                    )
-                                  }
-                                  title="Extract Details"
+                              </TableCell>
+                              {selectedDocument.fields?.map((field) => (
+                                <TableCell
+                                  key={field.id}
+                                  className="text-center border-r border-gray-100"
                                 >
-                                  <DownloadIcon className="h-4 w-4 text-green-500" />
-                                </Button>
-                              </>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleUploadClick(company.id, selectedDocument.id)}
-                                title="Upload Document"
-                              >
-                                <UploadIcon className="h-4 w-4 text-orange-500" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                        {selectedDocument.fields?.map((field, fieldIndex) => {
-                          const upload = uploads.find(
-                            u =>
-                              u.kyc_document_id === selectedDocument.id &&
-                              u.userid === company.id.toString()
-                          );
-                          return (
-                            <TableCell 
-                              key={field.id} 
-                              className={`text-center border-r border-gray-100 ${
-                                fieldIndex === selectedDocument.fields.length - 1 ? 'last:border-r-0' : ''
-                              }`}
+                                  -
+                                </TableCell>
+                              ))}
+                            </>
+                          ) : (
+                            <>
+                              <TableCell className="text-center border-r border-gray-100">
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="text-xs text-gray-500">v1</span>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleViewDocument(selectedDocument, company)}
+                                      title="View Document"
+                                      className="h-7 w-7"
+                                    >
+                                      <Eye className="h-3 w-3 text-blue-500" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleExtractClick(selectedDocument, companyUploads[0])}
+                                      title="Extract Details"
+                                      className="h-7 w-7"
+                                    >
+                                      <DownloadIcon className="h-3 w-3 text-green-500" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              {selectedDocument.fields?.map((field) => (
+                                <TableCell
+                                  key={field.id}
+                                  className="text-center border-r border-gray-100"
+                                >
+                                  {renderFieldValue(
+                                    field,
+                                    companyUploads[0]?.extracted_details?.[field.name]
+                                  )}
+                                </TableCell>
+                              ))}
+                            </>
+                          )}
+                        </TableRow>
+                      );
+
+                      // Additional document versions
+                      if (companyUploads.length > 1) {
+                        companyUploads.slice(1).forEach((upload, index) => {
+                          rows.push(
+                            <TableRow
+                              key={`${company.id}-${upload.id}`}
+                              className="border-b border-gray-100 hover:bg-gray-50"
                             >
-                              {renderFieldValue(
-                                field,
-                                upload?.extracted_details?.[field.name]
-                              )}
-                            </TableCell>
+                              <TableCell className="text-center border-r border-gray-100">
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="text-xs text-gray-500">v{index + 2}</span>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleViewDocument(selectedDocument, company)}
+                                      title="View Document"
+                                      className="h-7 w-7"
+                                    >
+                                      <Eye className="h-3 w-3 text-blue-500" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleExtractClick(selectedDocument, upload)}
+                                      title="Extract Details"
+                                      className="h-7 w-7"
+                                    >
+                                      <DownloadIcon className="h-3 w-3 text-green-500" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              {selectedDocument.fields?.map((field) => (
+                                <TableCell
+                                  key={field.id}
+                                  className="text-center border-r border-gray-100"
+                                >
+                                  {renderFieldValue(
+                                    field,
+                                    upload?.extracted_details?.[field.name]
+                                  )}
+                                </TableCell>
+                              ))}
+                            </TableRow>
                           );
-                        })}
-                      </TableRow>
-                    ))}
+                        });
+                      }
+
+                      return rows;
+                    })}
                   </TableBody>
                 </Table>
               </Card>
