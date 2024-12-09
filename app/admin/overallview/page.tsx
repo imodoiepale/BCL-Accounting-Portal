@@ -1,394 +1,306 @@
 // OverallView.tsx
 // @ts-nocheck
 "use client";
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef, Suspense } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Settings, Upload, Download } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toast } from "sonner";
-import { Table } from './components/overview/TableComponents';
-import { SettingsDialog } from './components/overview/Dialogs/settingsDialog';
-import { MissingFieldsDialog } from './components/missingFieldsDialog';
-import { CompanyEditDialog } from './components/overview/Dialogs/CompanyEditDialog';
-import { handleExport, handleImport } from './components/utility';
-import { ImportDialog } from './components/overview/Dialogs/ImportDialog';
-import { cacheUtils as redisCache } from '@/lib/redis';
+import dynamic from 'next/dynamic';
 
-const safeJSONParse = (jsonString: string, defaultValue = {}) => {
+// Lazy load heavy components using dynamic import
+const Table = dynamic(() =>
+    import('./components/overview/TableComponents').then(mod => mod.Table || mod.default), {
+    ssr: false,
+    loading: () => <div>Loading table...</div>
+});
+
+const SettingsDialog = dynamic(() =>
+    import('./components/overview/Dialogs/settingsDialog').then(mod => mod.SettingsDialog || mod.default), {
+    ssr: false,
+    loading: () => <div>Loading settings...</div>
+});
+
+const MissingFieldsDialog = dynamic(() =>
+    import('./components/missingFieldsDialog').then(mod => mod.MissingFieldsDialog || mod.default), {
+    ssr: false,
+    loading: () => <div>Loading...</div>
+});
+
+const CompanyEditDialog = dynamic(() =>
+    import('./components/overview/Dialogs/CompanyEditDialog').then(mod => mod.CompanyEditDialog || mod.default), {
+    ssr: false,
+    loading: () => <div>Loading...</div>
+});
+
+const ImportDialog = dynamic(() =>
+    import('./components/overview/Dialogs/ImportDialog').then(mod => mod.ImportDialog || mod.default), {
+    ssr: false,
+    loading: () => <div>Loading...</div>
+});
+
+// Add this function before the OverallView component
+const processTabData = (tableData: any, mapping: any) => {
     try {
-        if (!jsonString) return defaultValue;
-
-        // Handle already parsed objects
-        if (typeof jsonString === 'object') return jsonString;
-
-        // Handle strings with escaped quotes
-        let processedString = jsonString;
-        if (typeof jsonString === 'string') {
-            // Replace escaped backslashes first
-            processedString = processedString.replace(/\\\\/g, '\\');
-            // Replace escaped quotes
-            processedString = processedString.replace(/\\"/g, '"');
-            // Handle double-encoded JSON
-            while (processedString.includes('\\"')) {
-                try {
-                    processedString = JSON.parse(processedString);
-                    if (typeof processedString !== 'string') break;
-                } catch {
-                    break;
-                }
+      // Always get companies from acc_portal_company_duplicate
+      const companies = tableData['acc_portal_company_duplicate'] || [];
+      
+      return companies.map(company => ({
+        company: company,
+        rows: [{
+          id: company.id,
+          company_name: company.company_name, // Always include company_name
+          isFirstRow: true,
+          ...Object.keys(tableData).reduce((acc, tableName) => {
+            if (tableName !== 'acc_portal_company_duplicate') {
+              acc[`${tableName}_data`] = tableData[tableName]?.find(
+                (row: any) => row.company_id === company.id
+              );
             }
-        }
-
-        return typeof processedString === 'string'
-            ? JSON.parse(processedString)
-            : processedString;
+            return acc;
+          }, {})
+        }]
+      }));
     } catch (error) {
-        console.error('JSON Parse Error:', error, 'Input:', jsonString);
-        return defaultValue;
+      console.error('Error processing tab data:', error);
+      return [];
     }
-};
+  };
+  
 
 const OverallView: React.FC = () => {
-    const [allData, setAllData] = useState(new Map());
-    const [currentData, setCurrentData] = useState([]);
+    const [allTabsData, setAllTabsData] = useState<Map<string, any>>(new Map());
+    const [cachedData, setCachedData] = useState<Map<string, any>>(new Map());
+    const [visibleData, setVisibleData] = useState([]);
+    const dataCache = useRef<Map<string, any>>(new Map());
+    const [activeMainTab, setActiveMainTab] = useState<string>('');
+    const [activeSubTab, setActiveSubTab] = useState<string>('');
     const [structure, setStructure] = useState<any[]>([]);
-    const [mainTabs, setMainTabs] = useState<string[]>([]);
-    const [subTabs, setSubTabs] = useState<{ [key: string]: string[] }>({});
     const [loading, setLoading] = useState(true);
-    const [selectedCompany, setSelectedCompany] = useState<any>(null);
-    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [selectedMissingFields, setSelectedMissingFields] = useState<any>(null);
-    const [isMissingFieldsOpen, setIsMissingFieldsOpen] = useState(false);
-    const [activeMainTab, setActiveMainTab] = useState('');
-    const [activeSubTab, setActiveSubTab] = useState('');
-    const [mainSections, setMainSections] = useState<any[]>([]);
-    const [mainSubsections, setMainSubsections] = useState<any[]>([]);
     const [visibilityState, setVisibilityState] = useState<VisibilitySettings>({
         tabs: {},
         sections: {},
         subsections: {},
         fields: {}
     });
-    const dataCache = useRef(new Map());
-    const [fetchError, setFetchError] = useState(null);
     const [orderState, setOrderState] = useState<OrderSettings>({
         tabs: {},
         sections: {},
         subsections: {},
         fields: {}
-    });
+    })
+    const [mainTabs, setMainTabs] = useState<string[]>([]);
+    const [subTabs, setSubTabs] = useState<{ [key: string]: string[] }>({});
+    const [mainSections, setMainSections] = useState<any[]>([]);
+    const [mainSubsections, setMainSubsections] = useState<any[]>([]);
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isMissingFieldsOpen, setIsMissingFieldsOpen] = useState(false);
+    // Cache management
+    const cacheKey = useCallback((mainTab: string, subTab: string) => `${mainTab}:${subTab}`, []);
+    const [mappedData, setMappedData] = useState({
+        mainTabs: [],
+        subTabs: {},
+        currentData: []
+      });
 
-    const clientCacheUtils = {
-        async get(key: string) {
-            try {
-                const response = await fetch(`/api/cache?key=${encodeURIComponent(key)}`);
-                const data = await response.json();
-                return data;
-            } catch (error) {
-                console.error('Cache get error:', error);
-                return null;
+    const preloadAdjacentTabs = useCallback(async (mainTab: string, subTab: string) => {
+        const currentTabs = structure.filter(s => s.main_tab === mainTab);
+        const currentIndex = currentTabs.findIndex(t => t.Tabs === subTab);
+
+        // Preload next and previous tabs
+        [-1, 1].forEach(async (offset) => {
+            const targetTab = currentTabs[currentIndex + offset];
+            if (targetTab && !dataCache.current.has(cacheKey(mainTab, targetTab.Tabs))) {
+                const data = await fetchTabData(mainTab, targetTab.Tabs);
+                dataCache.current.set(cacheKey(mainTab, targetTab.Tabs), data);
             }
-        },
-
-        async set(key: string, data: any) {
-            try {
-                await fetch('/api/cache', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key, data })
-                });
-            } catch (error) {
-                console.error('Cache set error:', error);
-            }
-        },
-
-        async invalidate(pattern: string) {
-            try {
-                await fetch(`/api/cache?pattern=${encodeURIComponent(pattern)}`, {
-                    method: 'DELETE'
-                });
-            } catch (error) {
-                console.error('Cache invalidate error:', error);
-            }
-        },
-
-        async getAllData() {
-            try {
-                const response = await fetch('/api/cache?key=all_tabs_data');
-                const data = await response.json();
-                return data;
-            } catch (error) {
-                console.error('Cache getAllData error:', error);
-                return null;
-            }
-        }
-    };
-
-    // Replace the existing cacheUtils constant with:
-    const cacheUtils = {
-        ...clientCacheUtils,
-        ...(typeof window !== 'undefined' ? window.cacheUtils : {})
-    };
-
-
-    const memoizedCurrentData = useMemo(() => currentData, [currentData]);
-    useEffect(() => {
-        const initializeData = async () => {
-            try {
-                setLoading(true);
-
-                // Single fetch for all data and structure
-                const { data: mappings } = await supabase
-                    .from('profile_category_table_mapping_2')
-                    .select('*')
-                    .order('main_tab')
-                    .order('Tabs');
-
-                if (!mappings) throw new Error('No data found');
-
-                // Process structure data in one pass
-                const mainTabsSet = new Set<string>();
-                const subTabsMap: { [key: string]: string[] } = {};
-                const sectionsSet = new Set<string>();
-                const subsectionsSet = new Set<string>();
-                const allTables = new Set(['acc_portal_company_duplicate']);
-
-                mappings.forEach(mapping => {
-                    if (!mapping) return;
-
-                    if (mapping.main_tab) mainTabsSet.add(mapping.main_tab);
-                    if (mapping.main_tab && mapping.Tabs) {
-                        if (!subTabsMap[mapping.main_tab]) subTabsMap[mapping.main_tab] = [];
-                        if (!subTabsMap[mapping.main_tab].includes(mapping.Tabs)) {
-                            subTabsMap[mapping.main_tab].push(mapping.Tabs);
-                        }
-                    }
-
-                    if (mapping?.structure?.sections) {
-                        mapping.structure.sections.forEach(section => {
-                            if (section?.name) sectionsSet.add(section.name);
-                            section.subsections?.forEach(subsection => {
-                                if (subsection?.name) subsectionsSet.add(subsection.name);
-                                subsection.tables?.forEach(table => allTables.add(table));
-                            });
-                        });
-                    }
-                });
-
-                // Fetch all table data at once
-                const tableResponses = await Promise.all(
-                    Array.from(allTables).map(tableName =>
-                        supabase.from(tableName).select('*').order('id')
-                    )
-                );
-
-                const tableData = {};
-                Array.from(allTables).forEach((tableName, index) => {
-                    tableData[tableName] = tableResponses[index].data || [];
-                });
-
-                // Process all tab data at once and keep in memory
-                const processedData = new Map();
-                mappings.forEach(mapping => {
-                    const mainTab = mapping.main_tab;
-                    const subTab = mapping.Tabs;
-                    const key = `${mainTab}:${subTab}`;
-                    const tabData = processTabData(tableData, mapping);
-                    processedData.set(key, tabData);
-                });
-
-                // Set all state at once
-                const defaultMainTab = Array.from(mainTabsSet)[0] || '';
-                const defaultSubTab = subTabsMap[defaultMainTab]?.[0] || '';
-
-                setStructure(mappings);
-                setMainTabs(Array.from(mainTabsSet));
-                setSubTabs(subTabsMap);
-                setMainSections(Array.from(sectionsSet));
-                setMainSubsections(Array.from(subsectionsSet));
-                setAllData(processedData);
-                setActiveMainTab(defaultMainTab);
-                setActiveSubTab(defaultSubTab);
-                setCurrentData(processedData.get(`${defaultMainTab}:${defaultSubTab}`) || []);
-
-                setLoading(false);
-            } catch (error) {
-                console.error('Error loading data:', error);
-                setFetchError(error);
-                setLoading(false);
-            }
-        };
-
-        initializeData();
-    }, []);
-    // Helper function to process tab data
-    const processTabData = (tableData, mapping) => {
-        const companyDataMap = new Map();
-
-        tableData['acc_portal_company_duplicate'].forEach(company => {
-            const companyName = company.company_name?.toLowerCase();
-            const companyId = company.company_id;
-            const mergedData = { ...company };
-            const additionalRows = [];
-
-            // Get relevant tables for this mapping
-            const relevantTables = new Set();
-            if (mapping?.structure?.sections) {
-                mapping.structure.sections.forEach(section => {
-                    section.subsections?.forEach(subsection => {
-                        subsection.tables?.forEach(table => relevantTables.add(table));
-                    });
-                });
-            }
-
-            // Process each relevant table
-            relevantTables.forEach(tableName => {
-                if (tableName === 'acc_portal_company_duplicate') return;
-
-                const relatedRecords = tableData[tableName]?.filter(record => {
-                    return record.company_name?.toLowerCase() === companyName ||
-                        record.company_id === companyId;
-                });
-
-                if (relatedRecords?.length) {
-                    mergedData[`${tableName}_data`] = relatedRecords[0];
-                    if (relatedRecords.length > 1) {
-                        additionalRows.push(...relatedRecords.slice(1).map(record => ({
-                            ...record,
-                            isAdditionalRow: true,
-                            sourceTable: tableName
-                        })));
-                    }
-                }
-            });
-
-            const entry = {
-                company: mergedData,
-                rows: [
-                    { ...mergedData, isFirstRow: true },
-                    ...additionalRows
-                ],
-                rowSpan: 1 + additionalRows.length
-            };
-
-            companyDataMap.set(companyName, entry);
         });
+    }, [structure, cacheKey]);
 
-        return Array.from(companyDataMap.values());
-    };
-
-    // Add cache clearing on data updates
-    const clearCache = useCallback(() => {
-        dataCache.current.clear();
-    }, []);
-
-
-
-    const handleSave = async (updatedData: any) => {
-        try {
-            // Update local state
-            const newAllData = new Map(allData);
-            const key = `${activeMainTab}:${activeSubTab}`;
-            const currentTabData = newAllData.get(key) || [];
-
-            const updatedTabData = currentTabData.map(item => {
-                if (item.company.company_name === selectedCompany?.company?.company_name) {
-                    return {
-                        ...item,
-                        company: {
-                            ...item.company,
-                            ...Object.entries(updatedData).reduce((acc, [key, value]) => {
-                                const [table, field] = key.split('.');
-                                if (table === 'acc_portal_company_duplicate') {
-                                    acc[field] = value;
-                                }
-                                return acc;
-                            }, {})
-                        }
-                    };
-                }
-                return item;
-            });
-
-            newAllData.set(key, updatedTabData);
-            setAllData(newAllData);
-            setCurrentData(updatedTabData);
-
-            // Invalidate Redis cache
-            await cacheUtils.invalidate('all_tabs_data');
-
-            // Refetch all data
-            await fetchAllTabsData();
-
-        } catch (error) {
-            console.error('Error saving data:', error);
-            toast.error('Failed to save changes');
-        }
-    };
-
-    const handleStructureUpdate = async () => {
-        try {
-            setLoading(true);
-
-            // Fetch new structure
-            const { data: mappings } = await supabase
+    // Add console logs in useEffect after data fetch
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            try {
+              setLoading(true);
+              const { data: mappings } = await supabase
                 .from('profile_category_table_mapping_2')
                 .select('*')
                 .order('main_tab')
                 .order('Tabs');
-
-            if (!mappings) throw new Error('No data found');
-
-            // Process structure data
-            const mainTabsSet = new Set<string>();
-            const subTabsMap: { [key: string]: string[] } = {};
-            const sectionsSet = new Set<string>();
-            const subsectionsSet = new Set<string>();
-
-            mappings.forEach(mapping => {
-                if (!mapping) return;
-
-                if (mapping.main_tab) mainTabsSet.add(mapping.main_tab);
-                if (mapping.main_tab && mapping.Tabs) {
-                    if (!subTabsMap[mapping.main_tab]) subTabsMap[mapping.main_tab] = [];
-                    if (!subTabsMap[mapping.main_tab].includes(mapping.Tabs)) {
-                        subTabsMap[mapping.main_tab].push(mapping.Tabs);
-                    }
+          
+              if (!mappings) throw new Error('No data found');
+          
+              // Process and organize the data
+              const mainTabsSet = new Set(mappings.map(m => m.main_tab));
+              const subTabsMap = mappings.reduce((acc, m) => {
+                if (!acc[m.main_tab]) acc[m.main_tab] = [];
+                if (!acc[m.main_tab].includes(m.Tabs)) {
+                  acc[m.main_tab].push(m.Tabs);
                 }
-
-                if (mapping?.structure?.sections) {
-                    mapping.structure.sections.forEach(section => {
-                        if (section?.name) sectionsSet.add(section.name);
-                        section.subsections?.forEach(subsection => {
-                            if (subsection?.name) subsectionsSet.add(subsection.name);
-                        });
-                    });
+                return acc;
+              }, {});
+          
+              setMainTabs(Array.from(mainTabsSet));
+              setSubTabs(subTabsMap);
+              setStructure(mappings);
+          
+              // Set initial active tabs
+              if (mainTabsSet.size > 0) {
+                const firstMainTab = Array.from(mainTabsSet)[0];
+                setActiveMainTab(firstMainTab);
+                if (subTabsMap[firstMainTab]?.length > 0) {
+                  setActiveSubTab(subTabsMap[firstMainTab][0]);
                 }
-            });
+              }
+          
+            } catch (error) {
+              console.error('Error:', error);
+              toast.error('Failed to load initial data');
+            } finally {
+              setLoading(false);
+            }
+          };
 
-            // Update structure state
-            setStructure(mappings);
-            setMainTabs(Array.from(mainTabsSet));
-            setSubTabs(subTabsMap);
-            setMainSections(Array.from(sectionsSet));
-            setMainSubsections(Array.from(subsectionsSet));
+        fetchInitialData();
+    }, []);
+// Create function to fetch all data initially
+const fetchAllData = async () => {
+    try {
+      setLoading(true);
+      
+      const [mappingsResponse, ...tableResponses] = await Promise.all([
+        supabase
+          .from('profile_category_table_mapping_2')
+          .select('*')
+          .order('main_tab')
+          .order('Tabs'),
+          
+        supabase
+          .from('acc_portal_company_duplicate')
+          .select('*')
+          .order('id')
+      ]);
 
-            setLoading(false);
-        } catch (error) {
-            console.error('Error updating structure:', error);
-            toast.error('Failed to update structure');
-            setLoading(false);
+      const mappings = mappingsResponse.data;
+      if (!mappings) throw new Error('No mappings found');
+  
+      // Fetch all tables data in parallel
+      const allTables = new Set(['acc_portal_company_duplicate']);
+      mappings.forEach(mapping => {
+        mapping.structure?.sections?.forEach(section => {
+          section.subsections?.forEach(subsection => {
+            subsection.tables?.forEach(table => allTables.add(table));
+          });
+        });
+      });
+  
+      const additionalTableResponses = await Promise.all(
+        Array.from(allTables).slice(1).map(table =>
+          supabase.from(table).select('*').order('id')
+        )
+      );
+  
+      const tableData = [tableResponses[0], ...additionalTableResponses];
+  
+      // Process and cache data for each tab
+      const dataCache = new Map();
+      mappings.forEach(mapping => {
+        const key = `${mapping.main_tab}:${mapping.Tabs}`;
+        const tabData = processTabData(
+          tableData.reduce((acc, {data}, i) => {
+            acc[Array.from(allTables)[i]] = data;
+            return acc;
+          }, {}),
+          mapping
+        );
+        dataCache.set(key, tabData);
+      });
+  
+      setAllTabsData(dataCache);
+      setStructure(mappings);
+      
+      // Set initial tabs
+      const mainTabsSet = new Set(mappings.map(m => m.main_tab));
+      setMainTabs(Array.from(mainTabsSet));
+      
+      const subTabsMap = mappings.reduce((acc, m) => {
+        if (!acc[m.main_tab]) acc[m.main_tab] = [];
+        acc[m.main_tab].push(m.Tabs);
+        return acc;
+      }, {});
+      setSubTabs(subTabsMap);
+  
+    } catch (error) {
+      console.error('Error fetching all data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Call fetchAllData on component mount
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+    useEffect(() => {
+        if (mainTabs.length > 0 && !activeMainTab) {
+            setActiveMainTab(mainTabs[0]);
+            if (subTabs[mainTabs[0]]?.length > 0) {
+                setActiveSubTab(subTabs[mainTabs[0]][0]);
+            }
         }
-    };
+    }, [mainTabs, subTabs]);
+    useEffect(() => {
+        console.log('Cache status:', {
+          cacheSize: allTabsData.size,
+          currentTab: `${activeMainTab}:${activeSubTab}`,
+          hasData: allTabsData.has(`${activeMainTab}:${activeSubTab}`)
+        });
+      }, [allTabsData, activeMainTab, activeSubTab]);
+      
+    useEffect(() => {
+        console.log('Data state updated:', {
+          mainTabs,
+          activeMainTab,
+          subTabs: subTabs[activeMainTab],
+          dataLength: visibleData?.length
+        });
+      }, [mainTabs, activeMainTab, subTabs, visibleData]);
 
-    const processTabSections = useMemo(() => (activeMainTab: string, activeSubTab: string) => {
-        const isSpecialView = ['employee details', 'customer details', 'supplier details'].includes(activeMainTab?.toLowerCase());
+    const handleCompanyClick = useCallback((company: any) => {
+        console.log('Selected company data:', company);
+        const selectedCompanyData = {
+            company: company,
+            rows: company.rows,
+            activeTab: activeSubTab,
+        };
+        console.log('Prepared company data:', selectedCompanyData);
+        setSelectedCompany(selectedCompanyData);
+        setIsEditDialogOpen(true);
+    }, [activeSubTab]);
 
-        // Initialize with basic columns
+    const handleTabChange = useCallback((mainTab: string, subTab: string) => {
+        const key = `${mainTab}:${subTab}`;
+        const cachedData = allTabsData.get(key);
+        
+        if (cachedData) {
+          setVisibleData(cachedData);
+          setActiveMainTab(mainTab);
+          setActiveSubTab(subTab);
+        }
+      }, [allTabsData]);
+
+    const processTabSections = useCallback(() => (mainTab: string | undefined | null, subTab: string) => {
+        // Ensure mainTab has a value
+        if (!mainTab) {
+            return []; // Return empty array if no mainTab
+        }
+
+        const mainTabLower = mainTab.toLowerCase();
+        const isSpecialView = ['employee details', 'customer details', 'supplier details'].includes(mainTabLower);
         const processedSections = [
             {
                 name: 'index',
@@ -401,7 +313,6 @@ const OverallView: React.FC = () => {
             }
         ];
 
-        // Only add default columns if not in special view
         if (!isSpecialView) {
             processedSections.push({
                 name: '',
@@ -426,14 +337,13 @@ const OverallView: React.FC = () => {
         }
 
         const relevantMapping = structure.find(item =>
-            item?.Tabs === activeSubTab &&
-            item?.main_tab === activeMainTab
+            item?.Tabs === subTab &&
+            item?.main_tab === mainTab
         );
 
         if (relevantMapping?.structure?.sections) {
             const { sections } = relevantMapping.structure;
 
-            // Process each section
             sections.forEach((section, index) => {
                 if (visibilityState.sections[section.name] === false) return;
 
@@ -495,196 +405,135 @@ const OverallView: React.FC = () => {
             const orderB = orderState.sections[b.name] || 0;
             return orderA - orderB;
         });
-    }, [structure, visibilityState, orderState, activeMainTab, activeSubTab]);
+    }, [structure, visibilityState, orderState]);
 
+    const handleStructureUpdate = async () => {
+        try {
+            setLoading(true);
 
-    // Add this useEffect to initialize visibility and order states when structure changes
-    useEffect(() => {
-        if (structure.length > 0) {
-            const relevantMapping = structure.find(item =>
-                item?.Tabs === activeSubTab &&
-                item?.main_tab === activeMainTab
-            );
+            // Fetch new structure
+            const { data: mappings } = await supabase
+                .from('profile_category_table_mapping_2')
+                .select('*')
+                .order('main_tab')
+                .order('Tabs');
 
-            if (relevantMapping?.structure) {
-                const newVisibilityState = {
-                    tabs: {},
-                    sections: {},
-                    subsections: {},
-                    fields: {}
-                };
+            if (!mappings) throw new Error('No data found');
 
-                const newOrderState = {
-                    tabs: {},
-                    sections: {},
-                    subsections: {},
-                    fields: {}
-                };
+            // Process structure data
+            const mainTabsSet = new Set<string>();
+            const subTabsMap: { [key: string]: string[] } = {};
+            const sectionsSet = new Set<string>();
+            const subsectionsSet = new Set<string>();
 
-                // Process visibility and order states from the structure
-                relevantMapping.structure.sections.forEach((section, sectionIndex) => {
-                    newVisibilityState.sections[section.name] = section.visible !== false;
-                    newOrderState.sections[section.name] = section.order || sectionIndex;
+            mappings.forEach(mapping => {
+                if (!mapping) return;
 
-                    section.subsections?.forEach((subsection, subsectionIndex) => {
-                        newVisibilityState.subsections[subsection.name] = subsection.visible !== false;
-                        newOrderState.subsections[subsection.name] = subsection.order || subsectionIndex;
+                if (mapping.main_tab) mainTabsSet.add(mapping.main_tab);
+                if (mapping.main_tab && mapping.Tabs) {
+                    if (!subTabsMap[mapping.main_tab]) subTabsMap[mapping.main_tab] = [];
+                    if (!subTabsMap[mapping.main_tab].includes(mapping.Tabs)) {
+                        subTabsMap[mapping.main_tab].push(mapping.Tabs);
+                    }
+                }
 
-                        subsection.fields?.forEach((field, fieldIndex) => {
-                            const fieldKey = `${field.table}.${field.name}`;
-                            newVisibilityState.fields[fieldKey] = field.visible !== false;
-                            newOrderState.fields[fieldKey] = field.order || fieldIndex;
+                if (mapping?.structure?.sections) {
+                    mapping.structure.sections.forEach(section => {
+                        if (section?.name) sectionsSet.add(section.name);
+                        section.subsections?.forEach(subsection => {
+                            if (subsection?.name) subsectionsSet.add(subsection.name);
                         });
                     });
-                });
+                }
+            });
 
-                setVisibilityState(newVisibilityState);
-                setOrderState(newOrderState);
-            }
-        }
-    }, [structure, activeMainTab, activeSubTab]);
+            // Update structure state
+            setStructure(mappings);
+            setMainTabs(Array.from(mainTabsSet));
+            setSubTabs(subTabsMap);
+            setMainSections(Array.from(sectionsSet));
+            setMainSubsections(Array.from(subsectionsSet));
 
-    const handleCompanyClick = useCallback((company: any) => {
-        console.log('Selected company data:', company);
-        const selectedCompanyData = {
-            company: company,
-            rows: company.rows,
-            activeTab: activeSubTab,
-        };
-        console.log('Prepared company data:', selectedCompanyData);
-        setSelectedCompany(selectedCompanyData);
-        setIsEditDialogOpen(true);
-    }, [activeSubTab]);
-
-    const handleMainTabChange = useCallback((tabValue) => {
-        if (tabValue === activeMainTab) return;
-
-        const newSubTab = subTabs[tabValue]?.[0] || '';
-        setActiveMainTab(tabValue);
-        setActiveSubTab(newSubTab);
-        setCurrentData(allData.get(`${tabValue}:${newSubTab}`) || []);
-    }, [activeMainTab, subTabs, allData]);
-
-    const handleSubTabChange = useCallback((tabValue) => {
-        if (tabValue === activeSubTab) return;
-
-        setActiveSubTab(tabValue);
-        setCurrentData(allData.get(`${activeMainTab}:${tabValue}`) || []);
-    }, [activeMainTab, activeSubTab, allData]);
-
-
-    if (loading || !structure.length || !mainTabs.length) {
-        return (
-            <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                    <h3 className="text-lg font-medium">Loading data...</h3>
-                    <p className="text-gray-500 mt-2">Please wait while we fetch your data</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!currentData.length && !loading) {
-        return (
-            <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                    <h3 className="text-lg font-medium text-yellow-600">No data available</h3>
-                    <p className="text-gray-500 mt-2">Try selecting a different tab or refreshing the page</p>
-                    <Button
-                        onClick={() => fetchAllTabsData()}
-                        className="mt-4"
-                    >
-                        Refresh Data
-                    </Button>
-                </div>
-            </div>
-        );
-    }
-
-    const toggleTabVisibility = async (tab: string) => {
-        try {
-            const { error } = await supabase
-                .from('profile_category_table_mapping')
-                .update({
-                    column_order: {
-                        ...currentOrder,
-                        visibility: {
-                            ...currentOrder.visibility,
-                            tabs: {
-                                ...currentOrder.visibility.tabs,
-                                [tab]: !currentOrder.visibility.tabs[tab]
-                            }
-                        }
-                    }
-                })
-                .eq('Tabs', tab);
-
-            if (error) throw error;
-
-            // Call handleStructureUpdate instead of fetchStructure
-            await handleStructureUpdate();
+            setLoading(false);
         } catch (error) {
-            console.error('Error toggling tab visibility:', error);
-            toast.error('Failed to toggle tab visibility');
+            console.error('Error updating structure:', error);
+            toast.error('Failed to update structure');
+            setLoading(false);
         }
     };
-    if (fetchError) {
-        return (
-            <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                    <h3 className="text-lg font-medium text-red-600">Error loading data</h3>
-                    <p className="text-gray-500 mt-2">{fetchError.message}</p>
-                    <Button
-                        onClick={() => {
-                            setFetchError(null);
-                            fetchAllData(activeMainTab, activeSubTab);
-                        }}
-                        className="mt-4"
-                    >
-                        Retry
-                    </Button>
-                </div>
-            </div>
-        );
-    }
+
+    // Virtualized table rendering
+    const TableWrapper = useMemo(() => (
+        <Table
+            data={visibleData}
+            virtualizedRowHeight={50}
+            visibleRowsCount={20}
+            processedSections={processTabSections()(activeMainTab || '', activeSubTab || '')} // Add fallback
+            activeMainTab={activeMainTab || ''} 
+            activeSubTab={activeSubTab || ''}
+            handleCompanyClick={handleCompanyClick}
+            onMissingFieldsClick={(company) => {
+                const processedSections = processTabSections()(activeMainTab || '', activeSubTab || '');
+                setSelectedMissingFields(company);
+                setIsMissingFieldsOpen(true);
+            }}
+        />
+    ), [visibleData, activeMainTab, activeSubTab]);
+    
+    useEffect(() => {
+        if (mainTabs.length > 0 && !activeMainTab) {
+            const initialMainTab = mainTabs[0] || '';
+            setActiveMainTab(initialMainTab);
+            if (subTabs[initialMainTab]?.length > 0) {
+                setActiveSubTab(subTabs[initialMainTab][0] || '');
+            }
+        }
+    }, [mainTabs, subTabs]);
+    
     return (
         <div className="h-[1100px] flex flex-col">
-            <Tabs defaultValue={mainTabs[0]} value={activeMainTab} onValueChange={handleMainTabChange} className="h-full flex flex-col">
-                <TabsList className="w-full grid-cols-[repeat(auto-fit,minmax(0,1fr))] grid bg-gray-100 rounded-lg p-1">
-                    {mainTabs.map(tab => (
-                        <TabsTrigger
-                            key={tab}
-                            value={tab}
-                            disabled={loading}
-                            className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
-                        >
-                            {tab}
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
+            <Tabs defaultValue={mainTabs[0]} value={activeMainTab} className="h-full flex flex-col">
+                {mainTabs.length > 0 ? (
+                    <TabsList className="w-full grid-cols-[repeat(auto-fit,minmax(0,1fr))] grid bg-gray-100 rounded-lg p-1">
+                        {mainTabs.map(tab => (
+                            // In your TabsTrigger onClick
+<TabsTrigger
+  key={tab}
+  value={tab}
+  disabled={loading}
+  onClick={() => handleTabChange(tab, subTabs[tab]?.[0] || '')}
+  className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
+>
+  {tab}
+</TabsTrigger>
+
+                        ))}
+
+                    </TabsList>
+                ) : (
+                    <div>No tabs available</div> // Debug message
+                )}
 
                 <TabsContent value={activeMainTab} className="h-full">
                     <div className="h-full flex flex-col">
                         <div className="flex gap-4 p-6">
-                            <SettingsDialog
-                                mainTabs={mainTabs}
-                                mainSections={mainSections}
-                                mainSubsections={mainSubsections}
-                                onStructureChange={handleStructureUpdate}
-                                activeMainTab={activeMainTab}
-                                activeSubTab={activeSubTab}
-                                subTabs={subTabs[activeMainTab] || []}
-                                processedSections={processTabSections(activeMainTab, activeSubTab)}
-                                visibilityState={visibilityState}
-                                orderState={orderState}
-                                onVisibilityChange={setVisibilityState}
-                                onOrderChange={setOrderState}
-                            />
-                            <ImportDialog
-                                isOpen={isImportDialogOpen}
-                                onClose={() => setIsImportDialogOpen(false)}
-                                onImport={(file) => handleImport(file, activeMainTab, activeSubTab)}
-                            />
+                            <Suspense fallback={<div>Loading settings...</div>}>
+                                <SettingsDialog
+                                    mainTabs={mainTabs}
+                                    mainSections={mainSections}
+                                    mainSubsections={mainSubsections}
+                                    onStructureChange={handleStructureUpdate}
+                                    activeMainTab={activeMainTab}
+                                    activeSubTab={activeSubTab}
+                                    subTabs={subTabs[activeMainTab] || []}
+                                    processedSections={processTabSections(activeMainTab, activeSubTab)}
+                                    visibilityState={visibilityState}
+                                    orderState={orderState}
+                                    onVisibilityChange={setVisibilityState}
+                                    onOrderChange={setOrderState}
+                                />
+                            </Suspense>
+
                             <div className="flex gap-2">
                                 <Button
                                     onClick={() => setIsImportDialogOpen(true)}
@@ -704,18 +553,28 @@ const OverallView: React.FC = () => {
                         </div>
 
                         <div className="flex-1 overflow-hidden">
-                            <Tabs defaultValue={subTabs[activeMainTab]?.[0]} value={activeSubTab} onValueChange={handleSubTabChange} className="h-full flex flex-col">
+                            <Tabs
+                                defaultValue={subTabs[activeMainTab]?.[0]}
+                                value={activeSubTab}
+                                className="h-full flex flex-col"
+                            >
                                 <TabsList className="w-full grid grid-cols-10 bg-gray-100 rounded-lg p-1">
-                                    {(subTabs[activeMainTab] || []).map(tab => (
-                                        <TabsTrigger
-                                            key={tab}
-                                            value={tab}
-                                            disabled={loading}
-                                            className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
-                                        >
-                                            {tab}
-                                        </TabsTrigger>
-                                    ))}
+                                    {(subTabs[activeMainTab] || []).map(tab => {
+                                        console.log('Rendering subtab:', tab); // Debug log
+                                        return (
+                                  // In your TabsTrigger onClick
+<TabsTrigger
+  key={tab}
+  value={tab}
+  disabled={loading}
+  onClick={() => handleTabChange(tab, subTabs[tab]?.[0] || '')}
+  className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
+>
+  {tab}
+</TabsTrigger>
+
+                                        );
+                                    })}
                                 </TabsList>
 
                                 <div className="flex-1 overflow-hidden">
@@ -725,23 +584,20 @@ const OverallView: React.FC = () => {
                                     >
                                         <Card className="h-[890px] flex flex-col">
                                             <CardContent className="flex-1 p-0 overflow-hidden">
-                                                <div className="h-[890px] overflow-auto">
-                                                    <div className="min-w-max">
-                                                        <Table
-                                                            data={memoizedCurrentData}
-                                                            handleCompanyClick={handleCompanyClick}
-                                                            onMissingFieldsClick={(company) => {
-                                                                const processedSections = processTabSections(activeMainTab, activeSubTab);
-                                                                setSelectedMissingFields(company);
-                                                                setIsMissingFieldsOpen(true);
-                                                            }}
-                                                            processedSections={processTabSections(activeMainTab, activeSubTab)}
-                                                            activeMainTab={activeMainTab}
-                                                            activeSubTab={activeSubTab}
-                                                            
-                                                        />
+                                                {loading ? (
+                                                    <div className="flex items-center justify-center h-full">
+                                                        <div className="text-center">
+                                                            <h3 className="text-lg font-medium">Loading data...</h3>
+                                                            <p className="text-gray-500 mt-2">Please wait</p>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                ) : (
+                                                    <div className="h-[890px] overflow-auto">
+                                                        <div className="min-w-max">
+                                                            {TableWrapper}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </CardContent>
                                         </Card>
                                     </TabsContent>
@@ -751,23 +607,37 @@ const OverallView: React.FC = () => {
                     </div>
                 </TabsContent>
             </Tabs>
-            <CompanyEditDialog
-                isOpen={isEditDialogOpen}
-                onClose={() => setIsEditDialogOpen(false)}
-                companyData={selectedCompany}
-                processedSections={processTabSections(activeMainTab, activeSubTab)}
-                onSave={handleSave}
-                mainActiveTab={activeMainTab}
-            />
 
+            <Suspense fallback={null}>
+                {isImportDialogOpen && (
+                    <ImportDialog
+                        isOpen={true}
+                        onClose={() => setIsImportDialogOpen(false)}
+                        onImport={(file) => handleImport(file, activeMainTab, activeSubTab)}
+                    />
+                )}
 
-            <MissingFieldsDialog
-                isOpen={isMissingFieldsOpen}
-                onClose={() => setIsMissingFieldsOpen(false)}
-                companyData={selectedMissingFields}
-                processedSections={processTabSections(activeMainTab, activeSubTab)}
-                onSave={handleSave}
-            />
+                {isEditDialogOpen && (
+                    <CompanyEditDialog
+                        isOpen={true}
+                        onClose={() => setIsEditDialogOpen(false)}
+                        companyData={selectedCompany}
+                        processedSections={processTabSections(activeMainTab, activeSubTab)}
+                        onSave={handleSave}
+                        mainActiveTab={activeMainTab}
+                    />
+                )}
+
+                {isMissingFieldsOpen && (
+                    <MissingFieldsDialog
+                        isOpen={true}
+                        onClose={() => setIsMissingFieldsOpen(false)}
+                        companyData={selectedMissingFields}
+                        processedSections={processTabSections(activeMainTab, activeSubTab)}
+                        onSave={handleSave}
+                    />
+                )}
+            </Suspense>
         </div>
     );
 };
