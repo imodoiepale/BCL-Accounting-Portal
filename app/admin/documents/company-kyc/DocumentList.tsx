@@ -48,12 +48,17 @@ interface Upload {
 
 // Helper function for document status
 const getDocumentStatus = (daysLeft: number | null) => {
-  if (daysLeft === null) return { label: 'No Expiry', color: 'bg-slate-100 text-slate-800' };
-  if (daysLeft < 0) return { label: 'Expired', color: 'bg-red-100 text-red-800 border border-red-300' };
-  if (daysLeft <= 30) return { label: 'Expiring Soon', color: 'bg-amber-100 text-amber-800 border border-amber-300' };
+  if (daysLeft === null) {
+    return { label: 'No Expiry', color: 'bg-slate-100 text-slate-800' };
+  }
+  if (daysLeft < 0) {
+    return { label: 'Expired', color: 'bg-red-100 text-red-800 border border-red-300' };
+  }
+  if (daysLeft <= 30) {
+    return { label: 'Expiring Soon', color: 'bg-amber-100 text-amber-800 border border-amber-300' };
+  }
   return { label: 'Valid', color: 'bg-emerald-100 text-emerald-800 border border-emerald-300' };
 };
-
 const DocumentList = () => {
   // State management
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -329,8 +334,9 @@ const DocumentList = () => {
             <div className="p-6 border-b border-slate-200">
               <div className="flex justify-between items-center">
                 <div>
-                <h2 className="font-semibold text-slate-800 text-sm">{selectedDocument.name}</h2>
-                <p className="text-slate-500 text-xs mt-0.5">Document Uploads</p>
+                  <h2 className="font-semibold text-slate-800 text-sm">
+                    <span className="text-blue-600">{selectedDocument.name}</span> <span className="text-slate-500">for</span> <span className="text-green-600">{selectedCompany?.company_name}</span></h2>                
+                    <p className="text-slate-500 text-xs mt-0.5">Document Uploads</p>
                 </div>
                 <Button
                   variant="outline"
