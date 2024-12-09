@@ -252,7 +252,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                                           className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20"
                                           value={file.issueDate}
                                           onChange={(e) => updateFileField(index, 'issueDate', e.target.value)}
-                                          required
+                                          
                                         />
                                       </div>
                                       {selectedDocument?.document_type === 'renewal' && (
