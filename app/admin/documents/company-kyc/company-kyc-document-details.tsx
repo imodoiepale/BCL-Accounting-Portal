@@ -550,9 +550,10 @@ export default function CompanyKycDocumentDetails() {
       const { data, error } = await supabase
         .from('acc_portal_kyc_uploads')
         .select('*');
-
+  
       if (error) throw error;
-      return data || [];
+      // Filter to only include image files
+      return (data || []).filter(upload => isImageFile(upload.filepath));
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -595,31 +596,38 @@ export default function CompanyKycDocumentDetails() {
     return filtered;
   };
 
+
+  const isImageFile = (filepath: string) => {
+    const extension = filepath.split('.').pop()?.toLowerCase();
+    return extension && ['jpg', 'jpeg', 'png'].includes(extension);
+  };
+
   // Event Handlers
   const handleViewDocument = async (document: Document, company: Company) => {
     const upload = uploads.find(u =>
       u.kyc_document_id === document.id &&
-      u.userid === company.id.toString()
+      u.userid === company.id.toString() &&
+      isImageFile(u.filepath)
     );
-
+  
     if (!upload) {
-      toast.error('Document not found');
+      toast.error('Image not found');
       return;
     }
-
+  
     try {
       const { data, error } = await supabase
         .storage
         .from('kyc-documents')
         .createSignedUrl(upload.filepath, 60);
-
+  
       if (error) throw error;
-
+  
       setViewUrl(data.signedUrl);
       setShowViewModal(true);
     } catch (error) {
-      console.error('Error viewing document:', error);
-      toast.error('Failed to view document');
+      console.error('Error viewing image:', error);
+      toast.error('Failed to view image');
     }
   };
 
