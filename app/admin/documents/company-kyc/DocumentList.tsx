@@ -1,29 +1,25 @@
 // @ts-nocheck
 "use client"
 import React, { useState, useMemo } from 'react';
-import { Eye, Download, Search, Upload, RefreshCw } from 'lucide-react';
+import { Eye, Download, Search, Upload, RefreshCw, Mail, Phone } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
-
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { toast } from 'react-hot-toast';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
+import { SendDocumentModal } from './components/SendDocumentModal';
+import { DocumentViewer } from './Doc-viewer-list';
 
+
+// Types
 interface Company {
   id: number;
   company_name: string;
+  current_communication_email?: string;
+  phone?: string;
 }
 
 interface Document {
@@ -41,31 +37,28 @@ interface Upload {
   issue_date?: string;
   expiry_date?: string;
   kyc_document_id: number;
+  selected?: boolean;
 }
 
-const getDocumentStatus = (daysLeft: number | null) => {
-  if (daysLeft === null) return { label: 'No Expiry', color: 'bg-slate-100 text-slate-800' };
-  if (daysLeft < 0) return { label: 'Expired', color: 'bg-red-100 text-red-800 border border-red-300' };
-  if (daysLeft <= 30) return { label: 'Expiring Soon', color: 'bg-amber-100 text-amber-800 border border-amber-300' };
-  return { label: 'Valid', color: 'bg-emerald-100 text-emerald-800 border border-emerald-300' };
-};
-
 const DocumentList = () => {
+  // State management
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [activeTab, setActiveTab] = useState('All');
-  const [fileTypeTab, setFileTypeTab] = useState('all');
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [showViewer, setShowViewer] = useState(false);
   const [companySearch, setCompanySearch] = useState('');
   const [documentSearch, setDocumentSearch] = useState('');
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [selectedUploads, setSelectedUploads] = useState<Upload[]>([]);
 
+  // Query Hooks
   const { data: companies = [] } = useQuery<Company[]>({
     queryKey: ['companies'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('acc_portal_company_duplicate')
-        .select('*');
+        .select('id, company_name, current_communication_email, phone');
       if (error) throw error;
       return data || [];
     }
@@ -105,6 +98,22 @@ const DocumentList = () => {
     }
   });
 
+  // Filter functions
+  const filteredCompanies = useMemo(() => {
+    return companies.filter(company =>
+      company.company_name.toLowerCase().includes(companySearch.toLowerCase())
+    );
+  }, [companies, companySearch]);
+
+  const filteredDocuments = useMemo(() => {
+    return documents.filter(doc =>
+      doc.name.toLowerCase().includes(documentSearch.toLowerCase())
+    );
+  }, [documents, documentSearch]);
+
+// ... (continued from Part 1)
+
+  // Document handling functions
   const handleView = async (filepath: string) => {
     try {
       const { data, error } = await supabase.storage
@@ -140,29 +149,90 @@ const DocumentList = () => {
     }
   };
 
-  const filteredCompanies = useMemo(() => {
-    return companies.filter(company =>
-      company.company_name.toLowerCase().includes(companySearch.toLowerCase())
-    );
-  }, [companies, companySearch]);
-
-  const filteredDocuments = useMemo(() => {
-    return documents.filter(doc =>
-      doc.name.toLowerCase().includes(documentSearch.toLowerCase())
-    );
-  }, [documents, documentSearch]);
-
-  const filteredUploads = useMemo(() => {
-    return documentUploads.filter(upload => {
-      const extension = upload.filepath.split('.').pop()?.toLowerCase() || '';
-      if (fileTypeTab === 'pdf') return extension === 'pdf';
-      if (fileTypeTab === 'images') return ['jpg', 'jpeg', 'png', 'gif'].includes(extension);
-      return true;
+  const toggleUploadSelection = (upload: Upload) => {
+    setSelectedUploads(prev => {
+      const isSelected = prev.some(u => u.id === upload.id);
+      if (isSelected) {
+        return prev.filter(u => u.id !== upload.id);
+      }
+      return [...prev, upload];
     });
-  }, [documentUploads, fileTypeTab]);
+  };
 
+  const renderDocumentSection = (documents: Upload[], type: 'pdf' | 'images') => {
+    const filteredDocs = documents.filter(doc => {
+      const extension = doc.filepath.split('.').pop()?.toLowerCase() || '';
+      return type === 'pdf' 
+        ? extension === 'pdf'
+        : ['jpg', 'jpeg', 'png', 'gif'].includes(extension);
+    });
+
+    if (filteredDocs.length === 0) return null;
+
+    return (
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold mb-4 text-slate-800">
+          {type === 'pdf' ? 'PDF Documents' : 'Images'}
+        </h3>
+        <Card className="border-slate-200">
+          <CardContent className="p-0">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="w-8 p-4">
+                    <Checkbox />
+                  </th>
+                  <th className="text-left p-4 font-medium text-slate-700">Upload Date</th>
+                  <th className="text-center p-4 font-medium text-slate-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDocs.map(upload => (
+                  <tr key={upload.id} className="border-b border-slate-200 hover:bg-slate-50">
+                    <td className="p-4">
+                      <Checkbox
+                        checked={selectedUploads.some(u => u.id === upload.id)}
+                        onCheckedChange={() => toggleUploadSelection(upload)}
+                      />
+                    </td>
+                    <td className="p-4 text-slate-600">
+                      {format(new Date(upload.created_at), 'dd/MM/yyyy')}
+                    </td>
+                    
+                    <td className="p-4 text-center">
+                      <div className="flex justify-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleView(upload.filepath)}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDownload(upload.filepath, selectedDocument?.name || '')}
+                          className="text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
+  // Main render
   return (
     <div className="flex h-screen bg-slate-50">
+      {/* Companies List Column */}
       <div className="w-72 border-r border-slate-200 bg-white flex flex-col">
         <div className="p-6 border-b border-slate-200">
           <h2 className="font-semibold text-slate-800 text-sm mb-4">Companies</h2>
@@ -204,6 +274,7 @@ const DocumentList = () => {
         </ScrollArea>
       </div>
 
+      {/* Documents List Column */}
       <div className="w-80 border-r border-slate-200 bg-white flex flex-col">
         {selectedCompany ? (
           <>
@@ -286,11 +357,12 @@ const DocumentList = () => {
         )}
       </div>
 
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col bg-white">
         {selectedDocument ? (
           <>
             <div className="p-6 border-b border-slate-200">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex justify-between items-center mb-6">
                 <div>
                   <h2 className="font-semibold text-slate-800 text-sm">
                     <span className="text-blue-600">{selectedDocument.name}</span>
@@ -299,23 +371,28 @@ const DocumentList = () => {
                   </h2>
                   <p className="text-slate-500 text-xs mt-0.5">Document Uploads</p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  New Upload
-                </Button>
+                <div className="flex space-x-3">
+                  {selectedUploads.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowSendModal(true)}
+                      className="text-green-600 border-green-200 hover:bg-green-50"
+                    >
+                      <Mail className="w-4 h-4 mr-2" />
+                      Send Selected ({selectedUploads.length})
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    New Upload
+                  </Button>
+                </div>
               </div>
-              
-              <Tabs value={fileTypeTab} onValueChange={setFileTypeTab}>
-                <TabsList className="bg-slate-100">
-                  <TabsTrigger value="all">All Files</TabsTrigger>
-                  <TabsTrigger value="pdf">PDF</TabsTrigger>
-                  <TabsTrigger value="images">Images</TabsTrigger>
-                </TabsList>
-              </Tabs>
             </div>
 
             <div className="flex-1 overflow-auto p-6">
@@ -325,61 +402,10 @@ const DocumentList = () => {
                   Loading uploads...
                 </div>
               ) : (
-                <Card className="border-slate-200">
-                  <CardContent className="p-0">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-slate-200">
-                          <th className="text-left p-4 font-medium text-slate-700">Upload Date</th>
-                          <th className="text-left p-4 font-medium text-slate-700">File Type</th>
-                          <th className="text-center p-4 font-medium text-slate-700">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredUploads.map(upload => {
-                          const extension = upload.filepath.split('.').pop()?.toLowerCase() || '';
-                          return (
-                            <tr key={upload.id} className="border-b border-slate-200 hover:bg-slate-50">
-                              <td className="p-4 text-slate-600">
-                                {format(new Date(upload.created_at), 'dd/MM/yyyy')}
-                              </td>
-                              <td className="p-4 text-slate-600 uppercase">
-                                {extension}
-                              </td>
-                              <td className="p-4 text-center">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-slate-600 hover:text-slate-900"
-                                    >
-                                      <Eye className="w-4 h-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent className="w-40">
-                                    <DropdownMenuItem
-                                      onClick={() => handleView(upload.filepath)}
-                                      className="text-blue-600 focus:text-blue-700 focus:bg-blue-50"
-                                    >
-                                      <Eye className="w-4 h-4 mr-2" /> View
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => handleDownload(upload.filepath, selectedDocument.name)}
-                                      className="text-slate-600 focus:text-slate-700 focus:bg-slate-50"
-                                    >
-                                      <Download className="w-4 h-4 mr-2" /> Download
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </CardContent>
-                </Card>
+                <>
+                  {renderDocumentSection(documentUploads, 'pdf')}
+                  {renderDocumentSection(documentUploads, 'images')}
+                </>
               )}
             </div>
           </>
@@ -393,34 +419,20 @@ const DocumentList = () => {
         )}
       </div>
 
-      {showViewer && (
-        <Dialog open={showViewer} onOpenChange={setShowViewer}>
-          <DialogContent className="max-w-[95vw] w-[1400px] max-h-[90vh] h-[800px]">
-            <div className="h-full flex flex-col bg-white">
-              <div className="flex justify-between items-center p-4 border-b border-slate-200">
-                <h2 className="font-semibold text-lg text-slate-800">Document Preview</h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowViewer(false)}
-                  className="text-slate-600 hover:text-slate-900"
-                >
-                  Close
-                </Button>
-              </div>
-              <div className="flex-1 relative">
-                <iframe
-                  src={viewUrl}
-                  className="w-full h-full absolute inset-0"
-                  title="Document Viewer"
-                />
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+      {/* Modals */}
+      {showViewer && viewUrl && (
+        <DocumentViewer url={viewUrl} onClose={() => setShowViewer(false)} />
+      )}
+
+      {showSendModal && selectedCompany && (
+        <SendDocumentModal
+          company={selectedCompany}
+          documents={selectedUploads}
+          onClose={() => setShowSendModal(false)}
+        />
       )}
     </div>
   );
 };
-
+  
 export default DocumentList;
