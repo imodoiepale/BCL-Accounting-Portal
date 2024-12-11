@@ -927,11 +927,11 @@ export default function CompanyKycDocumentDetails() {
                           </TableCell>
                           {selectedDocument.fields?.map((field) => (
                             <TableCell
-                              key={field.id}
-                              className="text-center border-r border-gray-300 min-w-[150px] max-w-[200px] px-2"
-                            >
-                              {renderFieldValue(field, upload?.extracted_details?.[field.name])}
-                            </TableCell>
+                            key={field.id}
+                            className="text-center border-r border-gray-300"
+                          >
+                            {renderFieldValue(field, upload?.extracted_details?.[field.name])}
+                          </TableCell>
                           ))}
                         </TableRow>
                       ));
