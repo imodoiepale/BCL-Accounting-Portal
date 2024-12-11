@@ -65,7 +65,14 @@ const DocumentList = () => {
     sendingMethod: ''
   });
 
-
+  // Add this utility function near the top of the file
+  const truncateFilename = (filename, maxLength = 20) => {
+    if (filename.length <= maxLength) return filename;
+    const extension = filename.split('.').pop();
+    const nameWithoutExt = filename.slice(0, -(extension.length + 1));
+    const truncatedName = nameWithoutExt.slice(0, maxLength - 3) + '...';
+    return `${truncatedName}.${extension}`;
+  };
 
   // Query Hooks
   const { data: companies = [] } = useQuery<Company[]>({
@@ -99,11 +106,33 @@ const DocumentList = () => {
     }
   });
 
-
+  const handleBulkSend = (method) => {
+    if (method === 'email' && !selectedCompany?.current_communication_email) {
+      toast.error('No email address available for this company');
+      return;
+    }
+    if (method === 'whatsapp' && !selectedCompany?.phone) {
+      toast.error('No phone number available for this company');
+      return;
+    }
+  
+    setSendingDetails({
+      documentName: `${selectedUploads.length} documents`,
+      companyName: selectedCompany.company_name,
+      recipient: method === 'email' ? selectedCompany.current_communication_email : selectedCompany.phone,
+      sendingMethod: method
+    });
+    setShowSendingStatus(true);
+  };
 
   const handleEmailSend = async (documentName) => {
+    // If documentName is null, we're sending multiple documents
+    const docs = documentName ?
+      documentUploads.filter(doc => doc.filepath.split('/').pop()?.split('.')[0] === documentName) :
+      selectedUploads;
+
     setSendingDetails({
-      documentName,
+      documentName: documentName || `${docs.length} documents`,
       companyName: selectedCompany.company_name,
       recipient: selectedCompany.current_communication_email || '',
       sendingMethod: 'email'
@@ -111,10 +140,13 @@ const DocumentList = () => {
     setShowSendingStatus(true);
   };
 
-  // Update the WhatsApp sending function
   const handleWhatsAppSend = async (documentName) => {
+    const docs = documentName ?
+      documentUploads.filter(doc => doc.filepath.split('/').pop()?.split('.')[0] === documentName) :
+      selectedUploads;
+
     setSendingDetails({
-      documentName,
+      documentName: documentName || `${docs.length} documents`,
       companyName: selectedCompany.company_name,
       recipient: selectedCompany.phone || '',
       sendingMethod: 'whatsapp'
@@ -127,10 +159,20 @@ const DocumentList = () => {
     setIsSending(true);
 
     try {
-      const documentsToSend = documents.map(doc => ({
-        ...doc,
-        filename: newFileName + '.' + doc.filepath.split('.').pop()
-      }));
+      // Handle bulk sending by generating unique filenames for each document
+      const documentsToSend = documents.map(doc => {
+        const originalFileName = doc.filepath.split('/').pop();
+        const extension = originalFileName.split('.').pop();
+        // If sending multiple documents, use original filenames with company prefix
+        const finalFileName = documents.length > 1
+          ? `${selectedCompany.company_name}_${originalFileName}`
+          : `${newFileName}.${extension}`;
+
+        return {
+          ...doc,
+          filename: finalFileName
+        };
+      });
 
       const endpoint = sendingMethod === 'email' ? '/api/send-email' : '/api/send-whatsapp';
       const payload = sendingMethod === 'email' ? {
@@ -237,7 +279,6 @@ const DocumentList = () => {
 
   // Updated document section render function
   const renderDocumentSection = (documents: Upload[]) => {
-    // Group documents by their base name (excluding extension)
     const groupDocuments = () => {
       const groups: { [key: string]: { pdf?: Upload; image?: Upload } } = {};
 
@@ -268,68 +309,111 @@ const DocumentList = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200">
+                  <th className="p-4 text-sm font-medium text-slate-700 w-10">
+                    <Checkbox
+                      checked={selectedUploads.length === documents.length && documents.length > 0}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedUploads(documents);
+                        } else {
+                          setSelectedUploads([]);
+                        }
+                      }}
+                    />
+                  </th>
+                  <th className="p-4 text-sm font-medium text-slate-700">Document Name</th>
                   <th className="p-4 text-sm font-medium text-slate-700">PDF Document</th>
                   <th className="p-4 text-sm font-medium text-slate-700">Image Document</th>
                   <th className="text-center p-4 text-sm font-medium text-slate-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(documentGroups).map(([name, group], index) => (
-                  <tr key={index} className="border-b border-slate-200 hover:bg-slate-50">
-                    <td className="p-4">
-                      {group.pdf && (
-                        <div className="flex justify-center">
+                {Object.entries(documentGroups).map(([name, group], index) => {
+                  const originalName = group.pdf?.filepath.split('/').pop() ||
+                    group.image?.filepath.split('/').pop() || '';
+                  const isSelected = selectedUploads.some(u =>
+                    u.filepath.split('/').pop()?.split('.')[0] === name
+                  );
+
+                  return (
+                    <tr key={index} className="border-b border-slate-200 hover:bg-slate-50">
+                      <td className="p-4">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => {
+                            const docs = Object.values(group).filter(Boolean);
+                            if (checked) {
+                              setSelectedUploads(prev => [...prev, ...docs]);
+                            } else {
+                              setSelectedUploads(prev =>
+                                prev.filter(u =>
+                                  u.filepath.split('/').pop()?.split('.')[0] !== name
+                                )
+                              );
+                            }
+                          }}
+                        />
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm" title={originalName}>
+                          {truncateFilename(originalName)}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        {group.pdf && (
+                          <div className="flex justify-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleView(group.pdf.filepath)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              title={group.pdf.filepath.split('/').pop()}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        {group.image && (
+                          <div className="flex justify-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleView(group.image.filepath)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              title={group.image.filepath.split('/').pop()}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex justify-center space-x-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleView(group.pdf.filepath)}
-                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                            title={group.pdf.filepath.split('/').pop()}
+                            onClick={() => handleEmailSend(name)}
+                            className="text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                            title="Send via Email"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Mail className="w-4 h-4" />
                           </Button>
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      {group.image && (
-                        <div className="flex justify-center">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleView(group.image.filepath)}
-                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                            title={group.image.filepath.split('/').pop()}
+                            onClick={() => handleWhatsAppSend(name)}
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            title="Send via WhatsApp"
                           >
-                            <Eye className="w-4 h-4" />
+                            <MessageCircle className="w-4 h-4" />
                           </Button>
                         </div>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex justify-center space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEmailSend(name)}
-                          className="text-slate-600 hover:text-slate-700 hover:bg-slate-50"
-                          title="Send via Email"
-                        >
-                          <Mail className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleWhatsAppSend(name)}
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                          title="Send via WhatsApp"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </CardContent>
@@ -353,23 +437,18 @@ const DocumentList = () => {
     const [editedRecipient, setEditedRecipient] = useState(recipient);
     const [newFileName, setNewFileName] = useState('');
     const [showError, setShowError] = useState(false);
-
+  
     useEffect(() => {
       if (isOpen) {
         setEditedRecipient(recipient);
-        setNewFileName(`${companyName}_${documentName}`);
+        // Only set filename for single document sends
+        if (!documentName.includes('documents')) {
+          setNewFileName(`${companyName}_${documentName}`);
+        }
         setShowError(false);
       }
     }, [isOpen, recipient, companyName, documentName]);
-
-    const handleSend = () => {
-      if (!editedRecipient) {
-        setShowError(true);
-        return;
-      }
-      onSend(editedRecipient, newFileName);
-    };
-
+  
     const validateInput = () => {
       if (sendingMethod === 'email') {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedRecipient);
@@ -377,16 +456,24 @@ const DocumentList = () => {
         return /^\+?[\d\s-]{10,}$/.test(editedRecipient);
       }
     };
-
+  
+    const handleSend = () => {
+      if (!editedRecipient || !validateInput()) {
+        setShowError(true);
+        return;
+      }
+      onSend(editedRecipient, newFileName);
+    };
+  
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-2xl bg-white">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold text-slate-800">
-              Send Document
+              {documentName.includes('documents') ? 'Send Multiple Documents' : 'Send Document'}
             </DialogTitle>
           </DialogHeader>
-
+  
           <div className="space-y-6 py-4">
             {/* Company and Document Info */}
             <div className="grid grid-cols-2 gap-4">
@@ -395,24 +482,26 @@ const DocumentList = () => {
                 <div className="mt-1 text-sm text-slate-800 font-medium">{companyName}</div>
               </div>
               <div>
-                <Label className="text-sm font-medium text-green-600">Original Document</Label>
+                <Label className="text-sm font-medium text-green-600">Documents</Label>
                 <div className="mt-1 text-sm text-slate-800 font-medium">{documentName}</div>
               </div>
             </div>
-
-            {/* New Filename */}
-            <div className="space-y-2">
-              <Label htmlFor="newFileName" className="text-sm font-medium text-green-600">
-                New Filename
-              </Label>
-              <Input
-                id="newFileName"
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-                className="w-full border-slate-200 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-
+  
+            {/* Only show filename input for single document */}
+            {!documentName.includes('documents') && (
+              <div className="space-y-2">
+                <Label htmlFor="newFileName" className="text-sm font-medium text-green-600">
+                  New Filename
+                </Label>
+                <Input
+                  id="newFileName"
+                  value={newFileName}
+                  onChange={(e) => setNewFileName(e.target.value)}
+                  className="w-full border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+            )}
+  
             {/* Recipient Input */}
             <div className="space-y-2">
               <Label htmlFor="recipient" className="text-sm font-medium text-slate-700">
@@ -434,23 +523,48 @@ const DocumentList = () => {
                     setEditedRecipient(e.target.value);
                     setShowError(false);
                   }}
-                  className={`w-full pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500 ${showError ? 'border-red-500' : ''}`}
-                  placeholder={sendingMethod === 'email' ? 'email@example.com' : '+1234567890'}
+                  className={`w-full pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500 ${
+                    showError ? 'border-red-500 ring-red-200' : ''
+                  }`}
+                  placeholder={
+                    sendingMethod === 'email' 
+                      ? 'email@example.com' 
+                      : '+254123456789'
+                  }
                 />
               </div>
-            </div>
-
-            {/* Error Alert */}
-            {showError && (
-              <Alert variant="destructive" className="bg-red-50 border border-red-200">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <AlertDescription className="text-red-600">
+              {showError && (
+                <div className="text-sm text-red-600 mt-1">
                   Please enter a valid {sendingMethod === 'email' ? 'email address' : 'phone number'}
-                </AlertDescription>
-              </Alert>
-            )}
+                </div>
+              )}
+            </div>
+  
+            {/* Send Instructions */}
+            <div className="bg-slate-50 p-4 rounded-lg">
+              <h4 className="text-sm font-medium text-slate-700 mb-2">
+                {documentName.includes('documents') ? 'Bulk Send Information' : 'Send Information'}
+              </h4>
+              <ul className="text-sm text-slate-600 space-y-1">
+                {documentName.includes('documents') ? (
+                  <>
+                    <li>• All documents will be prefixed with the company name</li>
+                    <li>• Each document will maintain its original extension</li>
+                    <li>• Documents will be sent as individual attachments</li>
+                  </>
+                ) : (
+                  <>
+                    <li>• Document will be renamed as specified above</li>
+                    <li>• Original file extension will be preserved</li>
+                  </>
+                )}
+                <li>• {sendingMethod === 'email' 
+                  ? 'Document(s) will be sent as email attachment(s)' 
+                  : 'Document(s) will be sent as WhatsApp message(s)'}</li>
+              </ul>
+            </div>
           </div>
-
+  
           <DialogFooter className="sm:justify-between border-t border-slate-100 pt-4">
             <Button
               variant="outline"
@@ -460,29 +574,35 @@ const DocumentList = () => {
             >
               Cancel
             </Button>
-            <div className="flex space-x-2">
-              <Button
-                onClick={handleSend}
-                disabled={!validateInput() || isSending}
-                className={`bg-blue-600 hover:bg-blue-700 text-white ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isSending ? (
-                  <>
-                    <span className="mr-2">Sending...</span>
-                    <span className="animate-spin">⌛</span>
-                  </>
-                ) : (
-                  `Send via ${sendingMethod === 'email' ? 'Email' : 'WhatsApp'}`
-                )}
-              </Button>
-            </div>
+            <Button
+              onClick={handleSend}
+              disabled={!validateInput() || isSending}
+              className={`bg-blue-600 hover:bg-blue-700 text-white ${
+                isSending ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isSending ? (
+                <div className="flex items-center">
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Sending...
+                </div>
+              ) : (
+                <>
+                  Send via {sendingMethod === 'email' ? 'Email' : 'WhatsApp'}
+                  {documentName.includes('documents') && ` (${documentName})`}
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     );
   };
+
+
   // Main render
   return (
+
     <div className="flex h-screen bg-slate-50">
       {/* Companies List Column */}
       <div className="w-72 border-r border-slate-200 bg-white flex flex-col">
@@ -663,6 +783,39 @@ const DocumentList = () => {
             <p className="text-center">Select a document<br />to view uploads</p>
           </div>
         )}
+
+        <div className="flex space-x-3">
+          {selectedUploads.length > 0 && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkSend('email')}
+                className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                Email Selected ({selectedUploads.length})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkSend('whatsapp')}
+                className="text-green-600 border-green-200 hover:bg-green-50"
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
+                WhatsApp Selected ({selectedUploads.length})
+              </Button>
+            </>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-blue-600 border-blue-200 hover:bg-blue-50"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            New Upload
+          </Button>
+        </div>
       </div>
 
       {/* Modals */}
