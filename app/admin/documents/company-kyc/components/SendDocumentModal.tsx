@@ -149,23 +149,30 @@ export const SendDocumentModal: React.FC<SendDocumentModalProps> = ({
       
             toast.success('Documents sent successfully via email');
           } else {
-            // WhatsApp sending logic remains the same
-            const response = await fetch('/api/send-whatsapp', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                phone: phone,
-                documents: documents,
-                companyName: company.company_name,
-              }),
-            });
-      
-            if (!response.ok) {
-              throw new Error('Failed to send via WhatsApp');
+            let formattedPhone = phone.replace(/\D/g, '');
+            if (!formattedPhone.startsWith('+')) {
+              formattedPhone = '+' + formattedPhone;
             }
-      
-            toast.success('Documents sent successfully via WhatsApp');
-          }
+            if (formattedPhone.length <= 10) {
+              formattedPhone = '+1' + formattedPhone;
+            }
+            
+            const response = await fetch('/api/send-whatsapp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  phone: formattedPhone,
+                  documents: documents,
+                  companyName: company.company_name,
+                }),
+              });
+            
+              if (!response.ok) {
+                const errorData = await response.json();
+                toast.success("message sent successfully")
+                throw new Error(errorData.message || 'Failed to send via WhatsApp');
+              }
+            }
       
           onClose();
         } catch (error) {

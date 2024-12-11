@@ -1,6 +1,5 @@
-// @ts-nocheck
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   Dialog, 
@@ -20,69 +19,100 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, FileText, ClipboardList } from 'lucide-react';
+import { Eye, FileText, ClipboardList, Upload } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 
+interface UploadedDocument {
+  file: File;
+  name: string;
+  url: string;
+  base64: string;  // Added base64 property
+}
 
 const KYCDocumentsPage = () => {
-  const [documents, setDocuments] = useState([]);
-  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [documents, setDocuments] = useState<UploadedDocument[]>([]);
+  const [selectedDocument, setSelectedDocument] = useState<UploadedDocument | null>(null);
   const [extractFields, setExtractFields] = useState('');
-  const [extractedData, setExtractedData] = useState(null);
+  const [extractedData, setExtractedData] = useState<Record<string, any> | null>(null);
   const [isExtractionDialogOpen, setIsExtractionDialogOpen] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
 
-  const fetchDocuments = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('acc_portal_kyc_uploads')
-        .select(`
-          id, 
-          filepath,
-          acc_portal_kyc:kyc_document_id (name)
-        `);
-
-      if (error) throw error;
-      setDocuments(data || []);
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-    }
+  // Helper function to convert File to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Failed to convert file to base64'));
+        }
+      };
+      reader.onerror = error => reject(error);
+    });
   };
 
-  const handleViewDocument = async (filepath) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('kyc-documents')
-        .createSignedUrl(filepath, 60); // 60 seconds URL expiration
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
 
-      if (error) throw error;
+    const newDocuments: UploadedDocument[] = [];
 
-      setSelectedDocument({
-        url: data.signedUrl,
-        name: filepath.split('/').pop() || 'document.pdf',
-        filepath: filepath
-      });
-    } catch (error) {
-      console.error('View document error:', error);
-      alert('Failed to view document');
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const base64 = await fileToBase64(file);
+        const url = URL.createObjectURL(file);
+        
+        newDocuments.push({
+          file,
+          name: file.name,
+          url,
+          base64
+        });
+      } catch (error) {
+        console.error('Error converting file to base64:', error);
+        toast({
+          title: "Error",
+          description: `Failed to process file: ${file.name}`,
+          variant: "destructive"
+        });
+      }
     }
+
+    setDocuments(prevDocs => [...prevDocs, ...newDocuments]);
+  };
+
+  const handleViewDocument = (doc: UploadedDocument) => {
+    setSelectedDocument(doc);
   };
 
   const handleExtractDetails = async () => {
     if (!selectedDocument) {
-      alert('Please select a document first');
+      toast({
+        title: "Error",
+        description: "Please select a document first",
+        variant: "destructive"
+      });
       return;
     }
 
+    if (!extractFields.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter fields to extract",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsExtracting(true);
+
     try {
-      // Fetch the signed URL for the document
-      const { data: urlData, error: urlError } = await supabase.storage
-        .from('kyc-documents')
-        .createSignedUrl(selectedDocument.filepath, 60);
-
-      if (urlError) throw urlError;
-
-      // Prepare extraction request
       const extractionFields = extractFields.split(',').map(field => field.trim());
       const url = 'https://api.hyperbolic.xyz/v1/chat/completions';
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -100,7 +130,12 @@ const KYCDocumentsPage = () => {
                   text: `Extract the following details from the document: ${extractFields}. 
                   Please return the result as a JSON object where the keys are the requested fields.`
                 },
-                { type: "image_url", image_url: { url: urlData.signedUrl } }
+                { 
+                  type: "image_url", 
+                  image_url: { 
+                    url: selectedDocument.base64  // Use base64 string instead of blob URL
+                  } 
+                }
               ]
             }
           ],
@@ -111,10 +146,19 @@ const KYCDocumentsPage = () => {
         }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `API request failed with status ${response.status}`);
+      }
+
       const json = await response.json();
+      
+      if (!json.choices || !json.choices[0] || !json.choices[0].message) {
+        throw new Error('Invalid API response format');
+      }
+
       const extractedContent = json.choices[0].message.content;
       
-      // Try to parse the response as JSON
       try {
         const parsedData = JSON.parse(extractedContent);
         setExtractedData(parsedData);
@@ -123,10 +167,15 @@ const KYCDocumentsPage = () => {
         setExtractedData({ raw: extractedContent });
       }
 
-      setIsExtractionDialogOpen(true);
     } catch (error) {
       console.error('Document extraction error:', error);
-      alert('Failed to extract document details');
+      toast({
+        title: "Extraction Failed",
+        description: error instanceof Error ? error.message : "Failed to extract document details",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExtracting(false);
     }
   };
 
@@ -151,7 +200,7 @@ const KYCDocumentsPage = () => {
             <div className="col-span-2 text-gray-800">
               {typeof value === 'object' 
                 ? JSON.stringify(value, null, 2) 
-                : (value || 'N/A')}
+                : String(value || 'N/A')}
             </div>
           </div>
         ))}
@@ -159,12 +208,49 @@ const KYCDocumentsPage = () => {
     );
   };
 
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
+  const handleUploadToSupabase = async (doc: UploadedDocument) => {
+    try {
+      const fileName = `kyc_documents/${Date.now()}_${doc.file.name}`;
+
+      const { data, error } = await supabase.storage
+        .from('kyc-documents')
+        .upload(fileName, doc.file);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Document uploaded successfully!",
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload document to storage",
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <div className="container mx-auto p-6">
+      <div className="mb-4 flex items-center space-x-4">
+        <Input 
+          type="file" 
+          accept=".pdf,.jpg,.jpeg,.png" 
+          multiple 
+          onChange={handleFileUpload} 
+          className="hidden" 
+          id="file-upload"
+        />
+        <label 
+          htmlFor="file-upload" 
+          className="cursor-pointer inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+        >
+          <Upload className="mr-2 h-4 w-4" /> Upload Documents
+        </label>
+      </div>
+
       <Table>
         <TableHeader>
           <TableRow>
@@ -173,37 +259,29 @@ const KYCDocumentsPage = () => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {documents.map((doc) => (
-            <TableRow key={doc.id}>
-              <TableCell>
-                {doc['acc_portal_kyc']?.name || 'Unnamed Document'}
-              </TableCell>
+          {documents.map((doc, index) => (
+            <TableRow key={index}>
+              <TableCell>{doc.name}</TableCell>
               <TableCell className="flex space-x-2">
                 <Dialog>
                   <DialogTrigger 
                     className="text-blue-600 hover:text-blue-800 flex items-center"
-                    onClick={() => handleViewDocument(doc.filepath)}
+                    onClick={() => handleViewDocument(doc)}
                   >
                     <Eye className="mr-1 h-4 w-4" /> View
                   </DialogTrigger>
                   <DialogContent className="max-w-4xl">
                     <DialogHeader>
-                      <DialogTitle>
-                        {doc['acc_portal_kyc']?.name || 'Document'}
-                      </DialogTitle>
+                      <DialogTitle>{doc.name}</DialogTitle>
                     </DialogHeader>
-                    {selectedDocument ? (
-                      <div className="w-full h-[70vh]">
-                        <iframe 
-                          src={selectedDocument.url} 
-                          width="100%" 
-                          height="100%" 
-                          title={selectedDocument.name}
-                        />
-                      </div>
-                    ) : (
-                      <p>Loading document...</p>
-                    )}
+                    <div className="w-full h-[70vh]">
+                      <iframe 
+                        src={doc.url} 
+                        width="100%" 
+                        height="100%" 
+                        title={doc.name}
+                      />
+                    </div>
                   </DialogContent>
                 </Dialog>
 
@@ -211,11 +289,19 @@ const KYCDocumentsPage = () => {
                   variant="outline" 
                   className="text-green-600 hover:text-green-800 flex items-center"
                   onClick={() => {
-                    handleViewDocument(doc.filepath);
+                    handleViewDocument(doc);
                     setIsExtractionDialogOpen(true);
                   }}
                 >
                   <FileText className="mr-1 h-4 w-4" /> Extract
+                </Button>
+
+                <Button 
+                  variant="outline" 
+                  className="text-purple-600 hover:text-purple-800 flex items-center"
+                  onClick={() => handleUploadToSupabase(doc)}
+                >
+                  <Upload className="mr-1 h-4 w-4" /> Upload to Storage
                 </Button>
               </TableCell>
             </TableRow>
@@ -253,9 +339,9 @@ const KYCDocumentsPage = () => {
           <DialogFooter>
             <Button 
               onClick={handleExtractDetails}
-              disabled={!extractFields}
+              disabled={!extractFields || isExtracting}
             >
-              Extract Details
+              {isExtracting ? 'Extracting...' : 'Extract Details'}
             </Button>
           </DialogFooter>
         </DialogContent>

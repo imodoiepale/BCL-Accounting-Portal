@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client"
-import React, { useState, useMemo } from 'react';
-import { Eye, Download, Search, Upload, RefreshCw, Mail, Phone } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Eye, Download, Search, Upload, RefreshCw, Mail, Phone, Send, MessageCircle, Loader2, AlertCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
@@ -11,8 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from "@/components/ui/checkbox";
 import { SendDocumentModal } from './components/SendDocumentModal';
-import { DocumentViewer } from './Doc-viewer-list';
+import { toast, Toaster } from 'react-hot-toast';
 
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+
+import { DocumentViewer } from './Doc-viewer-list';
 
 // Types
 interface Company {
@@ -51,6 +56,16 @@ const DocumentList = () => {
   const [documentSearch, setDocumentSearch] = useState('');
   const [showSendModal, setShowSendModal] = useState(false);
   const [selectedUploads, setSelectedUploads] = useState<Upload[]>([]);
+  const [showSendingStatus, setShowSendingStatus] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendingDetails, setSendingDetails] = useState({
+    documentName: '',
+    companyName: '',
+    recipient: '',
+    sendingMethod: ''
+  });
+
+
 
   // Query Hooks
   const { data: companies = [] } = useQuery<Company[]>({
@@ -84,6 +99,69 @@ const DocumentList = () => {
     }
   });
 
+
+
+  const handleEmailSend = async (documentName) => {
+    setSendingDetails({
+      documentName,
+      companyName: selectedCompany.company_name,
+      recipient: selectedCompany.current_communication_email || '',
+      sendingMethod: 'email'
+    });
+    setShowSendingStatus(true);
+  };
+
+  // Update the WhatsApp sending function
+  const handleWhatsAppSend = async (documentName) => {
+    setSendingDetails({
+      documentName,
+      companyName: selectedCompany.company_name,
+      recipient: selectedCompany.phone || '',
+      sendingMethod: 'whatsapp'
+    });
+    setShowSendingStatus(true);
+  };
+
+  // Add new function to handle the actual sending
+  const handleConfirmSend = async (recipient, newFileName, sendingMethod, documents) => {
+    setIsSending(true);
+
+    try {
+      const documentsToSend = documents.map(doc => ({
+        ...doc,
+        filename: newFileName + '.' + doc.filepath.split('.').pop()
+      }));
+
+      const endpoint = sendingMethod === 'email' ? '/api/send-email' : '/api/send-whatsapp';
+      const payload = sendingMethod === 'email' ? {
+        to: recipient,
+        subject: `Documents from ${selectedCompany.company_name}`,
+        html: `<p>Please find attached the requested documents for ${selectedCompany.company_name}.</p>`,
+        documents: documentsToSend,
+        companyName: selectedCompany.company_name
+      } : {
+        phone: recipient,
+        documents: documentsToSend,
+        companyName: selectedCompany.company_name
+      };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error(`Failed to send via ${sendingMethod}`);
+      toast.success(`Documents sent successfully via ${sendingMethod}`);
+      setShowSendingStatus(false);
+    } catch (error) {
+      console.error(`Error sending ${sendingMethod}:`, error);
+      toast.error(`Failed to send documents via ${sendingMethod}`);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   const { data: documentUploads = [], isLoading: isLoadingUploads } = useQuery<Upload[]>({
     queryKey: ['uploads', selectedCompany?.id, selectedDocument?.id],
     enabled: !!selectedCompany && !!selectedDocument,
@@ -111,8 +189,6 @@ const DocumentList = () => {
     );
   }, [documents, documentSearch]);
 
-// ... (continued from Part 1)
-
   // Document handling functions
   const handleView = async (filepath: string) => {
     try {
@@ -134,7 +210,7 @@ const DocumentList = () => {
         .from('kyc-documents')
         .download(filepath);
       if (error) throw error;
-      
+
       const url = window.URL.createObjectURL(data);
       const link = document.createElement('a');
       link.href = url;
@@ -159,63 +235,96 @@ const DocumentList = () => {
     });
   };
 
-  const renderDocumentSection = (documents: Upload[], type: 'pdf' | 'images') => {
-    const filteredDocs = documents.filter(doc => {
-      const extension = doc.filepath.split('.').pop()?.toLowerCase() || '';
-      return type === 'pdf' 
-        ? extension === 'pdf'
-        : ['jpg', 'jpeg', 'png', 'gif'].includes(extension);
-    });
+  // Updated document section render function
+  const renderDocumentSection = (documents: Upload[]) => {
+    // Group documents by their base name (excluding extension)
+    const groupDocuments = () => {
+      const groups: { [key: string]: { pdf?: Upload; image?: Upload } } = {};
 
-    if (filteredDocs.length === 0) return null;
+      documents.forEach(doc => {
+        const extension = doc.filepath.split('.').pop()?.toLowerCase() || '';
+        const nameWithoutExt = doc.filepath.split('/').pop()?.split('.')[0] || '';
+
+        if (!groups[nameWithoutExt]) {
+          groups[nameWithoutExt] = {};
+        }
+
+        if (extension === 'pdf') {
+          groups[nameWithoutExt].pdf = doc;
+        } else if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) {
+          groups[nameWithoutExt].image = doc;
+        }
+      });
+
+      return groups;
+    };
+
+    const documentGroups = groupDocuments();
 
     return (
       <div className="mb-8">
-        <h3 className="text-lg font-semibold mb-4 text-slate-800">
-          {type === 'pdf' ? 'PDF Documents' : 'Images'}
-        </h3>
         <Card className="border-slate-200">
           <CardContent className="p-0">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200">
-                  <th className="w-8 p-4">
-                    <Checkbox />
-                  </th>
-                  <th className="text-left p-4 font-medium text-slate-700">Upload Date</th>
-                  <th className="text-center p-4 font-medium text-slate-700">Actions</th>
+                  <th className="p-4 text-sm font-medium text-slate-700">PDF Document</th>
+                  <th className="p-4 text-sm font-medium text-slate-700">Image Document</th>
+                  <th className="text-center p-4 text-sm font-medium text-slate-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredDocs.map(upload => (
-                  <tr key={upload.id} className="border-b border-slate-200 hover:bg-slate-50">
+                {Object.entries(documentGroups).map(([name, group], index) => (
+                  <tr key={index} className="border-b border-slate-200 hover:bg-slate-50">
                     <td className="p-4">
-                      <Checkbox
-                        checked={selectedUploads.some(u => u.id === upload.id)}
-                        onCheckedChange={() => toggleUploadSelection(upload)}
-                      />
+                      {group.pdf && (
+                        <div className="flex justify-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleView(group.pdf.filepath)}
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            title={group.pdf.filepath.split('/').pop()}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
                     </td>
-                    <td className="p-4 text-slate-600">
-                      {format(new Date(upload.created_at), 'dd/MM/yyyy')}
+                    <td className="p-4">
+                      {group.image && (
+                        <div className="flex justify-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleView(group.image.filepath)}
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            title={group.image.filepath.split('/').pop()}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
                     </td>
-                    
-                    <td className="p-4 text-center">
+                    <td className="p-4">
                       <div className="flex justify-center space-x-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleView(upload.filepath)}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => handleEmailSend(name)}
+                          className="text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                          title="Send via Email"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Mail className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDownload(upload.filepath, selectedDocument?.name || '')}
-                          className="text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                          onClick={() => handleWhatsAppSend(name)}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          title="Send via WhatsApp"
                         >
-                          <Download className="w-4 h-4" />
+                          <MessageCircle className="w-4 h-4" />
                         </Button>
                       </div>
                     </td>
@@ -229,6 +338,149 @@ const DocumentList = () => {
     );
   };
 
+
+
+  const SendingStatusModal = ({
+    isOpen,
+    onClose,
+    documentName,
+    companyName,
+    recipient,
+    sendingMethod,
+    onSend,
+    isSending
+  }) => {
+    const [editedRecipient, setEditedRecipient] = useState(recipient);
+    const [newFileName, setNewFileName] = useState('');
+    const [showError, setShowError] = useState(false);
+
+    useEffect(() => {
+      if (isOpen) {
+        setEditedRecipient(recipient);
+        setNewFileName(`${companyName}_${documentName}`);
+        setShowError(false);
+      }
+    }, [isOpen, recipient, companyName, documentName]);
+
+    const handleSend = () => {
+      if (!editedRecipient) {
+        setShowError(true);
+        return;
+      }
+      onSend(editedRecipient, newFileName);
+    };
+
+    const validateInput = () => {
+      if (sendingMethod === 'email') {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedRecipient);
+      } else {
+        return /^\+?[\d\s-]{10,}$/.test(editedRecipient);
+      }
+    };
+
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-2xl bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-slate-800">
+              Send Document
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Company and Document Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-green-600">Company Name</Label>
+                <div className="mt-1 text-sm text-slate-800 font-medium">{companyName}</div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-green-600">Original Document</Label>
+                <div className="mt-1 text-sm text-slate-800 font-medium">{documentName}</div>
+              </div>
+            </div>
+
+            {/* New Filename */}
+            <div className="space-y-2">
+              <Label htmlFor="newFileName" className="text-sm font-medium text-green-600">
+                New Filename
+              </Label>
+              <Input
+                id="newFileName"
+                value={newFileName}
+                onChange={(e) => setNewFileName(e.target.value)}
+                className="w-full border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Recipient Input */}
+            <div className="space-y-2">
+              <Label htmlFor="recipient" className="text-sm font-medium text-slate-700">
+                {sendingMethod === 'email' ? 'Email Address' : 'Phone Number'}
+              </Label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  {sendingMethod === 'email' ? (
+                    <Mail className="h-4 w-4 text-blue-500" />
+                  ) : (
+                    <MessageCircle className="h-4 w-4 text-blue-500" />
+                  )}
+                </div>
+                <Input
+                  id="recipient"
+                  type={sendingMethod === 'email' ? 'email' : 'tel'}
+                  value={editedRecipient}
+                  onChange={(e) => {
+                    setEditedRecipient(e.target.value);
+                    setShowError(false);
+                  }}
+                  className={`w-full pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500 ${showError ? 'border-red-500' : ''}`}
+                  placeholder={sendingMethod === 'email' ? 'email@example.com' : '+1234567890'}
+                />
+              </div>
+            </div>
+
+            {/* Error Alert */}
+            {showError && (
+              <Alert variant="destructive" className="bg-red-50 border border-red-200">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-600">
+                  Please enter a valid {sendingMethod === 'email' ? 'email address' : 'phone number'}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          <DialogFooter className="sm:justify-between border-t border-slate-100 pt-4">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={isSending}
+              className="text-slate-600 hover:text-slate-700 border-slate-200 hover:bg-slate-50"
+            >
+              Cancel
+            </Button>
+            <div className="flex space-x-2">
+              <Button
+                onClick={handleSend}
+                disabled={!validateInput() || isSending}
+                className={`bg-blue-600 hover:bg-blue-700 text-white ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {isSending ? (
+                  <>
+                    <span className="mr-2">Sending...</span>
+                    <span className="animate-spin">⌛</span>
+                  </>
+                ) : (
+                  `Send via ${sendingMethod === 'email' ? 'Email' : 'WhatsApp'}`
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
   // Main render
   return (
     <div className="flex h-screen bg-slate-50">
@@ -256,11 +508,10 @@ const DocumentList = () => {
                   setSelectedCompany(company);
                   setSelectedDocument(null);
                 }}
-                className={`w-full text-left px-4 py-2.5 rounded-lg text-xs transition-all ${
-                  selectedCompany?.id === company.id
-                    ? 'bg-blue-50 text-blue-700 font-medium shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`}
+                className={`w-full text-left px-4 py-2.5 rounded-lg text-xs transition-all ${selectedCompany?.id === company.id
+                  ? 'bg-blue-50 text-blue-700 font-medium shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+                  }`}
               >
                 <div className="flex items-start gap-2">
                   <span className="text-slate-400 mt-0.5 text-[10px]">
@@ -289,11 +540,10 @@ const DocumentList = () => {
                         setActiveTab(tab);
                         setSelectedDocument(null);
                       }}
-                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
-                        activeTab === tab
-                          ? 'bg-white text-blue-600 shadow-sm'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${activeTab === tab
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                        }`}
                     >
                       {tab}
                     </button>
@@ -323,11 +573,10 @@ const DocumentList = () => {
                     <button
                       key={doc.id}
                       onClick={() => setSelectedDocument(doc)}
-                      className={`w-full text-left px-4 py-2.5 rounded-lg text-xs transition-all ${
-                        selectedDocument?.id === doc.id
-                          ? 'bg-blue-50 text-blue-700 font-medium shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-50'
-                      }`}
+                      className={`w-full text-left px-4 py-2.5 rounded-lg text-xs transition-all ${selectedDocument?.id === doc.id
+                        ? 'bg-blue-50 text-blue-700 font-medium shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-50'
+                        }`}
                     >
                       <div className="flex items-start gap-2">
                         <span className="text-slate-400 mt-0.5 text-[10px]">
@@ -402,10 +651,7 @@ const DocumentList = () => {
                   Loading uploads...
                 </div>
               ) : (
-                <>
-                  {renderDocumentSection(documentUploads, 'pdf')}
-                  {renderDocumentSection(documentUploads, 'images')}
-                </>
+                renderDocumentSection(documentUploads)
               )}
             </div>
           </>
@@ -421,18 +667,37 @@ const DocumentList = () => {
 
       {/* Modals */}
       {showViewer && viewUrl && (
-        <DocumentViewer url={viewUrl} onClose={() => setShowViewer(false)} />
+        <Dialog open={true} onOpenChange={() => setShowViewer(false)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {selectedDocument?.name || 'Document'} Preview
+              </DialogTitle>
+            </DialogHeader>
+            <DocumentViewer url={viewUrl} onClose={() => setShowViewer(false)} />
+          </DialogContent>
+        </Dialog>
       )}
 
-      {showSendModal && selectedCompany && (
-        <SendDocumentModal
-          company={selectedCompany}
-          documents={selectedUploads}
-          onClose={() => setShowSendModal(false)}
-        />
-      )}
+
+      <SendingStatusModal
+        isOpen={showSendingStatus}
+        onClose={() => setShowSendingStatus(false)}
+        {...sendingDetails}
+        isSending={isSending}
+        onSend={(recipient, newFileName) =>
+          handleConfirmSend(
+            recipient,
+            newFileName,
+            sendingDetails.sendingMethod,
+            documentUploads.filter(doc =>
+              doc.filepath.split('/').pop()?.split('.')[0] === sendingDetails.documentName
+            )
+          )
+        }
+      />
     </div>
   );
 };
-  
+
 export default DocumentList;
