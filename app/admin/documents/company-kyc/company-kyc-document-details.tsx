@@ -86,48 +86,68 @@ export default function CompanyKycDocumentDetails() {
   const parentRef = useRef<HTMLDivElement>(null);
 
   // Render Field Value Helper
-  const renderFieldValue = (field: any, value: any) => {
-    // If value is array
-    if (field.type === 'array' && Array.isArray(value)) {
-      return (
-        <div className="min-w-[150px] max-w-[200px]">
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="items" className="border-none">
-              <AccordionTrigger className="text-[9px] py-1 hover:no-underline">
-                <span className="text-blue-600">{value.length} items</span>
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-1 pt-1">
-                  {value.map((item, index) => (
-                    <div key={index} className="bg-gray-50 p-1 rounded text-[9px]">
-                      <div className="font-medium mb-0.5">Item {index + 1}</div>
-                      {field.arrayConfig?.fields?.map(subField => (
-                        <div key={subField.id} className="flex justify-between py-0.5">
-                          <span className="text-gray-600 mr-1">{subField.name}:</span>
-                          <span className="text-gray-900 break-words max-w-[120px]">
-                            {item[subField.name] || '-'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </div>
-      );
-    }
-
-    // For simple values
+ 
+const renderFieldValue = (field: any, value: any) => {
+  // If value is array
+  if (field.type === 'array' && Array.isArray(value)) {
     return (
-      <div className="text-[9px] min-w-[150px] max-w-[200px] px-2">
-        <div className="line-clamp-2 text-left break-words">
-          {value ? String(value) : '-'}
+      <div className="min-w-[200px] max-w-[400px]">
+        <div className="border rounded-sm">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b">
+                {field.arrayConfig?.fields?.map((subField: any) => (
+                  <th 
+                    key={subField.id} 
+                    className="text-[8px] font-medium text-gray-600 p-1 border-r last:border-r-0"
+                  >
+                    {subField.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {value.length === 0 ? (
+                <tr>
+                  <td 
+                    colSpan={field.arrayConfig?.fields?.length || 1}
+                    className="text-[9px] text-gray-500 text-center p-1"
+                  >
+                    No items
+                  </td>
+                </tr>
+              ) : (
+                value.map((item, index) => (
+                  <tr key={index} className="border-b last:border-b-0">
+                    {field.arrayConfig?.fields?.map((subField: any) => (
+                      <td 
+                        key={subField.id} 
+                        className="text-[9px] p-1 border-r last:border-r-0 text-center"
+                      >
+                        <div className="truncate max-w-[100px]" title={item[subField.name] || '-'}>
+                          {item[subField.name] || '-'}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     );
-  };
+  }
+
+  // For simple values
+  return (
+    <div className="text-[9px] min-w-[150px] max-w-[200px] px-2">
+      <div className="line-clamp-2 text-left break-words">
+        {value ? String(value) : '-'}
+      </div>
+    </div>
+  );
+};
 
   // Debounced Search Effect
   useEffect(() => {
