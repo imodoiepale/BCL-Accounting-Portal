@@ -704,7 +704,7 @@ export default function CompanyKycDocumentDetails() {
                   </div>
                   <div className="flex items-center text-xs">
                     <div className="bg-green-50 px-2 py-1 rounded">
-                      <span className="text-green-600 font-medium">Total Documents: </span>
+                      <span className="text-green-600 font-medium">Total companies with Documents: </span>
                       <span className="text-green-700 font-bold">
                         {uploads.filter(u => u.kyc_document_id === selectedDocument.id).length}
                       </span>
@@ -761,7 +761,7 @@ export default function CompanyKycDocumentDetails() {
                   <TableHeader>
                     <TableRow className="text-[10px] bg-blue-100 border-b-2 border-blue-200">
                       <TableHead
-                        className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer border-r border-gray-200 w-12"
+                        className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer border-r border-gray-400 w-12"
                         onClick={() => handleSort('#')}
                       >
                         <div className="flex items-center">
@@ -772,7 +772,7 @@ export default function CompanyKycDocumentDetails() {
                         </div>
                       </TableHead>
                       <TableHead
-                        className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer border-r border-gray-200 min-w-[200px]"
+                        className="sticky top-0 left-0 bg-blue-100 z-10 cursor-pointer border-r border-gray-400 min-w-[200px]"
                         onClick={() => handleSort('Company')}
                       >
                         <div className="flex items-center">
@@ -782,11 +782,11 @@ export default function CompanyKycDocumentDetails() {
                           )}
                         </div>
                       </TableHead>
-                      <TableHead className="sticky top-0 bg-blue-100 z-10 border-r border-gray-200 w-28">Actions</TableHead>
+                      <TableHead className="sticky top-0 bg-blue-100 z-10 border-r border-gray-400 w-28">Actions</TableHead>
                       {selectedDocument.fields?.map((field) => (
                         <TableHead
                           key={field.id}
-                          className="text-center sticky top-0 bg-blue-100 z-10 border-r border-gray-200 last:border-r-0 min-w-[150px] max-w-[200px] px-2"
+                          className="text-center sticky top-0 bg-blue-100 z-10 border-r border-gray-400 last:border-r-0 min-w-[150px] max-w-[200px] px-2"
                         >
                           <div className="truncate" title={field.name}>
                             {field.name}
@@ -810,15 +810,15 @@ export default function CompanyKycDocumentDetails() {
                             key={company.id}
                             className="border-b-2 border-blue-200 hover:bg-gray-50"
                           >
-                            <TableCell className="font-medium sticky left-0 bg-white border-r border-gray-100 w-12">
+                            <TableCell className="font-medium sticky left-0 bg-white border-r border-gray-300 w-12">
                               {companyIndex + 1}
                             </TableCell>
-                            <TableCell className="font-medium sticky left-0 bg-white border-r border-gray-100 min-w-[200px]">
+                            <TableCell className="font-medium sticky left-0 bg-white border-r border-gray-300 min-w-[200px]">
                               <div className="text-[10px] line-clamp-2 break-words">
                                 {company.company_name}
                               </div>
                             </TableCell>
-                            <TableCell className="text-center border-r border-gray-100 w-28">
+                            <TableCell className="text-center border-r border-gray-300 w-28">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -832,7 +832,7 @@ export default function CompanyKycDocumentDetails() {
                             {selectedDocument.fields?.map((field) => (
                               <TableCell
                                 key={field.id}
-                                className="text-center border-r border-gray-100 min-w-[150px] max-w-[200px]"
+                                className="text-center border-r border-gray-300 min-w-[150px] max-w-[200px]"
                               >
                                 -
                               </TableCell>
@@ -849,14 +849,14 @@ export default function CompanyKycDocumentDetails() {
                         <TableRow
                           key={`${company.id}-${upload.id}`}
                           className={`
-          ${versionIndex === visibleUploads.length - 1 ? 'border-b-2 border-blue-200' : 'border-b border-gray-100'}
+          ${versionIndex === visibleUploads.length - 1 ? 'border-b-2 border-blue-200' : 'border-b border-gray-300'}
           hover:bg-gray-50
         `}
                         >
                           {versionIndex === 0 && (
                             <>
                               <TableCell
-                                className="font-medium sticky left-0 bg-white border-r border-gray-100 w-12"
+                                className="font-medium sticky left-0 bg-white border-r border-gray-300 w-12"
                                 rowSpan={visibleUploads.length}
                               >
                                 <div className="flex items-center gap-1">
@@ -878,7 +878,7 @@ export default function CompanyKycDocumentDetails() {
                                 </div>
                               </TableCell>
                               <TableCell
-                                className="font-medium sticky left-0 bg-white border-r border-gray-100 min-w-[200px]"
+                                className="font-medium sticky left-0 bg-white border-r border-gray-300 min-w-[200px]"
                                 rowSpan={visibleUploads.length}
                               >
                                 <div className="text-[10px] line-clamp-2 break-words">
@@ -887,7 +887,7 @@ export default function CompanyKycDocumentDetails() {
                               </TableCell>
                             </>
                           )}
-                          <TableCell className="text-center border-r border-gray-100 w-28">
+                          <TableCell className="text-center border-r border-gray-300 w-28">
                             <div className="flex items-center justify-center gap-2">
                               <span className="text-[9px] text-gray-500">
                                 {versionIndex === 0 ? 'Latest' : `v${companyUploads.length - versionIndex}`}
@@ -928,7 +928,7 @@ export default function CompanyKycDocumentDetails() {
                           {selectedDocument.fields?.map((field) => (
                             <TableCell
                               key={field.id}
-                              className="text-center border-r border-gray-100 min-w-[150px] max-w-[200px] px-2"
+                              className="text-center border-r border-gray-300 min-w-[150px] max-w-[200px] px-2"
                             >
                               {renderFieldValue(field, upload?.extracted_details?.[field.name])}
                             </TableCell>
