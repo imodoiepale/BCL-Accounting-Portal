@@ -8,12 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from '@/lib/supabaseClient';
 import { Input } from "@/components/ui/input";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
   Eye,
   DownloadIcon,
   UploadIcon,
@@ -27,41 +21,10 @@ import { Card } from '@/components/ui/card';
 import toast, { Toaster } from 'react-hot-toast';
 import { DocumentActions } from './DocumentComponents';
 import { UploadModal, ViewModal, AddFieldsDialog, ExtractDetailsModal } from './DocumentModals';
-import {
-  performExtraction,
-  saveExtractedData,
-  validateExtractedData
-} from '@/lib/extractionUtils';
+import { useVersionControl, VersionSettings } from './versionControl';
 
-interface Upload {
-  id: string;
-  userid: string;
-  kyc_document_id: string;
-  filepath: string;
-  issue_date: string;
-  expiry_date?: string;
-  value?: Record<string, any>;
-  extracted_details?: Record<string, any>;
-}
-
-interface Company {
-  id: number;
-  company_name: string;
-}
-
-interface Document {
-  id: string;
-  name: string;
-  category: string;
-  fields?: Array<{
-    id: string;
-    name: string;
-    type: string;
-  }>;
-  last_extracted_details?: Record<string, any>;
-}
 export default function CompanyKycDocumentDetails() {
-  // State Management
+  // Existing state
   const [searchTerm, setSearchTerm] = useState('');
   const [companySearch, setCompanySearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
@@ -82,72 +45,16 @@ export default function CompanyKycDocumentDetails() {
     'kra-docs': false,
   });
 
+  // Add version control
+  const {
+    expandedCompanies,
+    showAllVersions,
+    toggleCompanyVersions,
+    toggleAllVersions,
+  } = useVersionControl();
+
   const queryClient = useQueryClient();
   const parentRef = useRef<HTMLDivElement>(null);
-
-  // Render Field Value Helper
- 
-const renderFieldValue = (field: any, value: any) => {
-  // If value is array
-  if (field.type === 'array' && Array.isArray(value)) {
-    return (
-      <div className="min-w-[200px] max-w-[400px]">
-        <div className="border rounded-sm">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b">
-                {field.arrayConfig?.fields?.map((subField: any) => (
-                  <th 
-                    key={subField.id} 
-                    className="text-[8px] font-medium text-gray-600 p-1 border-r last:border-r-0"
-                  >
-                    {subField.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {value.length === 0 ? (
-                <tr>
-                  <td 
-                    colSpan={field.arrayConfig?.fields?.length || 1}
-                    className="text-[9px] text-gray-500 text-center p-1"
-                  >
-                    No items
-                  </td>
-                </tr>
-              ) : (
-                value.map((item, index) => (
-                  <tr key={index} className="border-b last:border-b-0">
-                    {field.arrayConfig?.fields?.map((subField: any) => (
-                      <td 
-                        key={subField.id} 
-                        className="text-[9px] p-1 border-r last:border-r-0 text-center"
-                      >
-                        <div className="truncate max-w-[100px]" title={item[subField.name] || '-'}>
-                          {item[subField.name] || '-'}
-                        </div>
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
-
-  // For simple values
-  return (
-    <div className="text-[9px] min-w-[150px] max-w-[200px] px-2">
-      <div className="line-clamp-2 text-left break-words">
-        {value ? String(value) : '-'}
-      </div>
-    </div>
-  );
-};
 
   // Debounced Search Effect
   useEffect(() => {
@@ -157,7 +64,7 @@ const renderFieldValue = (field: any, value: any) => {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // Data Fetching with React Query
+  // Companies Query
   const { data: companies = [], isLoading: isLoadingCompanies } = useQuery({
     queryKey: ['companies', debouncedSearch],
     queryFn: async () => {
@@ -173,30 +80,48 @@ const renderFieldValue = (field: any, value: any) => {
     staleTime: 1000 * 60 * 5,
   });
 
+  // Documents Query
+  const { data: documents = {}, isLoading: isLoadingDocuments } = useQuery({
+    queryKey: ['documents'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('acc_portal_kyc')
+        .select('*')
+        .eq('category', 'company-docs');
 
-  const DocumentItem = ({ document, isSelected, onSelect, onAddField, onUpdateFields }) => (
-    <li
-      className={`px-2 py-1 rounded flex items-center justify-between text-xs ${isSelected
-        ? 'bg-primary text-primary-foreground'
-        : 'hover:bg-gray-100'
-        }`}
-    >
-      <span
-        className="cursor-pointer flex-1"
-        onClick={onSelect}
-      >
-        {document.name}
-      </span>
-      <DocumentActions
-        document={document}
-        onAddField={onAddField}
-        onUpdateFields={(documentId, fields) => {
-          onUpdateFields({ documentId, fields });
-        }}
-      />
-    </li>
-  );
-  // Add this with other mutations near the top of the component after the query hooks
+      if (error) throw error;
+
+      // Group documents by subcategory
+      const groupedDocs = data.reduce((acc, doc) => {
+        const category = doc.subcategory === 'EMPTY' ? 'general' : doc.subcategory;
+        if (!acc[category]) {
+          acc[category] = [];
+        }
+        acc[category].push(doc);
+        return acc;
+      }, {});
+
+      return groupedDocs;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Uploads Query
+  const { data: uploads = [], isLoading: isLoadingUploads } = useQuery({
+    queryKey: ['uploads'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('acc_portal_kyc_uploads')
+        .select('*')
+        .order('created_at', { ascending: false }); // Sort by newest first
+
+      if (error) throw error;
+      return (data || []).filter(upload => isImageFile(upload.filepath));
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Update Fields Mutation
   const updateFieldsMutation = useMutation({
     mutationFn: async ({ documentId, fields }) => {
       const { data, error } = await supabase
@@ -215,7 +140,7 @@ const renderFieldValue = (field: any, value: any) => {
     },
   });
 
-  // Also add the uploadMutation if it's not already defined
+  // Upload Mutation
   const uploadMutation = useMutation({
     mutationFn: async ({ companyId, documentId, file, extractOnUpload, onProgress }) => {
       try {
@@ -271,6 +196,113 @@ const renderFieldValue = (field: any, value: any) => {
       console.error('Upload error:', error);
     }
   });
+
+  // Extract Details Mutation
+  const extractionMutation = useMutation({
+    mutationFn: async ({ uploadId, documentId, extractedData }) => {
+      const { data, error } = await supabase
+        .from('acc_portal_kyc_uploads')
+        .update({ extracted_details: extractedData })
+        .eq('id', uploadId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['uploads']);
+      setShowExtractModal(false);
+      toast.success('Details extracted successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to save extracted details');
+      console.error('Extraction error:', error);
+    }
+  });
+  // Utility Functions
+  const isImageFile = (filepath: string) => {
+    const extension = filepath.split('.').pop()?.toLowerCase();
+    return extension && ['jpg', 'jpeg', 'png'].includes(extension);
+  };
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const getFilteredAndSortedCompanies = () => {
+    let filtered = companies.filter(company =>
+      company.company_name.toLowerCase().includes(companySearch.toLowerCase())
+    );
+
+    if (sortColumn === '#') {
+      filtered = [...filtered].sort((a, b) => {
+        const aIndex = companies.indexOf(a);
+        const bIndex = companies.indexOf(b);
+        return sortDirection === 'asc' ? aIndex - bIndex : bIndex - aIndex;
+      });
+    } else if (sortColumn === 'Company') {
+      filtered = [...filtered].sort((a, b) => {
+        const comparison = a.company_name.localeCompare(b.company_name);
+        return sortDirection === 'asc' ? comparison : -comparison;
+      });
+    }
+
+    return filtered;
+  };
+
+  // Event Handlers
+  const handleViewDocument = async (document: Document, company: Company) => {
+    const upload = uploads.find(u =>
+      u.kyc_document_id === document.id &&
+      u.userid === company.id.toString() &&
+      isImageFile(u.filepath)
+    );
+
+    if (!upload) {
+      toast.error('Image not found');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .storage
+        .from('kyc-documents')
+        .createSignedUrl(upload.filepath, 60);
+
+      if (error) throw error;
+
+      setViewUrl(data.signedUrl);
+      setShowViewModal(true);
+    } catch (error) {
+      console.error('Error viewing image:', error);
+      toast.error('Failed to view image');
+    }
+  };
+
+  const handleUploadClick = (companyId: number, documentId: string) => {
+    setSelectedUploadCompany(companies.find(c => c.id === companyId) || null);
+    setShowUploadModal(true);
+  };
+
+  const handleExtractClick = (document: Document, upload: Upload) => {
+    setSelectedExtractDocument(document);
+    setSelectedExtractUpload(upload);
+    setShowExtractModal(true);
+  };
+
   const handleExtractComplete = async (extractedData: any) => {
     try {
       if (!selectedExtractDocument || !selectedExtractUpload) return;
@@ -309,30 +341,17 @@ const renderFieldValue = (field: any, value: any) => {
     }
   };
 
-  // Add the extraction mutation if not already defined
-  const extractionMutation = useMutation({
-    mutationFn: async ({ uploadId, documentId, extractedData }) => {
-      const { data, error } = await supabase
-        .from('acc_portal_kyc_uploads')
-        .update({ extracted_details: extractedData })
-        .eq('id', uploadId)
-        .select()
-        .single();
+  const getCompanyVersions = (company: Company) => {
+    const companyUploads = uploads.filter(u =>
+      u.kyc_document_id === selectedDocument?.id &&
+      u.userid === company.id.toString()
+    );
 
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['uploads']);
-      setShowExtractModal(false);
-      toast.success('Details extracted successfully');
-    },
-    onError: (error) => {
-      toast.error('Failed to save extracted details');
-      console.error('Extraction error:', error);
-    }
-  });
+    const isExpanded = expandedCompanies.has(company.id);
+    if (companyUploads.length <= 1) return companyUploads;
 
+    return showAllVersions || isExpanded ? companyUploads : [companyUploads[0]];
+  };
 
   const exportToExcel = () => {
     if (!selectedDocument || !companies.length) return;
@@ -349,13 +368,8 @@ const renderFieldValue = (field: any, value: any) => {
 
       // Create rows for the CSV
       const rows = filteredCompanies.map((company, index) => {
-        // Get all uploads for this company
-        const companyUploads = uploads.filter(u =>
-          u.kyc_document_id === selectedDocument?.id &&
-          u.userid === company.id.toString()
-        );
+        const companyUploads = getCompanyVersions(company);
 
-        // If company has no uploads, create a row with empty values
         if (companyUploads.length === 0) {
           return [
             index + 1,
@@ -364,26 +378,21 @@ const renderFieldValue = (field: any, value: any) => {
           ];
         }
 
-        // Create rows for each upload
         return companyUploads.map((upload, uploadIndex) => [
           index + 1,
           `${company.company_name}${companyUploads.length > 1 ? ` (v${uploadIndex + 1})` : ''}`,
           ...(selectedDocument.fields?.map(field => {
             const value = upload.extracted_details?.[field.name];
-            if (Array.isArray(value)) {
-              return JSON.stringify(value);
-            }
-            return value || '-';
+            return Array.isArray(value) ? JSON.stringify(value) : (value || '-');
           }) || [])
         ]);
-      }).flat(); // Flatten the array to handle multiple uploads per company
+      }).flat();
 
       // Convert to CSV format
       const csvContent = [
         headers.join(','),
         ...rows.map(row => row.map(cell => {
-          // Handle cells that might contain commas or quotes
-          const cellStr = String(cell).replace(/"/g, '""'); // Escape quotes
+          const cellStr = String(cell).replace(/"/g, '""');
           return /[,"\n]/.test(cellStr) ? `"${cellStr}"` : cellStr;
         }).join(','))
       ].join('\n');
@@ -405,12 +414,93 @@ const renderFieldValue = (field: any, value: any) => {
       toast.error('Failed to export data');
     }
   };
+  // Render Field Value Helper
+  const renderFieldValue = (field: any, value: any) => {
+    // If value is array
+    if (field.type === 'array' && Array.isArray(value)) {
+      return (
+        <div className="min-w-[800px]">
+          <div className="border rounded-sm w-full">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b">
+                  {field.arrayConfig?.fields?.map((subField: any) => (
+                    <th
+                      key={subField.id}
+                      className="text-[8px] font-medium text-gray-600 p-2 border-r last:border-r-0"
+                    >
+                      {subField.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {value.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={field.arrayConfig?.fields?.length || 1}
+                      className="text-[9px] text-gray-500 text-center p-2"
+                    >
+                      No items
+                    </td>
+                  </tr>
+                ) : (
+                  value.map((item, index) => (
+                    <tr key={index} className="border-b last:border-b-0 hover:bg-gray-50">
+                      {field.arrayConfig?.fields?.map((subField: any) => (
+                        <td
+                          key={subField.id}
+                          className="text-[9px] p-2 border-r last:border-r-0 whitespace-normal"
+                        >
+                          <div className="text-left">
+                            {item[subField.name] || '-'}
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
 
-  // Add this with other functions inside the CompanyKycDocumentDetails component
+    // For simple values
+    return (
+      <div className="text-[9px] min-w-[150px] max-w-[200px] px-2">
+        <div className="line-clamp-2 text-left break-words">
+          {value ? String(value) : '-'}
+        </div>
+      </div>
+    );
+  };
+
+  // Document Item Component
+  const DocumentItem = ({ document, isSelected, onSelect, onAddField, onUpdateFields }) => (
+    <li
+      className={`px-2 py-1 rounded flex items-center justify-between text-xs ${isSelected ? 'bg-primary text-primary-foreground' : 'hover:bg-gray-100'
+        }`}
+    >
+      <span className="cursor-pointer flex-1" onClick={onSelect}>
+        {document.name}
+      </span>
+      <DocumentActions
+        document={document}
+        onAddField={onAddField}
+        onUpdateFields={(documentId, fields) => {
+          onUpdateFields({ documentId, fields });
+        }}
+      />
+    </li>
+  );
+
+  // Render Sidebar
   const renderSidebar = () => (
     <div className="w-1/5 min-w-[200px] border-r overflow-hidden flex flex-col">
       <div className="p-2">
-        <h2 className="text-sm font-bold mb-2">Documents </h2>
+        <h2 className="text-sm font-bold mb-2">Documents</h2>
         <div className="relative">
           <Input
             type="text"
@@ -538,129 +628,7 @@ const renderFieldValue = (field: any, value: any) => {
       </div>
     </div>
   );
-
-  const { data: documents = {}, isLoading: isLoadingDocuments } = useQuery({
-    queryKey: ['documents'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('acc_portal_kyc')
-        .select('*')
-        .eq('category', 'company-docs');
-
-      if (error) throw error;
-
-      // Group documents by subcategory
-      const groupedDocs = data.reduce((acc, doc) => {
-        const category = doc.subcategory === 'EMPTY' ? 'general' : doc.subcategory;
-        if (!acc[category]) {
-          acc[category] = [];
-        }
-        acc[category].push(doc);
-        return acc;
-      }, {});
-
-      return groupedDocs;
-    },
-    staleTime: 1000 * 60 * 5,
-  });
-
-  const { data: uploads = [], isLoading: isLoadingUploads } = useQuery({
-    queryKey: ['uploads'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('acc_portal_kyc_uploads')
-        .select('*');
-  
-      if (error) throw error;
-      // Filter to only include image files
-      return (data || []).filter(upload => isImageFile(upload.filepath));
-    },
-    staleTime: 1000 * 60 * 5,
-  });
-
-  // Utility Functions
-  const toggleCategory = (category: string) => {
-    setExpandedCategories(prev => ({
-      ...prev,
-      [category]: !prev[category]
-    }));
-  };
-
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
-  };
-
-  const getFilteredAndSortedCompanies = () => {
-    let filtered = companies.filter(company =>
-      company.company_name.toLowerCase().includes(companySearch.toLowerCase())
-    );
-
-    if (sortColumn === '#') {
-      filtered = [...filtered].sort((a, b) => {
-        const aIndex = companies.indexOf(a);
-        const bIndex = companies.indexOf(b);
-        return sortDirection === 'asc' ? aIndex - bIndex : bIndex - aIndex;
-      });
-    } else if (sortColumn === 'Company') {
-      filtered = [...filtered].sort((a, b) => {
-        const comparison = a.company_name.localeCompare(b.company_name);
-        return sortDirection === 'asc' ? comparison : -comparison;
-      });
-    }
-
-    return filtered;
-  };
-
-
-  const isImageFile = (filepath: string) => {
-    const extension = filepath.split('.').pop()?.toLowerCase();
-    return extension && ['jpg', 'jpeg', 'png'].includes(extension);
-  };
-
-  // Event Handlers
-  const handleViewDocument = async (document: Document, company: Company) => {
-    const upload = uploads.find(u =>
-      u.kyc_document_id === document.id &&
-      u.userid === company.id.toString() &&
-      isImageFile(u.filepath)
-    );
-  
-    if (!upload) {
-      toast.error('Image not found');
-      return;
-    }
-  
-    try {
-      const { data, error } = await supabase
-        .storage
-        .from('kyc-documents')
-        .createSignedUrl(upload.filepath, 60);
-  
-      if (error) throw error;
-  
-      setViewUrl(data.signedUrl);
-      setShowViewModal(true);
-    } catch (error) {
-      console.error('Error viewing image:', error);
-      toast.error('Failed to view image');
-    }
-  };
-
-  const handleUploadClick = (companyId: number, documentId: string) => {
-    setSelectedUploadCompany(companies.find(c => c.id === companyId) || null);
-    setShowUploadModal(true);
-  };
-
-  const handleExtractClick = (document: Document, upload: Upload) => {
-    setSelectedExtractDocument(document);
-    setSelectedExtractUpload(upload);
-    setShowExtractModal(true);
-  };
+  // Main Component Return
   return (
     <div className="flex overflow-hidden">
       <Toaster position="top-right" />
@@ -711,7 +679,7 @@ const renderFieldValue = (field: any, value: any) => {
                 </div>
               </div>
 
-              {/* Search and Export controls */}
+              {/* Search, Version Settings and Export controls */}
               <div className="flex justify-between items-center gap-2">
                 <div className="relative flex-1 max-w-xs">
                   <Input
@@ -723,14 +691,20 @@ const renderFieldValue = (field: any, value: any) => {
                   />
                   <Search className="h-4 w-4 absolute left-2 top-2 text-gray-400" />
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={exportToExcel}
-                  className="flex items-center gap-2 h-8 text-xs"
-                >
-                  <Download className="h-4 w-4" />
-                  Export to Excel
-                </Button>
+                <div className="flex items-center gap-2">
+                  <VersionSettings
+                    showAllVersions={showAllVersions}
+                    onToggleAllVersions={toggleAllVersions}
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={exportToExcel}
+                    className="flex items-center gap-2 h-8 text-xs"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export to Excel
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -782,138 +756,138 @@ const renderFieldValue = (field: any, value: any) => {
                         u.userid === company.id.toString()
                       );
 
-                      const rows = [];
+                      // If company has no uploads, render empty row
+                      if (companyUploads.length === 0) {
+                        return (
+                          <TableRow
+                            key={company.id}
+                            className="border-b-2 border-blue-200 hover:bg-gray-50"
+                          >
+                            <TableCell className="font-medium sticky left-0 bg-white border-r border-gray-100 w-12">
+                              {companyIndex + 1}
+                            </TableCell>
+                            <TableCell className="font-medium sticky left-0 bg-white border-r border-gray-100 min-w-[200px]">
+                              <div className="text-[10px] line-clamp-2 break-words">
+                                {company.company_name}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center border-r border-gray-100 w-28">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleUploadClick(company.id, selectedDocument.id)}
+                                title="Upload Document"
+                                className="h-7 w-7"
+                              >
+                                <UploadIcon className="h-3 w-3 text-orange-500" />
+                              </Button>
+                            </TableCell>
+                            {selectedDocument.fields?.map((field) => (
+                              <TableCell
+                                key={field.id}
+                                className="text-center border-r border-gray-100 min-w-[150px] max-w-[200px]"
+                              >
+                                -
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        );
+                      }
 
-                      // Main company row with first document or upload button
-                      rows.push(
+                      // For companies with uploads, handle version display
+                      const isExpanded = expandedCompanies.has(company.id);
+                      const visibleUploads = showAllVersions || isExpanded ? companyUploads : [companyUploads[0]];
+
+                      return visibleUploads.map((upload, versionIndex) => (
                         <TableRow
-                          key={company.id}
-                          className={`${companyUploads.length === 0 || companyUploads.length === 1 ? 'border-b-2 border-blue-200' : 'border-b border-gray-400'} hover:bg-gray-50`}
+                          key={`${company.id}-${upload.id}`}
+                          className={`
+          ${versionIndex === visibleUploads.length - 1 ? 'border-b-2 border-blue-200' : 'border-b border-gray-100'}
+          hover:bg-gray-50
+        `}
                         >
-                          <TableCell
-                            className="font-medium sticky left-0 bg-white border-r border-gray-100 w-12"
-                            rowSpan={Math.max(1, companyUploads.length)}
-                          >
-                            {companyIndex + 1}
-                          </TableCell>
-                          <TableCell
-                            className="font-medium sticky left-0 bg-white border-r border-gray-100 min-w-[200px]"
-                            rowSpan={Math.max(1, companyUploads.length)}
-                          >
-                            <div className="text-[10px] line-clamp-2 break-words">
-                              {company.company_name}
-                            </div>
-                          </TableCell>
-
-                          {companyUploads.length === 0 ? (
+                          {versionIndex === 0 && (
                             <>
-                              <TableCell className="text-center border-r border-gray-100 w-28">
+                              <TableCell
+                                className="font-medium sticky left-0 bg-white border-r border-gray-100 w-12"
+                                rowSpan={visibleUploads.length}
+                              >
+                                <div className="flex items-center gap-1">
+                                  {companyIndex + 1}
+                                  {companyUploads.length > 1 && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => toggleCompanyVersions(company.id)}
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      {isExpanded ? (
+                                        <ChevronUp className="h-4 w-4" />
+                                      ) : (
+                                        <ChevronDown className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell
+                                className="font-medium sticky left-0 bg-white border-r border-gray-100 min-w-[200px]"
+                                rowSpan={visibleUploads.length}
+                              >
+                                <div className="text-[10px] line-clamp-2 break-words">
+                                  {company.company_name}
+                                </div>
+                              </TableCell>
+                            </>
+                          )}
+                          <TableCell className="text-center border-r border-gray-100 w-28">
+                            <div className="flex items-center justify-center gap-2">
+                              <span className="text-[9px] text-gray-500">
+                                {versionIndex === 0 ? 'Latest' : `v${companyUploads.length - versionIndex}`}
+                              </span>
+                              <div className="flex gap-1">
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleUploadClick(company.id, selectedDocument.id)}
-                                  title="Upload Document"
+                                  onClick={() => handleViewDocument(selectedDocument, company)}
+                                  title="View Document"
+                                  className="h-7 w-7"
                                 >
-                                  <UploadIcon className="h-4 w-4 text-orange-500" />
+                                  <Eye className="h-3 w-3 text-blue-500" />
                                 </Button>
-                              </TableCell>
-                              {selectedDocument.fields?.map((field) => (
-                                <TableCell
-                                  key={field.id}
-                                  className="text-center border-r border-gray-100 min-w-[150px] max-w-[200px]"
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleExtractClick(selectedDocument, upload)}
+                                  title="Extract Details"
+                                  className="h-7 w-7"
                                 >
-                                  -
-                                </TableCell>
-                              ))}
-                            </>
-                          ) : (
-                            <>
-                              <TableCell className="text-center border-r border-gray-100 w-28">
-                                <div className="flex items-center justify-center gap-2">
-                                  <span className="text-[9px] text-gray-500">v1</span>
-                                  <div className="flex gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleViewDocument(selectedDocument, company)}
-                                      title="View Document"
-                                      className="h-7 w-7"
-                                    >
-                                      <Eye className="h-3 w-3 text-blue-500" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleExtractClick(selectedDocument, companyUploads[0])}
-                                      title="Extract Details"
-                                      className="h-7 w-7"
-                                    >
-                                      <DownloadIcon className="h-3 w-3 text-green-500" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </TableCell>
-                              {selectedDocument.fields?.map((field) => (
-                                <TableCell
-                                  key={field.id}
-                                  className="text-center border-r border-gray-100 min-w-[150px] max-w-[200px] px-2"
-                                >
-                                  {renderFieldValue(field, companyUploads[0]?.extracted_details?.[field.name])}
-                                </TableCell>
-                              ))}
-                            </>
-                          )}
-                        </TableRow>
-                      );
-
-                      // Additional document rows
-                      if (companyUploads.length > 1) {
-                        companyUploads.slice(1).forEach((upload, index) => {
-                          const isLastVersion = index === companyUploads.length - 2;
-                          rows.push(
-                            <TableRow
-                              key={`${company.id}-${upload.id}`}
-                              className={`${isLastVersion ? 'border-b-2 border-black' : 'border-b border-gray-100'} hover:bg-gray-50`}
+                                  <DownloadIcon className="h-3 w-3 text-green-500" />
+                                </Button>
+                                {versionIndex === 0 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleUploadClick(company.id, selectedDocument.id)}
+                                    title="Upload New Version"
+                                    className="h-7 w-7"
+                                  >
+                                    <UploadIcon className="h-3 w-3 text-orange-500" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          {selectedDocument.fields?.map((field) => (
+                            <TableCell
+                              key={field.id}
+                              className="text-center border-r border-gray-100 min-w-[150px] max-w-[200px] px-2"
                             >
-                              <TableCell className="text-center border-r border-gray-100 w-28">
-                                <div className="flex items-center justify-center gap-2">
-                                  <span className="text-[9px] text-gray-500">v{index + 2}</span>
-                                  <div className="flex gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleViewDocument(selectedDocument, company)}
-                                      title="View Document"
-                                      className="h-7 w-7"
-                                    >
-                                      <Eye className="h-3 w-3 text-blue-500" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleExtractClick(selectedDocument, upload)}
-                                      title="Extract Details"
-                                      className="h-7 w-7"
-                                    >
-                                      <DownloadIcon className="h-3 w-3 text-green-500" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </TableCell>
-                              {selectedDocument.fields?.map((field) => (
-                                <TableCell
-                                  key={field.id}
-                                  className="text-center border-r border-gray-100 min-w-[150px] max-w-[200px] px-2"
-                                >
-                                  {renderFieldValue(field, upload?.extracted_details?.[field.name])}
-                                </TableCell>
-                              ))}
-                            </TableRow>
-                          );
-                        });
-                      }
-
-                      return rows;
+                              {renderFieldValue(field, upload?.extracted_details?.[field.name])}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ));
                     })}
                   </TableBody>
                 </Table>
@@ -974,4 +948,3 @@ const renderFieldValue = (field: any, value: any) => {
     </div>
   );
 }
-

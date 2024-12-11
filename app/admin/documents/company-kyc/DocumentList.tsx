@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from "@/components/ui/checkbox";
 import { SendDocumentModal } from './components/SendDocumentModal';
-import { toast, Toaster } from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -193,7 +193,9 @@ const DocumentList = () => {
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) throw new Error(`Failed to send via ${sendingMethod}`);
+      if (!response.ok) {
+        throw new Error(`Failed to send via ${sendingMethod}`);
+      }
       toast.success(`Documents sent successfully via ${sendingMethod}`);
       setShowSendingStatus(false);
     } catch (error) {
@@ -203,7 +205,6 @@ const DocumentList = () => {
       setIsSending(false);
     }
   };
-
   const { data: documentUploads = [], isLoading: isLoadingUploads } = useQuery<Upload[]>({
     queryKey: ['uploads', selectedCompany?.id, selectedDocument?.id],
     enabled: !!selectedCompany && !!selectedDocument,
