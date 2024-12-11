@@ -113,10 +113,19 @@ export default function CompanyKycDocumentDetails() {
       const { data, error } = await supabase
         .from('acc_portal_kyc_uploads')
         .select('*')
-        .order('created_at', { ascending: false }); // Sort by newest first
-
+        .order('created_at', { ascending: false });
+  
       if (error) throw error;
-      return (data || []).filter(upload => isImageFile(upload.filepath));
+  
+      // Filter to only include image files
+      const imageUploads = (data || []).filter(upload => isImageFile(upload.filepath));
+      
+      // Group by company and document, sort by date
+      return imageUploads.sort((a, b) => {
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -144,31 +153,37 @@ export default function CompanyKycDocumentDetails() {
   const uploadMutation = useMutation({
     mutationFn: async ({ companyId, documentId, file, extractOnUpload, onProgress }) => {
       try {
+        // Validate file type
+        if (!isImageFile(file.name)) {
+          throw new Error('Only JPG, JPEG, and PNG files are allowed');
+        }
+  
         onProgress?.('Uploading file...');
         const timestamp = new Date().getTime();
         const fileName = `${companyId}/${documentId}/${timestamp}_${file.name}`;
-
+  
         const { data: fileData, error: fileError } = await supabase
           .storage
           .from('kyc-documents')
           .upload(fileName, file);
-
+  
         if (fileError) throw fileError;
-
+  
         const uploadData = {
           userid: companyId.toString(),
           kyc_document_id: documentId,
           filepath: fileData.path,
+          created_at: new Date().toISOString(),
         };
-
+  
         const { data: uploadResult, error } = await supabase
           .from('acc_portal_kyc_uploads')
           .insert(uploadData)
           .select()
           .single();
-
+  
         if (error) throw error;
-
+  
         if (extractOnUpload) {
           setSelectedExtractDocument(Object.values(documents)
             .flat()
@@ -177,7 +192,7 @@ export default function CompanyKycDocumentDetails() {
           setShowExtractModal(true);
           return uploadResult;
         }
-
+  
         return uploadResult;
       } catch (error) {
         console.error('Upload error:', error);
@@ -192,11 +207,12 @@ export default function CompanyKycDocumentDetails() {
       }
     },
     onError: (error) => {
-      toast.error('Failed to upload document');
+      toast.error(error instanceof Error ? error.message : 'Failed to upload document');
       console.error('Upload error:', error);
     }
   });
 
+  
   // Extract Details Mutation
   const extractionMutation = useMutation({
     mutationFn: async ({ uploadId, documentId, extractedData }) => {
@@ -221,9 +237,10 @@ export default function CompanyKycDocumentDetails() {
     }
   });
   // Utility Functions
-  const isImageFile = (filepath: string) => {
+  const isImageFile = (filepath: string): boolean => {
+    if (!filepath) return false;
     const extension = filepath.split('.').pop()?.toLowerCase();
-    return extension && ['jpg', 'jpeg', 'png'].includes(extension);
+    return ['jpg', 'jpeg', 'png'].includes(extension || '');
   };
 
   const toggleCategory = (category: string) => {
@@ -270,20 +287,20 @@ export default function CompanyKycDocumentDetails() {
       u.userid === company.id.toString() &&
       isImageFile(u.filepath)
     );
-
+  
     if (!upload) {
       toast.error('Image not found');
       return;
     }
-
+  
     try {
       const { data, error } = await supabase
         .storage
         .from('kyc-documents')
         .createSignedUrl(upload.filepath, 60);
-
+  
       if (error) throw error;
-
+  
       setViewUrl(data.signedUrl);
       setShowViewModal(true);
     } catch (error) {
@@ -291,6 +308,7 @@ export default function CompanyKycDocumentDetails() {
       toast.error('Failed to view image');
     }
   };
+
 
   const handleUploadClick = (companyId: number, documentId: string) => {
     setSelectedUploadCompany(companies.find(c => c.id === companyId) || null);
@@ -344,14 +362,16 @@ export default function CompanyKycDocumentDetails() {
   const getCompanyVersions = (company: Company) => {
     const companyUploads = uploads.filter(u =>
       u.kyc_document_id === selectedDocument?.id &&
-      u.userid === company.id.toString()
+      u.userid === company.id.toString() &&
+      isImageFile(u.filepath)  // Add this check
     );
-
+  
     const isExpanded = expandedCompanies.has(company.id);
     if (companyUploads.length <= 1) return companyUploads;
-
+  
     return showAllVersions || isExpanded ? companyUploads : [companyUploads[0]];
   };
+  
 
   const exportToExcel = () => {
     if (!selectedDocument || !companies.length) return;
