@@ -212,7 +212,7 @@ export default function CompanyKycDocumentDetails() {
     }
   });
 
-  
+
   // Extract Details Mutation
   const extractionMutation = useMutation({
     mutationFn: async ({ uploadId, documentId, extractedData }) => {
@@ -375,48 +375,72 @@ export default function CompanyKycDocumentDetails() {
 
   const exportToExcel = () => {
     if (!selectedDocument || !companies.length) return;
-
+  
     try {
       // Create headers for the CSV
       const headers = ['#', 'Company'];
       if (selectedDocument.fields) {
         headers.push(...selectedDocument.fields.map(f => f.name));
       }
-
+  
       // Get filtered and sorted companies
       const filteredCompanies = getFilteredAndSortedCompanies();
-
+  
       // Create rows for the CSV
-      const rows = filteredCompanies.map((company, index) => {
-        const companyUploads = getCompanyVersions(company);
-
+      let rows: string[][] = [];
+      
+      filteredCompanies.forEach((company, index) => {
+        // Get all uploads for this company
+        const companyUploads = uploads.filter(u =>
+          u.kyc_document_id === selectedDocument?.id &&
+          u.userid === company.id.toString() &&
+          isImageFile(u.filepath)  // Only include image files
+        );
+  
+        // If company has no uploads, create a row with empty values
         if (companyUploads.length === 0) {
-          return [
-            index + 1,
+          rows.push([
+            (index + 1).toString(),
             company.company_name,
             ...Array(selectedDocument.fields?.length || 0).fill('-')
-          ];
+          ]);
+        } else {
+          // Create rows for each upload
+          companyUploads.forEach((upload, uploadIndex) => {
+            const row = [
+              (index + 1).toString(),
+              `${company.company_name}${companyUploads.length > 1 ? ` (v${uploadIndex + 1})` : ''}`
+            ];
+  
+            // Add fields
+            if (selectedDocument.fields) {
+              selectedDocument.fields.forEach(field => {
+                let value = upload.extracted_details?.[field.name];
+                if (Array.isArray(value)) {
+                  // Handle array values - convert to string representation
+                  value = JSON.stringify(value);
+                }
+                row.push(value?.toString() || '-');
+              });
+            }
+  
+            rows.push(row);
+          });
         }
-
-        return companyUploads.map((upload, uploadIndex) => [
-          index + 1,
-          `${company.company_name}${companyUploads.length > 1 ? ` (v${uploadIndex + 1})` : ''}`,
-          ...(selectedDocument.fields?.map(field => {
-            const value = upload.extracted_details?.[field.name];
-            return Array.isArray(value) ? JSON.stringify(value) : (value || '-');
-          }) || [])
-        ]);
-      }).flat();
-
+      });
+  
       // Convert to CSV format
       const csvContent = [
         headers.join(','),
-        ...rows.map(row => row.map(cell => {
-          const cellStr = String(cell).replace(/"/g, '""');
-          return /[,"\n]/.test(cellStr) ? `"${cellStr}"` : cellStr;
-        }).join(','))
+        ...rows.map(row => 
+          row.map(cell => {
+            if (cell === null || cell === undefined) return '""';
+            const cellStr = cell.toString().replace(/"/g, '""'); // Escape quotes
+            return /[,"\n]/.test(cellStr) ? `"${cellStr}"` : cellStr;
+          }).join(',')
+        )
       ].join('\n');
-
+  
       // Create and trigger download
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
@@ -427,13 +451,16 @@ export default function CompanyKycDocumentDetails() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-
+  
       toast.success('Export completed successfully');
     } catch (error) {
       console.error('Export error:', error);
       toast.error('Failed to export data');
     }
   };
+
+
+
   // Render Field Value Helper
   const renderFieldValue = (field: any, value: any) => {
     // If value is array
