@@ -6,82 +6,82 @@ import { useState } from "react";
 
 // Helper functions
 export const safeJSONParse = (jsonString: string, fallback: any = {}) => {
-    try {
-      return typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
-    } catch (error) {
-      return fallback;
-    }
-  };
+  try {
+    return typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+  } catch (error) {
+    return fallback;
+  }
+};
 
 export const safeJSONStringify = (data: any, fallback = '{}') => {
-    try {
-      return JSON.stringify(data || {});
-    } catch (error) {
-      console.error('JSON Stringify Error:', error);
-      return fallback;
-    }
-  };
+  try {
+    return JSON.stringify(data || {});
+  } catch (error) {
+    console.error('JSON Stringify Error:', error);
+    return fallback;
+  }
+};
 
 
-  export const processStructureData = (data: any) => {
-    // Validate input structure
-    if (!data || !data.sections || !Array.isArray(data.sections)) {
-      console.error('Invalid structure data format');
-      return {
-        sections: [],
-        subsections: {},
-        mappings: {}
-      };
-    }
-  
-    try {
-      const allSections = new Set<string>();
-      const allSubsections: Record<string, Set<string>> = {};
-      const mappings: Record<string, Record<string, any[]>> = {};
-  
-      // Process each section
-      data.sections.forEach(section => {
-        if (section.name) {
-          allSections.add(section.name);
-          
-          if (!allSubsections[section.name]) {
-            allSubsections[section.name] = new Set();
-          }
-  
-          // Process subsections
-          section.subsections?.forEach(subsection => {
-            if (subsection.name) {
-              allSubsections[section.name].add(subsection.name);
-  
-              // Process fields within subsection
-              if (subsection.fields) {
-                if (!mappings[section.name]) {
-                  mappings[section.name] = {};
-                }
-                mappings[section.name][subsection.name] = subsection.fields;
-              }
-            }
-          });
+export const processStructureData = (data: any) => {
+  // Validate input structure
+  if (!data || !data.sections || !Array.isArray(data.sections)) {
+    console.error('Invalid structure data format');
+    return {
+      sections: [],
+      subsections: {},
+      mappings: {}
+    };
+  }
+
+  try {
+    const allSections = new Set<string>();
+    const allSubsections: Record<string, Set<string>> = {};
+    const mappings: Record<string, Record<string, any[]>> = {};
+
+    // Process each section
+    data.sections.forEach(section => {
+      if (section.name) {
+        allSections.add(section.name);
+
+        if (!allSubsections[section.name]) {
+          allSubsections[section.name] = new Set();
         }
-      });
-  
-      return {
-        sections: Array.from(allSections),
-        subsections: Object.fromEntries(
-          Object.entries(allSubsections).map(([k, v]) => [k, Array.from(v)])
-        ),
-        mappings
-      };
-    } catch (error) {
-      console.error('Error processing structure data:', error);
-      return {
-        sections: [],
-        subsections: {},
-        mappings: {}
-      };
-    }
-  };
-  
+
+        // Process subsections
+        section.subsections?.forEach(subsection => {
+          if (subsection.name) {
+            allSubsections[section.name].add(subsection.name);
+
+            // Process fields within subsection
+            if (subsection.fields) {
+              if (!mappings[section.name]) {
+                mappings[section.name] = {};
+              }
+              mappings[section.name][subsection.name] = subsection.fields;
+            }
+          }
+        });
+      }
+    });
+
+    return {
+      sections: Array.from(allSections),
+      subsections: Object.fromEntries(
+        Object.entries(allSubsections).map(([k, v]) => [k, Array.from(v)])
+      ),
+      mappings
+    };
+  } catch (error) {
+    console.error('Error processing structure data:', error);
+    return {
+      sections: [],
+      subsections: {},
+      mappings: {}
+    };
+  }
+};
+
 export const reorderColumns = (columns: string[], startIndex: number, endIndex: number) => {
   const result = Array.from(columns);
   const [removed] = result.splice(startIndex, 1);
@@ -137,98 +137,100 @@ export const fetchTableColumns = async (tableName: string) => {
     return [];
   }
 };
-export  const handleAddField = async () => {
-    if (!selectedSection || !newField.value) return;
+export const handleAddField = async () => {
+  if (!selectedSection || !newField.value) return;
 
-    try {
-      const columnName = toColumnName(newField.value);
+  try {
+    const columnName = toColumnName(newField.value);
 
-      // Add new column mapping
-      const { error: addError } = await supabase.rpc('add_column_mapping_overalltable', {
-        p_table_name: selectedSection.table_name,
-        p_column_name: columnName,
-        p_display_name: newField.value
-      });
+    // Add new column mapping
+    const { error: addError } = await supabase.rpc('add_column_mapping_overalltable', {
+      p_table_name: selectedSection.table_name,
+      p_column_name: columnName,
+      p_display_name: newField.value
+    });
 
-      if (addError) throw addError;
+    if (addError) throw addError;
 
-      // Refresh the table columns
-      await fetchTableColumns(selectedSection.table_name);
+    // Refresh the table columns
+    await fetchTableColumns(selectedSection.table_name);
 
-      // Refresh the selected section to get updated mappings
-      const { data: updatedSection } = await supabase
-        .from('profile_category_table_mapping')
-        .select('*')
-        .eq('id', selectedSection.id)
-        .single();
+    // Refresh the selected section to get updated mappings
+    const { data: updatedSection } = await supabase
+      .from('profile_category_table_mapping')
+      .select('*')
+      .eq('id', selectedSection.id)
+      .single();
 
-      if (updatedSection) {
-        setSelectedSection(updatedSection);
-      }
-
-      setNewField({ key: '', value: '' });
-      setAddFieldDialog(false);
-      toast.success('Field added successfully');
-
-    } catch (error) {
-      console.error('Error adding field:', error);
-      toast.error('Failed to add field');
+    if (updatedSection) {
+      setSelectedSection(updatedSection);
     }
-  };
-  export const handleEditField = async (
-      key: string, 
-      structure: any[], 
-      selectedTab: string,
-      selectedSection: any,
-      selectedSubsection: string,
-      setEditingField: Function,
-      setEditFieldDialogOpen: Function,    
-      fetchStructure: () => Promise<void>
-  ) => {
-      console.log('Edit field clicked:', { key, selectedTab, selectedSection, selectedSubsection });
-    
-      const section = structure
-          .find(item => item.Tabs === selectedTab)
-          ?.sections
-          .find(s => s.name === selectedSection?.section);
 
-      const subsection = section?.subsections
-          .find(sub => sub.name === selectedSubsection);
+    setNewField({ key: '', value: '' });
+    setAddFieldDialog(false);
+    toast.success('Field added successfully');
 
-      console.log('Found subsection:', subsection);
+  } catch (error) {
+    console.error('Error adding field:', error);
+    toast.error('Failed to add field');
+  }
+};
+export const handleEditField = async (
+  key: string,
+  structure: any[],
+  selectedTab: string,
+  selectedSection: any,
+  selectedSubsection: string,
+  setEditingField: Function,
+  setEditFieldDialogOpen: Function,
+  fetchStructure: () => Promise<void>
+) => {
+  console.log('Edit field clicked:', { key, selectedTab, selectedSection, selectedSubsection });
 
-      if (!subsection) {
-          console.log('No matching subsection found');
-          return;
-      }
+  const section = structure
+    .find(item => item.Tabs === selectedTab)
+    ?.sections
+    .find(s => s.name === selectedSection?.section);
 
-      // Split the key to get table and field name
-      const [table, fieldName] = key.split('-');
-    
-      // Find the field in the subsection's fields array
-      const field = subsection.fields.find(f => 
-          f.table === table && f.name === fieldName
-      );
+  const subsection = section?.subsections
+    .find(sub => sub.name === selectedSubsection);
 
-      console.log('Found field:', field);
-    
-      if (field) {
-          const editingFieldData = {
-              key,
-              displayName: field.display,
-              tableName: field.table,
-              columnName: field.name,
-              dropdownOptions: field.dropdownOptions || [],
-              hasDropdown: field.dropdownOptions?.length > 0 ? 'yes' : 'no',
-              order: field.order || 0,
-              visible: field.visible !== false
-          };
-        
-          console.log('Setting editing field:', editingFieldData);
-          setEditingField(editingFieldData);
-          setEditFieldDialogOpen(true);
-      }
-  };export const handleDeleteField = async (
+  console.log('Found subsection:', subsection);
+
+  if (!subsection) {
+    console.log('No matching subsection found');
+    return;
+  }
+
+  // Split the key to get table and field name
+  const [table, fieldName] = key.split('-');
+
+  // Find the field in the subsection's fields array
+  const field = subsection.fields.find(f =>
+    f.table === table && f.name === fieldName
+  );
+
+  console.log('Found field:', field);
+
+  if (field) {
+    const editingFieldData = {
+      key,
+      displayName: field.display,
+      tableName: field.table,
+      columnName: field.name,
+      dropdownOptions: field.dropdownOptions || [],
+      hasDropdown: field.dropdownOptions?.length > 0 ? 'yes' : 'no',
+      order: field.order || 0,
+      visible: field.visible !== false
+    };
+
+    console.log('Setting editing field:', editingFieldData);
+    setEditingField(editingFieldData);
+    setEditFieldDialogOpen(true);
+  }
+}; 
+
+export const handleDeleteField = async (
   key: string,
   structure: any[],
   selectedTab: string,
@@ -238,260 +240,300 @@ export  const handleAddField = async () => {
   fetchStructure: () => Promise<void>
 ) => {
   try {
-      const { data: currentData, error: fetchError } = await supabase
-          .from('profile_category_table_mapping_2')
-          .select('*')
-          .eq('Tabs', selectedTab)
-          .single();
+    // Get current mapping data first
+    const { data: currentData, error: fetchError } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('*')
+      .eq('Tabs', selectedTab)
+      .single();
 
-      if (fetchError) throw fetchError;
+    if (fetchError) throw fetchError;
 
-      const updatedStructure = {
-          order: currentData.structure.order || {},
-          sections: currentData.structure.sections.map(section => ({
-              ...section,
-              subsections: section.subsections.map(subsection => {
-                  if (subsection.name === selectedSubsection) {
-                      return {
-                          ...subsection,
-                          fields: subsection.fields.filter(field => 
-                              `${field.table}-${field.name}` !== key
-                          )
-                      };
-                  }
-                  return subsection;
-              })
-          })),
-          visibility: currentData.structure.visibility || {},
-          relationships: currentData.structure.relationships || {}
-      };
+    // Create a deep copy of the structure to modify
+    const updatedStructure = {
+      ...currentData.structure,
+      sections: currentData.structure.sections.map(section => ({
+        ...section,
+        subsections: section.subsections.map(subsection => {
+          if (subsection.name === selectedSubsection) {
+            return {
+              ...subsection,
+              fields: subsection.fields.filter(field => 
+                `${field.table}-${field.name}` !== key
+              )
+            };
+          }
+          return subsection;
+        })
+      }))
+    };
 
-      const { error: updateError } = await supabase
-          .from('profile_category_table_mapping_2')
-          .update({ 
-              structure: updatedStructure,
-              updated_at: new Date().toISOString()
-          })
-          .eq('id', currentData.id);
+    // Update the database
+    const { error: updateError } = await supabase
+      .from('profile_category_table_mapping_2')
+      .update({
+        structure: updatedStructure,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', currentData.id);
 
-      if (updateError) throw updateError;
+    if (updateError) throw updateError;
 
-      // Wait for database update
-      await new Promise(resolve => setTimeout(resolve, 10));
-      
-      // Refresh structure data
-      await fetchStructure();
-      
-      // Dispatch custom event for UI refresh
-      window.dispatchEvent(new CustomEvent('structure-updated'));
-      
-      // Dispatch refresh event
-      window.dispatchEvent(new CustomEvent('refreshData'));
+    // Refresh data
+    await fetchStructure();
+    window.dispatchEvent(new CustomEvent('structure-updated'));
+    window.dispatchEvent(new CustomEvent('refreshData'));
 
-      toast.success('Field removed from mappings successfully');
+    toast.success('Field removed successfully');
 
   } catch (error) {
-      console.error('Error removing field:', error);
-      toast.error('Failed to remove field');
+    console.error('Error removing field:', error);
+    toast.error('Failed to remove field');
   }
 };
 
+export const handleCreateTable = async (tableName: string) => {
+  setLoadingTable(true);
+  try {
+    // Create table with default mappings
+    const { error: createError } = await supabase.rpc('create_table_with_mappings_overalltable', {
+      p_table_name: tableName
+    });
 
-  export const handleCreateTable = async (tableName: string) => {
-    setLoadingTable(true);
-    try {
-      // Create table with default mappings
-      const { error: createError } = await supabase.rpc('create_table_with_mappings_overalltable', {
-        p_table_name: tableName
-      });
+    if (createError) throw createError;
 
-      if (createError) throw createError;
+    await fetchTables();
+    setNewTableName('');
+    setShowNewTableDialog(false);
 
-      await fetchTables();
-      setNewTableName('');
-      setShowNewTableDialog(false);
+    // Set the new table as selected and fetch its columns
+    setNewStructure(prev => ({
+      ...prev,
+      table_name: tableName
+    }));
+    await fetchTableColumns(tableName);
 
-      // Set the new table as selected and fetch its columns
-      setNewStructure(prev => ({
-        ...prev,
-        table_name: tableName
-      }));
-      await fetchTableColumns(tableName);
+    toast.success('Table created successfully');
 
-      toast.success('Table created successfully');
+  } catch (error) {
+    toast.error('Failed to create table');
+    console.error('Error creating table:', error);
+  } finally {
+    setLoadingTable(false);
+  }
+};
 
-    } catch (error) {
-      toast.error('Failed to create table');
-      console.error('Error creating table:', error);
-    } finally {
-      setLoadingTable(false);
-    }
-  };
+export const handleUpdateSection = async (id: number, updates: any) => {
+  try {
+    const { data: existing, error: fetchError } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('structure')
+      .eq('id', id)
+      .single();
 
-  export const handleUpdateSection = async (id: number, updates: any) => {
-    try {
-      const { data: existing, error: fetchError } = await supabase
-        .from('profile_category_table_mapping_2')
-        .select('structure')
-        .eq('id', id)
-        .single();
-  
-      if (fetchError) throw fetchError;
-  
-      const updatedStructure = {
-        ...existing.structure,
-        sections: existing.structure.sections.map(section => {
-          if (section.name === updates.section) {
-            return {
-              ...section,
-              ...updates,
-            };
+    if (fetchError) throw fetchError;
+
+    const updatedStructure = {
+      ...existing.structure,
+      sections: existing.structure.sections.map(section => {
+        if (section.name === updates.section) {
+          return {
+            ...section,
+            ...updates,
+          };
+        }
+        return section;
+      })
+    };
+
+    const { error: updateError } = await supabase
+      .from('profile_category_table_mapping_2')
+      .update({
+        structure: updatedStructure,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (updateError) throw updateError;
+    toast.success('Updated successfully');
+  } catch (error) {
+    console.error('Error updating section:', error);
+    toast.error('Update failed');
+  }
+};
+
+export const handleNameUpdate = async (type: 'tab' | 'section' | 'subsection', oldName: string, newName: string) => {
+  try {
+    const { data: records, error: fetchError } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('*');
+
+    if (fetchError) throw fetchError;
+
+    for (const record of records) {
+      let needsUpdate = false;
+      const updatedStructure = { ...record.structure };
+
+      if (type === 'tab' && record.Tabs === oldName) {
+        // Update tab name
+        const { error: updateError } = await supabase
+          .from('profile_category_table_mapping_2')
+          .update({ Tabs: newName })
+          .eq('id', record.id);
+
+        if (updateError) throw updateError;
+      } else if (type === 'section' || type === 'subsection') {
+        // Update section or subsection names in structure
+        updatedStructure.sections = updatedStructure.sections.map(section => {
+          if (type === 'section' && section.name === oldName) {
+            needsUpdate = true;
+            return { ...section, name: newName };
+          }
+          if (type === 'subsection') {
+            section.subsections = section.subsections.map(subsection => {
+              if (subsection.name === oldName) {
+                needsUpdate = true;
+                return { ...subsection, name: newName };
+              }
+              return subsection;
+            });
           }
           return section;
-        })
+        });
+
+        if (needsUpdate) {
+          const { error: updateError } = await supabase
+            .from('profile_category_table_mapping_2')
+            .update({
+              structure: updatedStructure,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', record.id);
+
+          if (updateError) throw updateError;
+        }
+      }
+    }
+
+    // Fetch fresh data after updates
+    const { data: freshData, error: refreshError } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('*');
+
+    if (refreshError) throw refreshError;
+
+    toast.success(`${type} updated successfully`);
+    return freshData;
+  } catch (error) {
+    console.error('Update error:', error);
+    toast.error(`Failed to update ${type}`);
+    throw error;
+  }
+};
+
+export const handleColumnVisibilityChange = async (
+  mainTab: string,
+  subTab: string, 
+  field: string,
+  isVisible: boolean,
+  supabase: any,
+  onUpdate: () => void
+) => {
+  try {
+    const { data: currentData, error: fetchError } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('*')
+      .eq('main_tab', mainTab)
+      .eq('Tabs', subTab);
+
+    if (fetchError) throw fetchError;
+
+    const updates = currentData.map(async (item) => {
+      const updatedStructure = {
+        ...item.structure,
+        visibility: {
+          ...item.structure.visibility,
+          fields: {
+            ...item.structure.visibility?.fields,
+            [field]: isVisible
+          }
+        }
       };
-  
-      const { error: updateError } = await supabase
+
+      return supabase
         .from('profile_category_table_mapping_2')
         .update({ 
           structure: updatedStructure,
           updated_at: new Date().toISOString()
         })
-        .eq('id', id);
-  
-      if (updateError) throw updateError;
-      toast.success('Updated successfully');
-    } catch (error) {
-      console.error('Error updating section:', error);
-      toast.error('Update failed');
-    }
-  };
-  
-
-  export const handleNameUpdate = async (type: 'tab' | 'section' | 'subsection', oldName: string, newName: string) => {
-    try {
-      const { data: records, error: fetchError } = await supabase
-        .from('profile_category_table_mapping_2')
-        .select('*');
-  
-      if (fetchError) throw fetchError;
-  
-      for (const record of records) {
-        let needsUpdate = false;
-        const updatedStructure = { ...record.structure };
-  
-        if (type === 'tab' && record.Tabs === oldName) {
-          // Update tab name
-          const { error: updateError } = await supabase
-            .from('profile_category_table_mapping_2')
-            .update({ Tabs: newName })
-            .eq('id', record.id);
-  
-          if (updateError) throw updateError;
-        } else if (type === 'section' || type === 'subsection') {
-          // Update section or subsection names in structure
-          updatedStructure.sections = updatedStructure.sections.map(section => {
-            if (type === 'section' && section.name === oldName) {
-              needsUpdate = true;
-              return { ...section, name: newName };
-            }
-            if (type === 'subsection') {
-              section.subsections = section.subsections.map(subsection => {
-                if (subsection.name === oldName) {
-                  needsUpdate = true;
-                  return { ...subsection, name: newName };
-                }
-                return subsection;
-              });
-            }
-            return section;
-          });
-  
-          if (needsUpdate) {
-            const { error: updateError } = await supabase
-              .from('profile_category_table_mapping_2')
-              .update({ 
-                structure: updatedStructure,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', record.id);
-  
-            if (updateError) throw updateError;
-          }
-        }
-      }
-  
-      // Fetch fresh data after updates
-      const { data: freshData, error: refreshError } = await supabase
-        .from('profile_category_table_mapping_2')
-        .select('*');
-  
-      if (refreshError) throw refreshError;
-  
-      toast.success(`${type} updated successfully`);
-      return freshData;
-    } catch (error) {
-      console.error('Update error:', error);
-      toast.error(`Failed to update ${type}`);
-      throw error;
-    }
-  };
-  
-  // Add this function to generate indices
-  export const generateIndices = (structure: any[]) => {
-    const indexMapping = {
-        tabs: {},
-        sections: {},
-        subsections: {}
-      };
-        const newIndexMapping = {
-      tabs: {},
-      sections: {},
-      subsections: {}
-    };
-
-    // Index tabs and organize by tabs
-    const tabStructure = {};
-    structure.forEach(item => {
-      if (!tabStructure[item.Tabs]) {
-        tabStructure[item.Tabs] = [];
-      }
-      tabStructure[item.Tabs].push(item);
+        .eq('id', item.id);
     });
 
-    // Process each tab
-    Object.keys(tabStructure).forEach((tab, tabIndex) => {
-      const tabNumber = tabIndex + 1;
-      newIndexMapping.tabs[tab] = `${tabNumber}.0`;
+    await Promise.all(updates);
+    
+    // Trigger updates
+    onUpdate?.();
+    window.dispatchEvent(new CustomEvent('visibility-updated'));
 
-      // Process items within each tab
-      tabStructure[tab].forEach(item => {
-        // Safely parse JSON or use default empty object
-        const sections = typeof item.sections_sections === 'string'
-          ? JSON.parse(item.sections_sections)
-          : item.sections_sections || {};
+  } catch (error) {
+    console.error('Error updating column visibility:', error);
+    toast.error('Failed to update column visibility');
+  }
+};
+export const generateIndices = (structure: any[]) => {
+  const indexMapping = {
+    tabs: {},
+    sections: {},
+    subsections: {}
+  };
+  const newIndexMapping = {
+    tabs: {},
+    sections: {},
+    subsections: {}
+  };
 
-        const subsections = typeof item.sections_subsections === 'string'
-          ? JSON.parse(item.sections_subsections)
-          : item.sections_subsections || {};
+  // Index tabs and organize by tabs
+  const tabStructure = {};
+  structure.forEach(item => {
+    if (!tabStructure[item.Tabs]) {
+      tabStructure[item.Tabs] = [];
+    }
+    tabStructure[item.Tabs].push(item);
+  });
 
-        Object.keys(sections).forEach((section, sectionIndex) => {
-          const sectionNumber = `${tabNumber}.${sectionIndex + 1}`;
-          newIndexMapping.sections[section] = sectionNumber;
+  // Process each tab
+  Object.keys(tabStructure).forEach((tab, tabIndex) => {
+    const tabNumber = tabIndex + 1;
+    newIndexMapping.tabs[tab] = `${tabNumber}.0`;
 
-          const sectionSubsections = subsections[section];
-          if (Array.isArray(sectionSubsections)) {
-            sectionSubsections.forEach((subsection, subsectionIndex) => {
-              newIndexMapping.subsections[subsection] = `${sectionNumber}.${subsectionIndex + 1}`;
-            });
-          } else if (sectionSubsections) {
-            newIndexMapping.subsections[sectionSubsections] = `${sectionNumber}.1`;
-          }
-        });
+    // Process items within each tab
+    tabStructure[tab].forEach(item => {
+      // Safely parse JSON or use default empty object
+      const sections = typeof item.sections_sections === 'string'
+        ? JSON.parse(item.sections_sections)
+        : item.sections_sections || {};
+
+      const subsections = typeof item.sections_subsections === 'string'
+        ? JSON.parse(item.sections_subsections)
+        : item.sections_subsections || {};
+
+      Object.keys(sections).forEach((section, sectionIndex) => {
+        const sectionNumber = `${tabNumber}.${sectionIndex + 1}`;
+        newIndexMapping.sections[section] = sectionNumber;
+
+        const sectionSubsections = subsections[section];
+        if (Array.isArray(sectionSubsections)) {
+          sectionSubsections.forEach((subsection, subsectionIndex) => {
+            newIndexMapping.subsections[subsection] = `${sectionNumber}.${subsectionIndex + 1}`;
+          });
+        } else if (sectionSubsections) {
+          newIndexMapping.subsections[sectionSubsections] = `${sectionNumber}.1`;
+        }
       });
     });
+  });
 
-    return indexMapping; // Return the mapping instead of setting it
+  return indexMapping; // Return the mapping instead of setting it
 };
 export const handleTabSelection = async (
   tabValue: string,
@@ -586,7 +628,7 @@ export const processStructureForUI = (structure: any) => {
 export const mergeAndProcessStructure = (data: any) => {
   const mergedSections = data.sections.reduce((acc, section) => {
     const existingSection = acc.find(s => s.name === section.name);
-    
+
     if (existingSection) {
       // Merge subsections of matching sections
       existingSection.subsections = [
@@ -599,7 +641,7 @@ export const mergeAndProcessStructure = (data: any) => {
         subsections: [...section.subsections]
       });
     }
-    
+
     return acc;
   }, []);
 
@@ -695,7 +737,7 @@ export const handleSubsectionSelection = async (
   setSelectedTableFields: (fields: any) => void,
   processColumnMappings: (mappings: Record<string, string>) => Record<string, string[]>
 ) => {
-  try{
+  try {
     if (subsectionValue === 'new') {
       setNewStructure(prev => ({
         ...prev,
@@ -916,7 +958,7 @@ export const handleSaveFieldEdit = async (
       .eq('id', currentItem.id);
 
     if (error) throw error;
-    
+
     // First close the dialog
     setEditFieldDialogOpen(false);
 
@@ -930,6 +972,8 @@ export const handleSaveFieldEdit = async (
     // After all operations are complete, force a refresh of the page data
     window.dispatchEvent(new CustomEvent('structure-updated'));
 
+    // Dispatch event to refresh main table
+    window.dispatchEvent(new CustomEvent('visibility-updated'));
   } catch (error) {
     console.error('Error updating field:', error);
     toast.error('Failed to update field');
@@ -945,7 +989,7 @@ export const fetchExistingSectionsAndSubsections = async (
   }
 ) => {
   const { setExistingSections, setExistingSubsections } = stateSetters;
-  
+
   try {
     const { data, error } = await supabase
       .from('profile_category_table_mapping_2')
@@ -995,22 +1039,22 @@ export const fetchExistingSectionsAndSubsections = async (
 };
 export const validateStructureData = (data: any): boolean => {
   if (!data || typeof data !== 'object') return false;
-  
+
   // Check required top-level properties
   const requiredProps = ['order', 'sections', 'visibility', 'relationships'];
   if (!requiredProps.every(prop => prop in data)) return false;
 
   // Validate sections array
   if (!Array.isArray(data.sections)) return false;
-  
+
   // Validate each section
   return data.sections.every(section => {
     if (!section.name || !section.subsections) return false;
-    
+
     // Validate subsections
     return Array.isArray(section.subsections) && section.subsections.every(subsection => {
       if (!subsection.name || !Array.isArray(subsection.fields)) return false;
-      
+
       // Validate fields
       return subsection.fields.every(field => {
         return field.name && field.table && typeof field.display === 'string';
@@ -1133,7 +1177,7 @@ export const handleAddNewField = async () => {
 
 // Visibility Settings Handlers
 export const handleSaveVisibilitySettings = async (
-  structureId: number, 
+  structureId: number,
   visibilitySettings: any
 ) => {
   try {
@@ -1152,7 +1196,7 @@ export const handleSaveVisibilitySettings = async (
 
     const { error: updateError } = await supabase
       .from('profile_category_table_mapping_2')
-      .update({ 
+      .update({
         structure: updatedStructure,
         updated_at: new Date().toISOString()
       })
