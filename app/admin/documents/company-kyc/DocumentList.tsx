@@ -45,6 +45,17 @@ interface Upload {
   selected?: boolean;
 }
 
+interface SendingStatusModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  documentName: string;
+  companyName: string;
+  recipient: string;
+  sendingMethod: 'email' | 'whatsapp';
+  onSend: (recipient: string, newFileName: string) => void;
+  isSending: boolean;
+}
+
 const DocumentList = () => {
   // State management
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -56,14 +67,16 @@ const DocumentList = () => {
   const [documentSearch, setDocumentSearch] = useState('');
   const [showSendModal, setShowSendModal] = useState(false);
   const [selectedUploads, setSelectedUploads] = useState<Upload[]>([]);
-  const [showSendingStatus, setShowSendingStatus] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [showSendingStatus, setShowSendingStatus] = useState(false);
   const [sendingDetails, setSendingDetails] = useState({
     documentName: '',
     companyName: '',
     recipient: '',
     sendingMethod: ''
   });
+  
 
   // Add this utility function near the top of the file
   const truncateFilename = (filename, maxLength = 20) => {
@@ -140,71 +153,126 @@ const DocumentList = () => {
     setShowSendingStatus(true);
   };
 
-  const handleWhatsAppSend = async (documentName) => {
-    const docs = documentName ?
-      documentUploads.filter(doc => doc.filepath.split('/').pop()?.split('.')[0] === documentName) :
-      selectedUploads;
-
-    setSendingDetails({
-      documentName: documentName || `${docs.length} documents`,
-      companyName: selectedCompany.company_name,
-      recipient: selectedCompany.phone || '',
-      sendingMethod: 'whatsapp'
-    });
-    setShowSendingStatus(true);
-  };
+  
 
   // Add new function to handle the actual sending
-  const handleConfirmSend = async (recipient, newFileName, sendingMethod, documents) => {
-    setIsSending(true);
+ // Modified document selection logic in handleConfirmSend
+const handleConfirmSend = async (
+  recipient: string,
+  newFileName: string,
+  sendingMethod: 'email' | 'whatsapp',
+  documents: Upload[]
+) => {
+  setIsSending(true);
+  setSendError(null);
 
-    try {
-      // Handle bulk sending by generating unique filenames for each document
-      const documentsToSend = documents.map(doc => {
-        const originalFileName = doc.filepath.split('/').pop();
-        const extension = originalFileName.split('.').pop();
-        // If sending multiple documents, use original filenames with company prefix
-        const finalFileName = documents.length > 1
-          ? `${selectedCompany.company_name}_${originalFileName}`
-          : `${newFileName}.${extension}`;
-
-        return {
-          ...doc,
-          filename: finalFileName
-        };
-      });
-
-      const endpoint = sendingMethod === 'email' ? '/api/send-email' : '/api/send-whatsapp';
-      const payload = sendingMethod === 'email' ? {
-        to: recipient,
-        subject: `Documents from ${selectedCompany.company_name}`,
-        html: `<p>Please find attached the requested documents for ${selectedCompany.company_name}.</p>`,
-        documents: documentsToSend,
-        companyName: selectedCompany.company_name
-      } : {
-        phone: recipient,
-        documents: documentsToSend,
-        companyName: selectedCompany.company_name
-      };
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to send via ${sendingMethod}`);
-      }
-      toast.success(`Documents sent successfully via ${sendingMethod}`);
-      setShowSendingStatus(false);
-    } catch (error) {
-      console.error(`Error sending ${sendingMethod}:`, error);
-      toast.error(`Failed to send documents via ${sendingMethod}`);
-    } finally {
-      setIsSending(false);
+  try {
+    // Validate we have documents to send
+    if (!documents || documents.length === 0) {
+      throw new Error('No documents selected for sending');
     }
-  };
+
+    // Validate recipient format
+    if (sendingMethod === 'whatsapp' && !recipient.match(/^\+?[\d\s-]{10,}$/)) {
+      throw new Error('Invalid phone number format');
+    }
+
+    // Handle bulk sending by generating unique filenames for each document
+    const documentsToSend = documents.map(doc => {
+      if (!doc.filepath) {
+        throw new Error('Invalid document data: missing filepath');
+      }
+
+      const originalFileName = doc.filepath.split('/').pop();
+      if (!originalFileName) {
+        throw new Error('Invalid filepath format');
+      }
+
+      const extension = originalFileName.split('.').pop();
+      const finalFileName = documents.length > 1
+        ? `${selectedCompany?.company_name}_${originalFileName}`
+        : `${newFileName}.${extension}`;
+
+      return {
+        ...doc,
+        filename: finalFileName
+      };
+    });
+
+    const endpoint = sendingMethod === 'email' ? '/api/send-email' : '/api/send-whatsapp';
+    const payload = sendingMethod === 'email' 
+      ? {
+          to: recipient,
+          subject: `Documents from ${selectedCompany?.company_name}`,
+          html: `<p>Please find attached the requested documents for ${selectedCompany?.company_name}.</p>`,
+          documents: documentsToSend,
+          companyName: selectedCompany?.company_name
+        } 
+      : {
+          phone: recipient.replace(/\D/g, ''), // Strip non-numeric characters
+          documents: documentsToSend.map(doc => ({
+            filepath: doc.filepath,
+            filename: doc.filename
+          })),
+          companyName: selectedCompany?.company_name
+        };
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      throw new Error(responseData.message || responseData.error || `Failed to send via ${sendingMethod}`);
+    }
+
+    toast.success(`Documents sent successfully via ${sendingMethod}`);
+    setShowSendingStatus(false);
+    setSelectedUploads([]);
+  } catch (error) {
+    console.error(`Error sending ${sendingMethod}:`, error);
+    const errorMessage = error instanceof Error ? error.message : `Failed to send documents via ${sendingMethod}`;
+    setSendError(errorMessage);
+    toast.error(errorMessage);
+  } finally {
+    setIsSending(false);
+  }
+};
+
+// Modified WhatsApp send handler
+const handleWhatsAppSend = async (documentName?: string) => {
+
+  // Get the documents to send
+  const docs = documentName
+    ? documentUploads.filter(doc => doc.filepath.split('/').pop()?.split('.')[0] === documentName)
+    : selectedUploads;
+
+  // Validate documents
+  if (!docs.length) {
+    toast.error('No documents selected for sending');
+    return;
+  }
+
+  // Format phone number
+  const formattedPhone = selectedCompany.phone.startsWith('+') 
+    ? selectedCompany.phone 
+    : `+${selectedCompany.phone.replace(/\D/g, '')}`;
+
+  setSendingDetails({
+    documentName: documentName || `${docs.length} documents`,
+    companyName: selectedCompany.company_name,
+    recipient: formattedPhone,
+    sendingMethod: 'whatsapp'
+  });
+  setShowSendingStatus(true);
+};
+  
+
+
+
   const { data: documentUploads = [], isLoading: isLoadingUploads } = useQuery<Upload[]>({
     queryKey: ['uploads', selectedCompany?.id, selectedDocument?.id],
     enabled: !!selectedCompany && !!selectedDocument,
@@ -424,8 +492,7 @@ const DocumentList = () => {
   };
 
 
-
-  const SendingStatusModal = ({
+  const SendingStatusModal: React.FC<SendingStatusModalProps> = ({
     isOpen,
     onClose,
     documentName,
@@ -442,7 +509,6 @@ const DocumentList = () => {
     useEffect(() => {
       if (isOpen) {
         setEditedRecipient(recipient);
-        // Only set filename for single document sends
         if (!documentName.includes('documents')) {
           setNewFileName(`${companyName}_${documentName}`);
         }
@@ -488,6 +554,13 @@ const DocumentList = () => {
               </div>
             </div>
   
+            {sendError && (
+              <Alert variant="destructive" className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="ml-2">{sendError}</AlertDescription>
+              </Alert>
+            )}
+  
             {/* Only show filename input for single document */}
             {!documentName.includes('documents') && (
               <div className="space-y-2">
@@ -513,7 +586,7 @@ const DocumentList = () => {
                   {sendingMethod === 'email' ? (
                     <Mail className="h-4 w-4 text-blue-500" />
                   ) : (
-                    <MessageCircle className="h-4 w-4 text-blue-500" />
+                    <Phone className="h-4 w-4 text-blue-500" />
                   )}
                 </div>
                 <Input
@@ -753,14 +826,7 @@ const DocumentList = () => {
                       Send Selected ({selectedUploads.length})
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    New Upload
-                  </Button>
+                  
                 </div>
               </div>
             </div>
@@ -808,14 +874,7 @@ const DocumentList = () => {
               </Button>
             </>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-blue-600 border-blue-200 hover:bg-blue-50"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            New Upload
-          </Button>
+         
         </div>
       </div>
 

@@ -889,7 +889,7 @@ export default function CompanyKycDocumentDetails() {
                           )}
                           <TableCell className="text-center border-r border-gray-300 w-28">
                             <div className="flex items-center justify-center gap-2">
-                              <span className="text-[9px] text-gray-500">
+                              <span className="text-[9px] text-green-300">
                                 {versionIndex === 0 ? 'Latest' : `v${companyUploads.length - versionIndex}`}
                               </span>
                               <div className="flex gap-1">
