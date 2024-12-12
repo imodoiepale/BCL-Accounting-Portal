@@ -26,7 +26,6 @@ export default async function handler(
     });
   }
 
-
   const { name } = req.body;
   
   // Generate username and password based on company name
@@ -35,23 +34,11 @@ export default async function handler(
   const password = `${firstName}bcl1*`;
 
   try {
-
-
-
     // Create the user in Clerk with generated credentials
     const user = await clerkClient.users.createUser({
       username: username,
       password: password,
     });
-
-
-
-
-
-
-
-
-
 
     // Update user metadata in Clerk
     await clerkClient.users.updateUser(user.id, {
@@ -98,7 +85,6 @@ export default async function handler(
         .from('acc_portal_company_duplicate2')
         .upsert({
           company_name: name,
-
           userid: user.id,
           status: 'active'
         }, {
@@ -114,7 +100,6 @@ export default async function handler(
     return res.status(200).json({
       success: true,
       id: user.id,
-
       username: username,
       password: password
     });

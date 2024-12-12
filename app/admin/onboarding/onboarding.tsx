@@ -35,14 +35,10 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
 
   // Form states
   const [newCompanyName, setNewCompanyName] = useState("");
-  const [newCompanyUsername, setNewCompanyUsername] = useState("");
-  const [newCompanyPassword, setNewCompanyPassword] = useState("");
   const [selectedCompany, setSelectedCompany] = useState("");
 
   const resetInputs = () => {
     setNewCompanyName("");
-    setNewCompanyUsername("");
-    setNewCompanyPassword("");
     setErrorMessage("");
   };
 
@@ -69,20 +65,13 @@ const handleExistingCompanySubmit = async () => {
   try {
     if (!signUp) throw new Error("Sign up is not initialized");
 
-    await signUp.create({
-      username: newCompanyUsername.trim(),
-      password: newCompanyPassword,
-      firstName: newCompanyName.trim(),
-    });
-
     const response = await fetch("/api/create-users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         existingCompany: true,
         companyId: selectedCompany,
-        clientTypes: selectedTypes,
-        username: newCompanyUsername.trim()
+        clientTypes: selectedTypes
       }),
     });
 
@@ -123,27 +112,8 @@ const handleExistingCompanySubmit = async () => {
       }
   
       // Basic validation
-      if (!newCompanyName || !newCompanyUsername || !newCompanyPassword) {
-        throw new Error("All fields are required");
-      }
-  
-      if (!/^[a-zA-Z0-9_]+$/.test(newCompanyUsername)) {
-        throw new Error("Username can only contain letters, numbers, and underscores");
-      }
-  
-      if (newCompanyPassword.length < 8) {
-        throw new Error("Password must be at least 8 characters long");
-      }
-  
-      // Create the user account
-      try {
-        await signUp.create({
-          username: newCompanyUsername.trim(),
-          password: newCompanyPassword,
-          firstName: newCompanyName.trim(),
-        });
-      } catch (signUpError: any) {
-        throw new Error(signUpError.errors?.[0]?.message || "Failed to create account");
+      if (!newCompanyName) {
+        throw new Error("Company name is required");
       }
   
       // Update metadata through API
@@ -156,7 +126,6 @@ const handleExistingCompanySubmit = async () => {
           },
           body: JSON.stringify({
             name: newCompanyName.trim(),
-            username: newCompanyUsername.trim(),
           }),
         });
   
@@ -177,8 +146,7 @@ const handleExistingCompanySubmit = async () => {
         setIsOpen(false);
         
         onComplete({ 
-          name: newCompanyName.trim(), 
-          username: newCompanyUsername.trim(),
+          name: newCompanyName.trim(),
           userId: data.id 
         });
   
@@ -232,35 +200,6 @@ const handleExistingCompanySubmit = async () => {
                     disabled={loading}
                     required
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
-                  <Input
-                    id="username"
-                    value={newCompanyUsername}
-                    onChange={(e) => setNewCompanyUsername(e.target.value)}
-                    placeholder="Enter username"
-                    disabled={loading}
-                    required
-                    pattern="^[a-zA-Z0-9_]+$"
-                    title="Username can only contain letters, numbers, and underscores"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={newCompanyPassword}
-                    onChange={(e) => setNewCompanyPassword(e.target.value)}
-                    placeholder="Enter password"
-                    disabled={loading}
-                    required
-                    minLength={8}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Password must be at least 8 characters long
-                  </p>
                 </div>
                 <Button 
                   type="submit" 
