@@ -1,8 +1,11 @@
 // @ts-nocheck
+
 import { supabase } from './supabaseClient';
 
+// Types
 interface ArrayConfig {
   fields?: {
+    id: string;
     name: string;
     type: string;
   }[];
@@ -18,75 +21,179 @@ interface Field {
 interface Document {
   id: string;
   name: string;
+  category?: string;
+  subcategory?: string;
   fields?: Field[];
 }
 
 interface ExtractionResult {
-  [key: string]: string | number | null;
+  [key: string]: any;
 }
 
+interface ConversionResponse {
+  success: boolean;
+  message: string;
+  image_base64?: string;
+  mime_type?: string;
+  width?: number;
+  height?: number;
+  processed_at?: string;
+}
 
+interface ExtractedField {
+  name: string;
+  value: any;
+  confidence?: number;
+}
+
+// Constants
+const CONVERSION_SERVICE_URL = 'https://document-converter-tgxf.onrender.com';
+const EXTRACTION_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpamVwYWxlQGdtYWlsLmNvbSIsImlhdCI6MTczMTUxNDExMX0.DZf2t6fUGiVQN6FXCwLOnRG2Yx48aok1vIH00sKhWS4';
+const MAX_RETRIES = 3;
+const EXTRACTION_TIMEOUT = 60000; // 60 seconds
+const SUPPORTED_IMAGE_TYPES = ['jpg', 'jpeg', 'png', 'tiff', 'bmp', 'webp'];
+
+// Utility Functions
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const isImageFile = (filepath: string): boolean => {
+  if (!filepath) return false;
+  const extension = filepath.split('.').pop()?.toLowerCase();
+  return SUPPORTED_IMAGE_TYPES.includes(extension || '');
+};
 
 const formatExtractedValue = (value: any, fieldType: string): any => {
-  if (!value) return null;
+  if (value === null || value === undefined) return null;
 
   switch (fieldType) {
     case 'date':
       try {
-        // Try to parse and format the date
         const date = new Date(value);
-        if (!isNaN(date.getTime())) {
-          return date.toISOString().split('T')[0];
-        }
-        return null;
+        return !isNaN(date.getTime()) ? date.toISOString().split('T')[0] : null;
       } catch {
         return null;
       }
+    
     case 'number':
-      // Extract numbers from string and convert to float
-      const num = parseFloat(value.toString().replace(/[^\d.-]/g, ''));
+      const num = typeof value === 'string' ? 
+        parseFloat(value.replace(/[^\d.-]/g, '')) : 
+        parseFloat(String(value));
       return isNaN(num) ? null : num;
+    
+    case 'array':
+      return Array.isArray(value) ? value : [];
+    
+    case 'boolean':
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'string') {
+        const lowered = value.toLowerCase().trim();
+        if (['true', 'yes', '1'].includes(lowered)) return true;
+        if (['false', 'no', '0'].includes(lowered)) return false;
+      }
+      return null;
+    
     default:
-      return value.toString().trim();
+      return String(value).trim();
   }
 };
 
-const parseExtractionResponse = (output: string): Record<string, any> => {
+async function convertToImage(fileUrl: string): Promise<string> {
   try {
-    // First try to parse as JSON
-    const jsonMatch = output.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+    console.log('Converting document to image:', fileUrl);
+    
+    const response = await fetch(`${CONVERSION_SERVICE_URL}/convert-url`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ url: fileUrl })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Document conversion failed');
     }
 
-    // If not JSON, try to parse line by line
-    const parsedData: Record<string, any> = {};
-    const lines = output.split('\n');
-    lines.forEach(line => {
-      const [key, ...valueParts] = line.split(':');
-      if (key && valueParts.length > 0) {
-        const value = valueParts.join(':').trim();
-        if (value) {
-          parsedData[key.trim()] = value;
-        }
-      }
-    });
-    return parsedData;
+    const result: ConversionResponse = await response.json();
+    if (!result.success || !result.image_base64) {
+      throw new Error(result.message || 'Invalid conversion response');
+    }
+
+    console.log('Document successfully converted to image');
+    return `data:${result.mime_type || 'image/png'};base64,${result.image_base64}`;
   } catch (error) {
-    console.error('Error parsing extraction response:', error);
-    throw new Error('Failed to parse extraction response');
+    console.error('Conversion error:', error);
+    throw error instanceof Error ? error : new Error(String(error));
+  }
+}
+
+const validateExtractedData = (
+  extractedData: ExtractionResult,
+  fields: Field[]
+): boolean => {
+  try {
+    for (const field of fields) {
+      const value = extractedData[field.name];
+      if (value === null) continue;
+
+      switch (field.type) {
+        case 'date':
+          if (value && isNaN(Date.parse(String(value)))) {
+            console.warn(`Invalid date value for field ${field.name}:`, value);
+            return false;
+          }
+          break;
+
+        case 'number':
+          if (value && isNaN(Number(value))) {
+            console.warn(`Invalid number value for field ${field.name}:`, value);
+            return false;
+          }
+          break;
+
+        case 'array':
+          if (value && !Array.isArray(value)) {
+            console.warn(`Invalid array value for field ${field.name}:`, value);
+            return false;
+          }
+          if (field.arrayConfig?.fields && Array.isArray(value)) {
+            for (const item of value) {
+              for (const subField of field.arrayConfig.fields) {
+                const subValue = item[subField.name];
+                if (subValue !== null && subValue !== undefined) {
+                  const formattedValue = formatExtractedValue(subValue, subField.type);
+                  if (formattedValue === null && subValue !== null) {
+                    console.warn(`Invalid array item value for field ${field.name}.${subField.name}:`, subValue);
+                    return false;
+                  }
+                }
+              }
+            }
+          }
+          break;
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error('Validation error:', error);
+    return false;
   }
 };
 
 export const performExtraction = async (
   fileUrl: string,
   document: Document,
-  apiKey: string = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpamVwYWxlQGdtYWlsLmNvbSIsImlhdCI6MTczMTUxNDExMX0.DZf2t6fUGiVQN6FXCwLOnRG2Yx48aok1vIH00sKhWS4'
+  onProgress?: (message: string) => void
 ): Promise<ExtractionResult> => {
   try {
-    const url = 'https://api.hyperbolic.xyz/v1/chat/completions';
+    onProgress?.('Preparing document for extraction...');
+
+    // Convert document to image if it's not already an image
+    const imageUrl = isImageFile(fileUrl) ? fileUrl : await convertToImage(fileUrl);
     
-    // Build a detailed field description including array structures
+    onProgress?.('Extracting information from document...');
+
+    // Build field descriptions for the AI
     const fieldPrompts = document.fields?.map(field => {
       if (field.type === 'array') {
         const subFields = field.arrayConfig?.fields?.map(sf => 
@@ -97,7 +204,7 @@ export const performExtraction = async (
       return `${field.name} (${field.type})`;
     }).join('\n');
 
-    // Create a structured example of the expected output
+    // Create example output structure
     const exampleOutput = document.fields?.reduce((acc, field) => {
       if (field.type === 'array') {
         acc[field.name] = [{
@@ -110,48 +217,14 @@ export const performExtraction = async (
         acc[field.name] = `example_${field.type}`;
       }
       return acc;
-    }, {});
+    }, {} as Record<string, any>);
 
-    const fileType = fileUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image';
-
-    let content = [];
-    if (fileType === 'pdf') {
-      const pdfResponse = await fetch(fileUrl);
-      const pdfData = await pdfResponse.blob();
-      content = [
-        {
-          type: "text",
-          text: `Extract the following fields from the PDF document:\n\n${fieldPrompts}\n\n
-                Return the results in JSON format with field names as keys.
-                For array fields, ensure the data is returned as an array of objects.
-                Expected format example: ${JSON.stringify(exampleOutput, null, 2)}`
-        },
-        {
-          type: "file",
-          file: pdfData
-        }
-      ];
-    } else {
-      content = [
-        {
-          type: "text",
-          text: `Extract the following fields from the image:\n\n${fieldPrompts}\n\n
-                Return the results in JSON format with field names as keys.
-                For array fields, ensure the data is returned as an array of objects.
-                Expected format example: ${JSON.stringify(exampleOutput, null, 2)}`
-        },
-        {
-          type: "image_url",
-          image_url: { url: fileUrl }
-        }
-      ];
-    }
-
-    const response = await fetch(url, {
+    // Make extraction API request
+    const response = await fetch('https://api.hyperbolic.xyz/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${EXTRACTION_API_KEY}`,
       },
       body: JSON.stringify({
         model: 'Qwen/Qwen2-VL-7B-Instruct',
@@ -166,7 +239,19 @@ export const performExtraction = async (
           },
           {
             role: 'user',
-            content
+            content: [
+              {
+                type: "text",
+                text: `Extract the following fields from the image:\n\n${fieldPrompts}\n\n
+                      Return the results in JSON format with field names as keys.
+                      For array fields, ensure the data is returned as an array of objects.
+                      Expected format example: ${JSON.stringify(exampleOutput, null, 2)}`
+              },
+              {
+                type: "image_url",
+                image_url: { url: imageUrl }
+              }
+            ]
           }
         ],
         max_tokens: 2048,
@@ -177,18 +262,16 @@ export const performExtraction = async (
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
+      throw new Error(`Extraction API request failed: ${response.statusText}`);
     }
 
-    const json = await response.json();
-    const output = json.choices[0].message.content;
-    console.log('Raw extraction output:', output);
+    const result = await response.json();
+    const extractedData = parseExtractionResponse(result.choices[0].message.content);
 
-    const parsedData = parseExtractionResponse(output);
-    console.log('Parsed extraction data:', parsedData);
+    onProgress?.('Processing extracted data...');
 
-    // Process array fields
-    const processedData = { ...parsedData };
+    // Process and validate the extracted data
+    const processedData = { ...extractedData };
     document.fields?.forEach(field => {
       if (field.type === 'array') {
         if (!Array.isArray(processedData[field.name])) {
@@ -201,25 +284,39 @@ export const performExtraction = async (
         processedData[field.name] = processedData[field.name].map(item => {
           const processedItem = {};
           field.arrayConfig?.fields?.forEach(subField => {
-            processedItem[subField.name] = item[subField.name] || null;
+            processedItem[subField.name] = formatExtractedValue(
+              item[subField.name],
+              subField.type
+            );
           });
           return processedItem;
         });
+      } else {
+        processedData[field.name] = formatExtractedValue(
+          processedData[field.name],
+          field.type
+        );
       }
     });
+
+    // Validate the processed data
+    if (!validateExtractedData(processedData, document.fields || [])) {
+      throw new Error('Extracted data validation failed');
+    }
 
     return processedData;
   } catch (error) {
     console.error('Extraction error:', error);
-    throw new Error('Failed to extract document details');
+    throw error instanceof Error ? error : new Error('Failed to extract document details');
   }
 };
 
+// Save Extracted Data
 export const saveExtractedData = async (
   uploadId: string,
   documentId: string,
   extractedData: ExtractionResult
-) => {
+): Promise<{ upload: any; document: any }> => {
   try {
     const [uploadUpdate, documentUpdate] = await Promise.all([
       supabase
@@ -237,12 +334,8 @@ export const saveExtractedData = async (
         .single()
     ]);
 
-    if (uploadUpdate.error) {
-      throw uploadUpdate.error;
-    }
-    if (documentUpdate.error) {
-      throw documentUpdate.error;
-    }
+    if (uploadUpdate.error) throw uploadUpdate.error;
+    if (documentUpdate.error) throw documentUpdate.error;
 
     return {
       upload: uploadUpdate.data,
@@ -254,6 +347,42 @@ export const saveExtractedData = async (
   }
 };
 
+// Retry Extraction
+export const retryExtraction = async (
+  fileUrl: string,
+  document: Document,
+  maxRetries: number = MAX_RETRIES,
+  onProgress?: (message: string) => void
+): Promise<ExtractionResult> => {
+  let attempt = 0;
+  let lastError: Error | null = null;
+
+  while (attempt < maxRetries) {
+    try {
+      onProgress?.(`Attempt ${attempt + 1} of ${maxRetries}...`);
+      const result = await performExtraction(fileUrl, document, onProgress);
+      
+      if (validateExtractedData(result, document.fields || [])) {
+        return result;
+      }
+      
+      throw new Error('Validation failed for extracted data');
+    } catch (error) {
+      lastError = error as Error;
+      attempt++;
+      
+      if (attempt < maxRetries) {
+        const backoffTime = Math.pow(2, attempt - 1) * 1000;
+        onProgress?.(`Retrying in ${backoffTime/1000} seconds...`);
+        await delay(backoffTime);
+      }
+    }
+  }
+
+  throw new Error(`Extraction failed after ${maxRetries} attempts: ${lastError?.message}`);
+};
+
+// Get Signed URL
 export const getSignedUrl = async (filepath: string): Promise<string> => {
   try {
     const { data, error } = await supabase
@@ -261,84 +390,21 @@ export const getSignedUrl = async (filepath: string): Promise<string> => {
       .from('kyc-documents')
       .createSignedUrl(filepath, 60);
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data.signedUrl;
   } catch (error) {
     console.error('Error getting signed URL:', error);
     throw new Error('Failed to generate document URL');
   }
-};// Helper function to validate extracted data against field types
-export const validateExtractedData = (
-  extractedData: ExtractionResult,
-  fields: Field[]
-): boolean => {
-  try {
-    for (const field of fields) {
-      const value = extractedData[field.name];
-      if (value === null) continue;
-
-      switch (field.type) {
-        case 'date':
-          if (value && isNaN(Date.parse(value.toString()))) {
-            return false;
-          }
-          break;
-        case 'number':
-          if (value && isNaN(Number(value))) {
-            return false;
-          }
-          break;
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
 };
 
-// Helper function to clean extracted data
-export const cleanExtractedData = (
-  extractedData: ExtractionResult,
-  fields: Field[]
-): ExtractionResult => {
-  const cleanData: ExtractionResult = {};
-  fields.forEach(field => {
-    const value = extractedData[field.name];
-    cleanData[field.name] = formatExtractedValue(value, field.type);
-  });
-  return cleanData;
+
+const extractionUtils = {
+  performExtraction,
+  saveExtractedData,
+  retryExtraction,
+  getSignedUrl,
+  isImageFile,
 };
 
-// Helper function to retry extraction with different strategies
-export const retryExtraction = async (
-  fileUrl: string,
-  document: Document,
-  apiKey: string,
-  maxRetries: number = 3
-): Promise<ExtractionResult> => {
-  let attempt = 0;
-  let lastError: Error | null = null;
-
-  while (attempt < maxRetries) {
-    try {
-      const result = await performExtraction(fileUrl, document, apiKey);
-      if (validateExtractedData(result, document.fields || [])) {
-        return result;
-      }
-      throw new Error('Validation failed for extracted data');
-    } catch (error) {
-      lastError = error as Error;
-      attempt++;
-      
-      if (attempt < maxRetries) {
-        // Exponential backoff: 1s, 2s, 4s, etc.
-        const backoffTime = Math.pow(2, attempt - 1) * 1000;
-        await new Promise(resolve => setTimeout(resolve, backoffTime));
-      }
-    }
-  }
-
-  throw new Error(`Extraction failed after ${maxRetries} attempts: ${lastError?.message}`);
-};
+export default extractionUtils;
