@@ -1,5 +1,4 @@
-// columnManagementTab.tsx
-//@ts-nocheck
+// @ts-nocheck
 "use client"
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { toast } from "sonner";
 import { motion } from 'framer-motion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ColumnManagementProps {
   structure: any;
@@ -16,130 +17,149 @@ interface ColumnManagementProps {
   supabase: any;
   activeMainTab: string;
 }
+interface OrderState {
+  tabs: { [key: string]: number };
+  sections: { [key: string]: number };
+  subsections: { [key: string]: number };
+  fields: { [key: string]: number };
+}
 
 export const ColumnManagement: React.FC<ColumnManagementProps> = ({
   structure,
   structureId,
   onUpdate,
   supabase,
-  activeMainTab
+  activeMainTab,
 }) => {
   const [loading, setLoading] = useState(false);
   const [lastMovedItem, setLastMovedItem] = useState<string | null>(null);
-  const [filteredStructure, setFilteredStructure] = useState(structure);
-
+  const [allTabsData, setAllTabsData] = useState<any[]>([]);
+  const [selectedMainTab, setSelectedMainTab] = useState(activeMainTab);
+  const [selectedSubTab, setSelectedSubTab] = useState<string>('');
+  const [orderState, setOrderState] = useState<OrderState>({
+    tabs: {},
+    sections: {},
+    subsections: {},
+    fields: {}
+  });
+  // Fetch all tabs data
   useEffect(() => {
-    if (structure && activeMainTab) {
-      const filtered = {
-        ...structure,
-        sections: structure.sections.filter(section => 
-          section.mainTab === activeMainTab
-        )
-      };
-      setFilteredStructure(filtered);
-    }
-  }, [structure, activeMainTab]);
+    const fetchAllTabs = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profile_category_table_mapping_2')
+          .select('*')
+          .order('main_tab', { ascending: true })
+          .order('Tabs', { ascending: true });
 
-  const handleOrderChange = async (
-    type: 'sections' | 'subsections' | 'fields',
-    parentId: string,
+        if (error) throw error;
+        setAllTabsData(data || []);
+        
+        // Set initial sub tab
+        if (data?.length > 0) {
+          const firstSubTab = data.find(item => item.main_tab === selectedMainTab)?.Tabs;
+          if (firstSubTab) setSelectedSubTab(firstSubTab);
+        }
+      } catch (error) {
+        console.error('Error fetching tabs:', error);
+        toast.error('Failed to load tabs data');
+      }
+    };
+
+    fetchAllTabs();
+  }, [supabase, selectedMainTab]);
+
+  const handleReorder = async (
+    type: 'tabs' | 'sections' | 'subsections' | 'fields',
     itemId: string,
-    direction: 'up' | 'down'
+    direction: 'up' | 'down',
+    parentId?: string
   ) => {
     try {
       setLoading(true);
-      const currentStructure = { ...filteredStructure };
-      let items;
-      let parentPath;
-
-      if (type === 'sections') {
-        items = currentStructure.sections;
-        parentPath = 'sections';
-      } else if (type === 'subsections') {
-        const section = currentStructure.sections.find(s => s.name === parentId);
-        items = section?.subsections;
-        parentPath = `sections.${currentStructure.sections.indexOf(section)}.subsections`;
-      } else {
-        const section = currentStructure.sections.find(s => 
-          s.subsections.some(sub => sub.name === parentId)
-        );
-        const subsection = section?.subsections.find(sub => sub.name === parentId);
-        items = subsection?.fields;
-        parentPath = `sections.${currentStructure.sections.indexOf(section)}.subsections.${section.subsections.indexOf(subsection)}.fields`;
+      const currentTab = allTabsData.find(
+        tab => tab.main_tab === selectedMainTab && tab.Tabs === selectedSubTab
+      );
+      if (!currentTab) return;
+  
+      const updatedStructure = { ...currentTab.structure };
+      let items: any[];
+      let parentItems: any[];
+  
+      switch (type) {
+        case 'tabs':
+          items = allTabsData.filter(tab => tab.main_tab === selectedMainTab);
+          break;
+        case 'sections':
+          items = updatedStructure.sections;
+          break;
+        case 'subsections':
+          parentItems = updatedStructure.sections;
+          items = parentItems.find(s => s.name === parentId)?.subsections || [];
+          break;
+        case 'fields':
+          const section = updatedStructure.sections.find(s => 
+            s.subsections.some(sub => sub.name === parentId)
+          );
+          items = section?.subsections.find(sub => sub.name === parentId)?.fields || [];
+          break;
       }
-
-      if (!items) return;
-
+  
       const currentIndex = items.findIndex(item => 
         type === 'fields' ? `${item.table}.${item.name}` === itemId : item.name === itemId
       );
       const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-
+  
       if (newIndex < 0 || newIndex >= items.length) return;
-
+  
       // Swap items
-      const temp = items[currentIndex];
-      items[currentIndex] = items[newIndex];
-      items[newIndex] = temp;
-
+      [items[currentIndex], items[newIndex]] = [items[newIndex], items[currentIndex]];
+  
       // Update order properties
       items.forEach((item, index) => {
         item.order = index + 1;
       });
-
+  
       // Update database
       const { error } = await supabase
         .from('profile_category_table_mapping_2')
         .update({
-          structure: currentStructure,
+          structure: updatedStructure,
           updated_at: new Date().toISOString()
         })
-        .eq('id', structureId);
-
+        .eq('id', currentTab.id);
+  
       if (error) throw error;
-
-      // Set the moved item for highlighting
+  
+      // Update local state
+      setAllTabsData(prev => prev.map(tab => 
+        tab.id === currentTab.id ? { ...tab, structure: updatedStructure } : tab
+      ));
+  
       setLastMovedItem(itemId);
       setTimeout(() => setLastMovedItem(null), 2000);
-
-      // Update UI and trigger table refresh
+  
+      // Trigger updates
       await onUpdate();
       window.dispatchEvent(new CustomEvent('structure-updated'));
       window.dispatchEvent(new CustomEvent('refreshTable'));
-
+  
     } catch (error) {
-      console.error('Error updating order:', error);
-      toast.error('Failed to update order');
+      console.error('Error reordering items:', error);
+      toast.error('Failed to reorder items');
     } finally {
       setLoading(false);
     }
   };
-
-  const cascadeVisibility = async (
-    currentStructure: any,
-    type: string,
-    itemId: string,
-    isVisible: boolean
-  ) => {
-    if (type === 'sections') {
-      const section = currentStructure.sections.find(s => s.name === itemId);
-      if (section) {
-        section.visible = isVisible;
-        section.subsections.forEach(sub => {
-          sub.visible = isVisible;
-          sub.fields.forEach(field => field.visible = isVisible);
-        });
-      }
-    } else if (type === 'subsections') {
-      const subsection = currentStructure.sections
-        .flatMap(s => s.subsections)
-        .find(sub => sub.name === itemId);
-      if (subsection) {
-        subsection.visible = isVisible;
-        subsection.fields.forEach(field => field.visible = isVisible);
-      }
-    }
-  };
+  // Group tabs by main tab
+  const mainTabs = React.useMemo(() => {
+    const groups = allTabsData.reduce((acc, tab) => {
+      if (!acc[tab.main_tab]) acc[tab.main_tab] = [];
+      acc[tab.main_tab].push(tab.Tabs);
+      return acc;
+    }, {});
+    return groups;
+  }, [allTabsData]);
 
   const handleVisibilityToggle = async (
     type: 'sections' | 'subsections' | 'fields',
@@ -148,85 +168,78 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
   ) => {
     try {
       setLoading(true);
-      const currentStructure = { ...filteredStructure };
+      const currentTab = allTabsData.find(
+        tab => tab.main_tab === selectedMainTab && tab.Tabs === selectedSubTab
+      );
+      if (!currentTab) return;
+  
+      const updatedStructure = { ...currentTab.structure };
       let item;
-
+      let cascadeUpdates = {};
+  
       if (type === 'sections') {
-        item = currentStructure.sections.find(s => s.name === itemId);
+        item = updatedStructure.sections.find(s => s.name === itemId);
+        if (item) {
+          const newVisibility = !item.visible;
+          item.visible = newVisibility;
+          
+          // Cascade to all subsections and fields in this section
+          item.subsections.forEach(subsection => {
+            subsection.visible = newVisibility;
+            subsection.fields.forEach(field => {
+              field.visible = newVisibility;
+              cascadeUpdates[`${field.table}.${field.name}`] = newVisibility;
+            });
+          });
+        }
       } else if (type === 'subsections') {
-        const section = currentStructure.sections.find(s => s.name === parentId);
+        const section = updatedStructure.sections.find(s => s.name === parentId);
         item = section?.subsections.find(sub => sub.name === itemId);
+        if (item) {
+          const newVisibility = !item.visible;
+          item.visible = newVisibility;
+          
+          // Cascade to all fields in this subsection
+          item.fields.forEach(field => {
+            field.visible = newVisibility;
+            cascadeUpdates[`${field.table}.${field.name}`] = newVisibility;
+          });
+        }
       } else {
-        const section = currentStructure.sections.find(s => 
+        const section = updatedStructure.sections.find(s => 
           s.subsections.some(sub => sub.name === parentId)
         );
         const subsection = section?.subsections.find(sub => sub.name === parentId);
         item = subsection?.fields.find(f => `${f.table}.${f.name}` === itemId);
+        if (item) {
+          item.visible = !item.visible;
+        }
       }
-
-      if (!item) return;
-
-      const newVisibility = !item.visible;
-      item.visible = newVisibility;
-
-      // Cascade visibility changes
-      await cascadeVisibility(currentStructure, type, itemId, newVisibility);
-
+  
       // Update database
       const { error } = await supabase
         .from('profile_category_table_mapping_2')
         .update({
-          structure: currentStructure,
+          structure: updatedStructure,
           updated_at: new Date().toISOString()
         })
-        .eq('id', structureId);
-
+        .eq('id', currentTab.id);
+  
       if (error) throw error;
-
-      // Update UI and trigger table refresh
+  
+      // Update local state
+      setAllTabsData(prev => prev.map(tab => 
+        tab.id === currentTab.id ? { ...tab, structure: updatedStructure } : tab
+      ));
+  
+      // Trigger updates
       await onUpdate();
       window.dispatchEvent(new CustomEvent('structure-updated'));
       window.dispatchEvent(new CustomEvent('refreshTable'));
-
+      window.dispatchEvent(new CustomEvent('visibility-updated'));
+  
     } catch (error) {
       console.error('Error updating visibility:', error);
-      toast.error('Failed to update visibility');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleBulkVisibilityToggle = async (isVisible: boolean) => {
-    try {
-      setLoading(true);
-      const currentStructure = { ...filteredStructure };
-
-      currentStructure.sections.forEach(section => {
-        section.visible = isVisible;
-        section.subsections.forEach(subsection => {
-          subsection.visible = isVisible;
-          subsection.fields.forEach(field => {
-            field.visible = isVisible;
-          });
-        });
-      });
-
-      const { error } = await supabase
-        .from('profile_category_table_mapping_2')
-        .update({
-          structure: currentStructure,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', structureId);
-
-      if (error) throw error;
-
-      await onUpdate();
-      window.dispatchEvent(new CustomEvent('structure-updated'));
-      window.dispatchEvent(new CustomEvent('refreshTable'));
-
-    } catch (error) {
-      console.error('Error updating bulk visibility:', error);
       toast.error('Failed to update visibility');
     } finally {
       setLoading(false);
@@ -237,15 +250,19 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
     type: 'sections' | 'subsections' | 'fields',
     parentId: string,
     item: any,
-    level: number = 0
+    level: number = 0,
+    index: number,
+    totalItems: number
   ) => {
     const itemId = type === 'fields' ? `${item.table}.${item.name}` : item.name;
     const displayName = type === 'fields' ? item.display : item.name;
     const isHighlighted = lastMovedItem === itemId;
-
+    const uniqueKey = `${type}-${parentId}-${itemId}-${index}`;
+  
     return (
       <motion.div
-        key={itemId}
+
+        key={uniqueKey}
         initial={isHighlighted ? { backgroundColor: '#e3f2fd' } : {}}
         animate={isHighlighted ? { backgroundColor: '#ffffff' } : {}}
         transition={{ duration: 2 }}
@@ -253,24 +270,25 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
           level > 0 ? `ml-${level * 4}` : ''
         }`}
       >
-        <span className="flex-1 font-medium text-gray-700">{displayName}</span>
+        <span className="flex items-center gap-2">
+          <span className="text-sm text-gray-500">{index + 1}.</span>
+          <span className="flex-1 font-medium text-gray-700">{displayName}</span>
+        </span>
         <div className="flex items-center gap-3">
           <div className="flex gap-1">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleOrderChange(type, parentId, itemId, 'up')}
-              className="h-7 w-7 p-0 hover:bg-gray-100"
-              disabled={loading}
+              onClick={() => handleReorder(type, itemId, 'up', parentId)}
+              disabled={index === 0 || loading}
             >
               <ChevronUp className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleOrderChange(type, parentId, itemId, 'down')}
-              className="h-7 w-7 p-0 hover:bg-gray-100"
-              disabled={loading}
+              onClick={() => handleReorder(type, itemId, 'down', parentId)}
+              disabled={index === totalItems - 1 || loading}
             >
               <ChevronDown className="h-4 w-4" />
             </Button>
@@ -285,54 +303,61 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
     );
   };
 
+  const currentTabData = allTabsData.find(
+    tab => tab.main_tab === selectedMainTab && tab.Tabs === selectedSubTab
+  );
+
   return (
     <Card className="shadow-sm">
       <CardContent className="p-6">
         <div className="space-y-6">
-          <div className="flex justify-between items-center mb-6 border-b pb-4">
-            <h3 className="text-xl font-semibold text-gray-800">Column Management - {activeMainTab}</h3>
-            <div className="flex gap-3">
-              <Button 
-                onClick={() => handleBulkVisibilityToggle(true)}
-                disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                Show All
-              </Button>
-              <Button 
-                onClick={() => handleBulkVisibilityToggle(false)}
-                disabled={loading}
-                variant="outline"
-                className="border-gray-300 hover:bg-gray-50"
-              >
-                <EyeOff className="h-4 w-4 mr-2" />
-                Hide All
-              </Button>
-            </div>
-          </div>
+          <Tabs value={selectedMainTab} onValueChange={setSelectedMainTab}>
+            <TabsList>
+              {Object.keys(mainTabs).map(tab => (
+                <TabsTrigger key={tab} value={tab}>{tab}</TabsTrigger>
+              ))}
+            </TabsList>
 
-          {filteredStructure.sections
-            .sort((a, b) => a.order - b.order)
-            .map(section => (
-              <div key={section.name} className="border rounded-lg p-4 space-y-4 bg-white shadow-sm hover:shadow-md transition-shadow">
-                {renderItem('sections', '', section)}
-                <div className="pl-4 space-y-3">
-                  {section.subsections
-                    .sort((a, b) => a.order - b.order)
-                    .map(subsection => (
-                      <div key={subsection.name} className="bg-gray-50 rounded-md p-3">
-                        {renderItem('subsections', section.name, subsection, 1)}
-                        <div className="pl-4 space-y-2 mt-2">
-                          {subsection.fields
-                            .sort((a, b) => a.order - b.order)
-                            .map(field => renderItem('fields', subsection.name, field, 2))}
-                        </div>
-                      </div>
+            {Object.entries(mainTabs).map(([mainTab, subTabs]) => (
+              <TabsContent key={mainTab} value={mainTab}>
+                <Tabs value={selectedSubTab} onValueChange={setSelectedSubTab}>
+                  <TabsList>
+                    {subTabs.map(tab => (
+                      <TabsTrigger key={tab} value={tab}>{tab}</TabsTrigger>
                     ))}
-                </div>
-              </div>
+                  </TabsList>
+                </Tabs>
+              </TabsContent>
             ))}
+          </Tabs>
+
+          <ScrollArea className="h-[600px]">
+          {currentTabData?.structure?.sections
+  .sort((a, b) => a.order - b.order)
+  .map((section, sIndex, sections) => (
+
+    <div key={`section-${section.name}-${sIndex}`} className="border rounded-lg p-4 space-y-4 bg-white shadow-sm hover:shadow-md transition-shadow mb-4">
+      {renderItem('sections', '', section, 0, sIndex, sections.length)}
+      <div className="pl-4 space-y-3">
+        {section.subsections
+          .sort((a, b) => a.order - b.order)
+          .map((subsection, subIndex, subsections) => (
+
+            <div key={`subsection-${section.name}-${subsection.name}-${subIndex}`} className="bg-gray-50 rounded-md p-3">
+              {renderItem('subsections', section.name, subsection, 1, subIndex, subsections.length)}
+              <div className="pl-4 space-y-2 mt-2">
+                {subsection.fields
+                  .sort((a, b) => a.order - b.order)
+                  .map((field, fieldIndex, fields) => 
+                    renderItem('fields', subsection.name, field, 2, fieldIndex, fields.length)
+                  )}
+              </div>
+            </div>
+          ))}
+      </div>
+    </div>
+  ))}
+          </ScrollArea>
         </div>
       </CardContent>
     </Card>

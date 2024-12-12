@@ -223,9 +223,6 @@ export const handleReorder = async (
   }
 };
 
-// Helper functions for updateOrderInDatabase, getItemsForType, findCurrentIndex, etc.
-// Add all your existing helper functions here
-
 // Database operations
 const updateExistingStructure = async (
   supabase: SupabaseClient,
@@ -278,7 +275,7 @@ const createNewStructure = async (
   if (error) throw error;
 };
 
-const fetchSectionFields = async (section: string) => {
+export const fetchSectionFields = async (section: string) => {
     try {
       const { data, error } = await supabase
         .from('profile_category_table_mapping_2')
