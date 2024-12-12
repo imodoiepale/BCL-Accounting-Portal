@@ -15,7 +15,7 @@ export default function Home() {
       if (isAdmin) {
         router.push('/admin');
       } else if (user) {
-        router.push('/player');
+        router.push('/');
       }
     }
   }, [isLoaded, isAdmin, user, router]);
