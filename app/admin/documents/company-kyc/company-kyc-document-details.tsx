@@ -148,71 +148,63 @@ export default function CompanyKycDocumentDetails() {
       toast.success('Fields updated successfully');
     },
   });
-
-  // Upload Mutation
-  const uploadMutation = useMutation({
-    mutationFn: async ({ companyId, documentId, file, extractOnUpload, onProgress }) => {
-      try {
-        // Validate file type
-        if (!isImageFile(file.name)) {
-          throw new Error('Only JPG, JPEG, and PNG files are allowed');
-        }
+    // Upload Mutation
+    const uploadMutation = useMutation({
+      mutationFn: async ({ companyId, documentId, file, extractOnUpload, onProgress }) => {
+        try {
+          onProgress?.('Uploading file...');
+          const timestamp = new Date().getTime();
+          const fileName = `${companyId}/${documentId}/${timestamp}_${file.name}`;
   
-        onProgress?.('Uploading file...');
-        const timestamp = new Date().getTime();
-        const fileName = `${companyId}/${documentId}/${timestamp}_${file.name}`;
+          const { data: fileData, error: fileError } = await supabase
+            .storage
+            .from('kyc-documents')
+            .upload(fileName, file);
   
-        const { data: fileData, error: fileError } = await supabase
-          .storage
-          .from('kyc-documents')
-          .upload(fileName, file);
+          if (fileError) throw fileError;
   
-        if (fileError) throw fileError;
+          const uploadData = {
+            userid: companyId.toString(),
+            kyc_document_id: documentId,
+            filepath: fileData.path,
+            created_at: new Date().toISOString(),
+          };
   
-        const uploadData = {
-          userid: companyId.toString(),
-          kyc_document_id: documentId,
-          filepath: fileData.path,
-          created_at: new Date().toISOString(),
-        };
+          const { data: uploadResult, error } = await supabase
+            .from('acc_portal_kyc_uploads')
+            .insert(uploadData)
+            .select()
+            .single();
   
-        const { data: uploadResult, error } = await supabase
-          .from('acc_portal_kyc_uploads')
-          .insert(uploadData)
-          .select()
-          .single();
+          if (error) throw error;
   
-        if (error) throw error;
+          if (extractOnUpload) {
+            setSelectedExtractDocument(Object.values(documents)
+              .flat()
+              .find(d => d.id === documentId));
+            setSelectedExtractUpload(uploadResult);
+            setShowExtractModal(true);
+            return uploadResult;
+          }
   
-        if (extractOnUpload) {
-          setSelectedExtractDocument(Object.values(documents)
-            .flat()
-            .find(d => d.id === documentId));
-          setSelectedExtractUpload(uploadResult);
-          setShowExtractModal(true);
           return uploadResult;
+        } catch (error) {
+          console.error('Upload error:', error);
+          throw error;
         }
-  
-        return uploadResult;
-      } catch (error) {
+      },
+      onSuccess: (data) => {
+        queryClient.invalidateQueries(['uploads']);
+        if (!data.extracted_details) {
+          setShowUploadModal(false);
+          toast.success('Document uploaded successfully');
+        }
+      },
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Failed to upload document');
         console.error('Upload error:', error);
-        throw error;
       }
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(['uploads']);
-      if (!data.extracted_details) {
-        setShowUploadModal(false);
-        toast.success('Document uploaded successfully');
-      }
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Failed to upload document');
-      console.error('Upload error:', error);
-    }
-  });
-
-
+    });
   // Extract Details Mutation
   const extractionMutation = useMutation({
     mutationFn: async ({ uploadId, documentId, extractedData }) => {

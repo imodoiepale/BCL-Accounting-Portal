@@ -33,9 +33,11 @@ const adminNavItems = [
     label: "KYC Document Management",
     children: [
       { href: "/admin/documents/company-kyc", icon: FileIcon, label: "Company KYC Documents" },
+      { href: "/admin/documents/company_receipts", icon: FileIcon, label: "Company Receipts" },
       { href: "/admin/documents/directors_docs", icon: FileIcon, label: "Director KYC Documents" },
       { href: "/admin/documents/suppliers_doc", icon: FileIcon, label: "Suppliers KYC Documents" },
       { href: "/admin/documents/bank_kyc", icon: FileIcon, label: "Bank KYC Documents" },
+     
       { href: "/admin/documents/others", icon: FileIcon, label: "Other Documents" }
     ]
   },
