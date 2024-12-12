@@ -1,12 +1,12 @@
 // @ts-nocheck 
 "use client";
-import React, { useState, useEffect  } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Table as UITable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EditableCell } from './EditableCell';
-import { Search } from 'lucide-react';
+import { Lock, LockOpen, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 
@@ -22,6 +22,16 @@ export const SidebarTableView = ({
   const [selectedCompanyIndex, setSelectedCompanyIndex] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredData, setFilteredData] = useState(data);
+  const [lockedRows, setLockedRows] = useState<Record<string, any>>({});
+  const [lockedColumns, setLockedColumns] = useState<Record<string, any>>({});
+
+    // Function to get the table name from the row
+    const getTableName = (row) => {
+      if (row.sourceTable) {
+        return row.sourceTable;
+      }
+      return row.tableName || ''; // Fallback if no sourceTable is found
+    };
 
   const sectionColors = {
     index: { main: 'bg-gray-600', sub: 'bg-gray-500', cell: 'bg-gray-50' },
@@ -63,10 +73,181 @@ export const SidebarTableView = ({
   };
 
   useEffect(() => {
+    if (Array.isArray(processedSections) && processedSections.length > 0) {
+      initializeVerificationStates(processedSections, activeMainTab, activeSubTab, setLockedRows);
+      initializeFieldVerificationStates(processedSections, activeMainTab, activeSubTab, setLockedColumns);
+    }
+  }, [processedSections, activeMainTab, activeSubTab]);
+
+  const initializeVerificationStates = async () => {
+    try {
+      const { data: mappingData } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('structure')
+        .eq('main_tab', activeMainTab)
+        .eq('Tabs', activeSubTab)
+        .single();
+
+      if (!mappingData?.structure) return;
+
+      const columnVerifications = {};
+      const rowVerifications = {};
+
+      // Process structure for column verifications
+      mappingData.structure.sections?.forEach(section => {
+        section.subsections?.forEach(subsection => {
+          subsection.fields?.forEach(field => {
+            if (field.verification) {
+              const fieldKey = `field_${field.table}.${field.name}`;
+              columnVerifications[fieldKey] = field.verification;
+            }
+          });
+        });
+      });
+
+      setLockedColumns(columnVerifications);
+
+      // Get table names from processed sections
+      const tables = new Set();
+      processedSections.forEach(section => {
+        if (!section.isSeparator) {
+          section.categorizedFields?.forEach(category => {
+            if (!category.isSeparator) {
+              category.fields.forEach(field => {
+                const [tableName] = field.name.split('.');
+                if (tableName) tables.add(tableName);
+              });
+            }
+          });
+        }
+      });
+
+      // Fetch row verifications for each table
+      await Promise.all([...tables].map(async (tableName) => {
+        const { data: verifiedRows } = await supabase
+          .from(tableName)
+          .select('id, is_verified, verification_data')
+          .eq('is_verified', true);
+
+        verifiedRows?.forEach(row => {
+          const key = `${tableName}_${row.id}`;
+          rowVerifications[key] = {
+            is_verified: row.is_verified,
+            verified_at: row.verification_data?.verified_at,
+            verified_by: row.verification_data?.verified_by
+          };
+        });
+      }));
+
+      setLockedRows(rowVerifications);
+    } catch (error) {
+      console.error('Error initializing verification states:', error);
+    }
+  };
+
+  const initializeFieldVerificationStates = async (
+    processedSections: any[],
+    activeMainTab: string,
+    activeSubTab: string,
+    setLockedColumns: (columns: Record<string, any>) => void
+  ) => {
+    try {
+      const { data: mappingData } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('structure')
+        .eq('main_tab', activeMainTab)
+        .eq('Tabs', activeSubTab)
+        .single();
+  
+      if (!mappingData?.structure) return;
+  
+      const fieldVerifications = {};
+  
+      mappingData.structure.sections?.forEach(section => {
+        section.subsections?.forEach(subsection => {
+          subsection.fields?.forEach(field => {
+            if (field.verification) {
+              const fieldKey = `field_${field.table}.${field.name}`;
+              fieldVerifications[fieldKey] = field.verification;
+            }
+          });
+        });
+      });
+  
+      setLockedColumns(fieldVerifications);
+    } catch (error) {
+      console.error('Error initializing field verification states:', error);
+    }
+  };
+  
+  const handleToggleColumnLock = async (columnName) => {
+    try {
+      const [tableName, fieldName] = columnName.split('.');
+      const fieldKey = `field_${tableName}.${fieldName}`;
+      const currentVerificationState = lockedColumns[fieldKey]?.is_verified || false;
+
+      const { data: mappingData } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('structure')
+        .eq('main_tab', activeMainTab)
+        .eq('Tabs', activeSubTab)
+        .single();
+
+      if (!mappingData?.structure) throw new Error('Structure not found');
+
+      const updatedStructure = {
+        ...mappingData.structure,
+        sections: mappingData.structure.sections.map(section => ({
+          ...section,
+          subsections: section.subsections.map(subsection => ({
+            ...subsection,
+            fields: subsection.fields.map(field =>
+              field.table === tableName && field.name === fieldName
+                ? {
+                  ...field,
+                  verification: {
+                    is_verified: !currentVerificationState,
+                    verified_at: new Date().toISOString(),
+                    verified_by: 'current_user'
+                  }
+                }
+                : field
+            )
+          }))
+        }))
+      };
+
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({ structure: updatedStructure })
+        .eq('main_tab', activeMainTab)
+        .eq('Tabs', activeSubTab);
+
+      if (error) throw error;
+
+      setLockedColumns(prev => ({
+        ...prev,
+        [fieldKey]: {
+          is_verified: !currentVerificationState,
+          verified_at: new Date().toISOString(),
+          verified_by: 'current_user'
+        }
+      }));
+
+      toast.success(`Column ${!currentVerificationState ? 'locked' : 'unlocked'} successfully`);
+      if (refreshData) await refreshData();
+
+    } catch (error) {
+      console.error('Error toggling column lock:', error);
+      toast.error('Failed to update column verification');
+    }
+  };
+
+  useEffect(() => {
     // Filter and process data based on the active tab
     const processData = () => {
       if (!data) return [];
-      
+
       const filtered = data.filter(item => {
         const searchable = item.company?.company_name?.toLowerCase() || '';
         return searchable.includes(searchTerm.toLowerCase());
@@ -107,6 +288,83 @@ export const SidebarTableView = ({
       />
     );
   };
+// Add this to the SidebarTableView component
+const handleToggleLock = async (field: any, rowId: string, type: 'row' | 'column') => {
+  try {
+    const isCurrentlyLocked = type === 'row' 
+      ? lockedRows[`${field.table}_${rowId}`]?.is_verified
+      : lockedColumns[`field_${field.table}.${field.name}`]?.is_verified;
+
+    const newVerificationData = {
+      is_verified: !isCurrentlyLocked,
+      verified_at: new Date().toISOString(),
+      verified_by: 'current_user'
+    };
+
+    if (type === 'row') {
+      // Update row lock
+      const { error } = await supabase
+        .from(field.table)
+        .update({
+          is_verified: !isCurrentlyLocked,
+          verification_data: newVerificationData
+        })
+        .eq('id', rowId);
+
+      if (error) throw error;
+
+      setLockedRows(prev => ({
+        ...prev,
+        [`${field.table}_${rowId}`]: newVerificationData
+      }));
+    } else {
+      // Update column lock in structure
+      const { data: currentMapping } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('structure')
+        .eq('main_tab', activeMainTab)
+        .eq('Tabs', activeSubTab)
+        .single();
+
+      if (currentMapping?.structure) {
+        const updatedStructure = {
+          ...currentMapping.structure,
+          sections: currentMapping.structure.sections.map(section => ({
+            ...section,
+            subsections: section.subsections.map(subsection => ({
+              ...subsection,
+              fields: subsection.fields.map(f => 
+                f.table === field.table && f.name === field.name
+                  ? { ...f, verification: newVerificationData }
+                  : f
+              )
+            }))
+          }))
+        };
+
+        const { error } = await supabase
+          .from('profile_category_table_mapping_2')
+          .update({ structure: updatedStructure })
+          .eq('main_tab', activeMainTab)
+          .eq('Tabs', activeSubTab);
+
+        if (error) throw error;
+
+        setLockedColumns(prev => ({
+          ...prev,
+          [`field_${field.table}.${field.name}`]: newVerificationData
+        }));
+      }
+    }
+
+    toast.success(`${type === 'row' ? 'Row' : 'Column'} ${!isCurrentlyLocked ? 'locked' : 'unlocked'} successfully`);
+    refreshData();
+
+  } catch (error) {
+    console.error('Error toggling lock:', error);
+    toast.error('Failed to update lock status');
+  }
+};
 
   // Calculate missing fields for a specific row
   const calculateMissingFields = (row) => {
@@ -135,232 +393,315 @@ export const SidebarTableView = ({
     });
     return missingCount;
   };
-
-  const renderTableHeaders = () => (
-    <TableHeader className="sticky top-0 z-10 bg-white">
-      {/* Section Reference Row */}
-      <TableRow className="bg-yellow-50">
-        <TableHead className="font-medium">Sec REF</TableHead>
-        {renderSeparatorCell(`sec-ref-sep-start`, 'section')}
-        <TableHead className="text-center font-medium bg-yellow-50 border-b border-yellow-200">0</TableHead>
-        {processedSections.slice(1).map((section, index) => {
-          if (section.isSeparator) {
-            return renderSeparatorCell(`sec-sep-${index}`, 'section');
-          }
-          const colSpan = section.categorizedFields?.reduce((total, cat) =>
-            total + (cat.isSeparator ? 1 : cat.fields.length), 0);
-          return (
-            <TableHead
-              key={`sec-ref-${index}`}
-              colSpan={colSpan}
-              className="text-center font-medium bg-yellow-50 border-b border-yellow-200"
-            >
-              {index + 1}
-            </TableHead>
-          );
-        })}
-      </TableRow>
-
-      {/* Section Headers */}
-      <TableRow>
-        <TableHead className="font-medium bg-blue-600 text-white">Section</TableHead>
-        {renderSeparatorCell(`section-sep-start`, 'section')}
-        <TableHead className="text-center text-white bg-red-600">Missing Fields</TableHead>
-        {processedSections.slice(1).map((section, index) => {
-          if (section.isSeparator) {
-            return renderSeparatorCell(`section-sep-${index}`, 'section');
-          }
-          const colSpan = section.categorizedFields?.reduce((total, cat) =>
-            total + (cat.isSeparator ? 1 : cat.fields.length), 0);
-          return (
-            <TableHead
-              key={`section-${index}`}
-              colSpan={colSpan}
-              className={`text-center text-white bg-blue-600`}
-            >
-              {section.label}
-            </TableHead>
-          );
-        })}
-      </TableRow>
-
-      {/* Category Headers */}
-      <TableRow>
-        <TableHead className="font-medium">Subsection</TableHead>
-        {renderSeparatorCell(`cat-sep-start`, 'section')}
-        <TableHead className="text-center bg-red-50 text-red-700">Per Row</TableHead>
-        {processedSections.slice(1).map((section, sIndex) =>
-          section.categorizedFields?.map((category, catIndex) => {
-            if (category.isSeparator) {
-              return renderSeparatorCell(`cat-${sIndex}-${catIndex}`, 'category');
+    const renderTableHeaders = () => (
+      <TableHeader className="sticky top-0 z-10 bg-white">
+        {/* Section Reference Row */}
+        <TableRow className="bg-yellow-50">
+          <TableHead className="font-medium">Sec REF</TableHead>
+          <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+          {renderSeparatorCell(`sec-ref-sep-start`, 'section')}
+          <TableHead className="text-center font-medium bg-yellow-50 border-b border-yellow-200">0</TableHead>
+          {processedSections.slice(1).map((section, index) => {
+            if (section.isSeparator) {
+              return renderSeparatorCell(`sec-sep-${index}`, 'section');
             }
-
-            const categoryColor = categoryColors[category.category] ||
-              { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' };
-
+            const colSpan = section.categorizedFields?.reduce((total, cat) =>
+              total + (cat.isSeparator ? 1 : cat.fields.length), 0);
             return (
               <TableHead
-                key={`cat-${sIndex}-${catIndex}`}
-                colSpan={category.fields?.length}
-                className={`text-center ${categoryColor.bg} ${categoryColor.text} ${categoryColor.border}`}
+                key={`sec-ref-${index}`}
+                colSpan={colSpan}
+                className="text-center font-medium bg-yellow-50 border-b border-yellow-200"
               >
-                {category.category}
+                {index + 1}
               </TableHead>
             );
-          })
-        )}
-        {renderSeparatorCell(`cat-sep-end`, 'section')}
-      </TableRow>
+          })}
+        </TableRow>
 
-      {/* Field Headers */}
-      <TableRow>
-        <TableHead className="font-medium sticky left-0 z-0 bg-white">Field</TableHead>
-        {renderSeparatorCell(`field-sep-start`, 'section')}
-        <TableHead className="whitespace-nowrap bg-red-500 text-white sticky left-[50px] z-0">Missing Count</TableHead>
-        {processedSections.slice(1).map((section, sIndex) =>
-          section.categorizedFields?.map((category, cIndex) =>
-            category.fields?.map((field, fIndex) => (
+        {/* Section Headers */}
+        <TableRow>
+          <TableHead className="font-medium bg-blue-600 text-white">Section</TableHead>
+          <TableHead className='font-medium bg-green-600 text-white'>Verify</TableHead>
+          {renderSeparatorCell(`section-sep-start`, 'section')}
+          <TableHead className="text-center text-white bg-red-600">Missing Fields</TableHead>
+          {processedSections.slice(1).map((section, index) => {
+            if (section.isSeparator) {
+              return renderSeparatorCell(`section-sep-${index}`, 'section');
+            }
+            const colSpan = section.categorizedFields?.reduce((total, cat) =>
+              total + (cat.isSeparator ? 1 : cat.fields.length), 0);
+            return (
               <TableHead
-                key={`field-${sIndex}-${cIndex}-${fIndex}`}
-                className={`whitespace-nowrap font-medium bg-gray-500 text-white`}
+                key={`section-${index}`}
+                colSpan={colSpan}
+                className={`text-center text-white bg-blue-600`}
               >
-                {field.label}
+                {section.label}
               </TableHead>
-            ))
-          )
-        )}
-        {renderSeparatorCell(`field-sep-end`, 'section')}
-      </TableRow>
-    </TableHeader>
-  );
+            );
+          })}
+        </TableRow>
 
-  return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '300px 1fr' }}>
-      {/* Sidebar */}
-      <div className="border-r">
-        <div className="p-4 space-y-4">
-          <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-            <input
-              type="text"
-              placeholder="Search companies..."
-              className="w-full pl-8 pr-4 py-2 border rounded-md focus-visible:ring-0"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <ScrollArea className="h-[calc(100vh-200px)]">
-            <div className="space-y-1 pr-4">
-              {filteredCompanies.map((company, index) => (
-                <Button
-                  key={company.company.id}
-                  variant={selectedCompanyIndex === index ? "default" : "ghost"}
-                  className="w-full justify-start font-normal"
-                  onClick={() => setSelectedCompanyIndex(index)}
+        {/* Category Headers */}
+        <TableRow>
+          <TableHead className="font-medium">Subsection</TableHead>
+          <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+          {renderSeparatorCell(`cat-sep-start-1`, 'section')}
+          <TableHead className="text-center bg-red-50 text-red-700">Per Row</TableHead>
+          {renderSeparatorCell(`cat-sep-start-2`, 'section')}
+          {processedSections.slice(1).map((section, sIndex) =>
+            section.categorizedFields?.map((category, catIndex) => {
+              if (category.isSeparator) {
+                return renderSeparatorCell(`cat-${sIndex}-${catIndex}`, 'category');
+              }
+
+              const categoryColor = categoryColors[category.category] ||
+                { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' };
+
+              return (
+                <TableHead
+                  key={`cat-${sIndex}-${catIndex}`}
+                  colSpan={category.fields?.length}
+                  className={`text-center ${categoryColor.bg} ${categoryColor.text} ${categoryColor.border}`}
                 >
-                  {company.company.company_name}
-                </Button>
-              ))}
+                  {category.category}
+                </TableHead>
+              );
+            })
+          )}
+        </TableRow>
+
+        {/* Add new Lock Headers row */}
+        <TableRow>
+          <TableHead className="font-medium">Lock</TableHead>
+          <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+          {renderSeparatorCell(`lock-sep-start-1`, 'section')}
+          <TableHead className="text-center">-</TableHead>
+          {renderSeparatorCell(`lock-sep-start-2`, 'section')}
+          {processedSections.slice(1).map((section, sIndex) =>
+            section.categorizedFields?.map((category, cIndex) =>
+              category.fields?.map((field, fIndex) => {
+                const fieldKey = `field_${field.table}.${field.name}`;
+                const isVerified = lockedColumns[fieldKey]?.is_verified;
+                const uniqueLockKey = `lock_${sIndex}_${cIndex}_${fIndex}_${field.table}_${field.name}`;
+
+                return (
+                  <TableHead
+                    key={uniqueLockKey}
+                    className={`w-10 cursor-pointer hover:bg-gray-100 ${isVerified ? 'bg-green-50' : 'bg-red-50'}`}
+                    onClick={() => handleToggleColumnLock(`${field.table}.${field.name}`)}
+                  >
+                    {isVerified ? (
+                      <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
+                    ) : (
+                      <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
+                    )}
+                  </TableHead>
+                );
+              })
+            )
+          )}
+        </TableRow>
+
+        {/* Field Headers */}
+        <TableRow>
+          <TableHead className="font-medium sticky left-0 z-0 bg-white">Field</TableHead>
+          <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+          {renderSeparatorCell(`field-sep-start-1`, 'section')}
+          <TableHead className="whitespace-nowrap bg-red-500 text-white sticky left-[50px] z-0">Missing Count</TableHead>
+          {renderSeparatorCell(`field-sep-start-2`, 'section')}
+          {processedSections.slice(1).map((section, sIndex) =>
+            section.categorizedFields?.map((category, cIndex) =>
+              category.fields?.map((field, fIndex) => {
+                const uniqueHeaderKey = `header_${sIndex}_${cIndex}_${fIndex}_${field.table}_${field.name}`;
+                return (
+                  <TableHead
+                    key={uniqueHeaderKey}
+                    className={`whitespace-nowrap font-medium bg-gray-500 text-white`}
+                  >
+                    {field.label}
+                  </TableHead>
+                );
+              })
+            )
+          )}
+        </TableRow>
+      </TableHeader>
+    );
+
+    return (
+      <div className="grid h-full" style={{ gridTemplateColumns: '300px 1fr' }}>
+        {/* Sidebar */}
+        <div className="border-r">
+          <div className="p-4 space-y-4">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search companies..."
+                className="w-full pl-8 pr-4 py-2 border rounded-md focus-visible:ring-0"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-          </ScrollArea>
+            <ScrollArea className="h-[calc(100vh-200px)]">
+              <div className="space-y-1 pr-4">
+                {filteredCompanies.map((company, index) => (
+                  <Button
+                    key={company.company.id}
+                    variant={selectedCompanyIndex === index ? "default" : "ghost"}
+                    className="w-full justify-start font-normal"
+                    onClick={() => setSelectedCompanyIndex(index)}
+                  >
+                    {company.company.company_name}
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="overflow-hidden">
+          {selectedCompanyData ? (
+            <Card className="h-full rounded-none border-0">
+              <CardContent className="p-0">
+                <ScrollArea className="h-[calc(100vh-32px)]">
+                  <div className="min-w-max">
+                    <UITable>
+                      {renderTableHeaders()}
+                      <TableBody>
+                        {selectedCompanyData.rows.map((row, rowIndex) => (
+                          <TableRow key={rowIndex} className="hover:bg-gray-50">
+                            {/* Field Cell */}
+                            <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white">
+                              {rowIndex + 1}
+                            </TableCell>
+                            <TableCell
+                              className="w-10 cursor-pointer hover:bg-gray-100"
+                              onClick={() => {
+                                const tableName = getTableName(row);
+                                const rowId = row.id || row[`${tableName}_data`]?.id;
+                                const verificationKey = `${tableName}_${rowId}`;
+                                const isRowLocked = lockedRows[verificationKey]?.is_verified || false;
+    
+                                handleToggleRowLock(
+                                  row,
+                                  processedSections,
+                                  setLockedRows,
+                                  refreshData,
+                                  lockedRows,
+                                  activeMainTab,
+                                  activeSubTab
+                                );
+                              }}
+                            >
+                  {lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]?.is_verified ? (
+    <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
+  ) : (
+    <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
+  )}
+                            </TableCell>
+                            {/* Separator */}
+                            {renderSeparatorCell(`row-sep-start-${rowIndex}`, 'section')}
+
+                            {/* Missing Fields */}
+                            <TableCell
+                              className="whitespace-nowrap cursor-pointer hover:bg-gray-100 sticky left-[50px] z-0 bg-white"
+                              onClick={() => onMissingFieldsClick(selectedCompanyData)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-red-600">
+                                  {calculateMissingFields(row)}
+                                </span>
+                                <span className="text-black">Missing Fields</span>
+                              </div>
+                            </TableCell>
+                            {renderSeparatorCell(`row-sep-end-${rowIndex}`, 'section')}
+
+                            {/* Field Values */}
+                            {processedSections.slice(1).map((section, sIndex) =>
+                              section.categorizedFields?.map((category, cIndex) =>
+                                category.fields?.map((field, fIndex) => {
+                                  const [tableName, columnName] = field.name.split('.');
+                                  let value;
+                                  if (row.isAdditionalRow && row.sourceTable === tableName) {
+                                    value = row[columnName];
+                                  } else if (row[`${tableName}_data`]) {
+                                    value = row[`${tableName}_data`][columnName];
+                                  } else {
+                                    value = row[columnName];
+                                  }
+
+                                  const uniqueKey = `cell_${rowIndex}_${sIndex}_${cIndex}_${fIndex}_${field.table}_${field.name}`;
+                                
+                                  return (
+                                    <TableCell key={uniqueKey}>
+                                      <EditableCell
+                                        value={value}
+                                        onSave={async (newValue) => {
+                                          const tableName = getTableName(row);
+                                          const rowId = row.id || row[`${tableName}_data`]?.id;
+                                          const isRowLocked = lockedRows[`${tableName}_${rowId}`]?.is_verified;
+                                          const isColumnLocked = lockedColumns[`field_${tableName}.${columnName}`]?.is_verified;
+
+                                          if (isRowLocked || isColumnLocked) {
+                                            toast.error("This field is locked and cannot be edited");
+                                            return;
+                                          }
+
+                                          try {
+                                            const { error } = await supabase
+                                              .from(tableName)
+                                              .update({ [columnName]: newValue })
+                                              .eq('id', row.id);
+                                            if (error) throw error;
+                                            refreshData();
+                                          } catch (error) {
+                                            console.error('Error updating:', error);
+                                            toast.error('Update failed');
+                                          }
+                                        }}
+                                        fieldName={field.name}
+                                        field={field}
+                                        dropdownOptions={field.dropdownOptions}
+                                        rowId={row.id}
+                                        companyName={row.company_name}
+                                        refreshData={refreshData}
+                                        activeMainTab={activeMainTab}
+                                        activeSubTab={activeSubTab}
+                                        disabled={
+                                          lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]?.is_verified ||
+                                          lockedColumns[`field_${tableName}.${columnName}`]?.is_verified
+                                        }
+                                        verificationStatus={
+                                          lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]?.is_verified
+                                            ? lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]
+                                            : lockedColumns[`field_${tableName}.${columnName}`]
+                                        }
+                                      />
+                                    </TableCell>
+                                  );
+                                })
+                              )
+                            )}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </UITable>
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">Select a company from the sidebar</p>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Main Content */}
-      <div className="overflow-hidden">
-        {selectedCompanyData ? (
-          <Card className="h-full rounded-none border-0">
-            <CardContent className="p-0">
-              <ScrollArea className="h-[calc(100vh-32px)]">
-                <div className="min-w-max">
-                  <UITable>
-                    {renderTableHeaders()}
-                    <TableBody>
-                      {selectedCompanyData.rows.map((row, rowIndex) => (
-                        <TableRow key={rowIndex} className="hover:bg-gray-50">
-                          {/* Field Cell */}
-                          <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white">
-                            {rowIndex + 1}
-                          </TableCell>
-
-                          {/* Separator */}
-                          {renderSeparatorCell(`row-sep-start-${rowIndex}`, 'section')}
-
-                          {/* Missing Fields */}
-                          <TableCell
-                            className="whitespace-nowrap cursor-pointer hover:bg-gray-100 sticky left-[50px] z-0 bg-white"
-                            onClick={() => onMissingFieldsClick(selectedCompanyData)}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-red-600">
-                                {calculateMissingFields(row)}
-
-                              </span>
-                              <span className="text-black">Missing Fields</span>
-                            </div>
-                          </TableCell>
-
-                          {/* Field Values */}
-                          {processedSections.slice(1).map((section, sIndex) =>
-                            section.categorizedFields?.map((category) =>
-                              category.fields?.map((field, fIndex) => {
-                                const [tableName, columnName] = field.name.split('.');
-                                let value;
-                                if (row.isAdditionalRow && row.sourceTable === tableName) {
-                                  value = row[columnName];
-                                } else if (row[`${tableName}_data`]) {
-                                  value = row[`${tableName}_data`][columnName];
-                                } else {
-                                  value = row[columnName];
-                                }
-
-                                return (
-                                  <TableCell key={`${field.name}-${rowIndex}-${fIndex}`}>
-                                    <EditableCell
-                                      value={value}
-                                      onSave={async (newValue) => {
-                                        try {
-                                          const { error } = await supabase
-                                            .from(tableName)
-                                            .update({ [columnName]: newValue })
-                                            .eq('id', row.id);
-                                          if (error) throw error;
-                                          refreshData();
-                                        } catch (error) {
-                                          console.error('Error updating:', error);
-                                          toast.error('Update failed');
-                                        }
-                                      }}
-                                      fieldName={field.name}
-                                      field={field}
-                                      dropdownOptions={field.dropdownOptions}
-                                      rowId={row.id}
-                                      companyName={row.company_name}
-                                      refreshData={refreshData}
-                                      activeMainTab={activeMainTab}
-                                      activeSubTab={activeSubTab}
-                                    />
-                                  </TableCell>
-                                );
-                              })
-                            )
-                          )}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </UITable>
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-gray-500">Select a company from the sidebar</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+    );
+  };
 
 export default SidebarTableView;

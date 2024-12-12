@@ -44,31 +44,31 @@ const ImportDialog = dynamic(() =>
 // Add this function before the OverallView component
 const processTabData = (tableData: any, mapping: any) => {
     try {
-      // Always get companies from acc_portal_company_duplicate
-      const companies = tableData['acc_portal_company_duplicate'] || [];
-      
-      return companies.map(company => ({
-        company: company,
-        rows: [{
-          id: company.id,
-          company_name: company.company_name, // Always include company_name
-          isFirstRow: true,
-          ...Object.keys(tableData).reduce((acc, tableName) => {
-            if (tableName !== 'acc_portal_company_duplicate') {
-              acc[`${tableName}_data`] = tableData[tableName]?.find(
-                (row: any) => row.company_id === company.id
-              );
-            }
-            return acc;
-          }, {})
-        }]
-      }));
+        // Always get companies from acc_portal_company_duplicate
+        const companies = tableData['acc_portal_company_duplicate'] || [];
+
+        return companies.map(company => ({
+            company: company,
+            rows: [{
+                id: company.id,
+                company_name: company.company_name, // Always include company_name
+                isFirstRow: true,
+                ...Object.keys(tableData).reduce((acc, tableName) => {
+                    if (tableName !== 'acc_portal_company_duplicate') {
+                        acc[`${tableName}_data`] = tableData[tableName]?.find(
+                            (row: any) => row.company_id === company.id
+                        );
+                    }
+                    return acc;
+                }, {})
+            }]
+        }));
     } catch (error) {
-      console.error('Error processing tab data:', error);
-      return [];
+        console.error('Error processing tab data:', error);
+        return [];
     }
-  };
-  
+};
+
 
 const OverallView: React.FC = () => {
     const [allTabsData, setAllTabsData] = useState<Map<string, any>>(new Map());
@@ -104,7 +104,7 @@ const OverallView: React.FC = () => {
         mainTabs: [],
         subTabs: {},
         currentData: []
-      });
+    });
 
     const preloadAdjacentTabs = useCallback(async (mainTab: string, subTab: string) => {
         const currentTabs = structure.filter(s => s.main_tab === mainTab);
@@ -124,126 +124,126 @@ const OverallView: React.FC = () => {
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
-              setLoading(true);
-              const { data: mappings } = await supabase
-                .from('profile_category_table_mapping_2')
-                .select('*')
-                .order('main_tab')
-                .order('Tabs');
-          
-              if (!mappings) throw new Error('No data found');
-          
-              // Process and organize the data
-              const mainTabsSet = new Set(mappings.map(m => m.main_tab));
-              const subTabsMap = mappings.reduce((acc, m) => {
-                if (!acc[m.main_tab]) acc[m.main_tab] = [];
-                if (!acc[m.main_tab].includes(m.Tabs)) {
-                  acc[m.main_tab].push(m.Tabs);
+                setLoading(true);
+                const { data: mappings } = await supabase
+                    .from('profile_category_table_mapping_2')
+                    .select('*')
+                    .order('main_tab')
+                    .order('Tabs');
+
+                if (!mappings) throw new Error('No data found');
+
+                // Process and organize the data
+                const mainTabsSet = new Set(mappings.map(m => m.main_tab));
+                const subTabsMap = mappings.reduce((acc, m) => {
+                    if (!acc[m.main_tab]) acc[m.main_tab] = [];
+                    if (!acc[m.main_tab].includes(m.Tabs)) {
+                        acc[m.main_tab].push(m.Tabs);
+                    }
+                    return acc;
+                }, {});
+
+                setMainTabs(Array.from(mainTabsSet));
+                setSubTabs(subTabsMap);
+                setStructure(mappings);
+
+                // Set initial active tabs
+                if (mainTabsSet.size > 0) {
+                    const firstMainTab = Array.from(mainTabsSet)[0];
+                    setActiveMainTab(firstMainTab);
+                    if (subTabsMap[firstMainTab]?.length > 0) {
+                        setActiveSubTab(subTabsMap[firstMainTab][0]);
+                    }
                 }
-                return acc;
-              }, {});
-          
-              setMainTabs(Array.from(mainTabsSet));
-              setSubTabs(subTabsMap);
-              setStructure(mappings);
-          
-              // Set initial active tabs
-              if (mainTabsSet.size > 0) {
-                const firstMainTab = Array.from(mainTabsSet)[0];
-                setActiveMainTab(firstMainTab);
-                if (subTabsMap[firstMainTab]?.length > 0) {
-                  setActiveSubTab(subTabsMap[firstMainTab][0]);
-                }
-              }
-          
+
             } catch (error) {
-              console.error('Error:', error);
-              toast.error('Failed to load initial data');
+                console.error('Error:', error);
+                toast.error('Failed to load initial data');
             } finally {
-              setLoading(false);
+                setLoading(false);
             }
-          };
+        };
 
         fetchInitialData();
     }, []);
-// Create function to fetch all data initially
-const fetchAllData = async () => {
-    try {
-      setLoading(true);
-      
-      const [mappingsResponse, ...tableResponses] = await Promise.all([
-        supabase
-          .from('profile_category_table_mapping_2')
-          .select('*')
-          .order('main_tab')
-          .order('Tabs'),
-          
-        supabase
-          .from('acc_portal_company_duplicate')
-          .select('*')
-          .order('id')
-      ]);
+    // Create function to fetch all data initially
+    const fetchAllData = async () => {
+        try {
+            setLoading(true);
 
-      const mappings = mappingsResponse.data;
-      if (!mappings) throw new Error('No mappings found');
-  
-      // Fetch all tables data in parallel
-      const allTables = new Set(['acc_portal_company_duplicate']);
-      mappings.forEach(mapping => {
-        mapping.structure?.sections?.forEach(section => {
-          section.subsections?.forEach(subsection => {
-            subsection.tables?.forEach(table => allTables.add(table));
-          });
-        });
-      });
-  
-      const additionalTableResponses = await Promise.all(
-        Array.from(allTables).slice(1).map(table =>
-          supabase.from(table).select('*').order('id')
-        )
-      );
-  
-      const tableData = [tableResponses[0], ...additionalTableResponses];
-  
-      // Process and cache data for each tab
-      const dataCache = new Map();
-      mappings.forEach(mapping => {
-        const key = `${mapping.main_tab}:${mapping.Tabs}`;
-        const tabData = processTabData(
-          tableData.reduce((acc, {data}, i) => {
-            acc[Array.from(allTables)[i]] = data;
-            return acc;
-          }, {}),
-          mapping
-        );
-        dataCache.set(key, tabData);
-      });
-  
-      setAllTabsData(dataCache);
-      setStructure(mappings);
-      
-      // Set initial tabs
-      const mainTabsSet = new Set(mappings.map(m => m.main_tab));
-      setMainTabs(Array.from(mainTabsSet));
-      
-      const subTabsMap = mappings.reduce((acc, m) => {
-        if (!acc[m.main_tab]) acc[m.main_tab] = [];
-        acc[m.main_tab].push(m.Tabs);
-        return acc;
-      }, {});
-      setSubTabs(subTabsMap);
-  
-    } catch (error) {
-      console.error('Error fetching all data:', error);
-      toast.error('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
-  // Call fetchAllData on component mount
-  useEffect(() => {
-    fetchAllData();
-  }, []);
+            const [mappingsResponse, ...tableResponses] = await Promise.all([
+                supabase
+                    .from('profile_category_table_mapping_2')
+                    .select('*')
+                    .order('main_tab')
+                    .order('Tabs'),
+
+                supabase
+                    .from('acc_portal_company_duplicate')
+                    .select('*')
+                    .order('id')
+            ]);
+
+            const mappings = mappingsResponse.data;
+            if (!mappings) throw new Error('No mappings found');
+
+            // Fetch all tables data in parallel
+            const allTables = new Set(['acc_portal_company_duplicate']);
+            mappings.forEach(mapping => {
+                mapping.structure?.sections?.forEach(section => {
+                    section.subsections?.forEach(subsection => {
+                        subsection.tables?.forEach(table => allTables.add(table));
+                    });
+                });
+            });
+
+            const additionalTableResponses = await Promise.all(
+                Array.from(allTables).slice(1).map(table =>
+                    supabase.from(table).select('*').order('id')
+                )
+            );
+
+            const tableData = [tableResponses[0], ...additionalTableResponses];
+
+            // Process and cache data for each tab
+            const dataCache = new Map();
+            mappings.forEach(mapping => {
+                const key = `${mapping.main_tab}:${mapping.Tabs}`;
+                const tabData = processTabData(
+                    tableData.reduce((acc, { data }, i) => {
+                        acc[Array.from(allTables)[i]] = data;
+                        return acc;
+                    }, {}),
+                    mapping
+                );
+                dataCache.set(key, tabData);
+            });
+
+            setAllTabsData(dataCache);
+            setStructure(mappings);
+
+            // Set initial tabs
+            const mainTabsSet = new Set(mappings.map(m => m.main_tab));
+            setMainTabs(Array.from(mainTabsSet));
+
+            const subTabsMap = mappings.reduce((acc, m) => {
+                if (!acc[m.main_tab]) acc[m.main_tab] = [];
+                acc[m.main_tab].push(m.Tabs);
+                return acc;
+            }, {});
+            setSubTabs(subTabsMap);
+
+        } catch (error) {
+            console.error('Error fetching all data:', error);
+            toast.error('Failed to load data');
+        } finally {
+            setLoading(false);
+        }
+    };
+    // Call fetchAllData on component mount
+    useEffect(() => {
+        fetchAllData();
+    }, []);
 
     useEffect(() => {
         if (mainTabs.length > 0 && !activeMainTab) {
@@ -255,20 +255,20 @@ const fetchAllData = async () => {
     }, [mainTabs, subTabs]);
     useEffect(() => {
         console.log('Cache status:', {
-          cacheSize: allTabsData.size,
-          currentTab: `${activeMainTab}:${activeSubTab}`,
-          hasData: allTabsData.has(`${activeMainTab}:${activeSubTab}`)
+            cacheSize: allTabsData.size,
+            currentTab: `${activeMainTab}:${activeSubTab}`,
+            hasData: allTabsData.has(`${activeMainTab}:${activeSubTab}`)
         });
-      }, [allTabsData, activeMainTab, activeSubTab]);
-      
+    }, [allTabsData, activeMainTab, activeSubTab]);
+
     useEffect(() => {
         console.log('Data state updated:', {
-          mainTabs,
-          activeMainTab,
-          subTabs: subTabs[activeMainTab],
-          dataLength: visibleData?.length
+            mainTabs,
+            activeMainTab,
+            subTabs: subTabs[activeMainTab],
+            dataLength: visibleData?.length
         });
-      }, [mainTabs, activeMainTab, subTabs, visibleData]);
+    }, [mainTabs, activeMainTab, subTabs, visibleData]);
 
     const handleCompanyClick = useCallback((company: any) => {
         console.log('Selected company data:', company);
@@ -282,16 +282,27 @@ const fetchAllData = async () => {
         setIsEditDialogOpen(true);
     }, [activeSubTab]);
 
-    const handleTabChange = useCallback((mainTab: string, subTab: string) => {
-        const key = `${mainTab}:${subTab}`;
-        const cachedData = allTabsData.get(key);
-        
-        if (cachedData) {
-          setVisibleData(cachedData);
-          setActiveMainTab(mainTab);
-          setActiveSubTab(subTab);
-        }
-      }, [allTabsData]);
+// In OverallView.tsx
+const handleTabChange = useCallback((mainTab: string, subTab: string) => {
+    console.log('Changing tabs:', { mainTab, subTab });
+    
+    setActiveMainTab(mainTab);
+    setActiveSubTab(subTab);
+    
+    // Fetch data for the new tab combination
+    const key = `${mainTab}:${subTab}`;
+    const cachedData = allTabsData.get(key);
+    
+    if (cachedData) {
+      setVisibleData(cachedData);
+    } else {
+      // Fetch data if not cached
+      fetchTabData(mainTab, subTab).then(data => {
+        setVisibleData(data);
+        allTabsData.set(key, data);
+      });
+    }
+  }, [allTabsData]);
 
     const processTabSections = useCallback(() => (mainTab: string | undefined | null, subTab: string) => {
         // Ensure mainTab has a value
@@ -462,6 +473,18 @@ const fetchAllData = async () => {
         }
     };
 
+// In OverallView.tsx
+useEffect(() => {
+    const handleStructureUpdateEvent = () => {
+      // Prevent recursive calls by only running fetchData
+      fetchAllData();
+    };
+  
+    window.addEventListener('structure-updated', handleStructureUpdateEvent);
+    return () => {
+      window.removeEventListener('structure-updated', handleStructureUpdateEvent);
+    };
+  }, []);
     // Virtualized table rendering
     const TableWrapper = useMemo(() => (
         <Table
@@ -469,7 +492,7 @@ const fetchAllData = async () => {
             virtualizedRowHeight={50}
             visibleRowsCount={20}
             processedSections={processTabSections()(activeMainTab || '', activeSubTab || '')} // Add fallback
-            activeMainTab={activeMainTab || ''} 
+            activeMainTab={activeMainTab || ''}
             activeSubTab={activeSubTab || ''}
             handleCompanyClick={handleCompanyClick}
             onMissingFieldsClick={(company) => {
@@ -479,7 +502,7 @@ const fetchAllData = async () => {
             }}
         />
     ), [visibleData, activeMainTab, activeSubTab]);
-    
+
     useEffect(() => {
         if (mainTabs.length > 0 && !activeMainTab) {
             const initialMainTab = mainTabs[0] || '';
@@ -489,23 +512,25 @@ const fetchAllData = async () => {
             }
         }
     }, [mainTabs, subTabs]);
-    
+
     return (
         <div className="h-[1100px] flex flex-col">
             <Tabs defaultValue={mainTabs[0]} value={activeMainTab} className="h-full flex flex-col">
                 {mainTabs.length > 0 ? (
                     <TabsList className="w-full grid-cols-[repeat(auto-fit,minmax(0,1fr))] grid bg-gray-100 rounded-lg p-1">
                         {mainTabs.map(tab => (
-                            // In your TabsTrigger onClick
-<TabsTrigger
-  key={tab}
-  value={tab}
-  disabled={loading}
-  onClick={() => handleTabChange(tab, subTabs[tab]?.[0] || '')}
-  className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
->
-  {tab}
-</TabsTrigger>
+                            <TabsTrigger
+                            key={tab}
+                            value={tab}
+                            disabled={loading}
+                            onClick={() => {
+                              const firstSubTab = subTabs[tab]?.[0] || '';
+                              handleTabChange(tab, firstSubTab);
+                            }}
+                            className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
+                          >
+                            {tab}
+                          </TabsTrigger>
 
                         ))}
 
@@ -562,17 +587,15 @@ const fetchAllData = async () => {
                                     {(subTabs[activeMainTab] || []).map(tab => {
                                         console.log('Rendering subtab:', tab); // Debug log
                                         return (
-                                  // In your TabsTrigger onClick
-<TabsTrigger
-  key={tab}
-  value={tab}
-  disabled={loading}
-  onClick={() => handleTabChange(tab, subTabs[tab]?.[0] || '')}
-  className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
->
-  {tab}
-</TabsTrigger>
-
+                                            <TabsTrigger
+                                            key={tab}
+                                            value={tab}
+                                            disabled={loading}
+                                            onClick={() => handleTabChange(activeMainTab, tab)}
+                                            className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
+                                          >
+                                            {tab}
+                                          </TabsTrigger>
                                         );
                                     })}
                                 </TabsList>

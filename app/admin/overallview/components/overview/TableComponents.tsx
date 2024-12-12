@@ -1170,24 +1170,18 @@ const renderHeaders = (
       {renderSeparatorCell(`lock-sep-start-${Date.now()}`, 'section')}
       <TableHead className="text-center">-</TableHead>
       {renderSeparatorCell(`lock-sep-end-${Date.now()}`, 'section')}
-      {processedSections.slice(1).map((section, sectionIndex) => {
-        if (section.isSeparator) return null;
-
-        return section.categorizedFields?.map((category, catIndex) => {
-          if (category.isSeparator) {
-            return renderSeparatorCell(`lock-cat-${sectionIndex}-${catIndex}-${Date.now()}`, 'category');
-          }
-
-          return category.fields.map((field, fieldIndex, fieldsArray) => {
-            const fieldKey = `field_${field.table}.${field.name}`;
-            const verificationStatus = lockedColumns[fieldKey];
-            const isVerified = verificationStatus?.is_verified;
-
+      {processedSections.slice(1).map((section, sectionIndex) => 
+        section.categorizedFields?.map((category, catIndex) => 
+          category.fields.map((field, fieldIndex) => {
+            const isVerified = field.verification?.is_verified || false;
+            const verificationData = field.verification;
+            
             return (
-              <React.Fragment key={`lock-${field.table}-${field.name}-${sectionIndex}-${catIndex}-${fieldIndex}`}>
+              <React.Fragment key={`lock-${field.table}-${field.name}`}>
                 <TableCell
-                  className={`w-10 cursor-pointer hover:bg-gray-100 group relative ${isVerified ? 'bg-green-50' : 'bg-red-50'
-                    }`}
+                  className={`w-10 cursor-pointer hover:bg-gray-100 group relative ${
+                    isVerified ? 'bg-green-50' : 'bg-red-50'
+                  }`}
                   onClick={() => handleToggleColumnLock(`${field.table}.${field.name}`)}
                 >
                   <div className="group relative">
@@ -1196,29 +1190,32 @@ const renderHeaders = (
                     ) : (
                       <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
                     )}
-                    {verificationStatus && (
+                    
+                    {verificationData && (
                       <div className="absolute invisible group-hover:visible bg-gray-800 text-white text-xs p-2 rounded -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap z-50">
                         {isVerified ? 'Verified' : 'Not verified'}
-                        {verificationStatus.verified_by && ` by ${verificationStatus.verified_by}`}
-                        {verificationStatus.verified_at &&
-                          ` on ${new Date(verificationStatus.verified_at).toLocaleDateString()}`}
+                        {verificationData.verified_by && ` by ${verificationData.verified_by}`}
+                        {verificationData.verified_at && 
+                          ` on ${new Date(verificationData.verified_at).toLocaleDateString()}`
+                        }
                       </div>
                     )}
                   </div>
                 </TableCell>
-                {fieldIndex < fieldsArray.length - 1 &&
-                  field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
+                {fieldIndex < category.fields.length - 1 &&
+                  field.subCategory !== category.fields[fieldIndex + 1]?.subCategory &&
                   renderSeparatorCell(
                     `lock-separator-${sectionIndex}-${catIndex}-${fieldIndex}-${Date.now()}`,
                     'mini'
                   )}
               </React.Fragment>
             );
-          });
-        });
-      })}
+          })
+        )
+      )}
     </TableRow>
   );
+  
   return (
     <>
       {/* Section Reference Row */}
