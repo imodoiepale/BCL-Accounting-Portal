@@ -275,7 +275,7 @@ const createNewStructure = async (
   if (error) throw error;
 };
 
-export const fetchSectionFields = async (section: string) => {
+const fetchSectionFields = async (section: string) => {
     try {
       const { data, error } = await supabase
         .from('profile_category_table_mapping_2')
