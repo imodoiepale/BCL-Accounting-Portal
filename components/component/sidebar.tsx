@@ -23,6 +23,7 @@ import {
 
 const adminNavItems = [
   { href: "/admin", icon: LayoutDashboardIcon, label: "Admin Dashboard" },
+  { href: "/admin/onboarding", icon: UserPlusIcon, label: "Onboarding" },
   { href: "/mail", icon: Mail, label: "Mail" },
   { href: "/admin/registry", icon: User2Icon, label: "Registry" },
   { href: "/admin/overallview", icon: LayoutDashboardIcon, label: "Overall TableView" },
@@ -45,7 +46,6 @@ const adminNavItems = [
   { href: "/admin/reports", icon: FileIcon, label: "Report Management" },
   { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings" },
   // { label: "Table Settings", href: "/settings/table", icon: SettingsIcon },
-  { href: "/admin/onboarding", icon: UserPlusIcon, label: "Onboarding" },
 ];
 
 const userNavItems = [

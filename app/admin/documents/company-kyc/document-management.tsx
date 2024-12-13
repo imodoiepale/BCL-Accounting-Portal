@@ -19,7 +19,6 @@ import { supabase } from '@/lib/supabaseClient';
 import { toast, Toaster } from 'react-hot-toast';
 import { UploadModal } from './UploadModal';
 import { SettingsModal } from './SettingsModal';
-
 import {
   Select,
   SelectContent,
@@ -148,7 +147,9 @@ const DocumentViewer: React.FC<{
   };
 
   const handleConfirmDelete = async () => {
-    if (!deletingDoc || !onDelete) return;
+    if (!deletingDoc || !onDelete) {
+      return;
+    }
 
     setIsDeleting(true);
     try {
@@ -353,7 +354,9 @@ const DocumentViewer: React.FC<{
 
 // ViewModal Component
 const ViewModal: React.FC<ViewModalProps> = ({ url, setShowViewModal }) => {
-  if (!url) return null;
+  if (!url) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -371,7 +374,6 @@ const ViewModal: React.FC<ViewModalProps> = ({ url, setShowViewModal }) => {
     </div>
   );
 };
-
 // DocumentActions Component
 const DocumentActions = ({
   onView,
@@ -439,7 +441,9 @@ const handleViewDocuments = async (document: Document, company: Company) => {
           .from('kyc-documents')
           .createSignedUrl(upload.filepath, 60);
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         return {
           id: upload.id,
@@ -477,7 +481,9 @@ const handleMultiUpload = async (files: UploadFile[]) => {
           .from('kyc-documents')
           .upload(fileName, file);
 
-        if (fileError) throw fileError;
+                       if (fileError) {
+          throw fileError;
+        }
 
         const uploadData = {
           userid: selectedCompany.id.toString(),
@@ -491,9 +497,10 @@ const handleMultiUpload = async (files: UploadFile[]) => {
           .from('acc_portal_kyc_uploads')
           .insert(uploadData);
 
-        if (error) throw error;
-      })
-    );
+        if (error) {
+          throw error;
+        }
+      })    );
 
     queryClient.invalidateQueries({ queryKey: ['uploads'] });
     setShowUploadModal(false);
@@ -647,7 +654,9 @@ const DocumentManagement = () => {
         .from('acc_portal_kyc_uploads')
         .select('*');
 
-      if (error) throw error;
+      if 
+      (error) 
+        throw error;
       return data || [];
     }
   });
@@ -674,7 +683,9 @@ const DocumentManagement = () => {
             .from('kyc-documents')
             .upload(fileName, fileData.file);
 
-          if (fileError) throw fileError;
+          if
+           (fileError) 
+           throw fileError;
 
           const uploadData = {
             userid: companyId.toString(),
@@ -691,7 +702,8 @@ const DocumentManagement = () => {
             .select()
             .single();
 
-          if (error) throw error;
+          if 
+          (error) throw error;
           results.push(data);
         } catch (error) {
           console.error('Upload error:', error);
@@ -939,36 +951,37 @@ const DocumentManagement = () => {
       <ChevronUp className="w-4 h-4 text-blue-600" /> :
       <ChevronDown className="w-4 h-4 text-blue-600" />;
   };
-  // Begin render return
-  return (
-    <div className="w-full p-4 bg-white rounded-lg shadow-sm">
-      <Toaster />
+// Begin render return
+return (
+  <div className="w-full p-4 bg-white rounded-lg shadow-sm">
+    <Toaster />
+    
+    {/* Compact Tabs and Search Container */}
+    <div className="space-y-2">
       {/* Tabs */}
-      <div className="mb-2">
-        <div className="flex space-x-2">
-          {['All', 'KRA', 'Sheria'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-md text-sm ${activeTab === tab
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700'
-                }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+      <div className="flex space-x-2 items-center">
+        {['All', 'KRA', 'Sheria'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-3 py-1.5 rounded-md text-sm ${activeTab === tab
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
       {/* Search and Controls */}
-      <div className="flex justify-between items-center mb-4 text-sm">
+      <div className="flex justify-between items-center text-sm">
         <input
           type="text"
           placeholder="Search companies..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          className="flex-grow mr-2 px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
         />
         <div className="flex items-center space-x-2">
           <button className="flex items-center gap-1 px-3 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm">
@@ -997,6 +1010,7 @@ const DocumentManagement = () => {
           </button>
         </div>
       </div>
+    </div>
 
       {/* Loading State */}
       {(isLoadingCompanies || isLoadingDocuments) ? (
