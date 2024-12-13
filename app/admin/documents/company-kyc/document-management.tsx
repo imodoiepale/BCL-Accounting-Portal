@@ -19,7 +19,6 @@ import { supabase } from '@/lib/supabaseClient';
 import { toast, Toaster } from 'react-hot-toast';
 import { UploadModal } from './UploadModal';
 import { SettingsModal } from './SettingsModal';
-
 import {
   Select,
   SelectContent,
@@ -952,36 +951,37 @@ const DocumentManagement = () => {
       <ChevronUp className="w-4 h-4 text-blue-600" /> :
       <ChevronDown className="w-4 h-4 text-blue-600" />;
   };
-  // Begin render return
-  return (
-    <div className="w-full p-4 bg-white rounded-lg shadow-sm">
-      <Toaster />
+// Begin render return
+return (
+  <div className="w-full p-4 bg-white rounded-lg shadow-sm">
+    <Toaster />
+    
+    {/* Compact Tabs and Search Container */}
+    <div className="space-y-2">
       {/* Tabs */}
-      <div className="mb-2">
-        <div className="flex space-x-2">
-          {['All', 'KRA', 'Sheria'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-md text-sm ${activeTab === tab
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700'
-                }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+      <div className="flex space-x-2 items-center">
+        {['All', 'KRA', 'Sheria'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-3 py-1.5 rounded-md text-sm ${activeTab === tab
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
       {/* Search and Controls */}
-      <div className="flex justify-between items-center mb-4 text-sm">
+      <div className="flex justify-between items-center text-sm">
         <input
           type="text"
           placeholder="Search companies..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          className="flex-grow mr-2 px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
         />
         <div className="flex items-center space-x-2">
           <button className="flex items-center gap-1 px-3 py-2 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm">
@@ -1010,6 +1010,7 @@ const DocumentManagement = () => {
           </button>
         </div>
       </div>
+    </div>
 
       {/* Loading State */}
       {(isLoadingCompanies || isLoadingDocuments) ? (
