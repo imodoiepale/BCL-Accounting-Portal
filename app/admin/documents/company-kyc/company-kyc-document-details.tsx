@@ -276,14 +276,10 @@ export default function CompanyKycDocumentDetails() {
   const handleViewDocument = async (document: Document, company: Company) => {
     const upload = uploads.find(u =>
       u.kyc_document_id === document.id &&
-      u.userid === company.id.toString() &&
-      isImageFile(u.filepath)
+      u.userid === company.id.toString() 
+     
     );
   
-    if (!upload) {
-      toast.error('Image not found');
-      return;
-    }
   
     try {
       const { data, error } = await supabase
