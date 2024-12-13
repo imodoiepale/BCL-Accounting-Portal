@@ -225,10 +225,10 @@ export const SendDocumentModal: React.FC<SendDocumentModalProps> = ({
                     filepath: doc.filepath
                 })),
                 companyName: company?.company_name,
-                subject: `Documents for  ${company?.company_name}`,
+                subject: `Documents for ${company?.company_name}`,
                 html: `
           <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>Documents from ${company?.company_name}</h2>
+            <h2>Documents for ${company?.company_name}</h2>
             <p>Please find the attached documents:</p>
             <ul>
               ${availableDocuments.map(doc => `<li>${getDocumentName(doc)}</li>`).join('')}
