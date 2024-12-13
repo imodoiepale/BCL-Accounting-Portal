@@ -241,13 +241,17 @@ export const handleDeleteField = async (
 ) => {
   try {
     // Get current mapping data first
-    const { data: currentData, error: fetchError } = await supabase
+    const { data: mappings, error: fetchError } = await supabase
       .from('profile_category_table_mapping_2')
       .select('*')
-      .eq('Tabs', selectedTab)
-      .single();
+      .eq('Tabs', selectedTab);
 
     if (fetchError) throw fetchError;
+    if (!mappings || mappings.length === 0) {
+      throw new Error('No mapping found for selected tab');
+    }
+
+    const currentData = mappings[0]; // Take the first mapping
 
     // Create a deep copy of the structure to modify
     const updatedStructure = {
@@ -291,7 +295,6 @@ export const handleDeleteField = async (
     toast.error('Failed to remove field');
   }
 };
-
 export const handleCreateTable = async (tableName: string) => {
   setLoadingTable(true);
   try {

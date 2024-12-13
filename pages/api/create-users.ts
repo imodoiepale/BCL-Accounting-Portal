@@ -27,7 +27,7 @@ export default async function handler(
   }
 
   const { name } = req.body;
-  
+
   // Generate username and password based on company name
   const firstName = name.split(' ')[0].toLowerCase();
   const username = `${firstName}bcl`;
@@ -50,16 +50,14 @@ export default async function handler(
     console.log('Attempting to insert user into acc_portal_clerk_users_duplicate...');
     // Insert user into database
     const { error: userError } = await supabase
-    .from('acc_portal_clerk_users_duplicate')
-    .upsert({
-      username: username,
-      userid: user.id,
-      metadata: { companyName: name },
-      company_name: name,
-      updated_at: new Date().toISOString()
-    }, {
-      onConflict: 'userid'
-    });
+      .from('acc_portal_clerk_users_duplicate')
+      .insert({
+        username: username,
+        userid: user.id,
+        password: password,
+        company_name: name,
+        updated_at: new Date().toISOString()
+      });
 
     if (userError) {
       console.error('Error inserting user:', userError);
@@ -74,7 +72,7 @@ export default async function handler(
         .update({
           userid: user.id,
           client_types: req.body.clientTypes,
-          status: 'active'
+          status: 'active',
         })
         .eq('id', req.body.existingCompany.id);
 
@@ -86,7 +84,7 @@ export default async function handler(
         .upsert({
           company_name: name,
           userid: user.id,
-          status: 'active'
+          status: 'active',
         }, {
           onConflict: 'userid'
         });
@@ -106,7 +104,7 @@ export default async function handler(
 
   } catch (error: any) {
     console.error('API Error:', error);
-    
+
     return res.status(422).json({
       success: false,
       message: error.message || 'Failed to process user account'

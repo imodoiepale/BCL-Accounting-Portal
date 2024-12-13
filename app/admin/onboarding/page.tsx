@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import OnboardingPage from "./onboarding";
 import { Button } from "@/components/ui/button";
 import Upload from "./upload";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function Page() {
   const [step, setStep] = useState(() => {
@@ -42,18 +43,6 @@ export default function Page() {
     localStorage.setItem('companyData', JSON.stringify(companyData));
   }, [companyData]);
 
-const handleOnboardingComplete = (data: any) => {
-  console.log('Onboarding complete, data:', data);
-  setCompanyData({ 
-    ...companyData, 
-    name: data.name,
-    username: data.username,
-    userId: data.userId,
-    company_name: data.name
-  });
-  console.log('Moving to step 2');
-  setStep(2);
-};
 
   const handleUploadComplete = (data: any) => {
     setCompanyData({ 
@@ -68,6 +57,56 @@ const handleOnboardingComplete = (data: any) => {
     localStorage.removeItem('companyData');
     window.location.href = '/sign-in';
   };
+
+const fetchUserCredentials = async (userId: string) => {
+  if (!userId) return null;
+  
+  const { data, error } = await supabase
+    .from('acc_portal_clerk_users_duplicate')
+    .select('username, password')
+    .eq('userid', userId);
+    console.log('fetching credentials:', data);
+
+  if (error) {
+    console.error('Error fetching credentials:', error);
+    return null;
+  }
+
+  return data?.[0] || null;
+};
+
+const handleOnboardingComplete = async (data: any) => {
+  console.log('Onboarding complete, data:', data);
+  
+  const credentials = await fetchUserCredentials(data.userId);
+  
+  setCompanyData({ 
+    ...companyData, 
+    name: data.name,
+    username: credentials?.username || '',
+    password: credentials?.password || '',
+    userId: data.userId,
+    company_name: data.name
+  });
+  
+  setStep(2);
+};
+
+useEffect(() => {
+  const updateCredentials = async () => {
+    if (companyData.userId) {
+      const credentials = await fetchUserCredentials(companyData.userId);
+      if (credentials) {
+        setCompanyData(prev => ({
+          ...prev,
+          username: credentials.username,
+          password: credentials.password
+        }));
+      }
+    }
+  };
+  updateCredentials();
+}, [companyData.userId]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-24">
@@ -128,18 +167,25 @@ const handleOnboardingComplete = (data: any) => {
                 <h3 className="text-lg font-semibold mb-4">Company Details</h3>
                 <div className="space-y-2">
                   <p><span className="font-medium">Company Name:</span> {companyData.company_name}</p>
-                  <p><span className="font-medium">Username:</span> {companyData.username}</p>
-                  <p><span className="font-medium">Password:</span> {companyData.password}</p>
+                  <p><span className="font-medium">Username:</span> {companyData.username || 'Loading...'}</p>
+                  <p><span className="font-medium">Password:</span> {companyData.password || 'Loading...'}</p>
                   <p><span className="font-medium">Uploaded Records:</span> {companyData.uploadedData?.length || 0}</p>
                 </div>
               </div>
 
-              <Button
-                onClick={handleGoToLogin}
-                className="mt-4"
-              >
-                Go to Login
-              </Button>
+              <div className="flex justify-center gap-4">
+                <Button
+                  onClick={() => setStep(1)}
+                  variant="outline"
+                >
+                  Back to Onboarding
+                </Button>
+                <Button
+                  onClick={handleGoToLogin}
+                >
+                  Go to Login
+                </Button>
+              </div>
             </div>
           )}
         </div>
