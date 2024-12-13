@@ -2,7 +2,6 @@
 "use client"
 import React, { useEffect, useState, useMemo } from 'react';
 import { Eye, Download, Search, Upload, RefreshCw, Mail, Phone, Send, MessageCircle, Loader2, AlertCircle } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from "@/components/ui/checkbox";
 import { SendDocumentModal } from './components/SendDocumentModal';
 import toast, { Toaster } from 'react-hot-toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -71,7 +71,11 @@ const DocumentList = () => {
   const [sendError, setSendError] = useState<string | null>(null);
   const [showSendingStatus, setShowSendingStatus] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState<Document[]>([]);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [documentStatus, setDocumentStatus] = useState<{ [key: number]: boolean }>({});
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const queryClient = useQueryClient();
   const [sendingDetails, setSendingDetails] = useState({
     documentName: '',
     companyName: '',
@@ -89,8 +93,23 @@ const DocumentList = () => {
     return `${truncatedName}.${extension}`;
   };
 
+
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.refetchQueries(['companies']);
+      await queryClient.refetchQueries(['documents']);
+      await queryClient.refetchQueries(['uploads']);
+      toast.success('Data refreshed successfully');
+    } catch (error) {
+      toast.error('Failed to refresh data');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   // Query Hooks
-  const { data: companies = [] } = useQuery<Company[]>({
+  const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<Company[]>({
     queryKey: ['companies'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -98,13 +117,17 @@ const DocumentList = () => {
         .select('id, company_name, current_communication_email, phone');
       if (error) throw error;
       return data || [];
-    }
+    },
+    staleTime: 300000, // 5 minutes
+    refetchOnWindowFocus: false,
   });
+
 
   const { data: documents = [], isLoading: isLoadingDocuments } = useQuery<Document[]>({
     queryKey: ['documents', activeTab, selectedCompany?.id],
-    enabled: !!selectedCompany,
     queryFn: async () => {
+      if (!selectedCompany) return [];
+
       let query = supabase.from('acc_portal_kyc').select('*');
 
       if (activeTab === 'KRA') {
@@ -118,8 +141,12 @@ const DocumentList = () => {
       const { data, error } = await query;
       if (error) throw error;
       return data || [];
-    }
+    },
+    enabled: !!selectedCompany,
+    staleTime: 300000,
+    refetchOnWindowFocus: false,
   });
+
 
   const handleBulkSend = (method) => {
     if (method === 'email' && !selectedCompany?.current_communication_email) {
@@ -288,16 +315,21 @@ const DocumentList = () => {
 
   const { data: documentUploads = [], isLoading: isLoadingUploads } = useQuery<Upload[]>({
     queryKey: ['uploads', selectedCompany?.id, selectedDocument?.id],
-    enabled: !!selectedCompany && !!selectedDocument,
     queryFn: async () => {
+      if (!selectedCompany || !selectedDocument) return [];
+
       const { data, error } = await supabase
         .from('acc_portal_kyc_uploads')
         .select('*')
         .eq('userid', selectedCompany.id.toString())
         .eq('kyc_document_id', selectedDocument.id);
+
       if (error) throw error;
       return data || [];
-    }
+    },
+    enabled: !!selectedCompany && !!selectedDocument,
+    staleTime: 300000,
+    refetchOnWindowFocus: false,
   });
 
   // Filter functions
@@ -692,7 +724,18 @@ const DocumentList = () => {
       {/* Companies List Column */}
       <div className="w-72 border-r border-slate-200 bg-white flex flex-col">
         <div className="p-6 border-b border-slate-200">
-          <h2 className="font-semibold text-slate-800 text-sm mb-4">Companies</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-slate-800 text-sm">Companies</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshData}
+              disabled={isRefreshing}
+              className="h-8 w-8 p-0"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
             <Input
@@ -706,37 +749,32 @@ const DocumentList = () => {
         </div>
         <ScrollArea className="flex-1">
           <div className="space-y-0.5 p-3">
-            {filteredDocuments.map((doc, index) => (
-              <div
-                key={doc.id}
-                className="flex items-center p-2 hover:bg-slate-50 rounded-lg"
+            {filteredCompanies.map((company, index) => (
+              <button
+                key={company.id}
+                onClick={() => {
+                  setSelectedCompany(company);
+                  setSelectedDocument(null);
+                  setSelectedDocuments([]);
+                }}
+                className={`w-full text-left px-4 py-2.5 rounded-lg text-xs transition-all ${selectedCompany?.id === company.id
+                  ? 'bg-blue-50 text-blue-700 font-medium shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+                  }`}
               >
-                <Checkbox
-                  checked={selectedDocuments.some(d => d.id === doc.id)}
-                  onCheckedChange={() => toggleDocumentSelection(doc)}
-                  className="mr-3"
-                />
-                <button
-                  onClick={() => setSelectedDocument(doc)}
-                  className={`flex-1 text-left px-4 py-2.5 rounded-lg text-xs transition-all ${selectedDocument?.id === doc.id
-                      ? 'bg-blue-50 text-blue-700 font-medium shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <span className="text-slate-400 mt-0.5 text-[10px]">
-                      {(index + 1).toString().padStart(2, '0')}
-                    </span>
-                    <div className="flex-1">
-                      <div className="font-medium">{doc.name}</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">
-                        {doc.department || 'No Department'} • {doc.category || 'No Category'}
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-slate-400 mt-0.5 text-[10px]">
+                    {(index + 1).toString().padStart(2, '0')}
+                  </span>
+                  <span className="flex-1">{company.company_name}</span>
+                </div>
+              </button>
             ))}
+            {filteredCompanies.length === 0 && (
+              <div className="text-center py-4 text-slate-500 text-sm">
+                No companies found
+              </div>
+            )}
           </div>
         </ScrollArea>
       </div>
@@ -747,7 +785,14 @@ const DocumentList = () => {
           <>
             <div className="p-6 border-b border-slate-200">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="font-semibold text-slate-800 text-sm">Documents</h2>
+                <div className="flex items-center space-x-2">
+                  <h2 className="font-semibold text-slate-800 text-sm">Documents</h2>
+                  {selectedDocuments.length > 0 && (
+                    <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">
+                      {selectedDocuments.length} selected
+                    </span>
+                  )}
+                </div>
                 <div className="flex bg-slate-100 p-1 rounded-lg">
                   {['All', 'KRA', 'Sheria'].map((tab) => (
                     <button
@@ -755,6 +800,7 @@ const DocumentList = () => {
                       onClick={() => {
                         setActiveTab(tab);
                         setSelectedDocument(null);
+                        setSelectedDocuments([]); // Clear selections when changing tabs
                       }}
                       className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${activeTab === tab
                         ? 'bg-white text-blue-600 shadow-sm'
@@ -776,6 +822,26 @@ const DocumentList = () => {
                   className="w-full pl-9 border-slate-200 focus:ring-blue-500 text-xs"
                 />
               </div>
+              {selectedDocuments.length > 0 && (
+                <div className="mt-4 flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedDocuments([])}
+                    className="text-slate-600 text-xs"
+                  >
+                    Clear Selection
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setShowSendModal(true)}
+                    className="bg-blue-600 text-white text-xs"
+                  >
+                    Send Selected
+                  </Button>
+                </div>
+              )}
             </div>
             <ScrollArea className="flex-1">
               <div className="space-y-0.5 p-3">
@@ -785,28 +851,45 @@ const DocumentList = () => {
                     Loading...
                   </div>
                 ) : (
-                  filteredDocuments.map((doc, index) => (
-                    <button
-                      key={doc.id}
-                      onClick={() => setSelectedDocument(doc)}
-                      className={`w-full text-left px-4 py-2.5 rounded-lg text-xs transition-all ${selectedDocument?.id === doc.id
-                        ? 'bg-blue-50 text-blue-700 font-medium shadow-sm'
-                        : 'text-slate-600 hover:bg-slate-50'
-                        }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <span className="text-slate-400 mt-0.5 text-[10px]">
-                          {(index + 1).toString().padStart(2, '0')}
-                        </span>
-                        <div className="flex-1">
-                          <div className="font-medium">{doc.name}</div>
-                          <div className="text-[10px] text-slate-500 mt-0.5">
-                            {doc.department || 'No Department'} • {doc.category || 'No Category'}
+                  filteredDocuments.map((doc, index) => {
+                    const isSelected = selectedDocuments.some(d => d.id === doc.id);
+                    return (
+                      <div
+                        key={doc.id}
+                        className={`relative flex items-center px-4 py-2.5 rounded-lg text-xs transition-all ${selectedDocument?.id === doc.id
+                          ? 'bg-blue-50'
+                          : isSelected
+                            ? 'bg-blue-50/50'
+                            : 'hover:bg-slate-50'
+                          }`}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleDocumentSelection(doc)}
+                          className="mr-3 h-4 w-4"
+                        />
+                        <button
+                          onClick={() => setSelectedDocument(doc)}
+                          className="flex-1 text-left focus:outline-none"
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-slate-400 mt-0.5 text-[10px]">
+                              {(index + 1).toString().padStart(2, '0')}
+                            </span>
+                            <div className="flex-1">
+                              <div className={`font-medium ${selectedDocument?.id === doc.id ? 'text-blue-700' : 'text-slate-700'
+                                }`}>
+                                {doc.name}
+                              </div>
+                              <div className="text-[10px] text-slate-500 mt-0.5">
+                                {doc.department || 'No Department'} • {doc.category || 'No Category'}
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        </button>
                       </div>
-                    </button>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </ScrollArea>
@@ -820,6 +903,15 @@ const DocumentList = () => {
             <p className="text-center">Select a company<br />to view documents</p>
           </div>
         )}
+
+        {/* Send Document Modal */}
+        <SendDocumentModal
+          isOpen={showSendModal}
+          onClose={() => setShowSendModal(false)}
+          documents={selectedDocuments}
+          company={selectedCompany}
+          previewUrl={previewUrl}
+        />
       </div>
 
       {/* Main Content Area */}
@@ -931,6 +1023,19 @@ const DocumentList = () => {
           )
         }
       />
+
+      {selectedCompany && showSendModal && (
+        <SendDocumentModal
+          isOpen={showSendModal}
+          onClose={() => {
+            setShowSendModal(false);
+            setSelectedDocuments([]);
+          }}
+          documents={selectedDocuments}
+          company={selectedCompany}
+          previewUrl={previewUrl}
+        />
+      )}
     </div>
   );
 };
