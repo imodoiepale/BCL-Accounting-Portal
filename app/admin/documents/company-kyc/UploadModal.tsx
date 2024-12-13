@@ -14,9 +14,8 @@ import { Separator } from "@/components/ui/separator";
 
 interface UploadFile {
   file: File;
-  issueDate?: string;
-  expiryDate?: string;
   documentType: 'past' | 'recent';
+  expiryDate?: string;
   validityDays?: number;
   reminderDays?: string;
   status?: string;
@@ -42,8 +41,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles = acceptedFiles.map(file => ({
       file,
-      issueDate: '',
-      expiryDate: '',
       documentType: 'recent',
       validityDays: 365,
       reminderDays: '30,15,7',
@@ -69,19 +66,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       return;
     }
 
-    // Validate required fields
+    // Validate expiry date for renewal documents
     const invalidFiles = files.filter(file => {
-      if (file.documentType === 'recent' && !file.issueDate) {
-        return true;
-      }
-      if (selectedDocument?.document_type === 'renewal' && file.documentType === 'recent' && !file.expiryDate) {
-        return true;
-      }
-      return false;
+      return selectedDocument?.document_type === 'renewal' && 
+             file.documentType === 'recent' && 
+             !file.expiryDate;
     });
 
     if (invalidFiles.length > 0) {
-      toast.error('Please fill in all required dates for recent documents');
+      toast.error('Please add expiry dates for recent renewal documents');
       return;
     }
 
@@ -241,35 +234,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                                     </SelectContent>
                                   </Select>
 
-                                  {file.documentType === 'recent' && (
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700">
-                                          Issue Date *
-                                        </label>
-                                        <input
-                                          type="date"
-                                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20"
-                                          value={file.issueDate}
-                                          onChange={(e) => updateFileField(index, 'issueDate', e.target.value)}
-                                          
-                                        />
-                                      </div>
-                                      {selectedDocument?.document_type === 'renewal' && (
-                                        <div className="space-y-2">
-                                          <label className="text-sm font-medium text-gray-700">
-                                            Expiry Date *
-                                          </label>
-                                          <input
-                                            type="date"
-                                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20"
-                                            value={file.expiryDate}
-                                            onChange={(e) => updateFileField(index, 'expiryDate', e.target.value)}
-                                            min={file.issueDate}
-                                            required
-                                          />
-                                        </div>
-                                      )}
+                                  {file.documentType === 'recent' && selectedDocument?.document_type === 'renewal' && (
+                                    <div className="space-y-2">
+                                      <label className="text-sm font-medium text-gray-700">
+                                        Expiry Date *
+                                      </label>
+                                      <input
+                                        type="date"
+                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20"
+                                        value={file.expiryDate}
+                                        onChange={(e) => updateFileField(index, 'expiryDate', e.target.value)}
+                                        required
+                                      />
                                     </div>
                                   )}
                                 </div>
@@ -331,10 +307,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           <div className="border-t">
             <DialogFooter className="p-6">
               <div className="flex justify-between w-full items-center">
-                {files.some(f => f.documentType === 'recent') && (
+                {files.some(f => f.documentType === 'recent' && selectedDocument?.document_type === 'renewal') && (
                   <div className="flex items-center text-sm text-amber-600">
                     <AlertCircle className="h-4 w-4 mr-1.5" />
-                    Recent documents require dates
+                    Recent renewal documents require expiry dates
                   </div>
                 )}
                 <div className="flex gap-3">
