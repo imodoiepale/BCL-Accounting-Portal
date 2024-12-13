@@ -493,7 +493,7 @@ const handleToggleRowLock = async (
       throw new Error('Row ID not found');
     }
 
-    console.log('Using table info:', { tableName, rowId });
+    // console.log('Using table info:', { tableName, rowId });
 
     // Update verification status
     const verificationKey = `${tableName}_${rowId}`;
@@ -521,16 +521,16 @@ const handleToggleRowLock = async (
       }
     }));
     // Add these logs in handleToggleRowLock
-    console.log('Structure:', mappingData.structure);
-    console.log('Active subtab:', activeSubTab);
-    console.log('Determined table name:', tableName);
+    // console.log('Structure:', mappingData.structure);
+    // console.log('Active subtab:', activeSubTab);
+    // console.log('Determined table name:', tableName);
 
     toast.success(`Row ${!currentVerificationState ? 'verified' : 'unverified'}`);
     if (typeof refreshData === 'function') {
       await refreshData();
     }
-    console.log('refreshData type:', typeof refreshData);
-    console.log('refreshData:', refreshData);
+    // console.log('refreshData type:', typeof refreshData);
+    // console.log('refreshData:', refreshData);
 
   } catch (error) {
     console.error('Verification error:', error);
@@ -608,7 +608,7 @@ const renderDataRows = (
               <span className='text-black'>Missing Fields</span>
             </div>
           </TableCell>
-     
+
           {processedSections.slice(1).map((section, sectionIndex) => {
             if (section.isSeparator) {
               return renderSeparatorCell(`data-sep-${sectionIndex}-${groupIndex}-${rowIndex}`, 'section');
@@ -834,42 +834,45 @@ export const Table: React.FC<TableProps> = ({
   const [lockedColumns, setLockedColumns] = useState<Record<string, any>>({});
   const [lockedRows, setLockedRows] = useState<Record<string, any>>({});
   const [localProcessedSections, setLocalProcessedSections] = useState(processedSections);
-  const useSidebarLayout = typeof activeMainTab === 'string' && activeMainTab ? 
-  ['employee details', 'customer details', 'supplier details'].includes(
-    activeMainTab.toLowerCase()
-  ) : false;
+  const useSidebarLayout = typeof activeMainTab === 'string' && activeMainTab ?
+    ['employee details', 'customer details', 'supplier details'].includes(
+      activeMainTab.toLowerCase()
+    ) : false;
 
-// Add debug logging
-console.log('Table props:', {
-  activeMainTab,
-  type: typeof activeMainTab,
-  useSidebarLayout
-});
-useEffect(() => {
-  console.log('Table state:', {
-    hasData: data?.length > 0,
-    activeMainTab,
-    activeSubTab,
-    processedSections: processedSections?.length
-  });
-}, [data, activeMainTab, activeSubTab, processedSections]);
+  // Add debug logging
+  // console.log('Table props:', {
+  //   activeMainTab,
+  //   type: typeof activeMainTab,
+  //   useSidebarLayout
+  // });
+  // useEffect(() => {
+  //   console.log('Table state:', {
+  //     hasData: data?.length > 0,
+  //     activeMainTab,
+  //     activeSubTab,
+  //     processedSections: processedSections?.length
+  //   });
+  // }, [data, activeMainTab, activeSubTab, processedSections]);
 
-    useEffect(() => {
-      if (Array.isArray(processedSections) && processedSections.length > 0) {
-        // Initialize both row and column verification states
-        initializeVerificationStates(processedSections, activeMainTab, activeSubTab, setLockedRows);
-        initializeFieldVerificationStates(processedSections, activeMainTab, activeSubTab, setLockedColumns);
-      }
-    }, [processedSections, activeMainTab, activeSubTab]);
+  useEffect(() => {
+    if (Array.isArray(processedSections) && processedSections.length > 0) {
+      initializeVerificationStates(processedSections, activeMainTab, activeSubTab, setLockedRows);
+      initializeFieldVerificationStates(processedSections, activeMainTab, activeSubTab, setLockedColumns);
+    }
+  }, [processedSections, activeMainTab, activeSubTab]);
 
   useEffect(() => {
     setLocalProcessedSections(processedSections);
   }, [processedSections]);
 
-  useEffect(() => {
-    console.log('lockedRows updated:', lockedRows);
-  }, [lockedRows]);
+  // useEffect(() => {
+  //   console.log('lockedRows updated:', lockedRows);
+  // }, [lockedRows]);
 
+  // useEffect(() => {
+  //   console.log('lockedColumns updated:', lockedColumns);
+  // }, [lockedColumns]);
+  
   const sortedData = React.useMemo(() => {
     if (!sortConfig.field || !sortConfig.direction) return data;
 
@@ -887,7 +890,6 @@ useEffect(() => {
         : aValue < bValue ? 1 : -1;
     });
   }, [data, sortConfig]);
-
 
   const handleSort = (field: string) => {
     setSortConfig(prevConfig => ({
@@ -915,7 +917,7 @@ useEffect(() => {
 
   const handleVerification = async (type: 'field' | 'row' | 'section', id: string, mainTab: string, subTab: string) => {
     try {
-      console.log('Starting verification process:', { type, id, mainTab, subTab });
+      // console.log('Starting verification process:', { type, id, mainTab, subTab });
       const { data: currentMapping } = await supabase
         .from('profile_category_table_mapping_2')
         .select('structure')
@@ -923,12 +925,12 @@ useEffect(() => {
         .eq('Tabs', subTab)
         .single();
 
-      console.log('Current mapping:', currentMapping);
+      // console.log('Current mapping:', currentMapping);
 
       if (!currentMapping) return;
 
       let updatedStructure = { ...currentMapping.structure };
-      console.log('Initial structure:', updatedStructure);
+      // console.log('Initial structure:', updatedStructure);
 
       if (type === 'field') {
         // Update field verification
@@ -958,7 +960,7 @@ useEffect(() => {
         };
       }
 
-      console.log('Updated structure:', updatedStructure);
+      // console.log('Updated structure:', updatedStructure);
 
       const { error } = await supabase
         .from('profile_category_table_mapping_2')
@@ -974,248 +976,186 @@ useEffect(() => {
         .eq('Tabs', subTab);
 
       if (error) throw error;
-      console.log('Verification update successful');
+      // console.log('Verification update successful');
       toast.success(`${type} verification updated`);
     } catch (error) {
       console.error('Verification error:', error);
       toast.error('Verification update failed');
     }
   };
+    const handleToggleColumnLock = async (columnName: string) => {
+      try {
+        let tableName, fieldName;
+        const parts = columnName.split('.');
+        if (parts.length >= 2) {
+          tableName = parts[0];
+          fieldName = parts[parts.length - 1];
+        } else {
+          throw new Error('Invalid column name format');
+        }
 
-  const handleToggleColumnLock = async (columnName: string) => {
-    try {
-      // Fix the field name parsing
-      let tableName, fieldName;
+        const { data: mappingData, error: fetchError } = await supabase
+          .from('profile_category_table_mapping_2')
+          .select('*')
+          .eq('main_tab', activeMainTab)
+          .eq('Tabs', activeSubTab)
+          .single();
 
-      // Handle the case where the field name contains multiple dots
-      const parts = columnName.split('.');
-      if (parts.length >= 2) {
-        tableName = parts[0];
-        // Take the last part as the field name
-        fieldName = parts[parts.length - 1];
-      } else {
-        throw new Error('Invalid column name format');
-      }
+        if (fetchError) throw fetchError;
+        if (!mappingData) throw new Error('No mapping data found');
 
-      console.log('Handling toggle for:', { tableName, fieldName });
+        const fieldKey = `field_${tableName}.${fieldName}`;
+        const currentVerificationState = lockedColumns[fieldKey]?.is_verified || false;
 
-      // Fetch current mapping data
-      const { data: mappingData, error: fetchError } = await supabase
-        .from('profile_category_table_mapping_2')
-        .select('*')
-        .eq('main_tab', activeMainTab)
-        .eq('Tabs', activeSubTab)
-        .single();
+        const updatedStructure = JSON.parse(JSON.stringify(mappingData.structure));
+        let fieldUpdated = false;
 
-      if (fetchError) {
-        console.error('Error fetching mapping data:', fetchError);
-        throw fetchError;
-      }
+        updatedStructure.sections = updatedStructure.sections.map(section => ({
+          ...section,
+          subsections: section.subsections?.map(subsection => ({
+            ...subsection,
+            fields: subsection.fields?.map(field => {
+              if (field.table === tableName && field.name === fieldName) {
+                fieldUpdated = true;
+                return {
+                  ...field,
+                  verification: {
+                    is_verified: !currentVerificationState,
+                    verified_at: new Date().toISOString(),
+                    verified_by: 'current_user'
+                  }
+                };
+              }
+              return field;
+            })
+          }))
+        }));
 
-      if (!mappingData) {
-        throw new Error('No mapping data found');
-      }
+        if (!fieldUpdated) {
+          throw new Error(`Field ${fieldName} not found in structure for table ${tableName}`);
+        }
 
-      // Get current verification state
-      const fieldKey = `field_${tableName}.${fieldName}`;
-      const currentVerificationState = lockedColumns[fieldKey]?.is_verified || false;
-
-      console.log('Current verification state:', currentVerificationState);
-      console.log('Current structure:', mappingData.structure);
-
-      // Create deep copy of the structure
-      const updatedStructure = JSON.parse(JSON.stringify(mappingData.structure));
-
-      // Flag to check if we found and updated the field
-      let fieldUpdated = false;
-
-      // Update the field verification in the structure
-      updatedStructure.sections = updatedStructure.sections.map(section => ({
-        ...section,
-        subsections: section.subsections?.map(subsection => ({
-          ...subsection,
-          fields: subsection.fields?.map(field => {
-            // Log each field being checked
-            console.log('Checking field:', {
-              fieldTable: field.table,
-              fieldName: field.name,
-              lookingFor: { tableName, fieldName }
-            });
-
-            if (field.table === tableName && field.name === fieldName) {
-              fieldUpdated = true;
-              console.log('Found matching field, updating verification');
-              return {
-                ...field,
-                verification: {
-                  is_verified: !currentVerificationState,
-                  verified_at: new Date().toISOString(),
-                  verified_by: 'current_user'
-                }
-              };
-            }
-            return field;
+        const { error: updateError } = await supabase
+          .from('profile_category_table_mapping_2')
+          .update({
+            structure: updatedStructure
           })
-        }))
-      }));
+          .eq('id', mappingData.id);
 
-      if (!fieldUpdated) {
-        console.error('Field not found in structure. Available fields:',
-          updatedStructure.sections.flatMap(s =>
-            s.subsections?.flatMap(sub =>
-              sub.fields?.map(f => `${f.table}.${f.name}`)
-            )
-          )
-        );
-        throw new Error(`Field ${fieldName} not found in structure for table ${tableName}`);
-      }
+        if (updateError) throw updateError;
 
-      console.log('Updated structure:', updatedStructure);
-
-      // Update the database
-      const { error: updateError } = await supabase
-        .from('profile_category_table_mapping_2')
-        .update({
-          structure: {
-            ...updatedStructure,
-            order: mappingData.structure.order || {},
-            visibility: mappingData.structure.visibility || {},
-            relationships: mappingData.structure.relationships || {}
+        setLockedColumns(prev => ({
+          ...prev,
+          [fieldKey]: {
+            is_verified: !currentVerificationState,
+            verified_at: new Date().toISOString(),
+            verified_by: 'current_user'
           }
-        })
-        .eq('id', mappingData.id);
+        }));
 
-      if (updateError) throw updateError;
+        const rowKeys = Object.keys(lockedRows);
+        const updatedLockedRows = { ...lockedRows };
+        rowKeys.forEach(key => {
+          if (key.startsWith(tableName)) {
+            updatedLockedRows[key] = {
+              ...updatedLockedRows[key],
+              [`${fieldName}_locked`]: !currentVerificationState
+            };
+          }
+        });
+        setLockedRows(updatedLockedRows);
 
-      // Update local state for column verification
-      setLockedColumns(prev => ({
-        ...prev,
-        [fieldKey]: {
-          is_verified: !currentVerificationState,
-          verified_at: new Date().toISOString(),
-          verified_by: 'current_user'
+        toast.success(`Column ${!currentVerificationState ? 'locked' : 'unlocked'} successfully`);
+
+        if (typeof refreshData === 'function') {
+          await refreshData();
         }
-      }));
 
-      // Also need to disable editing for all cells in this column
-      const rowKeys = Object.keys(lockedRows);
-      const updatedLockedRows = { ...lockedRows };
-      rowKeys.forEach(key => {
-        if (key.startsWith(tableName)) {
-          updatedLockedRows[key] = {
-            ...updatedLockedRows[key],
-            [`${fieldName}_locked`]: !currentVerificationState
-          };
-        }
-      });
-      setLockedRows(updatedLockedRows);
-
-      // Show success message
-      toast.success(`Column ${!currentVerificationState ? 'locked' : 'unlocked'} successfully`);
-
-      // Refresh data if needed
-      if (typeof refreshData === 'function') {
-        await refreshData();
+      } catch (error) {
+        console.error('Error in handleToggleColumnLock:', error);
+        toast.error(`Failed to update column verification: ${(error as Error).message}`);
       }
+    };
 
-    } catch (error) {
-      console.error('Error in handleToggleColumnLock:', error);
-      toast.error(`Failed to update column verification: ${(error as Error).message}`);
+    if (!processedSections || !Array.isArray(processedSections)) {
+      return null;
     }
+
+    return (
+      <Card>
+        <CardContent className="p-0 h-[900px]">
+          <ScrollArea className="h-[900px] rounded-md border">
+            <UITable>
+              <TableHeader className="sticky top-0 z-10 bg-white">
+                {renderHeaders(
+                  localProcessedSections,
+                  sortConfig,
+                  handleSort,
+                  handleToggleColumnLock,
+                  lockedRows,
+                  lockedColumns
+                )}
+                {renderStatisticsRows(data, localProcessedSections)}
+              </TableHeader>
+              <TableBody>
+                {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, localProcessedSections, refreshData, lockedRows, lockedColumns, activeMainTab, activeSubTab, setLockedRows)}
+              </TableBody>
+            </UITable>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    );
   };
 
-  if (!processedSections || !Array.isArray(processedSections)) {
-    return null;
-  }
-
-  return (
-    <Card>
-      <CardContent className="p-0 h-[900px]">
-        <ScrollArea className="h-[900px] rounded-md border">
-          <UITable>
-            <TableHeader className="sticky top-0 z-10 bg-white">
-              {renderHeaders(
-                localProcessedSections,
-                sortConfig,
-                handleSort,
-                handleToggleColumnLock,
-                lockedRows,
-                lockedColumns
-              )}
-              {renderStatisticsRows(data, localProcessedSections)}
-            </TableHeader>
-            <TableBody>
-              {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, localProcessedSections, refreshData, lockedRows, lockedColumns, activeMainTab, activeSubTab, setLockedRows)}
-            </TableBody>
-          </UITable>
-        </ScrollArea>
-      </CardContent>
-    </Card>
-  );
-};
-
-// Render table headers
-const renderHeaders = (
-  processedSections: any[],
-  sortConfig: SortConfig,
-  handleSort: (field: string) => void,
-  handleToggleColumnLock: (columnName: string) => void,
-  lockedColumns: Record<string, boolean>,
-  lockedRows: Record<string, boolean>
-) => {
-  const lockHeadersRow = (
-    <TableRow>
-      <TableHead className="font-medium">Lock</TableHead>
-      <TableHead className='font-medium bg-green-100 text-white'></TableHead>
-      {renderSeparatorCell(`lock-sep-start-${Date.now()}`, 'section')}
-      <TableHead className="text-center">-</TableHead>
-      {renderSeparatorCell(`lock-sep-end-${Date.now()}`, 'section')}
-      {processedSections.slice(1).map((section, sectionIndex) => 
-        section.categorizedFields?.map((category, catIndex) => 
-          category.fields.map((field, fieldIndex) => {
-            const isVerified = field.verification?.is_verified || false;
-            const verificationData = field.verification;
+  const renderHeaders = (
+    processedSections: any[],
+    sortConfig: SortConfig,
+    handleSort: (field: string) => void,
+    handleToggleColumnLock: (columnName: string) => void,
+    lockedColumns: Record<string, boolean>,
+    lockedRows: Record<string, boolean>
+  ) => {
+    const lockHeadersRow = (
+      <TableRow>
+        <TableHead className="font-medium">Lock</TableHead>
+        <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+        {renderSeparatorCell(`lock-sep-start-${Date.now()}`, 'section')}
+        <TableHead className="text-center">-</TableHead>
+        {renderSeparatorCell(`lock-sep-end-${Date.now()}`, 'section')}
+        {processedSections.slice(1).map((section, sectionIndex) =>
+          section.categorizedFields?.map((category, catIndex) =>
+            category.fields.map((field, fieldIndex) => {
+              const verificationStatus = field.verification?.is_verified || false;
             
-            return (
-              <React.Fragment key={`lock-${field.table}-${field.name}`}>
-                <TableCell
-                  className={`w-10 cursor-pointer hover:bg-gray-100 group relative ${
-                    isVerified ? 'bg-green-50' : 'bg-red-50'
-                  }`}
-                  onClick={() => handleToggleColumnLock(`${field.table}.${field.name}`)}
-                >
-                  <div className="group relative">
-                    {isVerified ? (
-                      <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
-                    ) : (
-                      <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
+              return (
+                <React.Fragment key={`lock-${field.table}-${field.name}`}>
+                  <TableCell
+                    className={`w-10 cursor-pointer hover:bg-gray-100 group relative ${
+                      verificationStatus ? 'bg-green-50' : 'bg-red-50'
+                    }`}
+                    onClick={() => handleToggleColumnLock(`${field.table}.${field.name}`)}
+                  >
+                    <div className="group relative">
+                      {verificationStatus ? (
+                        <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
+                      ) : (
+                        <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
+                      )}
+                    </div>
+                  </TableCell>
+                  {fieldIndex < category.fields.length - 1 &&
+                    field.subCategory !== category.fields[fieldIndex + 1]?.subCategory &&
+                    renderSeparatorCell(
+                      `lock-separator-${sectionIndex}-${catIndex}-${fieldIndex}-${Date.now()}`,
+                      'mini'
                     )}
-                    
-                    {verificationData && (
-                      <div className="absolute invisible group-hover:visible bg-gray-800 text-white text-xs p-2 rounded -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap z-50">
-                        {isVerified ? 'Verified' : 'Not verified'}
-                        {verificationData.verified_by && ` by ${verificationData.verified_by}`}
-                        {verificationData.verified_at && 
-                          ` on ${new Date(verificationData.verified_at).toLocaleDateString()}`
-                        }
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-                {fieldIndex < category.fields.length - 1 &&
-                  field.subCategory !== category.fields[fieldIndex + 1]?.subCategory &&
-                  renderSeparatorCell(
-                    `lock-separator-${sectionIndex}-${catIndex}-${fieldIndex}-${Date.now()}`,
-                    'mini'
-                  )}
-              </React.Fragment>
-            );
-          })
-        )
-      )}
-    </TableRow>
-  );
-  
+                </React.Fragment>
+              );
+            })
+          )
+        )}
+      </TableRow>
+    );
   return (
     <>
       {/* Section Reference Row */}

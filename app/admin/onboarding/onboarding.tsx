@@ -11,17 +11,29 @@ import { useSignUp } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// import { usePathname } from "next/navigation";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface OnboardingPageProps {
   onComplete: (data: any) => void;
 }
 
-interface ClientType {
-  type: string;
-  wef: string;
-  to: string;
+interface ClientFields {
+  acc_client: string;
+  acc_client_effective_from: string;
+  acc_client_effective_to: string;
+  acc_client_status: string;
+  sheria_client: string;
+  sheria_client_effective_from: string;
+  sheria_client_effective_to: string;
+  sheria_client_status: string;
+  imm_client: string;
+  imm_client_effective_from: string;
+  imm_client_effective_to: string;
+  imm_client_status: string;
+  audit_client: string;
+  audit_client_effective_from: string;
+  audit_client_effective_to: string;
+  audit_client_status: string;
 }
 
 export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
@@ -30,16 +42,51 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
   const [errorMessage, setErrorMessage] = useState("");
   const { signUp, setActive } = useSignUp();
   const router = useRouter();
-  const [selectedTypes, setSelectedTypes] = useState<ClientType[]>([]);
   const [existingCompanies, setExistingCompanies] = useState([]);
 
   // Form states
   const [newCompanyName, setNewCompanyName] = useState("");
   const [selectedCompany, setSelectedCompany] = useState("");
+  const [clientFields, setClientFields] = useState<ClientFields>({
+    acc_client: 'No',
+    acc_client_effective_from: '',
+    acc_client_effective_to: '',
+    acc_client_status: 'Active',
+    sheria_client: 'No',
+    sheria_client_effective_from: '',
+    sheria_client_effective_to: '',
+    sheria_client_status: 'Active',
+    imm_client: 'No',
+    imm_client_effective_from: '',
+    imm_client_effective_to: '',
+    imm_client_status: 'Active',
+    audit_client: 'No',
+    audit_client_effective_from: '',
+    audit_client_effective_to: '',
+    audit_client_status: 'Active'
+  });
 
   const resetInputs = () => {
     setNewCompanyName("");
     setErrorMessage("");
+    setClientFields({
+      acc_client: 'No',
+      acc_client_effective_from: '',
+      acc_client_effective_to: '',
+      acc_client_status: 'Active',
+      sheria_client: 'No',
+      sheria_client_effective_from: '',
+      sheria_client_effective_to: '',
+      sheria_client_status: 'Active',
+      imm_client: 'No',
+      imm_client_effective_from: '',
+      imm_client_effective_to: '',
+      imm_client_status: 'Active',
+      audit_client: 'No',
+      audit_client_effective_from: '',
+      audit_client_effective_to: '',
+      audit_client_status: 'Active'
+    });
   };
 
   useEffect(() => {
@@ -47,12 +94,12 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
       const { data } = await supabase
         .from('acc_portal_company_duplicate2')
         .select('*')
-      
+
       if (data) {
         setExistingCompanies(data);
       }
     };
-  
+
     fetchExistingCompanies();
   }, []);
 
@@ -60,26 +107,35 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
     setSelectedCompany(value);
   };
 
+ // Update handleExistingCompanySubmit
 const handleExistingCompanySubmit = async () => {
   setLoading(true);
   try {
-    if (!signUp) throw new Error("Sign up is not initialized");
-
-    const response = await fetch("/api/create-users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        existingCompany: true,
-        companyId: selectedCompany,
-        clientTypes: selectedTypes
-      }),
+    const updates = {};
+    Object.entries(clientFields).forEach(([key, value]) => {
+      if (key.includes('client') && value) {
+        updates[key] = value;
+      }
     });
 
-    if (!response.ok) throw new Error("Failed to update company");
+    const { data, error } = await supabase
+      .from('acc_portal_company_duplicate2')
+      .update(updates)
+      .eq('id', selectedCompany)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     toast.success("Company assigned successfully!");
     setIsOpen(false);
-    
+
+    // Call onComplete with the selected company data
+    onComplete({
+      name: data.company_name,
+      userId: data.id
+    });
+
   } catch (error) {
     toast.error(error.message);
   } finally {
@@ -87,73 +143,44 @@ const handleExistingCompanySubmit = async () => {
   }
 };
 
-  const handleAddClientType = () => {
-    setSelectedTypes([...selectedTypes, { type: '', wef: '', to: '' }]);
-  };
-
-  const updateClientType = (index: number, field: keyof ClientType, value: string) => {
-    const newTypes = [...selectedTypes];
-    newTypes[index][field] = value;
-    setSelectedTypes(newTypes);
-  };
-
-  const removeClientType = (index: number) => {
-    setSelectedTypes(selectedTypes.filter((_, i) => i !== index));
-  };
-
   const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMessage("");
-  
+
     try {
       if (!signUp) {
         throw new Error("Sign up is not initialized");
       }
-  
-      // Basic validation
+
       if (!newCompanyName) {
         throw new Error("Company name is required");
       }
-  
-      // Update metadata through API
-      let response;
-      try {
-        response = await fetch("/api/create-users", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: newCompanyName.trim(),
-          }),
-        });
-  
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to update company metadata");
-        }
-  
-        const data = await response.json();
-  
-        if (!data.id) {
-          throw new Error("Failed to get company ID");
-        }
-  
-        // Success handling
-        toast.success("Company account created successfully!");
-        resetInputs();
-        setIsOpen(false);
-        
-        onComplete({ 
+
+      const companyData = {
+        company_name: newCompanyName.trim(),
+        status: 'Active',
+        ...clientFields
+      };
+
+      const { data, error } = await supabase
+        .from('acc_portal_company_duplicate2')
+        .insert([companyData])
+        .select();
+
+      if (error) throw error;
+
+      toast.success("Company account created successfully!");
+      resetInputs();
+      setIsOpen(false);
+
+      if (data && data[0]) {
+        onComplete({
           name: newCompanyName.trim(),
-          userId: data.id 
+          userId: data[0].id
         });
-  
-      } catch (apiError: any) {
-        throw new Error(apiError.message || "API request failed");
       }
-  
+
     } catch (error: any) {
       const errorMsg = error instanceof Error ? error.message : "An unexpected error occurred";
       console.error("Creation Error:", errorMsg);
@@ -163,7 +190,7 @@ const handleExistingCompanySubmit = async () => {
       setLoading(false);
     }
   };
-  
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-24">
       <Dialog open={isOpen} onOpenChange={(open) => {
@@ -173,7 +200,7 @@ const handleExistingCompanySubmit = async () => {
         <DialogTrigger asChild>
           <Button variant="default">Onboard New Company</Button>
         </DialogTrigger>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Company Onboarding</DialogTitle>
           </DialogHeader>
@@ -182,7 +209,7 @@ const handleExistingCompanySubmit = async () => {
               <TabsTrigger value="new">New Company</TabsTrigger>
               <TabsTrigger value="existing">Existing Company</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="new">
               <form onSubmit={handleAddCompany} className="space-y-4">
                 {errorMessage && (
@@ -201,8 +228,57 @@ const handleExistingCompanySubmit = async () => {
                     required
                   />
                 </div>
-                <Button 
-                  type="submit" 
+
+                <div className="space-y-6">
+                  {['acc', 'sheria', 'imm', 'audit'].map((type) => (
+                    <div key={type} className="p-6 border rounded-lg">
+                      <div className="grid grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                        <Label className="text-sm font-medium">{type.charAt(0).toUpperCase() + type.slice(1)} Client</Label>
+                        <Select
+                            value={clientFields[`${type}_client`]}
+                            onValueChange={(value) => setClientFields({
+                              ...clientFields,
+                              [`${type}_client`]: value
+                            })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={`Select ${type} client`} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Yes">Yes</SelectItem>
+                              <SelectItem value="No">No</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-sm">Effective From</Label>
+                          <Input
+                            type="date"
+                            value={clientFields[`${type}_client_effective_from`]}
+                            onChange={(e) => setClientFields({
+                              ...clientFields,
+                              [`${type}_client_effective_from`]: e.target.value
+                            })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-sm">Effective To</Label>
+                          <Input
+                            type="date"
+                            value={clientFields[`${type}_client_effective_to`]}
+                            onChange={(e) => setClientFields({
+                              ...clientFields,
+                              [`${type}_client_effective_to`]: e.target.value
+                            })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="submit"
                   disabled={loading}
                   className="w-full"
                 >
@@ -218,53 +294,68 @@ const handleExistingCompanySubmit = async () => {
                     <SelectValue placeholder="Select existing company" />
                   </SelectTrigger>
                   <SelectContent>
-                    {existingCompanies.map(company => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.company_name}
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      {existingCompanies.map(company => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.company_name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
 
-                <div className="space-y-2">
-                  <Label>Client Types</Label>
-                  <Button type="button" onClick={handleAddClientType} className="mb-2">
-                    Add Client Type
-                  </Button>
-                  {selectedTypes.map((type, index) => (
-                    <div key={index} className="grid grid-cols-4 gap-2 mb-2">
-                      <Select onValueChange={(value) => updateClientType(index, 'type', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {['Accounting', 'Sheria', 'Immigration', 'Audit'].map(t => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="date"
-                        value={type.wef}
-                        onChange={(e) => updateClientType(index, 'wef', e.target.value)}
-                        placeholder="WEF"
-                      />
-                      <Input
-                        type="date"
-                        value={type.to}
-                        onChange={(e) => updateClientType(index, 'to', e.target.value)}
-                        placeholder="To"
-                      />
-                      <Button type="button" onClick={() => removeClientType(index)} variant="destructive">
-                        Remove
-                      </Button>
+                <div className="space-y-6">
+                  {['acc', 'sheria', 'imm', 'audit'].map((type) => (
+                    <div key={type} className="p-6 border rounded-lg">
+                      <div className="grid grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                        <Label className="text-sm font-medium">{type.charAt(0).toUpperCase() + type.slice(1)} Client</Label>
+                        <Select
+                            value={clientFields[`${type}_client`]}
+                            onValueChange={(value) => setClientFields({
+                              ...clientFields,
+                              [`${type}_client`]: value
+                            })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={`Select ${type} client`} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Yes">Yes</SelectItem>
+                              <SelectItem value="No">No</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-sm">Effective From</Label>
+                          <Input
+                            type="date"
+                            value={clientFields[`${type}_client_effective_from`]}
+                            onChange={(e) => setClientFields({
+                              ...clientFields,
+                              [`${type}_client_effective_from`]: e.target.value
+                            })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-sm">Effective To</Label>
+                          <Input
+                            type="date"
+                            value={clientFields[`${type}_client_effective_to`]}
+                            onChange={(e) => setClientFields({
+                              ...clientFields,
+                              [`${type}_client_effective_to`]: e.target.value
+                            })}
+                          />
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
 
-                <Button 
+                <Button
                   onClick={handleExistingCompanySubmit}
-                  className="w-full"
+                  className="w-full mt-6"
                 >
                   Assign Company
                 </Button>
