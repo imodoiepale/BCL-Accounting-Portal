@@ -148,7 +148,9 @@ const DocumentViewer: React.FC<{
   };
 
   const handleConfirmDelete = async () => {
-    if (!deletingDoc || !onDelete) return;
+    if (!deletingDoc || !onDelete) {
+      return;
+    }
 
     setIsDeleting(true);
     try {
@@ -353,7 +355,9 @@ const DocumentViewer: React.FC<{
 
 // ViewModal Component
 const ViewModal: React.FC<ViewModalProps> = ({ url, setShowViewModal }) => {
-  if (!url) return null;
+  if (!url) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -371,7 +375,6 @@ const ViewModal: React.FC<ViewModalProps> = ({ url, setShowViewModal }) => {
     </div>
   );
 };
-
 // DocumentActions Component
 const DocumentActions = ({
   onView,
@@ -439,7 +442,9 @@ const handleViewDocuments = async (document: Document, company: Company) => {
           .from('kyc-documents')
           .createSignedUrl(upload.filepath, 60);
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         return {
           id: upload.id,
@@ -477,7 +482,9 @@ const handleMultiUpload = async (files: UploadFile[]) => {
           .from('kyc-documents')
           .upload(fileName, file);
 
-        if (fileError) throw fileError;
+                       if (fileError) {
+          throw fileError;
+        }
 
         const uploadData = {
           userid: selectedCompany.id.toString(),
@@ -491,9 +498,10 @@ const handleMultiUpload = async (files: UploadFile[]) => {
           .from('acc_portal_kyc_uploads')
           .insert(uploadData);
 
-        if (error) throw error;
-      })
-    );
+        if (error) {
+          throw error;
+        }
+      })    );
 
     queryClient.invalidateQueries({ queryKey: ['uploads'] });
     setShowUploadModal(false);
@@ -647,7 +655,9 @@ const DocumentManagement = () => {
         .from('acc_portal_kyc_uploads')
         .select('*');
 
-      if (error) throw error;
+      if 
+      (error) 
+        throw error;
       return data || [];
     }
   });
@@ -674,7 +684,9 @@ const DocumentManagement = () => {
             .from('kyc-documents')
             .upload(fileName, fileData.file);
 
-          if (fileError) throw fileError;
+          if
+           (fileError) 
+           throw fileError;
 
           const uploadData = {
             userid: companyId.toString(),
@@ -691,7 +703,8 @@ const DocumentManagement = () => {
             .select()
             .single();
 
-          if (error) throw error;
+          if 
+          (error) throw error;
           results.push(data);
         } catch (error) {
           console.error('Upload error:', error);
