@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Settings, Upload, Download } from 'lucide-react';
 import { toast } from "sonner";
 import dynamic from 'next/dynamic';
+import { handleExport } from './components/utility';
 
 // Lazy load heavy components using dynamic import
 const Table = dynamic(() =>
