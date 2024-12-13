@@ -907,7 +907,10 @@ const DocumentList = () => {
         {/* Send Document Modal */}
         <SendDocumentModal
           isOpen={showSendModal}
-          onClose={() => setShowSendModal(false)}
+          onClose={() => {
+            setShowSendModal(false);
+            setSelectedDocuments([]);
+          }}
           documents={selectedDocuments}
           company={selectedCompany}
           previewUrl={previewUrl}
