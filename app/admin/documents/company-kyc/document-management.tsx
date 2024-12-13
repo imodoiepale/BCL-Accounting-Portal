@@ -148,12 +148,14 @@ const DocumentViewer: React.FC<{
   };
 
   const handleConfirmDelete = async () => {
-    if (!deletingDoc || !onDelete) return;
-    
+    if (!deletingDoc || !onDelete) {
+      return;
+    }
+
     setIsDeleting(true);
     try {
       await onDelete(deletingDoc);
-      
+
       if (documents.length === 1) {
         onClose();
       } else {
@@ -172,8 +174,8 @@ const DocumentViewer: React.FC<{
   return (
     <>
       <Dialog open={true} onOpenChange={onClose}>
-        <DialogContent className={`max-w-[95vw] w-[1400px] max-h-[95vh] ${documents.length === 1 ? 'h-[95vh]' : 'h-[900px]'}`}>
-          <DialogHeader className="px-6 py-4">
+        <DialogContent className={`max-w-[98vw] w-[1600px] max-h-[99vh] ${documents.length === 1 ? 'h-[99vh]' : 'h-[99vh]'}`}>
+          <DialogHeader className="px-6 py-2">
             <DialogTitle className="flex justify-between items-center">
               <div className="flex flex-col">
                 <span>Document Preview ({currentIndex + 1}/{documents.length})</span>
@@ -212,16 +214,15 @@ const DocumentViewer: React.FC<{
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex gap-4 h-[calc(100%-80px)] p-6">
-            <div className="w-[300px] flex flex-col border-r pr-4">
+          <div className="flex gap-2 h-[calc(100%-60px)] p-2">
+            <div className="w-[250px] flex flex-col border-r pr-3">
               <ScrollArea className="flex-1">
                 <div className="space-y-3">
                   {sortedDocs.map((doc, index) => (
                     <div
                       key={doc.id}
-                      className={`cursor-pointer p-3 border rounded-lg transition-all group ${
-                        index === currentIndex ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-200'
-                      }`}
+                      className={`cursor-pointer p-3 border rounded-lg transition-all group ${index === currentIndex ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-200'
+                        }`}
                       onClick={() => setCurrentIndex(index)}
                     >
                       <div className="flex items-center justify-between mb-2">
@@ -296,11 +297,12 @@ const DocumentViewer: React.FC<{
               </ScrollArea>
             </div>
 
-            <div className="flex-1 border rounded-lg overflow-hidden">
+            <div className="flex-1 border rounded-lg overflow-hidden bg-white">
               <iframe
                 src={sortedDocs[currentIndex].url}
                 className="w-full h-full"
                 title={getFilenameFromPath(sortedDocs[currentIndex].filepath)}
+                style={{ height: 'calc(99vh - 70px)' }}
               />
             </div>
           </div>
@@ -350,13 +352,16 @@ const DocumentViewer: React.FC<{
     </>
   );
 };
+
 // ViewModal Component
 const ViewModal: React.FC<ViewModalProps> = ({ url, setShowViewModal }) => {
-  if (!url) return null;
+  if (!url) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-4 w-11/12 h-5/6 relative">
+      <div className="bg-white rounded-lg p-2 w-[98vw] h-[98vh] relative">
         <button
           onClick={() => setShowViewModal(false)}
           className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
@@ -370,7 +375,6 @@ const ViewModal: React.FC<ViewModalProps> = ({ url, setShowViewModal }) => {
     </div>
   );
 };
-
 // DocumentActions Component
 const DocumentActions = ({
   onView,
@@ -438,7 +442,9 @@ const handleViewDocuments = async (document: Document, company: Company) => {
           .from('kyc-documents')
           .createSignedUrl(upload.filepath, 60);
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         return {
           id: upload.id,
@@ -476,7 +482,9 @@ const handleMultiUpload = async (files: UploadFile[]) => {
           .from('kyc-documents')
           .upload(fileName, file);
 
-        if (fileError) throw fileError;
+                       if (fileError) {
+          throw fileError;
+        }
 
         const uploadData = {
           userid: selectedCompany.id.toString(),
@@ -490,9 +498,10 @@ const handleMultiUpload = async (files: UploadFile[]) => {
           .from('acc_portal_kyc_uploads')
           .insert(uploadData);
 
-        if (error) throw error;
-      })
-    );
+        if (error) {
+          throw error;
+        }
+      })    );
 
     queryClient.invalidateQueries({ queryKey: ['uploads'] });
     setShowUploadModal(false);
@@ -646,7 +655,9 @@ const DocumentManagement = () => {
         .from('acc_portal_kyc_uploads')
         .select('*');
 
-      if (error) throw error;
+      if 
+      (error) 
+        throw error;
       return data || [];
     }
   });
@@ -673,7 +684,9 @@ const DocumentManagement = () => {
             .from('kyc-documents')
             .upload(fileName, fileData.file);
 
-          if (fileError) throw fileError;
+          if
+           (fileError) 
+           throw fileError;
 
           const uploadData = {
             userid: companyId.toString(),
@@ -690,7 +703,8 @@ const DocumentManagement = () => {
             .select()
             .single();
 
-          if (error) throw error;
+          if 
+          (error) throw error;
           results.push(data);
         } catch (error) {
           console.error('Upload error:', error);
