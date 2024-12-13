@@ -1,29 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Phone, Loader2, AlertCircle, Eye } from 'lucide-react';
+import { Mail, Phone, Loader2, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { supabase } from '@/lib/supabaseClient';
 import toast from 'react-hot-toast';
 
 interface Document {
   id: number;
-  filepath: string;
-  created_at: string;
+  name: string;
+  filepath?: string;
+}
+
+interface Company {
+  id: number;
+  company_name: string;
+  current_communication_email?: string;
+  phone?: string;
 }
 
 interface SendDocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
   documents: Document[];
-  company: {
-    id: number;
-    company_name: string;
-    current_communication_email?: string;
-    phone?: string;
-  };
+  company: Company | null;
   previewUrl?: string;
 }
 
@@ -35,24 +38,69 @@ export const SendDocumentModal: React.FC<SendDocumentModalProps> = ({
   previewUrl
 }) => {
   const [sendingMethod, setSendingMethod] = useState<'email' | 'whatsapp'>('email');
-  const [email, setEmail] = useState(company.current_communication_email || '');
-  const [phone, setPhone] = useState(company.phone || '');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [documentStatus, setDocumentStatus] = useState<{ [key: number]: boolean }>({});
+
+  const verifyDocumentInStorage = async (filepath: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('kyc-documents')
+        .createSignedUrl(filepath, 10);
+        
+      if (error) {
+        console.error('Storage verification error:', error);
+        return false;
+      }
+      
+      return !!data;
+    } catch (error) {
+      console.error('Storage check failed:', error);
+      return false;
+    }
+  };
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && company) {
       setEmail(company.current_communication_email || '');
       setPhone(company.phone || '');
       setError(null);
     }
   }, [isOpen, company]);
 
-  const getDocumentName = (filepath: string) => {
-    const parts = filepath.split('/');
-    return parts[parts.length - 1]
-      .replace(/^\d+_/, '')
-      .split('.')[0];
+  useEffect(() => {
+    if (isOpen && documents.length > 0) {
+      const checkDocuments = async () => {
+        const statuses = await Promise.all(
+          documents.map(async (doc) => {
+            if (!doc.filepath) return false;
+            return verifyDocumentInStorage(doc.filepath);
+          })
+        );
+        
+        const statusMap: { [key: number]: boolean } = documents.reduce((acc, doc, index) => {
+          acc[doc.id] = statuses[index];
+          return acc;
+        }, {} as { [key: number]: boolean });        
+        setDocumentStatus(statusMap);
+      };
+      
+      checkDocuments();
+    }
+  }, [isOpen, documents]);
+
+  const getDocumentName = (doc: Document): string => {
+    if (!doc.name) return 'Unnamed Document';
+    
+    if (doc.filepath) {
+      const parts = doc.filepath.split('/');
+      const filename = parts[parts.length - 1];
+      return filename.replace(/^\d+_/, '').split('.')[0];
+    }
+    
+    return doc.name;
   };
 
   const validateInput = () => {
@@ -73,78 +121,79 @@ export const SendDocumentModal: React.FC<SendDocumentModalProps> = ({
     setError(null);
 
     try {
-      if (sendingMethod === 'email') {
-        const emailData = {
-          to: email,
-          subject: `Documents from ${company.company_name}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #2563eb; margin-bottom: 20px;">Documents from ${company.company_name}</h2>
-              <p style="color: #475569; margin-bottom: 20px;">
-                Please find the following documents attached to this email:
-              </p>
-              <ul style="list-style-type: none; padding: 0; margin: 0;">
-                ${documents.map(doc => `
-                  <li style="background-color: #f8fafc; padding: 12px; margin-bottom: 8px; border-radius: 6px; color: #475569;">
-                    📄 ${getDocumentName(doc.filepath)}
-                  </li>
-                `).join('')}
-              </ul>
-              <p style="color: #64748b; margin-top: 20px; font-size: 14px;">
-                Total documents: ${documents.length}
-              </p>
-            </div>
-          `,
-          documents: documents.map(doc => ({
-            filepath: doc.filepath
-          })),
-          companyName: company.company_name
-        };
+      // Verify all documents exist in storage first
+      const documentVerifications = await Promise.all(
+        documents.map(async (doc) => {
+          if (!doc.filepath) return false;
+          return verifyDocumentInStorage(doc.filepath);
+        })
+      );
 
-        const response = await fetch('/api/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(emailData)
-        });
+      const missingDocuments = documents.filter((_, index) => !documentVerifications[index]);
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to send email');
-        }
-
-        toast.success('Documents sent successfully via email');
-      } else {
-        let formattedPhone = phone.replace(/\D/g, '');
-        if (!formattedPhone.startsWith('+')) {
-          formattedPhone = '+' + formattedPhone;
-        }
-
-        const response = await fetch('/api/send-whatsapp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: formattedPhone,
-            documents: documents,
-            companyName: company.company_name,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to send via WhatsApp');
-        }
-
-        toast.success('Documents sent successfully via WhatsApp');
+      if (missingDocuments.length > 0) {
+        setError(
+          `${missingDocuments.length === documents.length ? 'No' : 'Some'} documents are available for sending. ` +
+          'Please verify the documents exist and try again.'
+        );
+        toast.error('Documents not found in storage');
+        return;
       }
 
+      const availableDocuments = documents.filter((_, index) => documentVerifications[index]);
+
+      if (availableDocuments.length === 0) {
+        setError('No documents available for sending');
+        return;
+      }
+
+      const endpoint = sendingMethod === 'email' ? '/api/send-email' : '/api/send-whatsapp';
+      const recipient = sendingMethod === 'email' ? email : phone.replace(/\D/g, '');
+
+      const payload = {
+        to: recipient,
+        documents: availableDocuments.map(doc => ({
+          name: getDocumentName(doc),
+          filepath: doc.filepath
+        })),
+        companyName: company?.company_name,
+        subject: `Documents from ${company?.company_name}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Documents from ${company?.company_name}</h2>
+            <p>Please find the attached documents:</p>
+            <ul>
+              ${availableDocuments.map(doc => `<li>${getDocumentName(doc)}</li>`).join('')}
+            </ul>
+          </div>
+        `
+      };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to send documents');
+      }
+
+      toast.success(`Documents sent successfully via ${sendingMethod}`);
       onClose();
     } catch (error) {
       console.error('Error sending documents:', error);
       setError(error instanceof Error ? error.message : 'Failed to send documents');
+      toast.error('Failed to send documents');
     } finally {
       setLoading(false);
     }
   };
+
+  if (!company) {
+    return null;
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -160,9 +209,20 @@ export const SendDocumentModal: React.FC<SendDocumentModalProps> = ({
               <h3 className="text-sm font-medium text-slate-900 mb-2">Selected Documents</h3>
               <div className="space-y-2">
                 {documents.map((doc, index) => (
-                  <div key={doc.id} className="flex items-center text-sm text-slate-600">
-                    <span className="w-5 text-slate-400">{index + 1}.</span>
-                    {getDocumentName(doc.filepath)}
+                  <div key={doc.id} className="flex items-center justify-between text-sm text-slate-600 p-2 bg-white rounded-md">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-5 text-slate-400">{index + 1}.</span>
+                      <span>{getDocumentName(doc)}</span>
+                    </div>
+                    <div className="flex items-center">
+                      {documentStatus[doc.id] === undefined ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                      ) : documentStatus[doc.id] ? (
+                        <span className="text-green-500 text-xs">Available</span>
+                      ) : (
+                        <span className="text-red-500 text-xs">Not Found</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
