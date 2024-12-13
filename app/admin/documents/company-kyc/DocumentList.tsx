@@ -70,13 +70,15 @@ const DocumentList = () => {
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [showSendingStatus, setShowSendingStatus] = useState(false);
+  const [selectedDocuments, setSelectedDocuments] = useState<Document[]>([]);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [sendingDetails, setSendingDetails] = useState({
     documentName: '',
     companyName: '',
     recipient: '',
     sendingMethod: ''
   });
-  
+
 
   // Add this utility function near the top of the file
   const truncateFilename = (filename, maxLength = 20) => {
@@ -128,7 +130,7 @@ const DocumentList = () => {
       toast.error('No phone number available for this company');
       return;
     }
-  
+
     setSendingDetails({
       documentName: `${selectedUploads.length} documents`,
       companyName: selectedCompany.company_name,
@@ -136,6 +138,17 @@ const DocumentList = () => {
       sendingMethod: method
     });
     setShowSendingStatus(true);
+  };
+
+  // Add this function to handle document selection
+  const toggleDocumentSelection = (doc: Document) => {
+    setSelectedDocuments(prev => {
+      const isSelected = prev.some(d => d.id === doc.id);
+      if (isSelected) {
+        return prev.filter(d => d.id !== doc.id);
+      }
+      return [...prev, doc];
+    });
   };
 
   const handleEmailSend = async (documentName) => {
@@ -153,62 +166,62 @@ const DocumentList = () => {
     setShowSendingStatus(true);
   };
 
-  
+
 
   // Add new function to handle the actual sending
- // Modified document selection logic in handleConfirmSend
-const handleConfirmSend = async (
-  recipient: string,
-  newFileName: string,
-  sendingMethod: 'email' | 'whatsapp',
-  documents: Upload[]
-) => {
-  setIsSending(true);
-  setSendError(null);
+  // Modified document selection logic in handleConfirmSend
+  const handleConfirmSend = async (
+    recipient: string,
+    newFileName: string,
+    sendingMethod: 'email' | 'whatsapp',
+    documents: Upload[]
+  ) => {
+    setIsSending(true);
+    setSendError(null);
 
-  try {
-    // Validate we have documents to send
-    if (!documents || documents.length === 0) {
-      throw new Error('No documents selected for sending');
-    }
-
-    // Validate recipient format
-    if (sendingMethod === 'whatsapp' && !recipient.match(/^\+?[\d\s-]{10,}$/)) {
-      throw new Error('Invalid phone number format');
-    }
-
-    // Handle bulk sending by generating unique filenames for each document
-    const documentsToSend = documents.map(doc => {
-      if (!doc.filepath) {
-        throw new Error('Invalid document data: missing filepath');
+    try {
+      // Validate we have documents to send
+      if (!documents || documents.length === 0) {
+        throw new Error('No documents selected for sending');
       }
 
-      const originalFileName = doc.filepath.split('/').pop();
-      if (!originalFileName) {
-        throw new Error('Invalid filepath format');
+      // Validate recipient format
+      if (sendingMethod === 'whatsapp' && !recipient.match(/^\+?[\d\s-]{10,}$/)) {
+        throw new Error('Invalid phone number format');
       }
 
-      const extension = originalFileName.split('.').pop();
-      const finalFileName = documents.length > 1
-        ? `${selectedCompany?.company_name}_${originalFileName}`
-        : `${newFileName}.${extension}`;
+      // Handle bulk sending by generating unique filenames for each document
+      const documentsToSend = documents.map(doc => {
+        if (!doc.filepath) {
+          throw new Error('Invalid document data: missing filepath');
+        }
 
-      return {
-        ...doc,
-        filename: finalFileName
-      };
-    });
+        const originalFileName = doc.filepath.split('/').pop();
+        if (!originalFileName) {
+          throw new Error('Invalid filepath format');
+        }
 
-    const endpoint = sendingMethod === 'email' ? '/api/send-email' : '/api/send-whatsapp';
-    const payload = sendingMethod === 'email' 
-      ? {
+        const extension = originalFileName.split('.').pop();
+        const finalFileName = documents.length > 1
+          ? `${selectedCompany?.company_name}_${originalFileName}`
+          : `${newFileName}.${extension}`;
+
+        return {
+          ...doc,
+          filename: finalFileName
+        };
+      });
+
+      const endpoint = sendingMethod === 'email' ? '/api/send-email' : '/api/send-whatsapp';
+      const payload = sendingMethod === 'email'
+        ? {
           to: recipient,
           subject: `Documents from ${selectedCompany?.company_name}`,
           html: `<p>Please find attached the requested documents for ${selectedCompany?.company_name}.</p>`,
           documents: documentsToSend,
           companyName: selectedCompany?.company_name
-        } 
-      : {
+        }
+        : {
           phone: recipient.replace(/\D/g, ''), // Strip non-numeric characters
           documents: documentsToSend.map(doc => ({
             filepath: doc.filepath,
@@ -217,59 +230,59 @@ const handleConfirmSend = async (
           companyName: selectedCompany?.company_name
         };
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-    const responseData = await response.json();
+      const responseData = await response.json();
 
-    if (!response.ok) {
-      throw new Error(responseData.message || responseData.error || `Failed to send via ${sendingMethod}`);
+      if (!response.ok) {
+        throw new Error(responseData.message || responseData.error || `Failed to send via ${sendingMethod}`);
+      }
+
+      toast.success(`Documents sent successfully via ${sendingMethod}`);
+      setShowSendingStatus(false);
+      setSelectedUploads([]);
+    } catch (error) {
+      console.error(`Error sending ${sendingMethod}:`, error);
+      const errorMessage = error instanceof Error ? error.message : `Failed to send documents via ${sendingMethod}`;
+      setSendError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Modified WhatsApp send handler
+  const handleWhatsAppSend = async (documentName?: string) => {
+
+    // Get the documents to send
+    const docs = documentName
+      ? documentUploads.filter(doc => doc.filepath.split('/').pop()?.split('.')[0] === documentName)
+      : selectedUploads;
+
+    // Validate documents
+    if (!docs.length) {
+      toast.error('No documents selected for sending');
+      return;
     }
 
-    toast.success(`Documents sent successfully via ${sendingMethod}`);
-    setShowSendingStatus(false);
-    setSelectedUploads([]);
-  } catch (error) {
-    console.error(`Error sending ${sendingMethod}:`, error);
-    const errorMessage = error instanceof Error ? error.message : `Failed to send documents via ${sendingMethod}`;
-    setSendError(errorMessage);
-    toast.error(errorMessage);
-  } finally {
-    setIsSending(false);
-  }
-};
+    // Format phone number
+    const formattedPhone = selectedCompany.phone.startsWith('+')
+      ? selectedCompany.phone
+      : `+${selectedCompany.phone.replace(/\D/g, '')}`;
 
-// Modified WhatsApp send handler
-const handleWhatsAppSend = async (documentName?: string) => {
+    setSendingDetails({
+      documentName: documentName || `${docs.length} documents`,
+      companyName: selectedCompany.company_name,
+      recipient: formattedPhone,
+      sendingMethod: 'whatsapp'
+    });
+    setShowSendingStatus(true);
+  };
 
-  // Get the documents to send
-  const docs = documentName
-    ? documentUploads.filter(doc => doc.filepath.split('/').pop()?.split('.')[0] === documentName)
-    : selectedUploads;
-
-  // Validate documents
-  if (!docs.length) {
-    toast.error('No documents selected for sending');
-    return;
-  }
-
-  // Format phone number
-  const formattedPhone = selectedCompany.phone.startsWith('+') 
-    ? selectedCompany.phone 
-    : `+${selectedCompany.phone.replace(/\D/g, '')}`;
-
-  setSendingDetails({
-    documentName: documentName || `${docs.length} documents`,
-    companyName: selectedCompany.company_name,
-    recipient: formattedPhone,
-    sendingMethod: 'whatsapp'
-  });
-  setShowSendingStatus(true);
-};
-  
 
 
 
@@ -505,7 +518,7 @@ const handleWhatsAppSend = async (documentName?: string) => {
     const [editedRecipient, setEditedRecipient] = useState(recipient);
     const [newFileName, setNewFileName] = useState('');
     const [showError, setShowError] = useState(false);
-  
+
     useEffect(() => {
       if (isOpen) {
         setEditedRecipient(recipient);
@@ -515,7 +528,7 @@ const handleWhatsAppSend = async (documentName?: string) => {
         setShowError(false);
       }
     }, [isOpen, recipient, companyName, documentName]);
-  
+
     const validateInput = () => {
       if (sendingMethod === 'email') {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedRecipient);
@@ -523,7 +536,7 @@ const handleWhatsAppSend = async (documentName?: string) => {
         return /^\+?[\d\s-]{10,}$/.test(editedRecipient);
       }
     };
-  
+
     const handleSend = () => {
       if (!editedRecipient || !validateInput()) {
         setShowError(true);
@@ -531,7 +544,7 @@ const handleWhatsAppSend = async (documentName?: string) => {
       }
       onSend(editedRecipient, newFileName);
     };
-  
+
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-2xl bg-white">
@@ -540,7 +553,7 @@ const handleWhatsAppSend = async (documentName?: string) => {
               {documentName.includes('documents') ? 'Send Multiple Documents' : 'Send Document'}
             </DialogTitle>
           </DialogHeader>
-  
+
           <div className="space-y-6 py-4">
             {/* Company and Document Info */}
             <div className="grid grid-cols-2 gap-4">
@@ -553,14 +566,14 @@ const handleWhatsAppSend = async (documentName?: string) => {
                 <div className="mt-1 text-sm text-slate-800 font-medium">{documentName}</div>
               </div>
             </div>
-  
+
             {sendError && (
               <Alert variant="destructive" className="border-red-200 bg-red-50">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="ml-2">{sendError}</AlertDescription>
               </Alert>
             )}
-  
+
             {/* Only show filename input for single document */}
             {!documentName.includes('documents') && (
               <div className="space-y-2">
@@ -575,7 +588,7 @@ const handleWhatsAppSend = async (documentName?: string) => {
                 />
               </div>
             )}
-  
+
             {/* Recipient Input */}
             <div className="space-y-2">
               <Label htmlFor="recipient" className="text-sm font-medium text-slate-700">
@@ -597,12 +610,11 @@ const handleWhatsAppSend = async (documentName?: string) => {
                     setEditedRecipient(e.target.value);
                     setShowError(false);
                   }}
-                  className={`w-full pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500 ${
-                    showError ? 'border-red-500 ring-red-200' : ''
-                  }`}
+                  className={`w-full pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500 ${showError ? 'border-red-500 ring-red-200' : ''
+                    }`}
                   placeholder={
-                    sendingMethod === 'email' 
-                      ? 'email@example.com' 
+                    sendingMethod === 'email'
+                      ? 'email@example.com'
                       : '+254123456789'
                   }
                 />
@@ -613,7 +625,7 @@ const handleWhatsAppSend = async (documentName?: string) => {
                 </div>
               )}
             </div>
-  
+
             {/* Send Instructions */}
             <div className="bg-slate-50 p-4 rounded-lg">
               <h4 className="text-sm font-medium text-slate-700 mb-2">
@@ -632,13 +644,13 @@ const handleWhatsAppSend = async (documentName?: string) => {
                     <li>• Original file extension will be preserved</li>
                   </>
                 )}
-                <li>• {sendingMethod === 'email' 
-                  ? 'Document(s) will be sent as email attachment(s)' 
+                <li>• {sendingMethod === 'email'
+                  ? 'Document(s) will be sent as email attachment(s)'
                   : 'Document(s) will be sent as WhatsApp message(s)'}</li>
               </ul>
             </div>
           </div>
-  
+
           <DialogFooter className="sm:justify-between border-t border-slate-100 pt-4">
             <Button
               variant="outline"
@@ -651,9 +663,8 @@ const handleWhatsAppSend = async (documentName?: string) => {
             <Button
               onClick={handleSend}
               disabled={!validateInput() || isSending}
-              className={`bg-blue-600 hover:bg-blue-700 text-white ${
-                isSending ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className={`bg-blue-600 hover:bg-blue-700 text-white ${isSending ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
             >
               {isSending ? (
                 <div className="flex items-center">
@@ -695,25 +706,36 @@ const handleWhatsAppSend = async (documentName?: string) => {
         </div>
         <ScrollArea className="flex-1">
           <div className="space-y-0.5 p-3">
-            {filteredCompanies.map((company, index) => (
-              <button
-                key={company.id}
-                onClick={() => {
-                  setSelectedCompany(company);
-                  setSelectedDocument(null);
-                }}
-                className={`w-full text-left px-4 py-2.5 rounded-lg text-xs transition-all ${selectedCompany?.id === company.id
-                  ? 'bg-blue-50 text-blue-700 font-medium shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50'
-                  }`}
+            {filteredDocuments.map((doc, index) => (
+              <div
+                key={doc.id}
+                className="flex items-center p-2 hover:bg-slate-50 rounded-lg"
               >
-                <div className="flex items-start gap-2">
-                  <span className="text-slate-400 mt-0.5 text-[10px]">
-                    {(index + 1).toString().padStart(2, '0')}
-                  </span>
-                  <span className="flex-1">{company.company_name}</span>
-                </div>
-              </button>
+                <Checkbox
+                  checked={selectedDocuments.some(d => d.id === doc.id)}
+                  onCheckedChange={() => toggleDocumentSelection(doc)}
+                  className="mr-3"
+                />
+                <button
+                  onClick={() => setSelectedDocument(doc)}
+                  className={`flex-1 text-left px-4 py-2.5 rounded-lg text-xs transition-all ${selectedDocument?.id === doc.id
+                      ? 'bg-blue-50 text-blue-700 font-medium shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-slate-400 mt-0.5 text-[10px]">
+                      {(index + 1).toString().padStart(2, '0')}
+                    </span>
+                    <div className="flex-1">
+                      <div className="font-medium">{doc.name}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {doc.department || 'No Department'} • {doc.category || 'No Category'}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </div>
             ))}
           </div>
         </ScrollArea>
@@ -826,7 +848,7 @@ const handleWhatsAppSend = async (documentName?: string) => {
                       Send Selected ({selectedUploads.length})
                     </Button>
                   )}
-                  
+
                 </div>
               </div>
             </div>
@@ -874,7 +896,7 @@ const handleWhatsAppSend = async (documentName?: string) => {
               </Button>
             </>
           )}
-         
+
         </div>
       </div>
 
