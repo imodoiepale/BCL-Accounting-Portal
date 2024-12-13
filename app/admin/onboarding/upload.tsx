@@ -1,7 +1,5 @@
 // @ts-nocheck
-// components/Upload.tsx
 "use client";
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import * as XLSX from 'xlsx';
 import { supabase } from "@/lib/supabaseClient";
 import { fetchStages, getFormFields, handleFileUpload } from "./utils/upload";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface TableMapping {
   id: number;
@@ -229,70 +228,102 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
       toast.error('Failed to generate template');
     }
   };
-
-  // Form submission handler
-  const handleManualEntry = async (formData: any) => {
-    try {
-      const currentMapping = formStructure.find(m => m.structure.order.tab === currentStage);
-      if (!currentMapping) {
-        toast.error('Form structure not found');
-        return;
+    const handleManualEntry = async (formData: any) => {
+      try {
+        const currentMapping = formStructure.find(m => m.structure.order.tab === currentStage);
+        if (!currentMapping) {
+          toast.error('Form structure not found');
+          return;
+        }
+  
+        // Filter out stage name from data
+        const { name, ...dataToSubmit } = formData;
+  
+        setData(prev => ({
+          ...prev,
+          [currentStage]: [
+            ...(prev[currentStage] || []),
+            {
+              ...dataToSubmit,
+              status: 'has_details',
+              userid: currentStage === 1 ? companyData.userId : undefined,
+              company_name: currentStage !== 1 ? companyData.company_name || companyData.name : undefined
+            }
+          ]
+        }));
+  
+        setIsDialogOpen(false);
+        toast.success('Data added successfully');
+      } catch (error) {
+        console.error('Error submitting form:', error);
+        toast.error('Failed to submit form data');
       }
+    };  
 
-      setData(prev => ({
-        ...prev,
-        [currentStage]: [
-          ...(prev[currentStage] || []),
-          {
-            ...formData,
-            status: 'has_details',
-            userid: companyData.userId
+    const handleSubmission = async () => {
+      try {
+        setLoading(true);
+
+        // Submit data to Supabase
+        for (const stage of stages) {
+          const stageData = data[stage.id];
+          if (!stageData?.length) continue;
+
+          const tableName = getTableNameForStage(stage.id);
+
+          for (const record of stageData) {
+            const { name, userid, ...recordWithoutName } = record;
+
+            // Check if record exists based on stage
+            const { data: existingData, error: fetchError } = await supabase
+              .from(tableName)
+              .select('*')
+              .eq(stage.id === 1 ? 'userid' : 'company_name', stage.id === 1 ? companyData.userId : (companyData.company_name || companyData.name))
+              .single();
+
+            if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found" error
+              throw fetchError;
+            }
+
+            const recordToSubmit = stage.id === 1 ? { ...recordWithoutName, userid: companyData.userId } : recordWithoutName;
+
+            if (existingData) {
+              // Update existing record
+              const { error: updateError } = await supabase
+                .from(tableName)
+                .update(recordToSubmit)
+                .eq(stage.id === 1 ? 'userid' : 'company_name', stage.id === 1 ? companyData.userId : (companyData.company_name || companyData.name));
+
+              if (updateError) throw updateError;
+            } else {
+              // Insert new record
+              const { error: insertError } = await supabase
+                .from(tableName)
+                .insert(recordToSubmit);
+
+              if (insertError) throw insertError;
+            }
           }
-        ]
-      }));
+        }
 
-      setIsDialogOpen(false);
-      toast.success('Data added successfully');
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      toast.error('Failed to submit form data');
-    }
-  };
-
-  const handleSubmission = async () => {
-    try {
-      setLoading(true);
-
-      // Submit data to Supabase
-      for (const stage of stages) {
-        const stageData = data[stage.id];
-        if (!stageData?.length) continue;
-
-        const { error } = await supabase
-          .from(getTableNameForStage(stage.id))
-          .insert(stageData);
-
-        if (error) throw error;
+        toast.success('All data submitted successfully');
+        onComplete(data);
+      } catch (error) {
+        console.error('Error submitting data:', error);
+        toast.error('Failed to submit data');
+      } finally {
+        setLoading(false);
       }
-
-      toast.success('All data submitted successfully');
-      onComplete(data);
-    } catch (error) {
-      console.error('Error submitting data:', error);
-      toast.error('Failed to submit data');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
   const getTableNameForStage = (stageId: number) => {
     // Map stage IDs to table names
     const tableMap = {
-      1: 'company_information',
-      2: 'director_information',
-      3: 'suppliers',
-      4: 'banks',
-      5: 'employee_details'
+      1: 'acc_portal_company_duplicate2',
+      2: 'acc_portal_directors',
+      3: 'acc_portal_suppliers',
+      4: 'acc_portal_banks_duplicate',
+      5: 'acc_portal_employees2'
     };
     return tableMap[stageId as keyof typeof tableMap] || 'unknown';
   };
@@ -355,18 +386,63 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                   <DialogTitle className="text-2xl">Add {getCurrentStageName()}</DialogTitle>
                 </DialogHeader>
 
-                <Tabs defaultValue="checklist">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="checklist">Set Status</TabsTrigger>
-                    <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-                    <TabsTrigger value="upload">File Upload</TabsTrigger>
+                <Tabs defaultValue="existing">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="existing">Choose Existing {getCurrentStageName()}</TabsTrigger>
+                    <TabsTrigger value="new">Add New {getCurrentStageName()}</TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="checklist">
+                  <TabsContent value="existing">
+                    <ScrollArea className="h-[calc(90vh-180px)] pr-4">
+                      <div className="p-6 space-y-6">
+                        {currentStage !== 1 && currentStage !== 5 && (
+                          <div className="space-y-4">
+                            <h3 className="font-semibold text-lg">Existing {getCurrentStageName()}</h3>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Select</TableHead>
+                                  {formStructure[currentStage - 1]?.structure.sections[0].subsections[0].fields
+                                    .filter(f => f.visible)
+                                    .map(field => (
+                                      <TableHead key={field.name}>{field.display}</TableHead>
+                                    ))}
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {existingData[getTableName(currentStage)]?.map((item, index) => (
+                                  <TableRow key={index}>
+                                    <TableCell>
+                                      <Checkbox
+                                        checked={selectedExisting.includes(item.id)}
+                                        onCheckedChange={(checked) => {
+                                          if (checked) {
+                                            setSelectedExisting(prev => [...prev, item.id]);
+                                          } else {
+                                            setSelectedExisting(prev => prev.filter(id => id !== item.id));
+                                          }
+                                        }}
+                                      />
+                                    </TableCell>
+                                    {Object.entries(item)
+                                      .filter(([key]) => !['id', 'userid', 'created_at', 'updated_at'].includes(key))
+                                      .map(([key, value]) => (
+                                        <TableCell key={key}>{value as string}</TableCell>
+                                      ))}
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+
+                  <TabsContent value="new">
                     <ScrollArea className="h-[calc(90vh-180px)] pr-4">
                       <div className="p-6 space-y-6">
                         <div className="space-y-4">
-                          <h3 className="font-semibold text-lg">{getCurrentStageName()} Details</h3>
                           <div className="border p-4 rounded-lg space-y-4">
                             <div className="space-y-2">
                               <Label>Status</Label>
@@ -392,200 +468,91 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                                 </SelectContent>
                               </Select>
                             </div>
+                          </div>
 
-                            {complianceStatus.find(s => s.name === getCurrentStageName())?.status === 'has_details' && (
-                              <div className="space-y-2">
-                                <Label>Number of {getCurrentStageName()}</Label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={complianceStatus.find(s => s.name === getCurrentStageName())?.count || 1}
-                                  onChange={(e) => {
-                                    const count = parseInt(e.target.value) || 1;
-                                    setComplianceStatus(prev => ([
-                                      ...prev.filter(p => p.name !== getCurrentStageName()),
-                                      {
-                                        name: getCurrentStageName(),
-                                        status: prev.find(p => p.name === getCurrentStageName())?.status || 'has_details',
-                                        count
-                                      }
-                                    ]));
-                                  }}
-                                  className="w-full"
-                                />
-                              </div>
-                            )}
+                          <div className="flex justify-between items-center">
+                            <h3 className="font-semibold text-lg">New {getCurrentStageName()} Details</h3>
+                            <Button
+                              variant="outline"
+                              onClick={handleTemplateDownload}
+                              className="hover:bg-blue-50"
+                            >
+                              Download Template
+                            </Button>
+                          </div>
+
+                          <div className="space-y-6">
+                            <Input
+                              type="file"
+                              accept=".csv,.xlsx"
+                              onChange={handleFileUpload}
+                              className="w-full"
+                            />
+
+                            <FormProvider {...methods}>
+                              <form onSubmit={methods.handleSubmit(handleManualEntry)} className="space-y-6">
+                                {formStructure[currentStage - 1]?.structure.sections
+                                  .filter(section => section.visible)
+                                  .map((section) => (
+                                    <div key={section.name} className="bg-white rounded-lg border p-6">
+                                      <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                                        {section.name}
+                                      </h3>
+                                      <div className="grid grid-cols-2 gap-4">
+                                        {section.subsections
+                                          .flatMap(subsection => subsection.fields)
+                                          .filter(field => field.visible)
+                                          .sort((a, b) => a.order - b.order)
+                                          .map((field) => (
+                                            <FormField
+                                              key={field.name}
+                                              control={methods.control}
+                                              name={field.name}
+                                              render={({ field: formField }) => (
+                                                <FormItem className={
+                                                  field.name.includes('description') ? 'col-span-2' : ''
+                                                }>
+                                                  <FormLabel>{field.display}</FormLabel>
+                                                  <FormControl>
+                                                    {field.dropdownOptions?.length > 0 ? (
+                                                      <Select
+                                                        onValueChange={formField.onChange}
+                                                        value={formField.value || ''}
+                                                      >
+                                                        <SelectTrigger>
+                                                          <SelectValue placeholder={`Select ${field.display}`} />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                          {field.dropdownOptions.map((option) => (
+                                                            <SelectItem key={option} value={option}>
+                                                              {option}
+                                                            </SelectItem>
+                                                          ))}
+                                                        </SelectContent>
+                                                      </Select>
+                                                    ) : (
+                                                      <Input 
+                                                        {...formField}
+                                                        type={field.type}
+                                                      />
+                                                    )}
+                                                  </FormControl>
+                                                </FormItem>
+                                              )}
+                                            />
+                                          ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                <Button type="submit" className="w-full">
+                                  Save
+                                </Button>
+                              </form>
+                            </FormProvider>
                           </div>
                         </div>
-
-                        <Button
-                          className="w-full mt-4"
-                          onClick={() => {
-                            const tabTriggers = document.querySelectorAll('[role="tab"]');
-                            const manualTab = Array.from(tabTriggers).find(
-                              trigger => trigger.getAttribute('value') === 'manual'
-                            );
-                            if (manualTab instanceof HTMLElement) {
-                              manualTab.click();
-                            }
-                          }}
-                        >
-                          Continue to Data Entry
-                        </Button>
                       </div>
                     </ScrollArea>
-                  </TabsContent>
-
-                  <TabsContent value="manual">
-                    <ScrollArea className="h-[calc(90vh-180px)] pr-4">
-                      <FormProvider {...methods}>
-                        <form onSubmit={methods.handleSubmit(handleManualEntry)} className="space-y-6 p-6">
-                          {!complianceStatus.find(s => s.name === getCurrentStageName())?.status ? (
-                            <div className="p-6 text-center">
-                              <h3 className="text-lg font-medium">Please select a status first</h3>
-                            </div>
-                          ) : complianceStatus.find(s => s.name === getCurrentStageName())?.status === 'missing' ? (
-                            <div className="p-6 text-center space-y-4">
-                              <h3 className="text-lg font-medium">This will be marked as missing</h3>
-                              <Button
-                                onClick={() => {
-                                  setData(prev => ({
-                                    ...prev,
-                                    [currentStage]: [{
-                                      status: 'missing',
-                                      userid: companyData.userId,
-                                      name: getCurrentStageName()
-                                    }]
-                                  }));
-                                  setIsDialogOpen(false);
-                                  toast.success(`${getCurrentStageName()} marked as missing`);
-                                }}
-                                className="w-full"
-                              >
-                                Confirm Status
-                              </Button>
-                            </div>
-                          ) : complianceStatus.find(s => s.name === getCurrentStageName())?.status === 'to_be_registered' ? (
-                            <div className="p-6 text-center space-y-4">
-                              <h3 className="text-lg font-medium">This will be marked for registration</h3>
-                              <Button
-                                onClick={() => {
-                                  setData(prev => ({
-                                    ...prev,
-                                    [currentStage]: [{
-                                      status: 'to_be_registered',
-                                      userid: companyData.userId,
-                                      name: getCurrentStageName()
-                                    }]
-                                  }));
-                                  setIsDialogOpen(false);
-                                  toast.success(`${getCurrentStageName()} marked for registration`);
-                                }}
-                                className="w-full"
-                              >
-                                Confirm Status
-                              </Button>
-                            </div>
-                          ) : (
-                            // Dynamic fields from database structure
-                            <div className="space-y-8">
-                            {formStructure[currentStage - 1]?.structure.sections
-                              .filter(section => section.visible)
-                              .map((section) => (
-                                <div key={section.name} className="bg-white rounded-lg border p-6">
-                                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                                    {section.name}
-                                  </h3>
-                                  <div className="space-y-6">
-                                    {section.subsections
-                                      .filter(subsection => subsection.visible)
-                                      .map((subsection) => (
-                                        <div key={subsection.name} className="space-y-4">
-                                          <h4 className="text-md font-medium text-gray-700 border-b pb-2">
-                                            {subsection.name}
-                                          </h4>
-                                          <div className="grid grid-cols-2 gap-4">
-                                            {subsection.fields
-                                              .filter(f => f.visible)
-                                              .sort((a, b) => a.order - b.order)
-                                              .map((field) => (
-                                                <FormField
-                                                  key={field.name}
-                                                  control={methods.control}
-                                                  name={field.name}
-                                                  render={({ field: formField }) => (
-                                                    <FormItem className={
-                                                      field.name.includes('description') ? 'col-span-2' : ''
-                                                    }>
-                                                      <FormLabel>{field.display}</FormLabel>
-                                                      <FormControl>
-                                                        {field.dropdownOptions?.length > 0 ? (
-                                                          <Select
-                                                            onValueChange={formField.onChange}
-                                                            value={formField.value || ''}
-                                                          >
-                                                            <SelectTrigger>
-                                                              <SelectValue 
-                                                                placeholder={`Select ${field.display}`} 
-                                                              />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                              {field.dropdownOptions.map((option) => (
-                                                                <SelectItem key={option} value={option}>
-                                                                  {option}
-                                                                </SelectItem>
-                                                              ))}
-                                                            </SelectContent>
-                                                          </Select>
-                                                        ) : (
-                                                          <Input 
-                                                            {...formField}
-                                                            type={field.type}
-                                                            // placeholder={`Enter ${field.display}`}
-                                                          />
-                                                        )}
-                                                      </FormControl>
-                                                    </FormItem>
-                                                  )}
-                                                />
-                                              ))}
-                                          </div>
-                                        </div>
-                                      ))}
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        )}
-                        <Button type="submit" className="w-full mt-6">
-                          Save
-                        </Button>
-                      </form>
-                    </FormProvider>
-                  </ScrollArea>
-                </TabsContent>
-
-                  <TabsContent value="upload">
-                    <div className="p-6 space-y-4">
-                      <div className="flex justify-end mb-4">
-                        <Button
-                          variant="outline"
-                          onClick={handleTemplateDownload}
-                          className="hover:bg-blue-50"
-                        >
-                          Download Template
-                        </Button>
-                      </div>
-                      <Input
-                        type="file"
-                        accept=".csv,.xlsx"
-                        onChange={handleFileUpload}
-                        className="w-full"
-                      />
-                      <p className="mt-2 text-sm text-gray-500">
-                        Upload a CSV or Excel file with your data
-                      </p>
-                    </div>
                   </TabsContent>
                 </Tabs>
               </DialogContent>
