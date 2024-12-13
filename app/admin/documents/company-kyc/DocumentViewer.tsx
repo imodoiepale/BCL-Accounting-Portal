@@ -10,7 +10,8 @@ import {
   Upload, 
   FileIcon, 
   AlertCircle,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -32,6 +33,7 @@ interface Document {
 interface DocumentViewerProps {
   documents: Document[];
   onClose: () => void;
+  onDelete: (documentId: string) => void;
 }
 
 interface DocumentActionsProps {
@@ -57,13 +59,19 @@ interface UploadFile {
 }
 
 // Document Viewer Component
-export const DocumentViewer: React.FC<DocumentViewerProps> = ({ documents, onClose }) => {
+export const DocumentViewer: React.FC<DocumentViewerProps> = ({ documents, onClose, onDelete }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const sortedDocs = [...documents].sort((a, b) => b.uploadDate.getTime() - a.uploadDate.getTime());
 
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to delete this document?')) {
+      onDelete(sortedDocs[currentIndex].id);
+    }
+  };
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
+      <DialogContent className="max-w-6xl max-h-[95vh]"> {/* Increased max width and height */}
         <DialogHeader>
           <DialogTitle className="flex justify-between items-center">
             <span>Document Preview ({currentIndex + 1}/{documents.length})</span>
@@ -86,12 +94,20 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ documents, onClo
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDelete}
+                className="hover:bg-red-50 text-red-600 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
           </DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col space-y-4">
-          <div className="flex-1 min-h-[500px] border rounded-lg">
+          <div className="flex-1 min-h-[700px] border rounded-lg"> {/* Increased minimum height */}
             <iframe 
               src={sortedDocs[currentIndex].url} 
               className="w-full h-full rounded-lg"
@@ -134,6 +150,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ documents, onClo
     </Dialog>
   );
 };
+
+
 // Document Actions Component
 export const DocumentActions: React.FC<DocumentActionsProps> = ({
   onView,
