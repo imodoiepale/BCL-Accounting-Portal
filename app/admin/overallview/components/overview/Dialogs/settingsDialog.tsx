@@ -82,6 +82,8 @@ export function SettingsDialog({
     subsections: {},
     fields: {}
   });
+  const [subTabs, setSubTabs] = useState<Record<string, string[]>>({});
+
   // Effect hooks
   useEffect(() => {
     if (activeMainTab) {
@@ -157,8 +159,23 @@ export function SettingsDialog({
 
   useEffect(() => {
     if (structure && structure.length > 0) {
-      const tabs = [...new Set(structure.map(item => item.Tabs))];
-      setUniqueTabs(tabs);
+      const newSubTabs: Record<string, string[]> = {};
+
+      structure.forEach(item => {
+        const mainTab = item.main_tab;
+        const subTab = item.Tabs;
+
+        if (mainTab && subTab) {
+          if (!newSubTabs[mainTab]) {
+            newSubTabs[mainTab] = [];
+          }
+          if (!newSubTabs[mainTab].includes(subTab)) {
+            newSubTabs[mainTab].push(subTab);
+          }
+        }
+      });
+
+      setSubTabs(newSubTabs);
     }
   }, [structure]);
 
@@ -927,20 +944,12 @@ export function SettingsDialog({
                 <CardContent className="p-6">
                   <ColumnManagement
                     structure={structure}
-                    structureId={mappingData?.id}
                     onUpdate={fetchStructure}
                     supabase={supabase}
-                    activeMainTab={activeMainTab}
                     mainTabs={uniqueTabs}
-                    subTabs={Object.fromEntries(
-                      uniqueTabs.map(tab => [
-                        tab,
-                        structure
-                          .filter(item => item.main_tab === tab)
-                          .map(item => item.Tabs)
-                      ])
-                    )}
+                    subTabs={subTabs}
                     visibilityState={visibilityState}
+                    activeMainTab={activeMainTab}
                   />
                 </CardContent>
               </Card>

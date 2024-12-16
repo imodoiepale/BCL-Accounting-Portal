@@ -1,6 +1,6 @@
 // @ts-nocheck
 "use client"
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -10,99 +10,131 @@ import { toast } from "sonner";
 
 export const ColumnManagement: React.FC<ColumnManagementProps> = ({
   structure = [],
-  structureId,
   onUpdate,
   supabase,
-  activeMainTab,
   mainTabs = [],
   subTabs = {},
-  visibilityState = {}
+  visibilityState = {},
+  activeMainTab
 }) => {
   const [loading, setLoading] = useState(false);
-  const [lastMovedItem, setLastMovedItem] = useState<string | null>(null);
+  const [processedStructure, setProcessedStructure] = useState([]);
 
-  const handleReorder = async (
-    type: 'mainTab' | 'subTab' | 'section' | 'subsection' | 'field',
-    itemId: string,
-    direction: 'up' | 'down',
-    parentIds?: { mainTab?: string; subTab?: string; section?: string; subsection?: string }
-  ) => {
+  useEffect(() => {
+    // Process structure data when it changes
+    if (structure && structure.length > 0) {
+      const processed = structure.map(item => ({
+        mainTab: item.main_tab,
+        subTab: item.Tabs,
+        sections: item.sections || [],
+        order: item.order || {},
+        visibility: item.visibility || {}
+      }));
+      setProcessedStructure(processed);
+    }
+  }, [structure]);
+
+  const handleReorder = async (type, itemId, direction, context) => {
     try {
       setLoading(true);
-
       const { data: records, error: fetchError } = await supabase
         .from('profile_category_table_mapping_2')
-        .select('*');
+        .select('*')
+        .eq('main_tab', context?.mainTab || activeMainTab);
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        throw fetchError;
+      }
 
-      // Find the relevant record based on the hierarchy
-      let record = records.find(r => {
-        if (type === 'mainTab') return r.main_tab === itemId;
-        if (type === 'subTab') return r.main_tab === parentIds?.mainTab && r.Tabs === itemId;
-        return r.main_tab === parentIds?.mainTab && r.Tabs === parentIds?.subTab;
-      });
+      const record = records.find(r => r.main_tab === (context?.mainTab || activeMainTab));
+      if (!record) {
+        return;
+      }
 
-      if (!record) return;
+      let items;
+      let updatedStructure = { ...record.structure };
 
-      // Get the array to reorder based on the type
-      let items = [];
       switch (type) {
         case 'mainTab':
-          items = mainTabs;
+          items = [...mainTabs];
           break;
         case 'subTab':
-          items = subTabs[parentIds?.mainTab || ''] || [];
+          items = [...(subTabs[context.mainTab] || [])];
           break;
         case 'section':
-          items = record.structure.sections;
+          items = [...(updatedStructure.sections || [])];
           break;
         case 'subsection':
-          items = record.structure.sections.find(s => s.name === parentIds?.section)?.subsections || [];
+          const section = updatedStructure.sections?.find(s => s.name === context.section);
+          items = [...(section?.subsections || [])];
           break;
         case 'field':
-          items = record.structure.sections
-            .find(s => s.name === parentIds?.section)
-            ?.subsections.find(sub => sub.name === parentIds?.subsection)
-            ?.fields || [];
+          const subsection = updatedStructure.sections
+            ?.find(s => s.name === context.section)
+            ?.subsections?.find(sub => sub.name === context.subsection);
+          items = [...(subsection?.fields || [])];
           break;
       }
 
-      // Calculate new positions
       const currentIndex = items.findIndex(item => 
         typeof item === 'string' ? item === itemId : item.name === itemId
       );
       const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
 
-      if (newIndex < 0 || newIndex >= items.length) return;
+      if (newIndex >= 0 && newIndex < items.length) {
+        // Swap items
+        [items[currentIndex], items[newIndex]] = [items[newIndex], items[currentIndex]];
+        
+        // Update order numbers
+        items.forEach((item, index) => {
+          if (typeof item === 'object') {
+            item.order = index;
+          }
+        });
 
-      // Swap items
-      [items[currentIndex], items[newIndex]] = [items[newIndex], items[currentIndex]];
-
-      // Update order numbers
-      items.forEach((item, index) => {
-        if (typeof item !== 'string') {
-          item.order = index + 1;
+        // Update the appropriate part of the structure
+        switch (type) {
+          case 'mainTab':
+            updatedStructure.order = { ...updatedStructure.order, mainTabs: items };
+            break;
+          case 'subTab':
+            updatedStructure.order = { ...updatedStructure.order, subTabs: { 
+              ...updatedStructure.order?.subTabs,
+              [context.mainTab]: items 
+            }};
+            break;
+          case 'section':
+            updatedStructure.sections = items;
+            break;
+          case 'subsection':
+            const sectionIndex = updatedStructure.sections.findIndex(s => s.name === context.section);
+            if (sectionIndex !== -1) {
+              updatedStructure.sections[sectionIndex].subsections = items;
+            }
+            break;
+          case 'field':
+            const section = updatedStructure.sections.find(s => s.name === context.section);
+            const subsection = section?.subsections?.find(sub => sub.name === context.subsection);
+            if (subsection) {
+              subsection.fields = items;
+            }
+            break;
         }
-      });
 
-      // Update the database
-      const { error: updateError } = await supabase
-        .from('profile_category_table_mapping_2')
-        .update({
-          structure: record.structure,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', record.id);
+        const { error: updateError } = await supabase
+          .from('profile_category_table_mapping_2')
+          .update({
+            structure: updatedStructure,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', record.id);
 
-      if (updateError) throw updateError;
+        if (updateError) {
+          throw updateError;
+        }
 
-      setLastMovedItem(itemId);
-      setTimeout(() => setLastMovedItem(null), 2000);
-
-      await onUpdate();
-      window.dispatchEvent(new CustomEvent('structure-updated'));
-
+        await onUpdate();
+      }
     } catch (error) {
       console.error('Error reordering:', error);
       toast.error('Failed to reorder items');
@@ -111,62 +143,49 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
     }
   };
 
-  const handleVisibilityToggle = async (
-    type: 'mainTab' | 'subTab' | 'section' | 'subsection' | 'field',
-    itemId: string,
-    parentIds?: { mainTab?: string; subTab?: string; section?: string; subsection?: string }
-  ) => {
+  const handleVisibilityToggle = async (type, itemId, context) => {
     try {
       setLoading(true);
-
       const { data: record, error: fetchError } = await supabase
         .from('profile_category_table_mapping_2')
         .select('*')
-        .eq('main_tab', parentIds?.mainTab || itemId)
+        .eq('main_tab', context?.mainTab || activeMainTab)
         .single();
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        throw fetchError;
+      }
 
       let updatedStructure = { ...record.structure };
+      let visibility = updatedStructure.visibility || {};
 
       switch (type) {
         case 'mainTab':
-          updatedStructure.visibility = {
-            ...updatedStructure.visibility,
-            tab: !updatedStructure.visibility?.tab
+          visibility = {
+            ...visibility,
+            mainTabs: { ...visibility.mainTabs, [itemId]: !visibility.mainTabs?.[itemId] }
+          };
+          break;
+        case 'subTab':
+          visibility = {
+            ...visibility,
+            subTabs: { ...visibility.subTabs, [itemId]: !visibility.subTabs?.[itemId] }
           };
           break;
         case 'section':
-          const section = updatedStructure.sections.find(s => s.name === itemId);
-          if (section) {
-            section.visible = !section.visible;
-            // Cascade visibility to subsections and fields
-            section.subsections?.forEach(sub => {
-              sub.visible = section.visible;
-              sub.fields?.forEach(f => f.visible = section.visible);
-            });
-          }
-          break;
         case 'subsection':
-          const subsection = updatedStructure.sections
-            .find(s => s.name === parentIds?.section)
-            ?.subsections.find(sub => sub.name === itemId);
-          if (subsection) {
-            subsection.visible = !subsection.visible;
-            // Cascade visibility to fields
-            subsection.fields?.forEach(f => f.visible = subsection.visible);
-          }
-          break;
         case 'field':
-          const field = updatedStructure.sections
-            .find(s => s.name === parentIds?.section)
-            ?.subsections.find(sub => sub.name === parentIds?.subsection)
-            ?.fields.find(f => `${f.table}.${f.name}` === itemId);
-          if (field) {
-            field.visible = !field.visible;
-          }
+          const path = type === 'section' ? itemId : 
+                      type === 'subsection' ? `${context.section}.${itemId}` : 
+                      `${context.section}.${context.subsection}.${itemId}`;
+          visibility = {
+            ...visibility,
+            [type]: { ...visibility[type], [path]: !visibility[type]?.[path] }
+          };
           break;
       }
+
+      updatedStructure.visibility = visibility;
 
       const { error: updateError } = await supabase
         .from('profile_category_table_mapping_2')
@@ -176,12 +195,11 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
         })
         .eq('id', record.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        throw updateError;
+      }
 
       await onUpdate();
-      window.dispatchEvent(new CustomEvent('structure-updated'));
-      window.dispatchEvent(new CustomEvent('visibility-updated'));
-
     } catch (error) {
       console.error('Error toggling visibility:', error);
       toast.error('Failed to update visibility');
@@ -190,24 +208,41 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
     }
   };
 
-  const renderOrderControls = (index: number, total: number, onMoveUp: () => void, onMoveDown: () => void) => (
-    <div className="flex gap-1">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onMoveUp}
-        disabled={index === 0 || loading}
-      >
-        <ChevronUp className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onMoveDown}
-        disabled={index === total - 1 || loading}
-      >
-        <ChevronDown className="h-4 w-4" />
-      </Button>
+  const StructureItem = ({ label, type, id, index, total, context, visible = true, depth = 0 }) => (
+    <div className={`
+      flex items-center justify-between p-2 hover:bg-gray-50 rounded
+      ${depth > 0 ? 'border-l-2 border-gray-200 pl-4 ml-6' : ''}
+    `}>
+      <span className={`${depth === 0 ? 'font-semibold' : ''}`}>
+        {label}
+      </span>
+      <div className="flex items-center gap-3">
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleReorder(type, id, 'up', context)}
+            disabled={index === 0 || loading}
+            className="h-6 w-6 p-0"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleReorder(type, id, 'down', context)}
+            disabled={index === total - 1 || loading}
+            className="h-6 w-6 p-0"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </div>
+        <Switch
+          checked={visible}
+          onCheckedChange={() => handleVisibilityToggle(type, id, context)}
+          disabled={loading}
+        />
+      </div>
     </div>
   );
 
@@ -216,135 +251,88 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
       <CardContent className="p-6">
         <ScrollArea className="h-[600px]">
           <div className="space-y-4">
-            {mainTabs.map((mainTab, mainIndex) => {
-              const mainTabStructure = structure.filter(item => item.main_tab === mainTab);
-              
-              return (
-                <div key={mainTab} className="border rounded-lg p-4">
-                  {/* Main Tab */}
-                  <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                    <span className="text-lg font-semibold">{mainTab}</span>
-                    <div className="flex items-center gap-3">
-                      {renderOrderControls(
-                        mainIndex,
-                        mainTabs.length,
-                        () => handleReorder('mainTab', mainTab, 'up'),
-                        () => handleReorder('mainTab', mainTab, 'down')
-                      )}
-                      <Switch
-                        checked={!visibilityState?.mainTabs?.[mainTab]}
-                        onCheckedChange={() => handleVisibilityToggle('mainTab', mainTab)}
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
+            {processedStructure.map((item, mainIndex) => (
+              <div key={item.mainTab} className="border rounded-lg p-4">
+                {/* Main Tab */}
+                <StructureItem
+                  label={item.mainTab}
+                  type="mainTab"
+                  id={item.mainTab}
+                  index={mainIndex}
+                  total={processedStructure.length}
+                  visible={!visibilityState?.mainTabs?.[item.mainTab]}
+                  depth={0}
+                />
 
-                  {/* Sub Tabs */}
-                  <div className="ml-6 mt-2 space-y-2">
-                    {(subTabs[mainTab] || []).map((subTab, subIndex) => {
-                      const subTabStructure = mainTabStructure.find(item => item.Tabs === subTab);
-                      const sections = subTabStructure?.structure?.sections || [];
+                {/* Sub Tabs */}
+                {(subTabs[item.mainTab] || []).map((subTab, subIndex) => (
+                  <div key={subTab}>
+                    <StructureItem
+                      label={subTab}
+                      type="subTab"
+                      id={subTab}
+                      index={subIndex}
+                      total={subTabs[item.mainTab].length}
+                      context={{ mainTab: item.mainTab }}
+                      visible={!visibilityState?.subTabs?.[subTab]}
+                      depth={1}
+                    />
 
-                      return (
-                        <div key={subTab} className="border-l-2 pl-4">
-                          <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                            <span className="font-medium">{subTab}</span>
-                            <div className="flex items-center gap-3">
-                              {renderOrderControls(
-                                subIndex,
-                                subTabs[mainTab].length,
-                                () => handleReorder('subTab', subTab, 'up', { mainTab }),
-                                () => handleReorder('subTab', subTab, 'down', { mainTab })
-                              )}
-                              <Switch
-                                checked={!visibilityState?.subTabs?.[subTab]}
-                                onCheckedChange={() => handleVisibilityToggle('subTab', subTab, { mainTab })}
-                                disabled={loading}
+                    {/* Sections */}
+                    {item.sections.map((section, sectionIndex) => (
+                      <div key={section.name}>
+                        <StructureItem
+                          label={section.name}
+                          type="section"
+                          id={section.name}
+                          index={sectionIndex}
+                          total={item.sections.length}
+                          context={{ mainTab: item.mainTab, subTab }}
+                          visible={section.visible}
+                          depth={2}
+                        />
+
+                        {/* Subsections */}
+                        {section.subsections.map((subsection, subsectionIndex) => (
+                          <div key={subsection.name}>
+                            <StructureItem
+                              label={subsection.name}
+                              type="subsection"
+                              id={subsection.name}
+                              index={subsectionIndex}
+                              total={section.subsections.length}
+                              context={{ mainTab: item.mainTab, subTab, section: section.name }}
+                              visible={subsection.visible}
+                              depth={3}
+                            />
+
+                            {/* Fields */}
+                            {subsection.fields.map((field, fieldIndex) => (
+                              <StructureItem
+                                key={`${field.table}.${field.name}`}
+                                label={field.display || `${field.table}.${field.name}`}
+                                type="field"
+                                id={`${field.table}.${field.name}`}
+                                index={fieldIndex}
+                                total={subsection.fields.length}
+                                context={{
+                                  mainTab: item.mainTab,
+                                  subTab,
+                                  section: section.name,
+                                  subsection: subsection.name
+                                }}
+                                visible={field.visible}
+                                depth={4}
                               />
-                            </div>
-                          </div>
-
-                          {/* Sections */}
-                          <div className="ml-6 mt-2 space-y-2">
-                            {sections.map((section, sectionIndex) => (
-                              <div key={section.name} className="border-l-2 pl-4">
-                                <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                                  <span>{section.name}</span>
-                                  <div className="flex items-center gap-3">
-                                    {renderOrderControls(
-                                      sectionIndex,
-                                      sections.length,
-                                      () => handleReorder('section', section.name, 'up', { mainTab, subTab }),
-                                      () => handleReorder('section', section.name, 'down', { mainTab, subTab })
-                                    )}
-                                    <Switch
-                                      checked={section.visible}
-                                      onCheckedChange={() => handleVisibilityToggle('section', section.name, { mainTab, subTab })}
-                                      disabled={loading}
-                                    />
-                                  </div>
-                                </div>
-
-                                {/* Subsections */}
-                                <div className="ml-6 mt-2 space-y-2">
-                                  {section.subsections.map((subsection, subsectionIndex) => (
-                                    <div key={subsection.name} className="border-l-2 pl-4">
-                                      <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                                        <span>{subsection.name}</span>
-                                        <div className="flex items-center gap-3">
-                                          {renderOrderControls(
-                                            subsectionIndex,
-                                            section.subsections.length,
-                                            () => handleReorder('subsection', subsection.name, 'up', { mainTab, subTab, section: section.name }),
-                                            () => handleReorder('subsection', subsection.name, 'down', { mainTab, subTab, section: section.name })
-                                          )}
-                                          <Switch
-                                            checked={subsection.visible}
-                                            onCheckedChange={() => handleVisibilityToggle('subsection', subsection.name, { mainTab, subTab, section: section.name })}
-                                            disabled={loading}
-                                          />
-                                        </div>
-                                      </div>
-
-                                      {/* Fields */}
-                                      <div className="ml-6 mt-2 space-y-2">
-                                        {subsection.fields.map((field, fieldIndex) => (
-                                          <div key={`${field.table}.${field.name}`} className="border-l-2 pl-4">
-                                            <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                                              <span>{field.display}</span>
-                                              <div className="flex items-center gap-3">
-                                                {renderOrderControls(
-                                                  fieldIndex,
-                                                  subsection.fields.length,
-                                                  () => handleReorder('field', `${field.table}.${field.name}`, 'up', 
-                                                    { mainTab, subTab, section: section.name, subsection: subsection.name }),
-                                                  () => handleReorder('field', `${field.table}.${field.name}`, 'down',
-                                                    { mainTab, subTab, section: section.name, subsection: subsection.name })
-                                                )}
-                                                <Switch
-                                                  checked={field.visible}
-                                                  onCheckedChange={() => handleVisibilityToggle('field', `${field.table}.${field.name}`,
-                                                    { mainTab, subTab, section: section.name, subsection: subsection.name })}
-                                                  disabled={loading}
-                                                />
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
                             ))}
                           </div>
-                        </div>
-                      );
-                    })}
+                        ))}
+                      </div>
+                    ))}
                   </div>
-                </div>
-              );
-            })}
+                ))}
+              </div>
+            ))}
           </div>
         </ScrollArea>
       </CardContent>
