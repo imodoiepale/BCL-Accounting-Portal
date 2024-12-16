@@ -17,8 +17,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-
 const SettingsPage = () => {
+  // State declarations
   const [documents, setDocuments] = useState([]);
   const [newDocument, setNewDocument] = useState({
     name: '',
@@ -33,11 +33,9 @@ const SettingsPage = () => {
   const [editingDocument, setEditingDocument] = useState(null);
   const [activeCategory, setActiveCategory] = useState('company-docs');
   const [activeSubcategory, setActiveSubcategory] = useState('');
-
   useEffect(() => {
     fetchDocuments();
   }, [activeCategory, activeSubcategory]);
-
 
   const fetchDocuments = async () => {
     let query = supabase
@@ -128,7 +126,6 @@ const SettingsPage = () => {
     }
   };
 
-
   const handleToggleListed = async (id, currentValue) => {
     const { error } = await supabase
       .from('acc_portal_kyc')
@@ -144,44 +141,59 @@ const SettingsPage = () => {
   };
 
   const renderDocumentTable = (category, subcategory) => (
-    <Table className="w-full">
-      <TableHeader>
-        <TableRow>
-          <TableHead className="font-bold">Document Name</TableHead>
-          <TableHead className="font-bold">Validity Days</TableHead>
-          <TableHead className="font-bold">Department</TableHead>
-          <TableHead className="font-bold">Type</TableHead>
-          <TableHead className="font-bold">Listed</TableHead>
-          <TableHead className="font-bold">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {documents
-          .filter(doc => doc.category === category && (!subcategory || doc.subcategory === subcategory))
-          .map((doc) => (
-            <TableRow key={doc.id} className="hover:bg-gray-100">
-              <TableCell>{doc.name}</TableCell>
-              <TableCell>{doc.validity_days || 'N/A'}</TableCell>
-              <TableCell>{doc.department}</TableCell>
-              <TableCell>{doc.document_type}</TableCell>
-              <TableCell>
-                <Switch
-                  checked={doc.listed}
-                  onCheckedChange={() => handleToggleListed(doc.id, doc.listed)}
-                />
-              </TableCell>
-              <TableCell>
-                <Button onClick={() => {
-                  setEditingDocument(doc);
-                  setIsEditDialogOpen(true);
-                }} className="mr-2 bg-yellow-500 hover:bg-yellow-600 text-white">Edit</Button>
-                <Button onClick={() => handleDeleteDocument(doc.id)} className="bg-red-500 hover:bg-red-600 text-white">Delete</Button>
-              </TableCell>
-            </TableRow>
-          ))}
-      </TableBody>
-    </Table>
+    <div className="overflow-hidden rounded-lg border border-gray-200">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-gray-100">
+            <TableHead className="py-3 px-4 text-xs font-semibold text-gray-600">Document Name</TableHead>
+            <TableHead className="py-3 px-4 text-xs font-semibold text-gray-600">Validity Days</TableHead>
+            <TableHead className="py-3 px-4 text-xs font-semibold text-gray-600">Department</TableHead>
+            <TableHead className="py-3 px-4 text-xs font-semibold text-gray-600">Type</TableHead>
+            <TableHead className="py-3 px-4 text-xs font-semibold text-gray-600">Listed</TableHead>
+            <TableHead className="py-3 px-4 text-xs font-semibold text-gray-600">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {documents
+            .filter(doc => doc.category === category && (!subcategory || doc.subcategory === subcategory))
+            .map((doc) => (
+              <TableRow key={doc.id} className="border-t border-gray-200 hover:bg-gray-50 transition-colors">
+                <TableCell className="py-2 px-4 text-sm">{doc.name}</TableCell>
+                <TableCell className="py-2 px-4 text-sm">{doc.validity_days || 'N/A'}</TableCell>
+                <TableCell className="py-2 px-4 text-sm">{doc.department}</TableCell>
+                <TableCell className="py-2 px-4 text-sm">{doc.document_type}</TableCell>
+                <TableCell className="py-2 px-4">
+                  <Switch
+                    checked={doc.listed}
+                    onCheckedChange={() => handleToggleListed(doc.id, doc.listed)}
+                  />
+                </TableCell>
+                <TableCell className="py-2 px-4">
+                  <div className="flex space-x-2">
+                    <Button 
+                      onClick={() => {
+                        setEditingDocument(doc);
+                        setIsEditDialogOpen(true);
+                      }} 
+                      className="px-3 py-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white"
+                    >
+                      Edit
+                    </Button>
+                    <Button 
+                      onClick={() => handleDeleteDocument(doc.id)} 
+                      className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white"
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+        </TableBody>
+      </Table>
+    </div>
   );
+
   const renderAddDocumentDialog = () => (
     <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
       <DialogTrigger asChild>
@@ -229,7 +241,9 @@ const SettingsPage = () => {
             onChange={handleInputChange}
             className="w-full"
           />
-          <Button onClick={handleAddDocument} className="w-full bg-green-500 hover:bg-green-600 text-white">Add Document</Button>
+          <Button onClick={handleAddDocument} className="w-full bg-green-500 hover:bg-green-600 text-white">
+            Add Document
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -279,159 +293,125 @@ const SettingsPage = () => {
             onChange={handleEditInputChange}
             className="w-full"
           />
-          <Button onClick={handleEditDocument} className="w-full bg-green-500 hover:bg-green-600 text-white">Update Document</Button>
+          <Button onClick={handleEditDocument} className="w-full bg-green-500 hover:bg-green-600 text-white">
+            Update Document
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
-
   const renderCategoryContent = (category, subcategories) => (
-    <Tabs 
-      defaultValue={subcategories.length > 0 ? subcategories[0].value : ''} 
-      className="w-full"
-      onValueChange={(value) => setActiveSubcategory(value)}
-    >
-      {subcategories.length > 0 && (
-        <TabsList className="mb-4">
-          {subcategories.map((subcategory) => (
-            <TabsTrigger key={subcategory.value} value={subcategory.value} className="px-4 py-2">
-              {subcategory.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+    <div className="flex flex-col h-[calc(100vh-12rem)]">
+      {subcategories.length > 0 ? (
+        <Tabs defaultValue={subcategories[0].value} className="w-full">
+          <TabsList className="h-8 bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
+            {subcategories.map((subcategory) => (
+              <TabsTrigger 
+                key={subcategory.value} 
+                value={subcategory.value} 
+                className="px-3 py-1 text-xs font-medium"
+              >
+                {subcategory.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <div className="flex-1 overflow-y-auto">
+            {subcategories.map((subcategory) => (
+              <TabsContent key={subcategory.value} value={subcategory.value}>
+                <Card className="m-4 shadow-sm">
+                  <CardHeader className="py-4">
+                    <h2 className="text-lg font-semibold">{subcategory.label}</h2>
+                  </CardHeader>
+                  <CardContent>
+                    {renderDocumentTable(category, subcategory.value)}
+                    {renderAddDocumentDialog()}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            ))}
+          </div>
+        </Tabs>
+      ) : (
+        <Card className="m-4 shadow-sm">
+          <CardHeader className="py-4">
+            <h2 className="text-lg font-semibold">{category}</h2>
+          </CardHeader>
+          <CardContent>
+            {renderDocumentTable(category, '')}
+            {renderAddDocumentDialog()}
+          </CardContent>
+        </Card>
       )}
-      {subcategories.length > 0
-        ? subcategories.map((subcategory) => (
-            <TabsContent key={subcategory.value} value={subcategory.value}>
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <h2 className="text-2xl font-semibold">{subcategory.label}</h2>
-                </CardHeader>
-                <CardContent>
-                  {renderDocumentTable(category, subcategory.value)}
-                  {renderAddDocumentDialog()}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          ))
-        : (
-          <Card className="shadow-lg">
-            <CardHeader>
-              <h2 className="text-2xl font-semibold">{category}</h2>
-            </CardHeader>
-            <CardContent>
-              {renderDocumentTable(category, '')}
-              {renderAddDocumentDialog()}
-            </CardContent>
-          </Card>
-        )}
-    </Tabs>
+    </div>
   );
 
   return (
-    <div className="w-full p-8 bg-gray-50">
-      <h1 className="text-3xl font-bold mb-8">Settings</h1>
-
-      <Tabs 
-        defaultValue="company-docs" 
-        className="w-full"
-        onValueChange={(value) => setActiveCategory(value)}
-      >
-        <TabsList className="mb-8 flex flex-wrap">
-          <TabsTrigger value="company-docs" className="px-4 py-2">Company Documents</TabsTrigger>
-          <TabsTrigger value="directors-docs" className="px-4 py-2">Directors Documents</TabsTrigger>
-          <TabsTrigger value="suppliers-docs" className="px-4 py-2">Suppliers Documents</TabsTrigger>
-          <TabsTrigger value="banks-docs" className="px-4 py-2">Banks Documents</TabsTrigger>
-          <TabsTrigger value="employees-docs" className="px-4 py-2">Employees Documents</TabsTrigger>
-          <TabsTrigger value="insurance-docs" className="px-4 py-2">Insurance Policy Documents</TabsTrigger>
-          <TabsTrigger value="deposits-docs" className="px-4 py-2">Deposits Documents</TabsTrigger>
-          <TabsTrigger value="fixed-assets-docs" className="px-4 py-2">Fixed Assets Register</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="company-docs">
-          {renderCategoryContent('company-docs', [
-            { value: 'kra-docs', label: 'KRA Documents' },
-            { value: 'sheria-docs', label: 'Sheria Documents' },
-          ])}
-        </TabsContent>
-
-        <TabsContent value="directors-docs">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <h2 className="text-2xl font-semibold">Directors Documents</h2>
-            </CardHeader>
-            <CardContent>
-              {renderDocumentTable('directors-docs', '')}
-              {renderAddDocumentDialog()}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="suppliers-docs">
-          {renderCategoryContent('suppliers-docs', [
-            { value: 'monthly-service-vendors-docs', label: 'Monthly Service Vendors - Documents' },
-            { value: 'trading-suppliers-docs', label: 'Trading Suppliers - Documents' },
-          ])}
-        </TabsContent>
-
-        <TabsContent value="banks-docs">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <h2 className="text-2xl font-semibold">Banks Documents</h2>
-            </CardHeader>
-            <CardContent>
-              {renderDocumentTable('banks-docs', '')}
-              {renderAddDocumentDialog()}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="employees-docs">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <h2 className="text-2xl font-semibold">Employees Documents</h2>
-            </CardHeader>
-            <CardContent>
-              {renderDocumentTable('employees-docs', '')}
-              {renderAddDocumentDialog()}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="insurance-docs">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <h2 className="text-2xl font-semibold">Insurance Policy Documents</h2>
-            </CardHeader>
-            <CardContent>
-              {renderDocumentTable('insurance-docs', '')}
-              {renderAddDocumentDialog()}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="deposits-docs">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <h2 className="text-2xl font-semibold">Deposits Documents</h2>
-            </CardHeader>
-            <CardContent>
-              {renderDocumentTable('deposits-docs', '')}
-              {renderAddDocumentDialog()}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="fixed-assets-docs">
-          {renderCategoryContent('fixed-assets-docs', [
-            { value: 'comp-equip-docs', label: 'Computer & Equipment' },
-            { value: 'furniture-fitting-docs', label: 'Furniture Fitting & Equipment 12.5%' },
-            { value: 'land-building-docs', label: 'Land & Building' },
-            { value: 'plant-equip-docs', label: 'Plant & Equipment - 12.5%' },
-            { value: 'motor-vehicles-docs', label: 'Motor Vehicles - 25%' },
-          ])}
-        </TabsContent>
-      </Tabs>
+    <div className="flex flex-col h-screen bg-gray-50">
+      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm">
+        <h1 className="text-xl font-bold p-4">Settings</h1>
+        <Tabs 
+          defaultValue="company-docs" 
+          className="w-full"
+          onValueChange={(value) => setActiveCategory(value)}
+        >
+          <TabsList className="w-full flex flex-wrap bg-gray-100 px-4 py-2 gap-2">
+            <TabsTrigger value="company-docs" className="px-3 py-1 text-xs">Company Documents</TabsTrigger>
+            <TabsTrigger value="directors-docs" className="px-3 py-1 text-xs">Directors Documents</TabsTrigger>
+            <TabsTrigger value="suppliers-docs" className="px-3 py-1 text-xs">Suppliers Documents</TabsTrigger>
+            <TabsTrigger value="banks-docs" className="px-3 py-1 text-xs">Banks Documents</TabsTrigger>
+            <TabsTrigger value="employees-docs" className="px-3 py-1 text-xs">Employees Documents</TabsTrigger>
+            <TabsTrigger value="insurance-docs" className="px-3 py-1 text-xs">Insurance Policy Documents</TabsTrigger>
+            <TabsTrigger value="deposits-docs" className="px-3 py-1 text-xs">Deposits Documents</TabsTrigger>
+            <TabsTrigger value="fixed-assets-docs" className="px-3 py-1 text-xs">Fixed Assets Register</TabsTrigger>
+          </TabsList>
+        
+          <div className="flex-1 overflow-y-auto">
+            <TabsContent value="company-docs">
+              {renderCategoryContent('company-docs', [
+                { value: 'kra-docs', label: 'KRA Documents' },
+                { value: 'sheria-docs', label: 'Sheria Documents' },
+              ])}
+            </TabsContent>
+  
+            <TabsContent value="directors-docs">
+              {renderCategoryContent('directors-docs', [])}
+            </TabsContent>
+  
+            <TabsContent value="suppliers-docs">
+              {renderCategoryContent('suppliers-docs', [
+                { value: 'monthly-service-vendors-docs', label: 'Monthly Service Vendors - Documents' },
+                { value: 'trading-suppliers-docs', label: 'Trading Suppliers - Documents' },
+              ])}
+            </TabsContent>
+  
+            <TabsContent value="banks-docs">
+              {renderCategoryContent('banks-docs', [])}
+            </TabsContent>
+  
+            <TabsContent value="employees-docs">
+              {renderCategoryContent('employees-docs', [])}
+            </TabsContent>
+  
+            <TabsContent value="insurance-docs">
+              {renderCategoryContent('insurance-docs', [])}
+            </TabsContent>
+  
+            <TabsContent value="deposits-docs">
+              {renderCategoryContent('deposits-docs', [])}
+            </TabsContent>
+  
+            <TabsContent value="fixed-assets-docs">
+              {renderCategoryContent('fixed-assets-docs', [
+                { value: 'comp-equip-docs', label: 'Computer & Equipment' },
+                { value: 'furniture-fitting-docs', label: 'Furniture Fitting & Equipment 12.5%' },
+                { value: 'land-building-docs', label: 'Land & Building' },
+                { value: 'plant-equip-docs', label: 'Plant & Equipment - 12.5%' },
+                { value: 'motor-vehicles-docs', label: 'Motor Vehicles - 25%' },
+              ])}
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
       {renderEditDocumentDialog()}
     </div>
   );
