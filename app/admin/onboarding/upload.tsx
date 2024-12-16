@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client";
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,88 +17,36 @@ import { Label } from "@/components/ui/label";
 import * as XLSX from 'xlsx';
 import { supabase } from "@/lib/supabaseClient";
 import { fetchStages, getFormFields, handleFileUpload } from "./utils/upload";
-import { Checkbox } from "@/components/ui/checkbox";
 
-interface TableMapping {
-  id: number;
-  main_tab: string;
-  Tabs: string;
-  structure: {
-    order: {
-      tab: number;
-      sections: Record<string, number>;
-    };
-    sections: Array<{
-      name: string;
-      order: number;
-      visible: boolean;
-      subsections: Array<{
-        name: string;
-        order: number;
-        fields: Array<{
-          name: string;
-          order: number;
-          table: string;
-          display: string;
-          visible: boolean;
-          verification: {
-            is_verified: boolean;
-            verified_at: string;
-            verified_by: string;
-          };
-          dropdownOptions: string[];
-        }>;
-        tables: string[];
-        visible: boolean;
-      }>;
-    }>;
-    visibility: {
-      tab: boolean;
-      sections: Record<string, boolean>;
-    };
-    relationships: Record<string, any>;
-  };
-}
-
-interface UploadProps {
-  onComplete: (data: any) => void;
-  companyData: {
-    name: string;
-    username: string;
-    userId: string;
-  };
-}
-
-type ComplianceStatus = {
-  name: string;
-  status: 'to_be_registered' | 'missing' | 'has_details';
-  count?: number;
-  verification?: {
-    is_verified: boolean;
-    verified_at: string;
-    verified_by: string;
-  };
+// Constants
+const TABLE_MAP = {
+  2: 'acc_portal_directors_duplicate',
+  3: 'acc_portal_suppliers_duplicate',
+  4: 'acc_portal_banks',
+  5: 'acc_portal_employees'
 };
 
-type Stage = {
-  id: number;
-  name: string;
-  order: number;
-  tables: string[];
-};
-
-const fetchFormStructure = async () => {
-  const { data, error } = await supabase
-    .from('profile_category_table_mapping_2')
-    .select('*')
-    .order('id');
-
-  if (error) throw error;
-  return data as TableMapping[];
+const STAGE_FIELDS = {
+  2: { // Directors
+    nameField: 'full_name',
+    displayFields: ['full_name', 'job_position', 'nationality', 'email_address']
+  },
+  3: { // Suppliers
+    nameField: 'supplier_name_as_per_qb',
+    displayFields: ['supplier_name_as_per_qb', 'exp_cat', 'country_name', 'off_email']
+  },
+  4: { // Banks
+    nameField: 'bank_name',
+    displayFields: ['bank_name', 'account_number', 'currency', 'branch', 'rm_name']
+  },
+  5: { // Employees
+    nameField: 'employee_name',
+    displayFields: ['employee_name', 'id_number', 'employee_email', 'employee_mobile']
+  }
 };
 
 export default function Upload({ onComplete, companyData }: UploadProps) {
-  // State declarations
+  // State Management
   const [currentStage, setCurrentStage] = useState(1);
   const [formStructure, setFormStructure] = useState<TableMapping[]>([]);
   const [fields, setFields] = useState<any[]>([]);
@@ -109,9 +58,10 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({});
   const [complianceStatus, setComplianceStatus] = useState<ComplianceStatus[]>([]);
-  const [stages, setStages] = useState<Array<{ id: number, name: string, order: number }>>([]);
+  const [stages, setStages] = useState<Stage[]>([]);
   const [existingData, setExistingData] = useState<Record<string, any[]>>({});
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Form initialization
   const methods = useForm({
@@ -122,66 +72,36 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
     }
   });
 
-  // Effects
-  useEffect(() => {
-    const initialize = async () => {
-      setIsLoading(true);
-      try {
-        const [structure, stages] = await Promise.all([
-          fetchFormStructure(),
-          fetchStages()
-        ]);
-
-        setFormStructure(structure);
-        setStages(stages);
-
-        // Also fetch initial stage data if needed
-        if (stages.length > 0) {
-          const { fields, defaultValues } = await getFormFields(currentStage, structure);
-          setFields(fields);
-          setDefaultValues(defaultValues);
-        }
-      } catch (error) {
-        console.error('Error initializing:', error);
-        toast.error('Failed to load form structure');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initialize();
-  }, []);
-  // Add function to fetch existing data
-  const fetchExistingData = async () => {
-    const tables = {
-      2: 'acc_portal_directors_duplicate',
-      3: 'acc_portal_suppliers_duplicate',
-      4: 'acc_portal_banks',
-      5: 'acc_portal_employees'
-    };
-
-    const promises = Object.entries(tables).map(async ([stage, table]) => {
-      const { data } = await supabase
-        .from(table)
-        .select('*')
-        .order('company_name', { ascending: false });
-      return [table, data || []];
-    });
-
-    const results = await Promise.all(promises);
-    const formattedResults = Object.fromEntries(results);
-    console.log('Fetched existing data:', formattedResults);
-    setExistingData(formattedResults);
-  };
-
-  useEffect(() => {
-    fetchExistingData();
-  }, []);
-
-
-  const getCurrentStageName = () => {
+  // Memoized Values
+  const currentStageName = useMemo(() => {
     if (!stages.length) return "Loading...";
     return stages[currentStage - 1]?.name || "Unknown Stage";
+  }, [stages, currentStage]);
+
+  const currentTableData = useMemo(() => {
+    const tableName = TABLE_MAP[currentStage as keyof typeof TABLE_MAP];
+    return existingData[tableName] || [];
+  }, [existingData, currentStage]);
+
+  const filteredTableData = useMemo(() => {
+    if (!searchTerm) return currentTableData;
+
+    const stageFields = STAGE_FIELDS[currentStage as keyof typeof STAGE_FIELDS];
+    if (!stageFields) return currentTableData;
+
+    return currentTableData.filter(item =>
+      item[stageFields.nameField]?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [currentTableData, searchTerm, currentStage]);
+
+  const fetchFormStructure = async () => {
+    const { data, error } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('*')
+      .order('id');
+
+    if (error) throw error;
+    return data as TableMapping[];
   };
 
   const handleTemplateDownload = async () => {
@@ -189,9 +109,7 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
       if (!stages.length) {
         toast.error('Form structure not loaded');
         return;
-      }
-
-      const currentMapping = formStructure.find(m => m.structure.order.tab === currentStage);
+      } const currentMapping = formStructure.find(m => m.structure.order.tab === currentStage);
       if (!currentMapping) {
         toast.error('Form structure not found');
         return;
@@ -229,7 +147,95 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
       toast.error('Failed to generate template');
     }
   };
+
+  // Effects
+  useEffect(() => {
+    const initialize = async () => {
+      setIsLoading(true);
+      try {
+        const [structure, fetchedStages] = await Promise.all([
+          fetchFormStructure(),
+          fetchStages()
+        ]);
+
+        setFormStructure(structure);
+        setStages(fetchedStages);
+
+        if (fetchedStages.length > 0) {
+          const { fields: initialFields, defaultValues: initialDefaults } =
+            await getFormFields(currentStage, structure);
+          setFields(initialFields);
+          setDefaultValues(initialDefaults);
+        }
+      } catch (error) {
+        console.error('Error initializing:', error);
+        toast.error('Failed to load form structure');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initialize();
+  }, []);
+
+  useEffect(() => {
+    const fetchExistingData = async () => {
+      try {
+        const promises = Object.entries(TABLE_MAP).map(async ([stage, table]) => {
+          const { data } = await supabase
+            .from(table)
+            .select('*')
+            .order('company_name', { ascending: false });
+          return [table, data || []];
+        });
+
+        const results = await Promise.all(promises);
+        const formattedResults = Object.fromEntries(results);
+        setExistingData(formattedResults);
+      } catch (error) {
+        console.error('Error fetching existing data:', error);
+        toast.error('Failed to fetch existing data');
+      }
+    };
+
+    fetchExistingData();
+  }, []);
+
+  // Handlers
+  const handleItemSelection = (item: any, checked: boolean) => {
+    console.log('Selected item:', item);
+    console.log('Checked status:', checked);
+    setSelectedItems(prev => {
+      if (checked) {
+        return [...prev, item.id];
+      }
+      return prev.filter(id => id !== item.id);
+    });
+  };
+
+  const handleAddSelected = () => {
+    console.log('Selected items to add:', selectedItems);
+    console.log('Current table data:', currentTableData);
+    const selectedData = currentTableData
+      .filter(item => selectedItems.includes(item.id))
+      .map(item => ({
+        ...item,
+        company_name: companyData.company_name || companyData.name
+      }));
+
+    console.log('Processed data to add:', selectedData);
+    setData(prev => ({
+      ...prev,
+      [currentStage]: [...(prev[currentStage] || []), ...selectedData]
+    }));
+
+    setIsDialogOpen(false);
+    setSelectedItems([]);
+    toast.success(`Added ${selectedItems.length} ${currentStageName}`);
+  };
+
   const handleManualEntry = async (formData: any) => {
+    console.log('Manual entry form data:', formData);
     try {
       const currentMapping = formStructure.find(m => m.structure.order.tab === currentStage);
       if (!currentMapping) {
@@ -237,8 +243,8 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
         return;
       }
 
-      // Filter out stage name from data
       const { name, ...dataToSubmit } = formData;
+      console.log('Data to submit:', dataToSubmit);
 
       setData(prev => ({
         ...prev,
@@ -262,42 +268,48 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
   };
 
   const handleSubmission = async () => {
+    console.log('Submitting data:', data);
     try {
       setLoading(true);
 
-      // Submit data to Supabase
       for (const stage of stages) {
         const stageData = data[stage.id];
         if (!stageData?.length) continue;
 
-        const tableName = getTableNameForStage(stage.id);
+        const tableName = TABLE_MAP[stage.id as keyof typeof TABLE_MAP];
+        console.log(`Processing stage ${stage.id} data for table ${tableName}:`, stageData);
 
         for (const record of stageData) {
           const { name, userid, ...recordWithoutName } = record;
 
-          // Check if record exists based on stage
-          const { data: existingData, error: fetchError } = await supabase
+          const { data: existingRecord, error: fetchError } = await supabase
             .from(tableName)
             .select('*')
-            .eq(stage.id === 1 ? 'userid' : 'company_name', stage.id === 1 ? companyData.userId : (companyData.company_name || companyData.name))
+            .eq(
+              stage.id === 1 ? 'userid' : 'company_name',
+              stage.id === 1 ? companyData.userId : (companyData.company_name || companyData.name)
+            )
             .single();
 
-          if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found" error
-            throw fetchError;
-          }
+          if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
 
-          const recordToSubmit = stage.id === 1 ? { ...recordWithoutName, userid: companyData.userId } : recordWithoutName;
+          const recordToSubmit = stage.id === 1
+            ? { ...recordWithoutName, userid: companyData.userId }
+            : recordWithoutName;
 
-          if (existingData) {
-            // Update existing record
+          console.log(`Submitting record for stage ${stage.id}:`, recordToSubmit);
+
+          if (existingRecord) {
             const { error: updateError } = await supabase
               .from(tableName)
               .update(recordToSubmit)
-              .eq(stage.id === 1 ? 'userid' : 'company_name', stage.id === 1 ? companyData.userId : (companyData.company_name || companyData.name));
+              .eq(
+                stage.id === 1 ? 'userid' : 'company_name',
+                stage.id === 1 ? companyData.userId : (companyData.company_name || companyData.name)
+              );
 
             if (updateError) throw updateError;
           } else {
-            // Insert new record
             const { error: insertError } = await supabase
               .from(tableName)
               .insert(recordToSubmit);
@@ -317,18 +329,35 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
     }
   };
 
-  const getTableNameForStage = (stageId: number) => {
-    // Map stage IDs to table names
-    const tableMap = {
-      1: 'acc_portal_company_duplicate2',
-      2: 'acc_portal_directors',
-      3: 'acc_portal_suppliers',
-      4: 'acc_portal_banks_duplicate',
-      5: 'acc_portal_employees2'
-    };
-    return tableMap[stageId as keyof typeof tableMap] || 'unknown';
+  // Render helper functions
+  const renderPreview = () => {
+    if (selectedItems.length !== 1) return null;
+  
+    const selectedItem = currentTableData.find(item => item.id === selectedItems[0]);
+    const stageFields = STAGE_FIELDS[currentStage as keyof typeof STAGE_FIELDS];
+  
+    if (!selectedItem || !stageFields) return null;
+  
+    return (
+      <div className="border p-4 rounded-lg">
+        <h3 className="font-semibold mb-2">Preview</h3>
+        <div className="space-y-2">
+          {stageFields.displayFields.map(field => (
+            <div key={field} className="flex justify-between">
+              <span className="text-gray-600">
+                {field.split('_').map(word =>
+                  word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ')}:
+              </span>
+              <span>{selectedItem[field] || '-'}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
-  // Loading state
+
+  // Loading states
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -345,56 +374,19 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-500">No stages found. Please try again.</p>
-          <Button
-            onClick={() => window.location.reload()}
-            className="mt-4"
-          >
+          <Button onClick={() => window.location.reload()} className="mt-4">
             Reload Page
           </Button>
         </div>
       </div>
     );
   }
-  const getVisibleFields = () => {
-    return formStructure[currentStage - 1]?.structure.sections[0].subsections[0].fields
-      .filter(f => f.visible) || [];
-  };
 
-  const formatFieldValue = (value: any) => {
-    if (value instanceof Date) {
-      return format(value, 'dd/MM/yyyy');
-    }
-    return value || '-';
-  };
-
-  const handleItemSelection = (item: any, checked: boolean) => {
-    setSelectedItems(prev => {
-      if (checked) {
-        return [...prev, item.id];
-      }
-      return prev.filter(id => id !== item.id);
-    });
-  };
-
-  const handleAddSelected = () => {
-    const selectedData = existingData[getTableNameForStage(currentStage)]
-      ?.filter(item => selectedItems.includes(item.id));
-
-    setData(prev => ({
-      ...prev,
-      [currentStage]: [...(prev[currentStage] || []), ...selectedData]
-    }));
-
-    setIsDialogOpen(false);
-    toast.success(`Added ${selectedItems.length} ${getCurrentStageName()}`);
-  };
-
-
+  // Main render
   return (
     <div className="min-h-screen bg-gray-50 p-8">
-      {/* Main content */}
       <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6">
-        {/* Company header */}
+        {/* Company Header */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -407,7 +399,7 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
           </div>
         </div>
 
-        {/* Progress indicators */}
+        {/* Progress Indicators */}
         <div className="flex justify-between items-center mb-8">
           {stages.map((stage) => (
             <div
@@ -417,9 +409,7 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
             >
               <div
                 className={`w-12 h-12 rounded-full flex items-center justify-center mb-3
-                  ${stage.id === currentStage
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200"}`}
+                  ${stage.id === currentStage ? "bg-blue-600 text-white" : "bg-gray-200"}`}
               >
                 {stage.id}
               </div>
@@ -428,11 +418,11 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
           ))}
         </div>
 
-        {/* Form content */}
+        {/* Form Content */}
         <div className="bg-white p-6 rounded-lg mb-8">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold">
-              Stage {currentStage}: {getCurrentStageName()}
+              Stage {currentStage}: {currentStageName}
             </h2>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -445,66 +435,61 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
 
               <DialogContent className="max-w-[1200px] w-[100vw] max-h-[90vh]">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl">Add {getCurrentStageName()}</DialogTitle>
+                  <DialogTitle className="text-2xl">Add {currentStageName}</DialogTitle>
                 </DialogHeader>
 
                 <Tabs defaultValue="existing">
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="existing">Choose Existing {getCurrentStageName()}</TabsTrigger>
-                    <TabsTrigger value="new">Add New {getCurrentStageName()}</TabsTrigger>
+                    {currentStage === 1 ? (
+                      <TabsTrigger value="new" className="w-full">Add New {currentStageName}</TabsTrigger>
+                    ) : (
+                      <>
+                        <TabsTrigger value="existing">Choose Existing {currentStageName}</TabsTrigger>
+                        <TabsTrigger value="new">Add New {currentStageName}</TabsTrigger>
+                      </>
+                    )}
                   </TabsList>
-                  <TabsContent value="existing">
-                    <ScrollArea className="h-[calc(90vh-180px)] pr-4">
-                      <div className="p-6 space-y-6">
-                        {currentStage !== 1 && (
+
+                  {currentStage !== 1 && (
+                    <TabsContent value="existing">
+                      <ScrollArea className="h-[calc(90vh-180px)] pr-4">
+                        <div className="p-6 space-y-6">
                           <div className="space-y-4">
                             <div className="flex flex-col gap-4">
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  placeholder="Search..."
-                                  className="w-full"
-                                  onChange={(e) => {
-                                    // Add search functionality
-                                  }}
-                                />
-                              </div>                              
+                              <Input
+                                placeholder={`Search ${currentStageName}...`}
+                                className="w-full"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                              />
+
                               <Select>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select item" />
+                                  <SelectValue placeholder={`Select ${currentStageName}`} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {existingData[getTableNameForStage(currentStage)]?.map((item, index) => {
-                                    const displayName = currentStage === 4 ? item.fullname : item[`${getCurrentStageName().toLowerCase()}_name`]
+                                  {filteredTableData.map((item) => {
+                                    const stageFields = STAGE_FIELDS[currentStage as keyof typeof STAGE_FIELDS];
+                                    const displayName = item[stageFields?.nameField];
+
+                                    // Skip items without a display name
+                                    if (!displayName) return null;
+
                                     return (
-                                      <SelectItem 
-                                        key={index} 
+                                      <SelectItem
+                                        key={item.id}
                                         value={item.id.toString()}
                                         onClick={() => handleItemSelection(item, true)}
                                       >
                                         {displayName}
                                       </SelectItem>
-                                    )
+                                    );
                                   })}
                                 </SelectContent>
                               </Select>
-                              {selectedItems.length === 1 && (
-                                <div className="border p-4 rounded-lg">
-                                  <h3 className="font-semibold mb-2">Preview</h3>
-                                  <div className="space-y-2">
-                                    {getVisibleFields().slice(0, 3).map(field => {
-                                      const selectedItem = existingData[getTableNameForStage(currentStage)]?.find(
-                                        item => item.id === selectedItems[0]
-                                      )
-                                      return (
-                                        <div key={field.name} className="flex justify-between">
-                                          <span className="text-gray-600">{field.display}:</span>
-                                          <span>{formatFieldValue(selectedItem?.[field.name])}</span>
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                </div>
-                              )}
+
+                              {renderPreview()}
+
                               {selectedItems.length > 0 && (
                                 <div className="flex justify-end gap-2">
                                   <Button
@@ -520,10 +505,10 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                               )}
                             </div>
                           </div>
-                        )}
-                      </div>
-                    </ScrollArea>                  
-                  </TabsContent>
+                        </div>
+                      </ScrollArea>
+                    </TabsContent>
+                  )}
 
                   <TabsContent value="new">
                     <ScrollArea className="h-[calc(90vh-180px)] pr-4">
@@ -535,14 +520,14 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                               <Select
                                 onValueChange={(value) =>
                                   setComplianceStatus(prev => ([
-                                    ...prev.filter(p => p.name !== getCurrentStageName()),
+                                    ...prev.filter(p => p.name !== currentStageName),
                                     {
-                                      name: getCurrentStageName(),
+                                      name: currentStageName,
                                       status: value as ComplianceStatus['status']
                                     }
                                   ]))
                                 }
-                                value={complianceStatus.find(s => s.name === getCurrentStageName())?.status}
+                                value={complianceStatus.find(s => s.name === currentStageName)?.status}
                               >
                                 <SelectTrigger className="w-full">
                                   <SelectValue placeholder="Select status" />
@@ -557,7 +542,7 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                           </div>
 
                           <div className="flex justify-between items-center">
-                            <h3 className="font-semibold text-lg">New {getCurrentStageName()} Details</h3>
+                            <h3 className="font-semibold text-lg">New {currentStageName} Details</h3>
                             <Button
                               variant="outline"
                               onClick={handleTemplateDownload}
@@ -640,11 +625,12 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                       </div>
                     </ScrollArea>
                   </TabsContent>
-                </Tabs>              </DialogContent>
+                </Tabs>
+              </DialogContent>
             </Dialog>
           </div>
 
-          {/* Data table */}
+          {/* Data Table */}
           {data[currentStage]?.length > 0 ? (
             <Table>
               <TableHeader>
@@ -653,8 +639,7 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                     .filter(key => !['userid', 'company_name'].includes(key))
                     .map(header => (
                       <TableHead key={header}>{header}</TableHead>
-                    ))
-                  }
+                    ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -664,8 +649,7 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                       .filter(([key]) => !['userid', 'company_name'].includes(key))
                       .map(([key, value]) => (
                         <TableCell key={key}>{value as string}</TableCell>
-                      ))
-                    }
+                      ))}
                   </TableRow>
                 ))}
               </TableBody>
@@ -677,7 +661,7 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
           )}
         </div>
 
-        {/* Navigation buttons */}
+        {/* Navigation Buttons */}
         <div className="flex justify-end space-x-4">
           {currentStage > 1 && (
             <Button

@@ -1,3 +1,4 @@
+/* eslint-disable react/jsx-key */
 /* eslint-disable react-hooks/rules-of-hooks */
 // components/overview/TableComponents.tsx
 // @ts-nocheck
@@ -539,204 +540,110 @@ const handleToggleRowLock = async (
 };
 
 // Render data rows
-const renderDataRows = (
-  data: any[],
-  handleCompanyClick: (company: any) => void,
-  onMissingFieldsClick: (company: any) => void,
-  processedSections: any[],
-  refreshData: () => Promise<void>,
-  lockedRows: Record<string, boolean>,
-  lockedColumns: Record<string, boolean>,
-  activeMainTab: any[],
-  activeSubTab: any[],
-  setLockedRows: (value: any) => void
-) => {
-  return data.map((companyGroup, groupIndex) => (
-    companyGroup.rows.map((row, rowIndex) => {
-
-      const tableName = getTableName(row);
+const renderDataRows = (data: any[], handleCompanyClick: (company: any) => void, onMissingFieldsClick: (company: any) => void, processedSections: any[], refreshData: () => Promise<void>, lockedRows: Record<string, boolean>, lockedColumns: Record<string, boolean>, activeMainTab: any[], activeSubTab: any[], setLockedRows: (value: any) => void) => {
+    return data.map((companyGroup, groupIndex) => companyGroup.rows.map((row, rowIndex) => {
+      const isFirstRow = rowIndex === 0;
+      const tableName = row.sourceTable || getTableName(row);
       const rowId = row.id || row[`${tableName}_data`]?.id;
       const isRowVerified = lockedRows[`${tableName}_${rowId}`]?.is_verified;
       return (
-        <TableRow
-          key={`${groupIndex}-${rowIndex}`}
-          className="hover:bg-gray-50 transition-colors"
-        >
-          <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white" style={{ width: '20px', minWidth: '20px' }} >
-            {groupIndex + 1}
-          </TableCell>
-          <TableCell
-            className="w-10 cursor-pointer hover:bg-gray-100"
-            style={{ width: '80px', minWidth: '80px' }}
-            onClick={() => {
-              // Get the table name from the row data
-              const sourceTableName = row.sourceTable ||
-                Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') ||
-                'acc_portal_company_duplicate';
-
-              handleToggleRowLock(
-                row,
-                processedSections,
-                setLockedRows,
-                refreshData,
-                lockedRows,
-                activeMainTab, // Add these parameters
-                activeSubTab
-              );
-            }}
-          >
-            {lockedRows[`${row.sourceTable ||
-              Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') ||
-              'acc_portal_company_duplicate'}_${row.id || row[`${row.sourceTable ||
-                Object.keys(row).find(key => key.endsWith('_data'))?.replace('_data', '') ||
-                'acc_portal_company_duplicate'}_data`]?.id}`]?.is_verified ? (
-              <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
-            ) : (
-              <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
-            )}
-          </TableCell>
-          {renderSeparatorCell(`missing-fields-separator-${groupIndex}-${rowIndex}`, 'section')}
-          <TableCell
-            className="whitespace-nowrap cursor-pointer hover:bg-gray-100 sticky left-[50px] z-0 bg-white"
-            style={{ width: '10px', minWidth: '10px' }}
-            onClick={() => onMissingFieldsClick(companyGroup)}
-          >
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-red-600">
-                {calculateMissingFieldsForRow(row, processedSections)}
-              </span>
-              <span className='text-black'>Missing Fields</span>
-            </div>
-          </TableCell>
-
+        <TableRow key={`${groupIndex}-${rowIndex}`} className="hover:bg-gray-50 transition-colors">
+          {isFirstRow && (
+            <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white" style={{ width: '20px', minWidth: '20px' }} rowSpan={companyGroup.rowSpan}>
+              {groupIndex + 1}
+            </TableCell>
+          )}
+          {isFirstRow && (
+            <TableCell className="w-10 cursor-pointer hover:bg-gray-100" style={{ width: '80px', minWidth: '80px' }} rowSpan={companyGroup.rowSpan} onClick={() => {handleToggleRowLock(row, processedSections, setLockedRows, refreshData, lockedRows, activeMainTab, activeSubTab);}}>
+              {isRowVerified ? (<Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />) : (<LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />)}
+            </TableCell>
+          )}
+          {isFirstRow && renderSeparatorCell(`missing-fields-separator-${groupIndex}-${rowIndex}`, 'section', companyGroup.rowSpan)}
+          {isFirstRow && (
+            <TableCell className="whitespace-nowrap cursor-pointer hover:bg-gray-100 sticky left-[50px] z-0 bg-white" style={{ width: '10px', minWidth: '10px' }} onClick={() => onMissingFieldsClick(companyGroup)} rowSpan={companyGroup.rowSpan}>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-red-600">{calculateMissingFieldsForRow(row, processedSections)}</span>
+                <span className='text-black'>Missing Fields</span>
+              </div>
+            </TableCell>
+          )}
           {processedSections.slice(1).map((section, sectionIndex) => {
             if (section.isSeparator) {
-              return renderSeparatorCell(`data-sep-${sectionIndex}-${groupIndex}-${rowIndex}`, 'section');
+              return isFirstRow && renderSeparatorCell(`data-sep-${sectionIndex}-${groupIndex}-${rowIndex}`, 'section', companyGroup.rowSpan);
             }
-
             return section.categorizedFields?.map((category, catIndex) => {
               if (category.isSeparator) {
-                return renderSeparatorCell(`data-cat-sep-${sectionIndex}-${catIndex}-${groupIndex}-${rowIndex}`, 'category');
+                return isFirstRow && renderSeparatorCell(`data-cat-sep-${sectionIndex}-${catIndex}-${groupIndex}-${rowIndex}`, 'category', companyGroup.rowSpan);
               }
-
               return category.fields.map((field, fieldIndex, fieldsArray) => {
-                const [tableName, columnName] = field.name.split('.');
-
+                const [fieldTableName, columnName] = field.name.split('.');
+                if (field.name === 'acc_portal_company_duplicate.company_name') {
+                  if (!isFirstRow) return null;
+                  return (
+                    <TableCell className="whitespace-nowrap cursor-pointer hover:text-primary sticky left-[150px] z-0" onClick={() => handleCompanyClick(companyGroup)} rowSpan={companyGroup.rowSpan}>
+                      <EditableCell value={row.company_name} onSave={async (newValue) => {
+                        if (isRowVerified || lockedColumns[`field_${fieldTableName}.${columnName}`]?.is_verified) {
+                          toast.error("This field is locked and cannot be edited");
+                          return;
+                        }
+                        try {
+                          const { error } = await supabase.from(fieldTableName).update({ [columnName]: newValue }).eq('id', row.id);
+                          if (error) throw error;
+                          window.dispatchEvent(new CustomEvent('refreshData'));
+                        } catch (error) {
+                          console.error('Error updating:', error);
+                          toast.error('Update failed');
+                        }
+                      }} fieldName={field.name} field={field} dropdownOptions={field.dropdownOptions} rowId={row.id} companyName={row.company_name} className="hover:text-primary" refreshData={refreshData} activeMainTab={activeMainTab} activeSubTab={activeSubTab} disabled={isRowVerified || lockedColumns[`field_${fieldTableName}.${columnName}`]?.is_verified} verificationStatus={isRowVerified ? lockedRows[`${fieldTableName}_${rowId}`] : lockedColumns[`field_${fieldTableName}.${columnName}`]} />
+                    </TableCell>
+                  );
+                }
+                if (columnName === 'index') {
+                  return (
+                    <TableCell className="whitespace-nowrap">
+                      <EditableCell value={rowIndex + 1} fieldName={field.name} field={field} disabled={true} rowId={row.id} companyName={row.company_name} />
+                    </TableCell>
+                  );
+                }
                 let value;
-                if (row.isAdditionalRow && row.sourceTable === tableName) {
+                if (row.isAdditionalRow && row.sourceTable === fieldTableName) {
                   value = row[columnName];
-                } else if (row[`${tableName}_data`]) {
-                  value = row[`${tableName}_data`][columnName];
+                } else if (row[`${fieldTableName}_data`]) {
+                  if (Array.isArray(row[`${fieldTableName}_data`])) {
+                    value = row[`${fieldTableName}_data`][0]?.[columnName];
+                  } else {
+                    value = row[`${fieldTableName}_data`][columnName];
+                  }
                 } else {
                   value = row[columnName];
                 }
-
                 if (field.type === 'date') {
                   value = formatDate(value);
                 }
-
-                if (field.name === 'acc_portal_company_duplicate.company_name') {
-                  if (!row.isFirstRow) return null;
-
-                  return (
-                    <React.Fragment key={`${groupIndex}-${rowIndex}-${sectionIndex}-${catIndex}-company-name`}>
-                      <TableCell
-                        className="whitespace-nowrap cursor-pointer hover:text-primary sticky left-[150px] z-0"
-                        onClick={() => handleCompanyClick(companyGroup)}
-                        rowSpan={companyGroup.rowSpan}
-                      >
-                        <EditableCell
-                          value={value}
-                          onSave={async (newValue) => {
-                            if (disabled) {
-                              toast.error("This field is locked and cannot be edited");
-                              return;
-                            }
-                            try {
-                              const { error } = await supabase
-                                .from(tableName)
-                                .update({ [columnName]: newValue })
-                                .eq('id', row.id);
-
-                              if (error) throw error;
-                              window.dispatchEvent(new CustomEvent('refreshData'));
-                            } catch (error) {
-                              console.error('Error updating:', error);
-                              toast.error('Update failed');
-                            }
-                          }}
-                          fieldName={field.name}
-                          field={field}
-                          dropdownOptions={field.dropdownOptions}
-                          rowId={row.id}
-                          companyName={row.company_name}
-                          className="hover:text-primary"
-                          refreshData={refreshData}
-                          activeMainTab={activeMainTab}
-                          activeSubTab={activeSubTab}
-                          disabled={isRowVerified || lockedColumns[`field_${tableName}.${columnName}`]?.is_verified}
-                          verificationStatus={
-                            isRowVerified ?
-                              lockedRows[`${tableName}_${rowId}`] :
-                              lockedColumns[`field_${tableName}.${columnName}`]
-                          } />
-                      </TableCell>
-                    </React.Fragment>
-                  );
-                }
-
                 return (
                   <React.Fragment key={`${groupIndex}-${rowIndex}-${sectionIndex}-${catIndex}-${fieldIndex}-${field.name}`}>
                     <TableCell className="whitespace-nowrap transition-colors">
-                      <EditableCell
-                        value={value}
-                        onSave={async (newValue) => {
-                          try {
-                            const { error } = await supabase
-                              .from(tableName)
-                              .update({ [columnName]: newValue })
-                              .eq('id', row.id);
-
-                            if (error) throw error;
-                            window.dispatchEvent(new CustomEvent('refreshData'));
-                          } catch (error) {
-                            console.error('Error updating:', error);
-                            toast.error('Update failed');
-                          }
-                        }}
-                        fieldName={field.name}
-                        field={field}
-                        dropdownOptions={field.dropdownOptions}
-                        rowId={row.id}
-                        companyName={row.company_name}
-                        refreshData={refreshData}
-                        activeMainTab={activeMainTab}
-                        activeSubTab={activeSubTab}
-                        disabled={isRowVerified || lockedColumns[`field_${tableName}.${columnName}`]?.is_verified}
-                        verificationStatus={
-                          isRowVerified ?
-                            lockedRows[`${tableName}_${rowId}`] :
-                            lockedColumns[`field_${tableName}.${columnName}`]
+                      <EditableCell value={value} onSave={async (newValue) => {
+                        try {
+                          const { error } = await supabase.from(fieldTableName).update({ [columnName]: newValue }).eq('id', row.id);
+                          if (error) throw error;
+                          window.dispatchEvent(new CustomEvent('refreshData'));
+                        } catch (error) {
+                          console.error('Error updating:', error);
+                          toast.error('Update failed');
                         }
-                      />
+                      }} fieldName={field.name} field={field} dropdownOptions={field.dropdownOptions} rowId={row.id} companyName={row.company_name} refreshData={refreshData} activeMainTab={activeMainTab} activeSubTab={activeSubTab} disabled={isRowVerified || lockedColumns[`field_${fieldTableName}.${columnName}`]?.is_verified} verificationStatus={isRowVerified ? lockedRows[`${fieldTableName}_${rowId}`] : lockedColumns[`field_${fieldTableName}.${columnName}`]} />
                     </TableCell>
-                    {fieldIndex < fieldsArray.length - 1 &&
-                      field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory &&
-                      renderSeparatorCell(
-                        `data-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}-${groupIndex}-${rowIndex}`,
-                        'mini'
-                      )}
+                    {fieldIndex < fieldsArray.length - 1 && field.subCategory !== fieldsArray[fieldIndex + 1]?.subCategory && renderSeparatorCell(`data-subcat-sep-${sectionIndex}-${catIndex}-${fieldIndex}-${groupIndex}-${rowIndex}`, 'mini')}
                   </React.Fragment>
                 );
               });
             });
           })}
         </TableRow>
-      )
-    }
-    )))
+      );
+    }));
 };
-
 const persistVerificationStates = async (structure: any, activeMainTab: string, activeSubTab: string) => {
   try {
     const { error } = await supabase
@@ -834,26 +741,11 @@ export const Table: React.FC<TableProps> = ({
   const [lockedColumns, setLockedColumns] = useState<Record<string, any>>({});
   const [lockedRows, setLockedRows] = useState<Record<string, any>>({});
   const [localProcessedSections, setLocalProcessedSections] = useState(processedSections);
+
   const useSidebarLayout = typeof activeMainTab === 'string' && activeMainTab ?
     ['employee details', 'customer details', 'supplier details'].includes(
       activeMainTab.toLowerCase()
     ) : false;
-
-  // Add debug logging
-  // console.log('Table props:', {
-  //   activeMainTab,
-  //   type: typeof activeMainTab,
-  //   useSidebarLayout
-  // });
-  // useEffect(() => {
-  //   console.log('Table state:', {
-  //     hasData: data?.length > 0,
-  //     activeMainTab,
-  //     activeSubTab,
-  //     processedSections: processedSections?.length
-  //   });
-  // }, [data, activeMainTab, activeSubTab, processedSections]);
-
   useEffect(() => {
     if (Array.isArray(processedSections) && processedSections.length > 0) {
       initializeVerificationStates(processedSections, activeMainTab, activeSubTab, setLockedRows);
@@ -864,14 +756,6 @@ export const Table: React.FC<TableProps> = ({
   useEffect(() => {
     setLocalProcessedSections(processedSections);
   }, [processedSections]);
-
-  // useEffect(() => {
-  //   console.log('lockedRows updated:', lockedRows);
-  // }, [lockedRows]);
-
-  // useEffect(() => {
-  //   console.log('lockedColumns updated:', lockedColumns);
-  // }, [lockedColumns]);
   
   const sortedData = React.useMemo(() => {
     if (!sortConfig.field || !sortConfig.direction) return data;
@@ -917,7 +801,6 @@ export const Table: React.FC<TableProps> = ({
 
   const handleVerification = async (type: 'field' | 'row' | 'section', id: string, mainTab: string, subTab: string) => {
     try {
-      // console.log('Starting verification process:', { type, id, mainTab, subTab });
       const { data: currentMapping } = await supabase
         .from('profile_category_table_mapping_2')
         .select('structure')
@@ -925,12 +808,9 @@ export const Table: React.FC<TableProps> = ({
         .eq('Tabs', subTab)
         .single();
 
-      // console.log('Current mapping:', currentMapping);
-
       if (!currentMapping) return;
 
       let updatedStructure = { ...currentMapping.structure };
-      // console.log('Initial structure:', updatedStructure);
 
       if (type === 'field') {
         // Update field verification
