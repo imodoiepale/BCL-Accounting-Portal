@@ -56,12 +56,13 @@ interface OrderSettings {
     subsections: Record<string, number>;
     fields: Record<string, number>;
 }
+
 const processTabData = (tableData: any, mapping: any) => {
     try {
         const companies = tableData['acc_portal_company_duplicate'] || [];
         const relevantTables = new Set(['acc_portal_company_duplicate']);
 
-        // Get relevant tables for this tab from the mapping structure
+        // Get relevant tables for this tab
         if (mapping?.structure?.sections) {
             mapping.structure.sections.forEach(section => {
                 section.subsections?.forEach(subsection => {
@@ -74,88 +75,57 @@ const processTabData = (tableData: any, mapping: any) => {
 
         return companies.map(company => {
             const relatedRecords = {};
-            let allRows = [];
-            let hasRelevantData = false;
+            const allRows = [];
 
-            // Process each related table that's relevant to this tab
+            // Create base company row
+            allRows.push({
+                id: company.id,
+                company_name: company.company_name,
+                index: 1,
+                isFirstRow: true,
+                isAdditionalRow: false,
+                sourceTable: 'acc_portal_company_duplicate',
+                ...company
+            });
+
+            // Process related tables
             Object.keys(tableData).forEach(tableName => {
-                if (!relevantTables.has(tableName)) return; // Skip tables not relevant to this tab
+                if (!relevantTables.has(tableName) || tableName === 'acc_portal_company_duplicate') return;
 
-                if (tableName !== 'acc_portal_company_duplicate') {
-                    // Get records for this company from current table
-                    const records = tableData[tableName]?.filter(
-                        (row: any) => row.company_id === company.id
-                    ) || [];
+                const records = tableData[tableName]?.filter(
+                    row => row.company_id === company.id
+                ) || [];
 
-                    if (records.length > 0) {
-                        hasRelevantData = true;
-                        relatedRecords[`${tableName}_data`] = records;
+                if (records.length > 0) {
+                    relatedRecords[`${tableName}_data`] = records;
 
-                        // Add rows for each record found
-                        records.forEach((record, idx) => {
-                            const row = {
-                                id: record.id,
-                                company_name: idx === 0 ? company.company_name : '',
-                                index: idx + 1,
-                                isFirstRow: idx === 0,
-                                isAdditionalRow: idx > 0,
-                                sourceTable: tableName,
-                                ...(idx === 0 ? { ...company } : {}),
-                                [`${tableName}_data`]: record
-                            };
-
-                            // Add specific table data
-                            Object.keys(record).forEach(key => {
-                                row[key] = record[key];
-                            });
-
-                            allRows.push(row);
+                    records.forEach((record, idx) => {
+                        allRows.push({
+                            id: record.id,
+                            company_name: company.company_name,
+                            index: idx + 1,
+                            isFirstRow: false,
+                            isAdditionalRow: true,
+                            sourceTable: tableName,
+                            [`${tableName}_data`]: record,
+                            ...record
                         });
-                    }
+                    });
                 }
             });
 
-            // Only create base company row if either:
-            // 1. This company has no related records but company data is needed in this tab
-            // 2. No rows have been created yet but company fields are used in this tab
-            const needsCompanyData = mapping.structure?.sections?.some(section =>
-                section.subsections?.some(subsection =>
-                    subsection.fields?.some(field =>
-                        field.table === 'acc_portal_company_duplicate'
-                    )
-                )
-            );
-
-            if ((needsCompanyData && allRows.length === 0) || (!hasRelevantData && needsCompanyData)) {
-                allRows.push({
-                    id: company.id,
-                    company_name: company.company_name,
-                    index: 1,
-                    isFirstRow: true,
-                    ...company,
-                    ...relatedRecords
-                });
-            }
-
-            // Skip companies with no relevant data for this tab
-            if (allRows.length === 0) {
-                return null;
-            }
-
-            // Sort rows by table type and index
-            allRows.sort((a, b) => {
-                if (a.sourceTable === b.sourceTable) {
-                    return a.index - b.index;
-                }
-                return (a.sourceTable || '').localeCompare(b.sourceTable || '');
-            });
+            // Add related records to the first row
+            allRows[0] = {
+                ...allRows[0],
+                ...relatedRecords
+            };
 
             return {
                 company: company,
                 rows: allRows,
                 rowSpan: allRows.length
             };
-        }).filter(Boolean); // Remove null entries for companies with no relevant data
+        });
     } catch (error) {
         console.error('Error processing tab data:', error);
         return [];
@@ -215,8 +185,8 @@ const OverallView: React.FC = () => {
     const fetchAllData = async () => {
         try {
             setLoading(true);
-
-            // Fetch mappings and companies data in parallel
+    
+            // 1. Fetch mappings and companies data in parallel
             const [mappingsResponse, companiesResponse] = await Promise.all([
                 supabase
                     .from('profile_category_table_mapping_2')
@@ -228,24 +198,18 @@ const OverallView: React.FC = () => {
                     .select('*')
                     .order('id')
             ]);
-
-            // First set the data in state
+    
             const mappingsData = mappingsResponse.data || [];
             const companiesData = companiesResponse.data || [];
             
             setMappings(mappingsData);
             setCompanies(companiesData);
-            
-            // Add detailed logging
-            console.log('Companies response:', companiesResponse);
-            console.log('Initial mappings:', mappingsData);
-            console.log('Companies:', companiesData);
-
+    
             if (!mappingsData || !companiesData) {
                 throw new Error('No data found');
             }
-
-            // Get all unique tables
+    
+            // 2. Get all unique tables from mappings
             const tables = new Set(['acc_portal_company_duplicate']);
             mappingsData.forEach(mapping => {
                 if (mapping.structure?.sections) {
@@ -256,39 +220,33 @@ const OverallView: React.FC = () => {
                     });
                 }
             });
-
-            // Fetch all table data in parallel
+    
+            // 3. Fetch all table data in parallel
             const tableResponses = await Promise.all(
                 Array.from(tables).map(table => {
                     console.log('Fetching data for table:', table);
                     return supabase.from(table).select('*').order('id');
                 })
             );
-
-            // Combine all table data
-            const allTableData = tableResponses.reduce((acc, response, index) => {
+    
+            // 4. Combine all table data
+            const rawTableData = tableResponses.reduce((acc, response, index) => {
                 acc[Array.from(tables)[index]] = response.data;
                 return acc;
             }, {});
-
-            // Log combined table data
-            console.log('All table data:', allTableData);
-
-            // Process initial company data
-            const processedData = processTabData(allTableData, mappingsData[0]);
-            console.log('Processed data:', processedData);
-            setAllData(processedData);
-            setVisibleData(processedData);
     
-
-            // Get visibility settings from all mappings
+            // 5. Store the raw table data
+            setAllData(rawTableData);
+    
+            // 6. Process visibility settings
             const aggregatedVisibility = {
                 tabs: {},
                 sections: {},
                 subsections: {},
                 fields: {}
             };
-
+    
+            // 7. Process order settings
             const aggregatedOrder = {
                 mainTabs: {},
                 subTabs: {},
@@ -296,12 +254,12 @@ const OverallView: React.FC = () => {
                 subsections: {},
                 fields: {}
             };
-
-            // Process main tabs and their visibility/order
+    
+            // 8. Process tabs mapping
             const mainTabsSet = new Set(mappingsData.map(m => m.main_tab));
             const subTabsMap = {};
-
-            // First pass: gather all visibility and order information
+    
+            // 9. Process all mappings
             mappingsData.forEach(mapping => {
                 // Process main tab visibility and order
                 if (mapping.structure?.visibility?.tabs) {
@@ -310,14 +268,14 @@ const OverallView: React.FC = () => {
                         ...mapping.structure.visibility.tabs
                     };
                 }
-
+    
                 if (mapping.structure?.order?.mainTabs) {
                     aggregatedOrder.mainTabs = {
                         ...aggregatedOrder.mainTabs,
                         ...mapping.structure.order.mainTabs
                     };
                 }
-
+    
                 // Process sub tabs
                 if (mapping.main_tab) {
                     if (!subTabsMap[mapping.main_tab]) {
@@ -325,46 +283,35 @@ const OverallView: React.FC = () => {
                     }
                     if (mapping.Tabs && !subTabsMap[mapping.main_tab].includes(mapping.Tabs)) {
                         subTabsMap[mapping.main_tab].push(mapping.Tabs);
-
-                        // Add sub tab order
                         if (mapping.structure?.order?.subTabs) {
                             aggregatedOrder.subTabs[mapping.Tabs] = mapping.structure.order.subTabs[mapping.Tabs] || 0;
                         }
                     }
                 }
-
-                // Process sections, subsections, and fields visibility and order
+    
+                // Process sections, subsections, and fields
                 if (mapping.structure?.sections) {
                     mapping.structure.sections.forEach(section => {
-                        // Section visibility
                         if (section.visible !== undefined) {
                             aggregatedVisibility.sections[section.name] = section.visible;
                         }
-
-                        // Section order
                         if (section.order !== undefined) {
                             aggregatedOrder.sections[section.name] = section.order;
                         }
-
+    
                         section.subsections?.forEach(subsection => {
-                            // Subsection visibility
                             if (subsection.visible !== undefined) {
                                 aggregatedVisibility.subsections[subsection.name] = subsection.visible;
                             }
-
-                            // Subsection order
                             if (subsection.order !== undefined) {
                                 aggregatedOrder.subsections[subsection.name] = subsection.order;
                             }
-
+    
                             subsection.fields?.forEach(field => {
                                 const fieldKey = `${field.table}.${field.name}`;
-                                // Field visibility
                                 if (field.visible !== undefined) {
                                     aggregatedVisibility.fields[fieldKey] = field.visible;
                                 }
-
-                                // Field order
                                 if (field.order !== undefined) {
                                     aggregatedOrder.fields[fieldKey] = field.order;
                                 }
@@ -373,32 +320,32 @@ const OverallView: React.FC = () => {
                     });
                 }
             });
-
-            // Filter and sort main tabs
+    
+            // 10. Process main tabs with visibility and order
             const visibleMainTabs = Array.from(mainTabsSet)
                 .filter(tab => aggregatedVisibility.tabs[tab] !== false)
                 .sort((a, b) => (aggregatedOrder.mainTabs[a] || 0) - (aggregatedOrder.mainTabs[b] || 0));
-
-            // Process sub tabs with visibility and order
+    
+            // 11. Process sub tabs with visibility and order
             const processedSubTabs = Object.entries(subTabsMap).reduce((acc, [mainTab, subTabsList]) => {
                 const visibleSubTabs = subTabsList
                     .filter(tab => aggregatedVisibility.tabs[tab] !== false)
                     .sort((a, b) => (aggregatedOrder.subTabs[a] || 0) - (aggregatedOrder.subTabs[b] || 0));
-
+    
                 if (visibleSubTabs.length > 0) {
                     acc[mainTab] = visibleSubTabs;
                 }
                 return acc;
             }, {});
-
-            // Set all the processed data
+    
+            // 12. Set processed data to state
             setMainTabs(visibleMainTabs);
             setSubTabs(processedSubTabs);
             setStructure(mappingsData);
             setVisibilityState(aggregatedVisibility);
             setOrderState(aggregatedOrder);
-
-            // Process sections and subsections
+    
+            // 13. Process sections and subsections
             const visibleSections = mappingsData.reduce((acc, mapping) => {
                 if (mapping.structure?.sections) {
                     mapping.structure.sections
@@ -414,54 +361,30 @@ const OverallView: React.FC = () => {
                 }
                 return acc;
             }, new Set());
-
+    
             setMainSections(Array.from(visibleSections));
-
-            // Set initial active tabs if not already set
+    
+            // 14. Set initial active tabs if needed
             if (!activeMainTab && visibleMainTabs.length > 0) {
                 const firstMainTab = visibleMainTabs[0];
                 setActiveMainTab(firstMainTab);
-
+    
                 const firstSubTab = processedSubTabs[firstMainTab]?.[0];
                 if (firstSubTab) {
                     setActiveSubTab(firstSubTab);
                 }
             }
-
-            // Process full structure for UI
-            const processedStructure = {
-                sections: mappingsData[0]?.structure?.sections
-                    .filter(section => aggregatedVisibility.sections[section.name] !== false)
-                    .map(section => ({
-                        ...section,
-                        subsections: section.subsections
-                            ?.filter(subsection => aggregatedVisibility.subsections[subsection.name] !== false)
-                            .map(subsection => ({
-                                ...subsection,
-                                fields: subsection.fields
-                                    ?.filter(field => {
-                                        const fieldKey = `${field.table}.${field.name}`;
-                                        return aggregatedVisibility.fields[fieldKey] !== false;
-                                    })
-                                    .sort((a, b) => {
-                                        const keyA = `${a.table}.${a.name}`;
-                                        const keyB = `${b.table}.${b.name}`;
-                                        return (aggregatedOrder.fields[keyA] || 0) - (aggregatedOrder.fields[keyB] || 0);
-                                    })
-                            }))
-                            .sort((a, b) => (aggregatedOrder.subsections[a.name] || 0) - (aggregatedOrder.subsections[b.name] || 0))
-                    }))
-                    .sort((a, b) => (aggregatedOrder.sections[a.name] || 0) - (aggregatedOrder.sections[b.name] || 0))
-            };
-
-            setProcessedStructure(processedStructure);
-
-            console.log('Processed visibility:', aggregatedVisibility);
-            console.log('Processed order:', aggregatedOrder);
-            console.log('Visible main tabs:', visibleMainTabs);
-            console.log('Processed sub tabs:', processedSubTabs);
-            console.log('Processed structure:', processedStructure);
-
+    
+            // 15. Process data for current tab
+            const currentMapping = mappingsData.find(m => 
+                m.main_tab === activeMainTab && m.Tabs === activeSubTab
+            );
+            
+            if (currentMapping) {
+                const processedData = processTabData(rawTableData, currentMapping);
+                setVisibleData(processedData);
+            }
+    
         } catch (error) {
             console.error('Error fetching data:', error);
             toast.error('Failed to load data');
@@ -513,15 +436,14 @@ const OverallView: React.FC = () => {
         setActiveMainTab(mainTab);
         setActiveSubTab(subTab);
     
-        // Find the specific mapping for this tab combination
         const relevantMapping = structure.find(m =>
             m.main_tab === mainTab && m.Tabs === subTab
         );
     
-        if (relevantMapping) {
-            // Process data specifically for this tab using the relevant mapping
-            const tabSpecificData = processTabData(allData, relevantMapping);
-            setVisibleData(tabSpecificData);
+        if (relevantMapping && allData) {
+            // Process the stored raw data for the new tab
+            const processedData = processTabData(allData, relevantMapping);
+            setVisibleData(processedData);
         }
     }, [allData, structure]);
 
@@ -843,7 +765,7 @@ const OverallView: React.FC = () => {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div className="h-[890px] overflow-auto">
+                                                    <div className={`h-[890px] ${(activeMainTab === "Company Details" || activeMainTab === "Directors Details" || activeMainTab === "Bank Details") ? "overflow-auto" : ""}`}>
                                                         <div className="min-w-max">
                                                             {TableWrapper}
                                                         </div>

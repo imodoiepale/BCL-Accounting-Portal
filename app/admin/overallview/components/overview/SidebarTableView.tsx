@@ -533,45 +533,48 @@ export const SidebarTableView = ({
   return (
     <div className="grid h-full" style={{ gridTemplateColumns: '300px 1fr' }}>
       {/* Sidebar */}
-      <div className="fixed top-0 left-0 h-screen w-[300px] border-r bg-white z-20">
-  <div className="p-4 space-y-4">
-    <div className="relative">
-      <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-      <input
-        type="text"
-        placeholder="Search companies..."
-        className="w-full pl-8 pr-4 py-2 border rounded-md focus-visible:ring-0"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
-    </div>
-    <ScrollArea className="h-[calc(100vh-100px)]">
-      <div className="space-y-1 pr-4">
-        {filteredCompanies.map((company, index) => (
-          <Button
-            key={company.company.id}
-            variant={selectedCompanyIndex === index ? "default" : "ghost"}
-            className="w-full justify-start font-normal"
-            onClick={() => setSelectedCompanyIndex(index)}
-          >
-            {company.company.company_name}
-          </Button>
-        ))}
+      <div className="w-[300px] border-r bg-white flex-shrink-0 overflow-hidden">
+        <div className="h-full flex flex-col">
+          <div className="p-4">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search companies..."
+                className="w-full pl-8 pr-4 py-2 border rounded-md focus-visible:ring-0"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          <ScrollArea className="h-[calc(100vh-100px)]">
+            <div className="space-y-1 p-4">
+              {filteredCompanies.map((company, index) => (
+                <Button
+                  key={company.company.id}
+                  variant={selectedCompanyIndex === index ? "default" : "ghost"}
+                  className="w-full justify-start font-normal"
+                  onClick={() => setSelectedCompanyIndex(index)}
+                >
+                  {company.company.company_name}
+                </Button>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+
       </div>
-    </ScrollArea>
-  </div>
-</div>
 
       {/* Main Content */}
-      <div className="ml-[300px] overflow-hidden flex-1">
+      <div className="flex-1 overflow-hidden">
         {selectedCompanyData ? (
           <Card className="h-full rounded-none border-0">
             <CardContent className="p-0">
-              <ScrollArea className="h-[calc(100vh-32px)]">
-                <div className="min-w-max">
+              <div className="h-[calc(100vh-32px)] overflow-auto">
+                <div className="min-w-max overflow-visible">
                   <UITable>
                     {renderTableHeaders()}
-                    <TableBody>
+                    <TableBody className='overflow-auto'>
                       {selectedCompanyData.rows.map((row, rowIndex) => (
                         <TableRow key={rowIndex} className="hover:bg-gray-50">
                           {/* Field Cell */}
@@ -691,7 +694,7 @@ export const SidebarTableView = ({
                     </TableBody>
                   </UITable>
                 </div>
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -705,3 +708,4 @@ export const SidebarTableView = ({
 };
 
 export default SidebarTableView;
+
