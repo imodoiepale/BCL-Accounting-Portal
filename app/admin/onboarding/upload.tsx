@@ -62,7 +62,8 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
   const [existingData, setExistingData] = useState<Record<string, any[]>>({});
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const showInputFields = selectedStatus === "has_details";
   // Form initialization
   const methods = useForm({
     defaultValues: {
@@ -148,7 +149,6 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
     }
   };
 
-  // Effects
   useEffect(() => {
     const initialize = async () => {
       setIsLoading(true);
@@ -176,7 +176,7 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
     };
 
     initialize();
-  }, []);
+  }, [currentStage]);
 
   useEffect(() => {
     const fetchExistingData = async () => {
@@ -201,7 +201,6 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
     fetchExistingData();
   }, []);
 
-  // Handlers
   const handleItemSelection = (item: any, checked: boolean) => {
     console.log('Selected item:', item);
     console.log('Checked status:', checked);
@@ -332,12 +331,12 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
   // Render helper functions
   const renderPreview = () => {
     if (selectedItems.length !== 1) return null;
-  
+
     const selectedItem = currentTableData.find(item => item.id === selectedItems[0]);
     const stageFields = STAGE_FIELDS[currentStage as keyof typeof STAGE_FIELDS];
-  
+
     if (!selectedItem || !stageFields) return null;
-  
+
     return (
       <div className="border p-4 rounded-lg">
         <h3 className="font-semibold mb-2">Preview</h3>
@@ -381,6 +380,17 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
       </div>
     );
   }
+
+  const handleStatusChange = (value: string) => {
+    setSelectedStatus(value);
+    setComplianceStatus(prev => ([
+      ...prev.filter(p => p.name !== currentStageName),
+      {
+        name: currentStageName,
+        status: value as ComplianceStatus['status']
+      }
+    ]));
+  };
 
   // Main render
   return (
@@ -509,7 +519,6 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                       </ScrollArea>
                     </TabsContent>
                   )}
-
                   <TabsContent value="new">
                     <ScrollArea className="h-[calc(90vh-180px)] pr-4">
                       <div className="p-6 space-y-6">
@@ -518,16 +527,8 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                             <div className="space-y-2">
                               <Label>Status</Label>
                               <Select
-                                onValueChange={(value) =>
-                                  setComplianceStatus(prev => ([
-                                    ...prev.filter(p => p.name !== currentStageName),
-                                    {
-                                      name: currentStageName,
-                                      status: value as ComplianceStatus['status']
-                                    }
-                                  ]))
-                                }
-                                value={complianceStatus.find(s => s.name === currentStageName)?.status}
+                                onValueChange={handleStatusChange}
+                                value={selectedStatus}
                               >
                                 <SelectTrigger className="w-full">
                                   <SelectValue placeholder="Select status" />
@@ -541,86 +542,90 @@ export default function Upload({ onComplete, companyData }: UploadProps) {
                             </div>
                           </div>
 
-                          <div className="flex justify-between items-center">
-                            <h3 className="font-semibold text-lg">New {currentStageName} Details</h3>
-                            <Button
-                              variant="outline"
-                              onClick={handleTemplateDownload}
-                              className="hover:bg-blue-50"
-                            >
-                              Download Template
-                            </Button>
-                          </div>
-
-                          <div className="space-y-6">
-                            <Input
-                              type="file"
-                              accept=".csv,.xlsx"
-                              onChange={handleFileUpload}
-                              className="w-full"
-                            />
-
-                            <FormProvider {...methods}>
-                              <form onSubmit={methods.handleSubmit(handleManualEntry)} className="space-y-6">
-                                {formStructure[currentStage - 1]?.structure.sections
-                                  .filter(section => section.visible)
-                                  .map((section) => (
-                                    <div key={section.name} className="bg-white rounded-lg border p-6">
-                                      <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                                        {section.name}
-                                      </h3>
-                                      <div className="grid grid-cols-2 gap-4">
-                                        {section.subsections
-                                          .flatMap(subsection => subsection.fields)
-                                          .filter(field => field.visible)
-                                          .sort((a, b) => a.order - b.order)
-                                          .map((field) => (
-                                            <FormField
-                                              key={field.name}
-                                              control={methods.control}
-                                              name={field.name}
-                                              render={({ field: formField }) => (
-                                                <FormItem className={
-                                                  field.name.includes('description') ? 'col-span-2' : ''
-                                                }>
-                                                  <FormLabel>{field.display}</FormLabel>
-                                                  <FormControl>
-                                                    {field.dropdownOptions?.length > 0 ? (
-                                                      <Select
-                                                        onValueChange={formField.onChange}
-                                                        value={formField.value || ''}
-                                                      >
-                                                        <SelectTrigger>
-                                                          <SelectValue placeholder={`Select ${field.display}`} />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                          {field.dropdownOptions.map((option) => (
-                                                            <SelectItem key={option} value={option}>
-                                                              {option}
-                                                            </SelectItem>
-                                                          ))}
-                                                        </SelectContent>
-                                                      </Select>
-                                                    ) : (
-                                                      <Input
-                                                        {...formField}
-                                                        type={field.type}
-                                                      />
-                                                    )}
-                                                  </FormControl>
-                                                </FormItem>
-                                              )}
-                                            />
-                                          ))}
-                                      </div>
-                                    </div>
-                                  ))}
-                                <Button type="submit" className="w-full">
-                                  Save
+                          {showInputFields && (
+                            <>
+                              <div className="flex justify-between items-center">
+                                <h3 className="font-semibold text-lg">New {currentStageName} Details</h3>
+                                <Button
+                                  variant="outline"
+                                  onClick={handleTemplateDownload}
+                                  className="hover:bg-blue-50"
+                                >
+                                  Download Template
                                 </Button>
-                              </form>
-                            </FormProvider>
-                          </div>
+                              </div>
+
+                              <div className="space-y-6">
+                                <Input
+                                  type="file"
+                                  accept=".csv,.xlsx"
+                                  onChange={handleFileUpload}
+                                  className="w-full"
+                                />
+
+                                <FormProvider {...methods}>
+                                  <form onSubmit={methods.handleSubmit(handleManualEntry)} className="space-y-6">
+                                    {formStructure[currentStage - 1]?.structure.sections
+                                      .filter(section => section.visible)
+                                      .map((section) => (
+                                        <div key={section.name} className="bg-white rounded-lg border p-6">
+                                          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                                            {section.name}
+                                          </h3>
+                                          <div className="grid grid-cols-2 gap-4">
+                                            {section.subsections
+                                              .flatMap(subsection => subsection.fields)
+                                              .filter(field => field.visible)
+                                              .sort((a, b) => a.order - b.order)
+                                              .map((field) => (
+                                                <FormField
+                                                  key={field.name}
+                                                  control={methods.control}
+                                                  name={field.name}
+                                                  render={({ field: formField }) => (
+                                                    <FormItem className={
+                                                      field.name.includes('description') ? 'col-span-2' : ''
+                                                    }>
+                                                      <FormLabel>{field.display}</FormLabel>
+                                                      <FormControl>
+                                                        {field.dropdownOptions?.length > 0 ? (
+                                                          <Select
+                                                            onValueChange={formField.onChange}
+                                                            value={formField.value || ''}
+                                                          >
+                                                            <SelectTrigger>
+                                                              <SelectValue placeholder={`Select ${field.display}`} />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                              {field.dropdownOptions.map((option) => (
+                                                                <SelectItem key={option} value={option}>
+                                                                  {option}
+                                                                </SelectItem>
+                                                              ))}
+                                                            </SelectContent>
+                                                          </Select>
+                                                        ) : (
+                                                          <Input
+                                                            {...formField}
+                                                            type={field.type}
+                                                          />
+                                                        )}
+                                                      </FormControl>
+                                                    </FormItem>
+                                                  )}
+                                                />
+                                              ))}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    <Button type="submit" className="w-full">
+                                      Save
+                                    </Button>
+                                  </form>
+                                </FormProvider>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </ScrollArea>
