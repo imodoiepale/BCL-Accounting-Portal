@@ -314,31 +314,108 @@ export const fetchSectionFields = async (section: string) => {
       return { fields: [], subsections: {} };
     }
   };
-
+  export const handleSectionSelect = async (
+    sectionValue: string,
+    supabase: SupabaseClient,
+    setNewStructure: (value: any) => void,
+    setSelectedTables: (tables: string[]) => void,
+    setSelectedTableFields: (fields: any) => void,
+    selectedTab: string,
+    processColumnMappings: (mappings: Record<string, string>) => Record<string, string[]>
+  ) => {
+    try {
+      if (sectionValue === 'new') {
+        setNewStructure(prev => ({
+          ...prev,
+          section: '',
+          isNewSection: true
+        }));
+        return;
+      }
+  
+      const { data, error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('structure')
+        .eq('Tabs', selectedTab)
+        .single();
+  
+      if (error) throw error;
+  
+      const sectionData = data.structure.sections.find(s => s.name === sectionValue);
+      if (sectionData) {
+        const allTables = new Set<string>();
+        const tableFields: Record<string, string[]> = {};
+  
+        sectionData.subsections.forEach(subsection => {
+          subsection.tables?.forEach(table => {
+            allTables.add(table);
+            if (!tableFields[table]) tableFields[table] = [];
+            
+            subsection.fields
+              .filter(f => f.table === table)
+              .forEach(f => {
+                if (!tableFields[table].includes(f.name)) {
+                  tableFields[table].push(f.name);
+                }
+              });
+          });
+        });
+  
+        setNewStructure(prev => ({
+          ...prev,
+          section: sectionValue,
+          isNewSection: false,
+          table_names: Array.from(allTables)
+        }));
+  
+        setSelectedTables(Array.from(allTables));
+        setSelectedTableFields(tableFields);
+      }
+  
+    } catch (error) {
+      console.error('Error fetching section data:', error);
+      toast.error('Failed to load section data');
+    }
+  };
+  
+  export const handleSubsectionSelect = async (
+    subsectionValue: string,
+    supabase: SupabaseClient,
+    setNewStructure: (value: any) => void,
+    setSelectedTables: (tables: string[]) => void,
+    setSelectedTableFields: (fields: any) => void,
+    processColumnMappings: (mappings: Record<string, string>) => Record<string, string[]>
+  ) => {
+    try {
+      if (subsectionValue === 'new') {
+        setNewStructure(prev => ({
+          ...prev,
+          subsection: '',
+          isNewSubsection: true
+        }));
+        return;
+      }
+  
+      setNewStructure(prev => ({
+        ...prev,
+        subsection: subsectionValue,
+        isNewSubsection: false
+      }));
+  
+    } catch (error) {
+      console.error('Error in subsection selection:', error);
+      toast.error('Failed to load subsection data');
+    }
+  };
+  
   
 // Export all your existing helper functions and utilities
 export {
-  fetchTableColumns,
-  fetchTables,
-  getColumnOrder,
-  safeJSONParse,
-  handleSaveFieldEdit,
-  processColumnMappings,
-  fetchSectionFields,
-  fetchExistingSectionsAndSubsections,
-  handleSaveVisibilitySettings,
-  generateIndices,
-  isVisible,
-  getVisibleColumns,
-  handleAddNewField,
-  handleSectionSelection,
-  handleNameUpdate,
-  handleUpdateSection,
-  handleCreateTable,
-  handleDeleteField,
-  handleEditField,
-  handleAddField,
-  toColumnName,
-  handleSubsectionSelection,
-  handleAddExistingFields
-} from './settingsFunctions';
+  handleAddStructure,
+  handleTabSelect,
+  handleSectionSelect,
+  handleSubsectionSelect,
+  handleVisibilitySettings,
+  handleReorder,
+  fetchSectionFields
+};

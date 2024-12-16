@@ -56,45 +56,77 @@ interface OrderSettings {
     subsections: Record<string, number>;
     fields: Record<string, number>;
 }
-
 const processTabData = (tableData: any, mapping: any) => {
     try {
         const companies = tableData['acc_portal_company_duplicate'] || [];
+        const relevantTables = new Set(['acc_portal_company_duplicate']);
+
+        // Get relevant tables for this tab from the mapping structure
+        if (mapping?.structure?.sections) {
+            mapping.structure.sections.forEach(section => {
+                section.subsections?.forEach(subsection => {
+                    subsection.tables?.forEach(table => {
+                        relevantTables.add(table);
+                    });
+                });
+            });
+        }
 
         return companies.map(company => {
             const relatedRecords = {};
             let allRows = [];
+            let hasRelevantData = false;
 
-            // Process each related table
+            // Process each related table that's relevant to this tab
             Object.keys(tableData).forEach(tableName => {
+                if (!relevantTables.has(tableName)) return; // Skip tables not relevant to this tab
+
                 if (tableName !== 'acc_portal_company_duplicate') {
+                    // Get records for this company from current table
                     const records = tableData[tableName]?.filter(
                         (row: any) => row.company_id === company.id
                     ) || [];
 
                     if (records.length > 0) {
+                        hasRelevantData = true;
                         relatedRecords[`${tableName}_data`] = records;
 
-                        // For tables with multiple records (banks, directors, etc.)
-                        if (records.length > 1) {
-                            records.forEach((record, idx) => {
-                                allRows.push({
-                                    id: record.id,
-                                    company_name: idx === 0 ? company.company_name : '',
-                                    index: idx + 1,
-                                    isFirstRow: idx === 0,
-                                    isAdditionalRow: idx > 0,
-                                    sourceTable: tableName,
-                                    ...record
-                                });
+                        // Add rows for each record found
+                        records.forEach((record, idx) => {
+                            const row = {
+                                id: record.id,
+                                company_name: idx === 0 ? company.company_name : '',
+                                index: idx + 1,
+                                isFirstRow: idx === 0,
+                                isAdditionalRow: idx > 0,
+                                sourceTable: tableName,
+                                ...(idx === 0 ? { ...company } : {}),
+                                [`${tableName}_data`]: record
+                            };
+
+                            // Add specific table data
+                            Object.keys(record).forEach(key => {
+                                row[key] = record[key];
                             });
-                        }
+
+                            allRows.push(row);
+                        });
                     }
                 }
             });
 
-            // If no multiple records exist, create single row with company info
-            if (allRows.length === 0) {
+            // Only create base company row if either:
+            // 1. This company has no related records but company data is needed in this tab
+            // 2. No rows have been created yet but company fields are used in this tab
+            const needsCompanyData = mapping.structure?.sections?.some(section =>
+                section.subsections?.some(subsection =>
+                    subsection.fields?.some(field =>
+                        field.table === 'acc_portal_company_duplicate'
+                    )
+                )
+            );
+
+            if ((needsCompanyData && allRows.length === 0) || (!hasRelevantData && needsCompanyData)) {
                 allRows.push({
                     id: company.id,
                     company_name: company.company_name,
@@ -105,12 +137,25 @@ const processTabData = (tableData: any, mapping: any) => {
                 });
             }
 
+            // Skip companies with no relevant data for this tab
+            if (allRows.length === 0) {
+                return null;
+            }
+
+            // Sort rows by table type and index
+            allRows.sort((a, b) => {
+                if (a.sourceTable === b.sourceTable) {
+                    return a.index - b.index;
+                }
+                return (a.sourceTable || '').localeCompare(b.sourceTable || '');
+            });
+
             return {
                 company: company,
                 rows: allRows,
                 rowSpan: allRows.length
             };
-        });
+        }).filter(Boolean); // Remove null entries for companies with no relevant data
     } catch (error) {
         console.error('Error processing tab data:', error);
         return [];
@@ -121,22 +166,15 @@ const OverallView: React.FC = () => {
     // State Management
     const [allData, setAllData] = useState<any[]>([]);
     const [visibleData, setVisibleData] = useState([]);
+    const [mappings, setMappings] = useState<any[]>([]);
+    const [companies, setCompanies] = useState<any[]>([]);
     const [activeMainTab, setActiveMainTab] = useState<string>('');
     const [activeSubTab, setActiveSubTab] = useState<string>('');
     const [structure, setStructure] = useState<any[]>([]);
+    const [processedStructure, setProcessedStructure] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [visibilityState, setVisibilityState] = useState<VisibilitySettings>({
-        tabs: {},
-        sections: {},
-        subsections: {},
-        fields: {}
-    });
-    const [orderState, setOrderState] = useState<OrderSettings>({
-        tabs: {},
-        sections: {},
-        subsections: {},
-        fields: {}
-    });
+    const [visibilityState, setVisibilityState] = useState({});
+    const [orderState, setOrderState] = useState({});
     const [mainTabs, setMainTabs] = useState<string[]>([]);
     const [subTabs, setSubTabs] = useState<{ [key: string]: string[] }>({});
     const [mainSections, setMainSections] = useState<any[]>([]);
@@ -150,12 +188,35 @@ const OverallView: React.FC = () => {
         return [...items].sort((a, b) => (orderMapping[a] || 0) - (orderMapping[b] || 0));
     };
 
+    const getVisibilityFromStructure = (structure) => {
+        const visibility = {
+            mainTabs: {},
+            subTabs: {},
+            sections: {},
+            subsections: {},
+            fields: {}
+        };
+
+        // Extract main tab visibility
+        if (structure?.visibility?.tabs) {
+            Object.entries(structure.visibility.tabs).forEach(([tab, isVisible]) => {
+                if (tab === structure.main_tab) {
+                    visibility.mainTabs[tab] = isVisible;
+                } else {
+                    visibility.subTabs[tab] = isVisible;
+                }
+            });
+        }
+
+        return visibility;
+    };
+
     // Data Fetching
     const fetchAllData = async () => {
         try {
             setLoading(true);
 
-            // Fetch mappings and main data
+            // Fetch mappings and companies data in parallel
             const [mappingsResponse, companiesResponse] = await Promise.all([
                 supabase
                     .from('profile_category_table_mapping_2')
@@ -168,16 +229,25 @@ const OverallView: React.FC = () => {
                     .order('id')
             ]);
 
-            const mappings = mappingsResponse.data;
-            const companies = companiesResponse.data;
+            // First set the data in state
+            const mappingsData = mappingsResponse.data || [];
+            const companiesData = companiesResponse.data || [];
+            
+            setMappings(mappingsData);
+            setCompanies(companiesData);
+            
+            // Add detailed logging
+            console.log('Companies response:', companiesResponse);
+            console.log('Initial mappings:', mappingsData);
+            console.log('Companies:', companiesData);
 
-            if (!mappings || !companies) {
+            if (!mappingsData || !companiesData) {
                 throw new Error('No data found');
             }
 
             // Get all unique tables
             const tables = new Set(['acc_portal_company_duplicate']);
-            mappings.forEach(mapping => {
+            mappingsData.forEach(mapping => {
                 if (mapping.structure?.sections) {
                     mapping.structure.sections.forEach(section => {
                         section.subsections?.forEach(subsection => {
@@ -189,9 +259,10 @@ const OverallView: React.FC = () => {
 
             // Fetch all table data in parallel
             const tableResponses = await Promise.all(
-                Array.from(tables).map(table =>
-                    supabase.from(table).select('*').order('id')
-                )
+                Array.from(tables).map(table => {
+                    console.log('Fetching data for table:', table);
+                    return supabase.from(table).select('*').order('id');
+                })
             );
 
             // Combine all table data
@@ -200,60 +271,196 @@ const OverallView: React.FC = () => {
                 return acc;
             }, {});
 
-            // Process initial data
-            const processedData = processTabData(allTableData, mappings[0]);
+            // Log combined table data
+            console.log('All table data:', allTableData);
+
+            // Process initial company data
+            const processedData = processTabData(allTableData, mappingsData[0]);
+            console.log('Processed data:', processedData);
             setAllData(processedData);
             setVisibleData(processedData);
-            // Process structure and tabs
-            const mainTabsSet = new Set(mappings.map(m => m.main_tab));
-            const subTabsMap = mappings.reduce((acc, m) => {
-                if (!acc[m.main_tab]) acc[m.main_tab] = [];
-                if (m.Tabs && !acc[m.main_tab].includes(m.Tabs)) {
-                    acc[m.main_tab].push(m.Tabs);
+    
+
+            // Get visibility settings from all mappings
+            const aggregatedVisibility = {
+                tabs: {},
+                sections: {},
+                subsections: {},
+                fields: {}
+            };
+
+            const aggregatedOrder = {
+                mainTabs: {},
+                subTabs: {},
+                sections: {},
+                subsections: {},
+                fields: {}
+            };
+
+            // Process main tabs and their visibility/order
+            const mainTabsSet = new Set(mappingsData.map(m => m.main_tab));
+            const subTabsMap = {};
+
+            // First pass: gather all visibility and order information
+            mappingsData.forEach(mapping => {
+                // Process main tab visibility and order
+                if (mapping.structure?.visibility?.tabs) {
+                    aggregatedVisibility.tabs = {
+                        ...aggregatedVisibility.tabs,
+                        ...mapping.structure.visibility.tabs
+                    };
+                }
+
+                if (mapping.structure?.order?.mainTabs) {
+                    aggregatedOrder.mainTabs = {
+                        ...aggregatedOrder.mainTabs,
+                        ...mapping.structure.order.mainTabs
+                    };
+                }
+
+                // Process sub tabs
+                if (mapping.main_tab) {
+                    if (!subTabsMap[mapping.main_tab]) {
+                        subTabsMap[mapping.main_tab] = [];
+                    }
+                    if (mapping.Tabs && !subTabsMap[mapping.main_tab].includes(mapping.Tabs)) {
+                        subTabsMap[mapping.main_tab].push(mapping.Tabs);
+
+                        // Add sub tab order
+                        if (mapping.structure?.order?.subTabs) {
+                            aggregatedOrder.subTabs[mapping.Tabs] = mapping.structure.order.subTabs[mapping.Tabs] || 0;
+                        }
+                    }
+                }
+
+                // Process sections, subsections, and fields visibility and order
+                if (mapping.structure?.sections) {
+                    mapping.structure.sections.forEach(section => {
+                        // Section visibility
+                        if (section.visible !== undefined) {
+                            aggregatedVisibility.sections[section.name] = section.visible;
+                        }
+
+                        // Section order
+                        if (section.order !== undefined) {
+                            aggregatedOrder.sections[section.name] = section.order;
+                        }
+
+                        section.subsections?.forEach(subsection => {
+                            // Subsection visibility
+                            if (subsection.visible !== undefined) {
+                                aggregatedVisibility.subsections[subsection.name] = subsection.visible;
+                            }
+
+                            // Subsection order
+                            if (subsection.order !== undefined) {
+                                aggregatedOrder.subsections[subsection.name] = subsection.order;
+                            }
+
+                            subsection.fields?.forEach(field => {
+                                const fieldKey = `${field.table}.${field.name}`;
+                                // Field visibility
+                                if (field.visible !== undefined) {
+                                    aggregatedVisibility.fields[fieldKey] = field.visible;
+                                }
+
+                                // Field order
+                                if (field.order !== undefined) {
+                                    aggregatedOrder.fields[fieldKey] = field.order;
+                                }
+                            });
+                        });
+                    });
+                }
+            });
+
+            // Filter and sort main tabs
+            const visibleMainTabs = Array.from(mainTabsSet)
+                .filter(tab => aggregatedVisibility.tabs[tab] !== false)
+                .sort((a, b) => (aggregatedOrder.mainTabs[a] || 0) - (aggregatedOrder.mainTabs[b] || 0));
+
+            // Process sub tabs with visibility and order
+            const processedSubTabs = Object.entries(subTabsMap).reduce((acc, [mainTab, subTabsList]) => {
+                const visibleSubTabs = subTabsList
+                    .filter(tab => aggregatedVisibility.tabs[tab] !== false)
+                    .sort((a, b) => (aggregatedOrder.subTabs[a] || 0) - (aggregatedOrder.subTabs[b] || 0));
+
+                if (visibleSubTabs.length > 0) {
+                    acc[mainTab] = visibleSubTabs;
                 }
                 return acc;
             }, {});
-            
-            // Sort tabs based on order from structure
-            const mainTabOrder = mappings[0]?.structure?.order?.mainTabs || {};
-            const sortedMainTabs = sortByOrder(Array.from(mainTabsSet), mainTabOrder);
 
-            const sortedSubTabs = Object.fromEntries(
-                Object.entries(subTabsMap).map(([mainTab, subTabsList]) => {
-                    const subTabOrder = mappings.find(m => m.main_tab === mainTab)
-                        ?.structure?.order?.subTabs || {};
-                    return [mainTab, sortByOrder(subTabsList, subTabOrder)];
-                })
-            );
-
-            setMainTabs(sortedMainTabs);
-            setSubTabs(sortedSubTabs);
-            setStructure(mappings);
+            // Set all the processed data
+            setMainTabs(visibleMainTabs);
+            setSubTabs(processedSubTabs);
+            setStructure(mappingsData);
+            setVisibilityState(aggregatedVisibility);
+            setOrderState(aggregatedOrder);
 
             // Process sections and subsections
-            const sectionsSet = new Set<string>();
-            const subsectionsSet = new Set<string>();
-            mappings.forEach(mapping => {
-                mapping.structure?.sections?.forEach(section => {
-                    if (section.name) sectionsSet.add(section.name);
-                    section.subsections?.forEach(subsection => {
-                        if (subsection.name) subsectionsSet.add(subsection.name);
-                    });
-                });
-            });
+            const visibleSections = mappingsData.reduce((acc, mapping) => {
+                if (mapping.structure?.sections) {
+                    mapping.structure.sections
+                        .filter(section => aggregatedVisibility.sections[section.name] !== false)
+                        .forEach(section => {
+                            acc.add(section.name);
+                            section.subsections
+                                ?.filter(subsection => aggregatedVisibility.subsections[subsection.name] !== false)
+                                .forEach(subsection => {
+                                    acc.add(subsection.name);
+                                });
+                        });
+                }
+                return acc;
+            }, new Set());
 
-            setMainSections(Array.from(sectionsSet));
-            setMainSubsections(Array.from(subsectionsSet));
+            setMainSections(Array.from(visibleSections));
 
-            // Set initial active tabs
-            const firstMainTab = Array.from(mainTabsSet)[0];
-            if (firstMainTab) {
+            // Set initial active tabs if not already set
+            if (!activeMainTab && visibleMainTabs.length > 0) {
+                const firstMainTab = visibleMainTabs[0];
                 setActiveMainTab(firstMainTab);
-                const firstSubTab = subTabsMap[firstMainTab]?.[0];
+
+                const firstSubTab = processedSubTabs[firstMainTab]?.[0];
                 if (firstSubTab) {
                     setActiveSubTab(firstSubTab);
                 }
             }
+
+            // Process full structure for UI
+            const processedStructure = {
+                sections: mappingsData[0]?.structure?.sections
+                    .filter(section => aggregatedVisibility.sections[section.name] !== false)
+                    .map(section => ({
+                        ...section,
+                        subsections: section.subsections
+                            ?.filter(subsection => aggregatedVisibility.subsections[subsection.name] !== false)
+                            .map(subsection => ({
+                                ...subsection,
+                                fields: subsection.fields
+                                    ?.filter(field => {
+                                        const fieldKey = `${field.table}.${field.name}`;
+                                        return aggregatedVisibility.fields[fieldKey] !== false;
+                                    })
+                                    .sort((a, b) => {
+                                        const keyA = `${a.table}.${a.name}`;
+                                        const keyB = `${b.table}.${b.name}`;
+                                        return (aggregatedOrder.fields[keyA] || 0) - (aggregatedOrder.fields[keyB] || 0);
+                                    })
+                            }))
+                            .sort((a, b) => (aggregatedOrder.subsections[a.name] || 0) - (aggregatedOrder.subsections[b.name] || 0))
+                    }))
+                    .sort((a, b) => (aggregatedOrder.sections[a.name] || 0) - (aggregatedOrder.sections[b.name] || 0))
+            };
+
+            setProcessedStructure(processedStructure);
+
+            console.log('Processed visibility:', aggregatedVisibility);
+            console.log('Processed order:', aggregatedOrder);
+            console.log('Visible main tabs:', visibleMainTabs);
+            console.log('Processed sub tabs:', processedSubTabs);
+            console.log('Processed structure:', processedStructure);
 
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -263,21 +470,58 @@ const OverallView: React.FC = () => {
         }
     };
 
+    // Add helper function for structure processing
+    const processStructureForUI = (structure) => {
+        return {
+            sections: structure.sections.map(section => ({
+                ...section,
+                subsections: section.subsections
+                    .filter(subsection =>
+                        structure.visibility?.subsections?.[subsection.name] !== false
+                    )
+                    .sort((a, b) =>
+                        (structure.order?.subsections?.[a.name] || 0) -
+                        (structure.order?.subsections?.[b.name] || 0)
+                    )
+                    .map(subsection => ({
+                        ...subsection,
+                        fields: subsection.fields
+                            .filter(field =>
+                                structure.visibility?.fields?.[`${field.table}.${field.name}`] !== false
+                            )
+                            .sort((a, b) =>
+                                (structure.order?.fields?.[`${a.table}.${a.name}`] || 0) -
+                                (structure.order?.fields?.[`${b.table}.${b.name}`] || 0)
+                            )
+                    }))
+            }))
+                .filter(section =>
+                    structure.visibility?.sections?.[section.name] !== false
+                )
+                .sort((a, b) =>
+                    (structure.order?.sections?.[a.name] || 0) -
+                    (structure.order?.sections?.[b.name] || 0)
+                ),
+            visibility: structure.visibility || {},
+            order: structure.order || {},
+            relationships: structure.relationships || {}
+        };
+    };
+
     // Event Handlers
     const handleTabChange = useCallback((mainTab: string, subTab: string) => {
         setActiveMainTab(mainTab);
         setActiveSubTab(subTab);
-
+    
+        // Find the specific mapping for this tab combination
         const relevantMapping = structure.find(m =>
             m.main_tab === mainTab && m.Tabs === subTab
         );
-
+    
         if (relevantMapping) {
-            const filteredData = allData.filter(item => {
-                // Add any specific filtering logic here if needed
-                return true;
-            });
-            setVisibleData(filteredData);
+            // Process data specifically for this tab using the relevant mapping
+            const tabSpecificData = processTabData(allData, relevantMapping);
+            setVisibleData(tabSpecificData);
         }
     }, [allData, structure]);
 
@@ -461,13 +705,24 @@ const OverallView: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const handleStructureUpdateEvent = () => {
+        const handleStructureUpdate = () => {
             fetchAllData();
         };
 
-        window.addEventListener('structure-updated', handleStructureUpdateEvent);
+        window.addEventListener('structure-updated', handleStructureUpdate);
         return () => {
-            window.removeEventListener('structure-updated', handleStructureUpdateEvent);
+            window.removeEventListener('structure-updated', handleStructureUpdate);
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleVisibilityUpdate = () => {
+            fetchAllData();
+        };
+
+        window.addEventListener('visibility-updated', handleVisibilityUpdate);
+        return () => {
+            window.removeEventListener('visibility-updated', handleVisibilityUpdate);
         };
     }, []);
 
@@ -494,20 +749,22 @@ const OverallView: React.FC = () => {
             <Tabs defaultValue={mainTabs[0]} value={activeMainTab} className="h-full flex flex-col">
                 {mainTabs.length > 0 ? (
                     <TabsList className="w-full grid-cols-[repeat(auto-fit,minmax(0,1fr))] grid bg-gray-100 rounded-lg p-1">
-                        {mainTabs.map(tab => (
-                            <TabsTrigger
-                                key={tab}
-                                value={tab}
-                                disabled={loading}
-                                onClick={() => {
-                                    const firstSubTab = subTabs[tab]?.[0] || '';
-                                    handleTabChange(tab, firstSubTab);
-                                }}
-                                className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
-                            >
-                                {tab}
-                            </TabsTrigger>
-                        ))}
+                        {mainTabs
+                            .filter(tab => visibilityState.tabs[tab] !== false)
+                            .map(tab => (
+                                <TabsTrigger
+                                    key={tab}
+                                    value={tab}
+                                    disabled={loading}
+                                    onClick={() => {
+                                        const firstSubTab = subTabs[tab]?.[0] || '';
+                                        handleTabChange(tab, firstSubTab);
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
+                                >
+                                    {tab}
+                                </TabsTrigger>
+                            ))}
                     </TabsList>
                 ) : (
                     <div>No tabs available</div>
@@ -556,19 +813,20 @@ const OverallView: React.FC = () => {
                                 defaultValue={subTabs[activeMainTab]?.[0]}
                                 value={activeSubTab}
                                 className="h-full flex flex-col"
-                            >
-                                <TabsList className="w-full grid grid-cols-10 bg-gray-100 rounded-lg p-1">
-                                    {(subTabs[activeMainTab] || []).map(tab => (
-                                        <TabsTrigger
-                                            key={tab}
-                                            value={tab}
-                                            disabled={loading}
-                                            onClick={() => handleTabChange(activeMainTab, tab)}
-                                            className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
-                                        >
-                                            {tab}
-                                        </TabsTrigger>
-                                    ))}
+                            > <TabsList className="w-full grid grid-cols-10 bg-gray-100 rounded-lg p-1">
+                                    {(subTabs[activeMainTab] || [])
+                                        .filter(tab => visibilityState.tabs[tab] !== false)
+                                        .map(tab => (
+                                            <TabsTrigger
+                                                key={tab}
+                                                value={tab}
+                                                disabled={loading}
+                                                onClick={() => handleTabChange(activeMainTab, tab)}
+                                                className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
+                                            >
+                                                {tab}
+                                            </TabsTrigger>
+                                        ))}
                                 </TabsList>
                                 <div className="flex-1 overflow-hidden">
                                     <TabsContent

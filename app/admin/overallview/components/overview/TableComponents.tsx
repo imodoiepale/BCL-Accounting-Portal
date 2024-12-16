@@ -606,16 +606,22 @@ const renderDataRows = (data: any[], handleCompanyClick: (company: any) => void,
                   );
                 }
                 let value;
-                if (row.isAdditionalRow && row.sourceTable === fieldTableName) {
-                  value = row[columnName];
+                if (row.sourceTable === fieldTableName) {
+                    // For additional rows from related tables (banks, directors etc)
+                    value = row[columnName];
                 } else if (row[`${fieldTableName}_data`]) {
-                  if (Array.isArray(row[`${fieldTableName}_data`])) {
-                    value = row[`${fieldTableName}_data`][0]?.[columnName];
-                  } else {
-                    value = row[`${fieldTableName}_data`][columnName];
-                  }
+                    // For the first row of company data
+                    if (Array.isArray(row[`${fieldTableName}_data`])) {
+                        // If we have multiple records, find the matching one by index
+                        const recordIndex = row.index - 1;
+                        value = row[`${fieldTableName}_data`][recordIndex]?.[columnName];
+                    } else {
+                        // Single record case
+                        value = row[`${fieldTableName}_data`][columnName];
+                    }
                 } else {
-                  value = row[columnName];
+                    // Direct access for company fields
+                    value = row[columnName];
                 }
                 if (field.type === 'date') {
                   value = formatDate(value);

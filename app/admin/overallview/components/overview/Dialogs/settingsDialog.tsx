@@ -2,7 +2,7 @@
 // @ts-nocheck 
 "use client";
 import React, { useCallback, useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Plus, Settings, Edit2, X, ChevronDown, ChevronUp, Eye, EyeOff, Trash } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,8 +16,15 @@ import { EditFieldDialog } from './EditDialog';
 import { MultiSelectDialog } from './MultiselectDialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { useStructureState, useVisibilityState, useTableState, useFormState, processStructureForUI } from './settingsState';
-import { fetchTableColumns, fetchTables, getColumnOrder, safeJSONParse, handleSaveFieldEdit, processColumnMappings, fetchExistingSectionsAndSubsections, handleSaveVisibilitySettings, generateIndices, isVisible, getVisibleColumns, handleAddNewField, handleNameUpdate, handleUpdateSection, handleCreateTable, handleDeleteField, handleEditField, handleAddField, toColumnName, handleAddExistingFields, handleSectionSelection } from './settingsFunctions';
-import { handleAddStructure, handleTabSelect, handleVisibilitySettings, handleReorder, fetchSectionFields } from './SettingsHandlers';
+import { fetchTableColumns, handleTabSelection, handleSubsectionSelection, fetchTables, getColumnOrder, safeJSONParse, handleSaveFieldEdit, processColumnMappings, fetchExistingSectionsAndSubsections, handleSaveVisibilitySettings, generateIndices, isVisible, getVisibleColumns, handleAddNewField, handleNameUpdate, handleUpdateSection, handleCreateTable, handleDeleteField, handleEditField, handleAddField, toColumnName, handleAddExistingFields, } from './settingsFunctions';
+import {
+  handleTabSelect,
+  handleSectionSelect,
+  handleSubsectionSelect,
+  handleVisibilitySettings,
+  handleReorder,
+  fetchSectionFields
+} from './SettingsHandlers';
 import { DraggableColumns } from './DragOder';
 import { updateVisibility, updateOrder, getVisibilityState, getOrderState, type VisibilitySettings, type OrderSettings } from './visibilityHandler';
 import { ColumnManagement } from './columnManangementTab';
@@ -211,17 +218,6 @@ export function SettingsDialog({
     .find(item => item.Tabs === selectedTab)
     ?.sections.findIndex(s => s.name === selectedSection?.section) ?? -1;
 
-  const handleSubsectionSelect = async (subsectionValue: string) => {
-    await handleSubsectionSelection(
-      subsectionValue,
-      supabase,
-      setNewStructure,
-      setSelectedTables,
-      setSelectedTableFields,
-      processColumnMappings
-    );
-  };
-
   // Render helpers
   const OrderControls = ({ currentOrder, onMoveUp, onMoveDown }) => (
     <div className="flex gap-1">
@@ -297,7 +293,9 @@ export function SettingsDialog({
         <DialogContent className="max-w-8xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Table Structure Settings</DialogTitle>
-
+            <DialogDescription>
+              Manage your table structure, sections, and column visibility settings.
+            </DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="structure" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
@@ -315,7 +313,11 @@ export function SettingsDialog({
                     <ScrollArea className="h-[700px]">
                       <div className="flex justify-between items-center mb-2 px-2">
                         <h3 className="font-semibold">Tabs</h3>
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedTab('')}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedTab('')}
+                        >
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
@@ -640,17 +642,20 @@ export function SettingsDialog({
                     <label className="text-sm font-medium text-gray-700">Tab</label>
                     <Select
                       value={newStructure.Tabs}
-                      onValueChange={(value) => {
-                        const stateSetters = {
+                      onValueChange={(value) => handleTabSelection(
+                        value,
+                        isNewStructure,
+                        supabase,
+                        {
                           setExistingSections,
                           setExistingSubsections,
                           setNewStructure,
                           setSelectedTab,
                           setSelectedTables,
                           setSelectedTableFields
-                        };
-                        handleTabSelection(value, true, supabase, stateSetters);
-                      }}
+                        }
+                      )}
+
                     >
                       <SelectTrigger className="w-full bg-white">
                         <SelectValue placeholder="Select or Create Tab" />
@@ -686,7 +691,17 @@ export function SettingsDialog({
                     <label className="text-sm font-medium text-gray-700">Section</label>
                     <Select
                       value={newStructure.section}
-                      onValueChange={handleSectionSelection}
+                      onValueChange={(value) =>
+                        handleSectionSelect(
+                          value,
+                          supabase,
+                          setNewStructure,
+                          setSelectedTables,
+                          setSelectedTableFields,
+                          selectedTab,
+                          processColumnMappings
+                        )
+                      }
                     >
                       <SelectTrigger className="w-full bg-white">
                         <SelectValue placeholder="Select or Create Section" />
@@ -726,7 +741,15 @@ export function SettingsDialog({
                     {!newStructure.isNewSection ? (
                       <Select
                         value={newStructure.subsection}
-                        onValueChange={handleSubsectionSelect}
+                        onValueChange={(value) => handleSubsectionSelection(
+                          value,
+                          supabase,
+                          setNewStructure,
+                          setSelectedTables,
+                          setSelectedTableFields,
+                          processColumnMappings
+                        )}
+
                       >
                         <SelectTrigger className="w-full bg-white">
                           <SelectValue placeholder="Select or Create Subsection" />
@@ -865,7 +888,27 @@ export function SettingsDialog({
 
                     <div className="flex justify-end">
                       <Button
-                        onClick={handleAddStructure}
+                        onClick={() =>
+                          handleAddStructure(
+                            newStructure,
+                            supabase,
+                            activeMainTab,
+                            () => setNewStructure({
+                              section: '',
+                              subsection: '',
+                              table_name: '',
+                              Tabs: '',
+                              column_mappings: {},
+                              isNewTab: false,
+                              isNewSection: false,
+                              isNewSubsection: false,
+                              table_names: []
+                            }),
+                            setAddFieldDialogOpen,
+                            fetchStructure,
+                            onStructureChange
+                          )
+                        }
                         className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
                       >
                         <Plus className="h-4 w-4 mr-2" />
@@ -883,10 +926,21 @@ export function SettingsDialog({
               <Card>
                 <CardContent className="p-6">
                   <ColumnManagement
-                    structure={mappingData?.structure}
+                    structure={structure}
                     structureId={mappingData?.id}
                     onUpdate={fetchStructure}
                     supabase={supabase}
+                    activeMainTab={activeMainTab}
+                    mainTabs={uniqueTabs}
+                    subTabs={Object.fromEntries(
+                      uniqueTabs.map(tab => [
+                        tab,
+                        structure
+                          .filter(item => item.main_tab === tab)
+                          .map(item => item.Tabs)
+                      ])
+                    )}
+                    visibilityState={visibilityState}
                   />
                 </CardContent>
               </Card>

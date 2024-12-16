@@ -83,7 +83,7 @@ const OrderManagement = ({
           <div>
             <h4 className="font-medium mb-2">Main Tabs</h4>
             <ScrollArea className="h-[300px]">
-              {mainTabs.map((tab, index) => (
+              {Array.isArray(mainTabs) && mainTabs.map((tab, index) => (
                 <div key={tab} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
                   <span>{tab}</span>
                   <div className="flex gap-1">
@@ -99,7 +99,7 @@ const OrderManagement = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleReorder('mainTab', tab, 'down')}
-                      disabled={index === mainTabs.length - 1}
+                      disabled={index === (mainTabs?.length || 0) - 1}
                     >
                       <ChevronDown className="h-4 w-4" />
                     </Button>
@@ -113,7 +113,7 @@ const OrderManagement = ({
           <div>
             <h4 className="font-medium mb-2">Sub Tabs for {activeMainTab}</h4>
             <ScrollArea className="h-[300px]">
-              {(subTabs[activeMainTab] || []).map((tab, index) => (
+              {Array.isArray(subTabs?.[activeMainTab]) && subTabs[activeMainTab].map((tab, index) => (
                 <div key={tab} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
                   <span>{tab}</span>
                   <div className="flex gap-1">
@@ -129,7 +129,7 @@ const OrderManagement = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleReorder('subTab', tab, 'down', activeMainTab)}
-                      disabled={index === (subTabs[activeMainTab] || []).length - 1}
+                      disabled={index === (subTabs[activeMainTab]?.length || 0) - 1}
                     >
                       <ChevronDown className="h-4 w-4" />
                     </Button>
