@@ -2,8 +2,8 @@
 // @ts-nocheck
 import { SupabaseClient } from '@supabase/supabase-js';
 import { toast } from "sonner";
-import { 
-  StructureItem, 
+import {
+  StructureItem,
   VisibilitySettings,
   NewStructure
 } from './SettingsState';
@@ -18,7 +18,7 @@ interface StateSetters {
   setSelectedTableFields: (fields: any) => void;
 }
 
-export const handleAddStructure = async (
+const handleAddStructure = async (
   newStructure: NewStructure,
   supabase: SupabaseClient,
   activeMainTab: string,
@@ -89,7 +89,7 @@ export const handleAddStructure = async (
   }
 };
 
-export const handleTabSelect = async (
+const handleTabSelect = async (
   tabValue: string,
   isNewStructure: boolean,
   supabase: SupabaseClient,
@@ -132,7 +132,7 @@ export const handleTabSelect = async (
   setSelectedTableFields({});
 };
 
-export const handleVisibilitySettings = async (
+const handleVisibilitySettings = async (
   visibilitySettings: VisibilitySettings,
   selectedTab: string,
   supabase: SupabaseClient,
@@ -170,7 +170,7 @@ export const handleVisibilitySettings = async (
   }
 };
 
-export const handleReorder = async (
+const handleReorder = async (
   type: 'tab' | 'section' | 'subsection' | 'column',
   id: string,
   direction: 'up' | 'down',
@@ -182,7 +182,7 @@ export const handleReorder = async (
   supabase: SupabaseClient,
   fetchStructure: () => Promise<void>
 ) => {
-    const items = type === 'tab' ? uniqueTabs :
+  const items = type === 'tab' ? uniqueTabs :
     type === 'section' ? structure.find(s => s.Tabs === selectedTab)?.sections :
       type === 'subsection' ? structure.find(s => s.Tabs === selectedTab)?.sections.find(s => s.name === selectedSection?.section)?.subsections :
         columnOrder.columns;
@@ -275,140 +275,141 @@ const createNewStructure = async (
   if (error) throw error;
 };
 
-export const fetchSectionFields = async (section: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profile_category_table_mapping_2')
-        .select('structure')
-        .single();
-  
-      if (error) throw error;
-  
-      const fields: string[] = [];
-      const subsectionFields: Record<string, string[]> = {};
-  
-      const sectionData = data.structure.sections.find(s => s.name === section);
-      if (sectionData) {
-        sectionData.subsections.forEach(subsection => {
-          subsectionFields[subsection.name] = subsection.fields.map(field => 
-            `${field.table}.${field.name}`
-          );
-          
-          // Add to overall fields list
-          subsection.fields.forEach(field => {
-            const fieldKey = `${field.table}.${field.name}`;
-            if (!fields.includes(fieldKey)) {
-              fields.push(fieldKey);
-            }
-          });
+const fetchSectionFields = async (section: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('structure')
+      .single();
+
+    if (error) throw error;
+
+    const fields: string[] = [];
+    const subsectionFields: Record<string, string[]> = {};
+
+    const sectionData = data.structure.sections.find(s => s.name === section);
+    if (sectionData) {
+      sectionData.subsections.forEach(subsection => {
+        subsectionFields[subsection.name] = subsection.fields.map(field =>
+          `${field.table}.${field.name}`
+        );
+
+        // Add to overall fields list
+        subsection.fields.forEach(field => {
+          const fieldKey = `${field.table}.${field.name}`;
+          if (!fields.includes(fieldKey)) {
+            fields.push(fieldKey);
+          }
         });
-      }
-  
-      return {
-        fields,
-        subsections: subsectionFields
-      };
-    } catch (error) {
-      console.error('Error fetching section fields:', error);
-      toast.error('Failed to fetch section fields');
-      return { fields: [], subsections: {} };
+      });
     }
-  };
-  export const handleSectionSelect = async (
-    sectionValue: string,
-    supabase: SupabaseClient,
-    setNewStructure: (value: any) => void,
-    setSelectedTables: (tables: string[]) => void,
-    setSelectedTableFields: (fields: any) => void,
-    selectedTab: string,
-    processColumnMappings: (mappings: Record<string, string>) => Record<string, string[]>
-  ) => {
-    try {
-      if (sectionValue === 'new') {
-        setNewStructure(prev => ({
-          ...prev,
-          section: '',
-          isNewSection: true
-        }));
-        return;
-      }
-  
-      const { data, error } = await supabase
-        .from('profile_category_table_mapping_2')
-        .select('structure')
-        .eq('Tabs', selectedTab)
-        .single();
-  
-      if (error) throw error;
-  
-      const sectionData = data.structure.sections.find(s => s.name === sectionValue);
-      if (sectionData) {
-        const allTables = new Set<string>();
-        const tableFields: Record<string, string[]> = {};
-  
-        sectionData.subsections.forEach(subsection => {
-          subsection.tables?.forEach(table => {
-            allTables.add(table);
-            if (!tableFields[table]) tableFields[table] = [];
-            
-            subsection.fields
-              .filter(f => f.table === table)
-              .forEach(f => {
-                if (!tableFields[table].includes(f.name)) {
-                  tableFields[table].push(f.name);
-                }
-              });
-          });
-        });
-  
-        setNewStructure(prev => ({
-          ...prev,
-          section: sectionValue,
-          isNewSection: false,
-          table_names: Array.from(allTables)
-        }));
-  
-        setSelectedTables(Array.from(allTables));
-        setSelectedTableFields(tableFields);
-      }
-  
-    } catch (error) {
-      console.error('Error fetching section data:', error);
-      toast.error('Failed to load section data');
-    }
-  };
-  
-  export const handleSubsectionSelect = async (
-    subsectionValue: string,
-    supabase: SupabaseClient,
-    setNewStructure: (value: any) => void,
-    setSelectedTables: (tables: string[]) => void,
-    setSelectedTableFields: (fields: any) => void,
-    processColumnMappings: (mappings: Record<string, string>) => Record<string, string[]>
-  ) => {
-    try {
-      if (subsectionValue === 'new') {
-        setNewStructure(prev => ({
-          ...prev,
-          subsection: '',
-          isNewSubsection: true
-        }));
-        return;
-      }
-  
+
+    return {
+      fields,
+      subsections: subsectionFields
+    };
+  } catch (error) {
+    console.error('Error fetching section fields:', error);
+    toast.error('Failed to fetch section fields');
+    return { fields: [], subsections: {} };
+  }
+};
+
+const handleSectionSelect = async (
+  sectionValue: string,
+  supabase: SupabaseClient,
+  setNewStructure: (value: any) => void,
+  setSelectedTables: (tables: string[]) => void,
+  setSelectedTableFields: (fields: any) => void,
+  selectedTab: string,
+  processColumnMappings: (mappings: Record<string, string>) => Record<string, string[]>
+) => {
+  try {
+    if (sectionValue === 'new') {
       setNewStructure(prev => ({
         ...prev,
-        subsection: subsectionValue,
-        isNewSubsection: false
+        section: '',
+        isNewSection: true
       }));
-  
-    } catch (error) {
-      console.error('Error in subsection selection:', error);
-      toast.error('Failed to load subsection data');
+      return;
     }
-  };
-  
-  
+
+    const { data, error } = await supabase
+      .from('profile_category_table_mapping_2')
+      .select('structure')
+      .eq('Tabs', selectedTab)
+      .single();
+
+    if (error) throw error;
+
+    const sectionData = data.structure.sections.find(s => s.name === sectionValue);
+    if (sectionData) {
+      const allTables = new Set<string>();
+      const tableFields: Record<string, string[]> = {};
+
+      sectionData.subsections.forEach(subsection => {
+        subsection.tables?.forEach(table => {
+          allTables.add(table);
+          if (!tableFields[table]) tableFields[table] = [];
+
+          subsection.fields
+            .filter(f => f.table === table)
+            .forEach(f => {
+              if (!tableFields[table].includes(f.name)) {
+                tableFields[table].push(f.name);
+              }
+            });
+        });
+      });
+
+      setNewStructure(prev => ({
+        ...prev,
+        section: sectionValue,
+        isNewSection: false,
+        table_names: Array.from(allTables)
+      }));
+
+      setSelectedTables(Array.from(allTables));
+      setSelectedTableFields(tableFields);
+    }
+
+  } catch (error) {
+    console.error('Error fetching section data:', error);
+    toast.error('Failed to load section data');
+  }
+};
+
+const handleSubsectionSelect = async (
+  subsectionValue: string,
+  supabase: SupabaseClient,
+  setNewStructure: (value: any) => void,
+  setSelectedTables: (tables: string[]) => void,
+  setSelectedTableFields: (fields: any) => void,
+  processColumnMappings: (mappings: Record<string, string>) => Record<string, string[]>
+) => {
+  try {
+    if (subsectionValue === 'new') {
+      setNewStructure(prev => ({
+        ...prev,
+        subsection: '',
+        isNewSubsection: true
+      }));
+      return;
+    }
+
+    setNewStructure(prev => ({
+      ...prev,
+      subsection: subsectionValue,
+      isNewSubsection: false
+    }));
+
+  } catch (error) {
+    console.error('Error in subsection selection:', error);
+    toast.error('Failed to load subsection data');
+  }
+};
+
+
 // Export all your existing helper functions and utilities
 export {
   handleAddStructure,
