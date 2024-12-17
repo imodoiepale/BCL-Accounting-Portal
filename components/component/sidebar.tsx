@@ -28,6 +28,7 @@ const adminNavItems = [
   { href: "/admin/registry", icon: User2Icon, label: "Registry" },
   { href: "/admin/overallview", icon: LayoutDashboardIcon, label: "Overall TableView" },
   { href: "/admin/companies", icon: User2Icon, label: "Companies" },
+  { href: "/profile-management", icon: User2Icon, label: "Registry Management" },
   {
     href: "/admin/documents",
     icon: FileIcon,
@@ -99,12 +100,10 @@ export function Sidebar() {
                 <Link
                   key={childItem.href}
                   href={childItem.href}
-                  className={`
-                    flex items-center p-2 rounded-md text-sm transition-colors
+                  className={`flex items-center p-2 rounded-md text-sm transition-colors
                     ${pathname === childItem.href
                       ? "text-blue-600 bg-blue-50"
-                      : "text-gray-700 hover:bg-gray-100"}
-                  `}
+                      : "text-gray-700 hover:bg-gray-100"}`}
                   prefetch={false}
                 >
                   <childItem.icon className="w-4 h-4 mr-2" />
@@ -131,14 +130,12 @@ export function Sidebar() {
   };
 
   return (
-    <aside className={`
-      bg-white shadow-lg transition-all duration-300 ease-in-out
+    <aside className={`bg-white shadow-lg transition-all duration-300 ease-in-out
       ${isExpanded ? 'w-64' : 'w-16'}
       p-4 hidden md:flex flex-col h-screen sticky top-0
       border-r border-gray-200
     `}>
-      <div className={`
-        flex items-center mb-6 h-12
+      <div className={`flex items-center mb-6 h-12
         ${isExpanded ? '' : 'justify-center'}
       `}>
         {isExpanded && (
