@@ -4,9 +4,36 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronRight } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+
+interface ColumnManagementProps {
+  structure: Array<{
+    id: number;
+    main_tab: string;
+    Tabs: string;
+    structure: {
+      order: Record<string, any>;
+      fields: Record<string, any>;
+      sections: Array<any>;
+      visibility: Record<string, any>;
+      relationships: Record<string, any>;
+    };
+    created_at?: string;
+    updated_at?: string;
+    verification_status: {
+      row_verifications: Record<string, any>;
+      field_verifications: Record<string, any>;
+      section_verifications: Record<string, any>;
+    };
+  }>;
+  onUpdate: () => Promise<void>;
+  supabase: any;
+  mainTabs: string[];
+  subTabs: Record<string, string[]>;
+  visibilityState: Record<string, any>;
+}
 
 export const ColumnManagement: React.FC<ColumnManagementProps> = ({
   structure = [],
@@ -14,65 +41,69 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
   supabase,
   mainTabs = [],
   subTabs = {},
-  visibilityState = {},
-  activeMainTab
+  visibilityState = {}
 }) => {
   const [loading, setLoading] = useState(false);
-  const [processedStructure, setProcessedStructure] = useState([]);
+  const [expandedItems, setExpandedItems] = useState({});
 
-  useEffect(() => {
-    // Process structure data when it changes
-    if (structure && structure.length > 0) {
-      const processed = structure.map(item => ({
-        mainTab: item.main_tab,
-        subTab: item.Tabs,
-        sections: item.sections || [],
-        order: item.order || {},
-        visibility: item.visibility || {}
-      }));
-      setProcessedStructure(processed);
-    }
-  }, [structure]);
+  const toggleExpand = (itemType, itemId) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [`${itemType}-${itemId}`]: !prev[`${itemType}-${itemId}`]
+    }));
+  };
 
   const handleReorder = async (type, itemId, direction, context) => {
     try {
       setLoading(true);
       const { data: records, error: fetchError } = await supabase
         .from('profile_category_table_mapping_2')
-        .select('*')
-        .eq('main_tab', context?.mainTab || activeMainTab);
+        .select('*');
 
       if (fetchError) {
         throw fetchError;
       }
 
-      const record = records.find(r => r.main_tab === (context?.mainTab || activeMainTab));
+      const record = records.find(r => {
+        if (type === 'main_tab') {
+          return true;
+        }
+        if (type === 'subTab') {
+          return r.main_tab === context.main_tab;
+        }
+        return r.main_tab === context.main_tab && r.Tabs === context.subTab;
+      });
+
       if (!record) {
         return;
       }
 
-      let items;
       let updatedStructure = { ...record.structure };
+      let items = [];
+
 
       switch (type) {
-        case 'mainTab':
+        case 'main_tab':
           items = [...mainTabs];
           break;
         case 'subTab':
-          items = [...(subTabs[context.mainTab] || [])];
+          items = [...(subTabs[context.main_tab] || [])];
           break;
         case 'section':
-          items = [...(updatedStructure.sections || [])];
+
+          items = [...(record.structure.sections || [])];
           break;
         case 'subsection':
-          const section = updatedStructure.sections?.find(s => s.name === context.section);
-          items = [...(section?.subsections || [])];
+
+          items = [...(record.structure.sections.find(s => s.name === context.section)?.subsections || [])];
           break;
         case 'field':
-          const subsection = updatedStructure.sections
-            ?.find(s => s.name === context.section)
-            ?.subsections?.find(sub => sub.name === context.subsection);
-          items = [...(subsection?.fields || [])];
+
+          items = [...(record.structure.sections
+            .find(s => s.name === context.section)
+            ?.subsections
+            .find(sub => sub.name === context.subsection)
+            ?.fields || [])];
           break;
       }
 
@@ -82,49 +113,22 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
       const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
 
       if (newIndex >= 0 && newIndex < items.length) {
-        // Swap items
         [items[currentIndex], items[newIndex]] = [items[newIndex], items[currentIndex]];
-        
-        // Update order numbers
-        items.forEach((item, index) => {
-          if (typeof item === 'object') {
-            item.order = index;
-          }
-        });
 
-        // Update the appropriate part of the structure
-        switch (type) {
-          case 'mainTab':
-            updatedStructure.order = { ...updatedStructure.order, mainTabs: items };
-            break;
-          case 'subTab':
-            updatedStructure.order = { ...updatedStructure.order, subTabs: { 
-              ...updatedStructure.order?.subTabs,
-              [context.mainTab]: items 
-            }};
-            break;
-          case 'section':
-            updatedStructure.sections = items;
-            break;
-          case 'subsection':
-            const sectionIndex = updatedStructure.sections.findIndex(s => s.name === context.section);
-            if (sectionIndex !== -1) {
-              updatedStructure.sections[sectionIndex].subsections = items;
-            }
-            break;
-          case 'field':
-            const section = updatedStructure.sections.find(s => s.name === context.section);
-            const subsection = section?.subsections?.find(sub => sub.name === context.subsection);
-            if (subsection) {
-              subsection.fields = items;
-            }
-            break;
-        }
 
         const { error: updateError } = await supabase
           .from('profile_category_table_mapping_2')
           .update({
-            structure: updatedStructure,
+            structure: {
+              ...updatedStructure,
+              order: {
+                ...updatedStructure.order,
+                [type]: items.reduce((acc, item, idx) => ({
+                  ...acc,
+                  [typeof item === 'string' ? item : item.name]: idx
+                }), {})
+              }
+            },
             updated_at: new Date().toISOString()
           })
           .eq('id', record.id);
@@ -132,7 +136,6 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
         if (updateError) {
           throw updateError;
         }
-
         await onUpdate();
       }
     } catch (error) {
@@ -149,7 +152,7 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
       const { data: record, error: fetchError } = await supabase
         .from('profile_category_table_mapping_2')
         .select('*')
-        .eq('main_tab', context?.mainTab || activeMainTab)
+        .eq('id', context?.recordId)
         .single();
 
       if (fetchError) {
@@ -159,38 +162,21 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
       let updatedStructure = { ...record.structure };
       let visibility = updatedStructure.visibility || {};
 
-      switch (type) {
-        case 'mainTab':
-          visibility = {
-            ...visibility,
-            mainTabs: { ...visibility.mainTabs, [itemId]: !visibility.mainTabs?.[itemId] }
-          };
-          break;
-        case 'subTab':
-          visibility = {
-            ...visibility,
-            subTabs: { ...visibility.subTabs, [itemId]: !visibility.subTabs?.[itemId] }
-          };
-          break;
-        case 'section':
-        case 'subsection':
-        case 'field':
-          const path = type === 'section' ? itemId : 
-                      type === 'subsection' ? `${context.section}.${itemId}` : 
-                      `${context.section}.${context.subsection}.${itemId}`;
-          visibility = {
-            ...visibility,
-            [type]: { ...visibility[type], [path]: !visibility[type]?.[path] }
-          };
-          break;
-      }
-
-      updatedStructure.visibility = visibility;
+      visibility = {
+        ...visibility,
+        [type]: {
+          ...visibility[type],
+          [itemId]: !visibility[type]?.[itemId]
+        }
+      };
 
       const { error: updateError } = await supabase
         .from('profile_category_table_mapping_2')
         .update({
-          structure: updatedStructure,
+          structure: {
+            ...updatedStructure,
+            visibility
+          },
           updated_at: new Date().toISOString()
         })
         .eq('id', record.id);
@@ -198,7 +184,6 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
       if (updateError) {
         throw updateError;
       }
-
       await onUpdate();
     } catch (error) {
       console.error('Error toggling visibility:', error);
@@ -208,15 +193,43 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
     }
   };
 
-  const StructureItem = ({ label, type, id, index, total, context, visible = true, depth = 0 }) => (
-    <div className={`
-      flex items-center justify-between p-2 hover:bg-gray-50 rounded
-      ${depth > 0 ? 'border-l-2 border-gray-200 pl-4 ml-6' : ''}
-    `}>
-      <span className={`${depth === 0 ? 'font-semibold' : ''}`}>
-        {label}
-      </span>
-      <div className="flex items-center gap-3">
+  const StructureItem = ({ 
+    label, 
+    type, 
+    id, 
+    index, 
+    total, 
+    context, 
+    visible = true, 
+    depth = 0,
+    hasChildren = false 
+  }) => (
+    <div 
+      className={`
+        flex items-center justify-between p-2 hover:bg-gray-50 rounded
+        ${depth > 0 ? `ml-${depth * 4} border-l-2 border-gray-200` : ''}
+      `}
+    >
+      <div className="flex items-center gap-2">
+        {hasChildren && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => toggleExpand(type, id)}
+            className="p-0 h-6 w-6"
+          >
+            <ChevronRight 
+              className={`h-4 w-4 transition-transform ${
+                expandedItems[`${type}-${id}`] ? 'rotate-90' : ''
+              }`}
+            />
+          </Button>
+        )}
+        <span className={depth === 0 ? 'font-semibold' : ''}>
+          {label}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
         <div className="flex gap-1">
           <Button
             variant="ghost"
@@ -251,49 +264,50 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
       <CardContent className="p-6">
         <ScrollArea className="h-[600px]">
           <div className="space-y-4">
-            {processedStructure.map((item, mainIndex) => (
-              <div key={item.mainTab} className="border rounded-lg p-4">
-                {/* Main Tab */}
+            {structure.map((item, mainIndex) => (
+              <div key={item.main_tab} className="border rounded-lg p-4">
                 <StructureItem
-                  label={item.mainTab}
-                  type="mainTab"
-                  id={item.mainTab}
+                  label={item.main_tab}
+                  type="main_tab"
+                  id={item.main_tab}
                   index={mainIndex}
-                  total={processedStructure.length}
-                  visible={!visibilityState?.mainTabs?.[item.mainTab]}
+                  total={structure.length}
+                  visible={!visibilityState?.mainTabs?.[item.main_tab]}
                   depth={0}
+                  hasChildren={true}
                 />
 
-                {/* Sub Tabs */}
-                {(subTabs[item.mainTab] || []).map((subTab, subIndex) => (
-                  <div key={subTab}>
+                {expandedItems[`main_tab-${item.main_tab}`] && item.Tabs && (
+                  <div key={item.Tabs}>
                     <StructureItem
-                      label={subTab}
+                      label={item.Tabs}
                       type="subTab"
-                      id={subTab}
-                      index={subIndex}
-                      total={subTabs[item.mainTab].length}
-                      context={{ mainTab: item.mainTab }}
-                      visible={!visibilityState?.subTabs?.[subTab]}
+                      id={item.Tabs}
+                      index={0}
+                      total={1}
+                      context={{ main_tab: item.main_tab }}
+                      visible={!visibilityState?.subTabs?.[item.Tabs]}
                       depth={1}
+                      hasChildren={true}
                     />
 
-                    {/* Sections */}
-                    {item.sections.map((section, sectionIndex) => (
+
+                    {expandedItems[`subTab-${item.Tabs}`] && item.structure.sections?.map((section, sectionIndex) => (
                       <div key={section.name}>
                         <StructureItem
                           label={section.name}
                           type="section"
                           id={section.name}
                           index={sectionIndex}
-                          total={item.sections.length}
-                          context={{ mainTab: item.mainTab, subTab }}
-                          visible={section.visible}
+
+                          total={item.structure.sections.length}
+                          context={{ main_tab: item.main_tab, subTab: item.Tabs }}
+                          visible={!visibilityState?.sections?.[section.name]}
                           depth={2}
+                          hasChildren={true}
                         />
 
-                        {/* Subsections */}
-                        {section.subsections.map((subsection, subsectionIndex) => (
+                        {expandedItems[`section-${section.name}`] && section.subsections?.map((subsection, subsectionIndex) => (
                           <div key={subsection.name}>
                             <StructureItem
                               label={subsection.name}
@@ -301,13 +315,13 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
                               id={subsection.name}
                               index={subsectionIndex}
                               total={section.subsections.length}
-                              context={{ mainTab: item.mainTab, subTab, section: section.name }}
-                              visible={subsection.visible}
+                              context={{ main_tab: item.main_tab, subTab: item.Tabs, section: section.name }}
+                              visible={!visibilityState?.subsections?.[`${section.name}.${subsection.name}`]}
                               depth={3}
+                              hasChildren={true}
                             />
 
-                            {/* Fields */}
-                            {subsection.fields.map((field, fieldIndex) => (
+                            {expandedItems[`subsection-${subsection.name}`] && subsection.fields?.map((field, fieldIndex) => (
                               <StructureItem
                                 key={`${field.table}.${field.name}`}
                                 label={field.display || `${field.table}.${field.name}`}
@@ -316,12 +330,12 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
                                 index={fieldIndex}
                                 total={subsection.fields.length}
                                 context={{
-                                  mainTab: item.mainTab,
-                                  subTab,
+                                  main_tab: item.main_tab,
+                                  subTab: item.Tabs,
                                   section: section.name,
                                   subsection: subsection.name
                                 }}
-                                visible={field.visible}
+                                visible={!visibilityState?.fields?.[`${section.name}.${subsection.name}.${field.name}`]}
                                 depth={4}
                               />
                             ))}
@@ -330,7 +344,7 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
                       </div>
                     ))}
                   </div>
-                ))}
+                )}
               </div>
             ))}
           </div>
