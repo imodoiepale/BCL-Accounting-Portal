@@ -18,7 +18,7 @@ interface StateSetters {
   setSelectedTableFields: (fields: any) => void;
 }
 
-export const handleAddStructure = async (
+const handleAddStructure = async (
   newStructure: NewStructure,
   supabase: SupabaseClient,
   activeMainTab: string,
