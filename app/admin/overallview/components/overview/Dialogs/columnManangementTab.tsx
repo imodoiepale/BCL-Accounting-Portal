@@ -81,7 +81,6 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
       let updatedStructure = { ...record.structure };
       let items = [];
 
-
       switch (type) {
         case 'main_tab':
           items = [...mainTabs];
@@ -114,7 +113,6 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
 
       if (newIndex >= 0 && newIndex < items.length) {
         [items[currentIndex], items[newIndex]] = [items[newIndex], items[currentIndex]];
-
 
         const { error: updateError } = await supabase
           .from('profile_category_table_mapping_2')
@@ -264,89 +262,115 @@ export const ColumnManagement: React.FC<ColumnManagementProps> = ({
       <CardContent className="p-6">
         <ScrollArea className="h-[600px]">
           <div className="space-y-4">
-            {structure.map((item, mainIndex) => (
-              <div key={item.main_tab} className="border rounded-lg p-4">
-                <StructureItem
-                  label={item.main_tab}
-                  type="main_tab"
-                  id={item.main_tab}
-                  index={mainIndex}
-                  total={structure.length}
-                  visible={!visibilityState?.mainTabs?.[item.main_tab]}
-                  depth={0}
-                  hasChildren={true}
-                />
+            {mainTabs.map((mainTab, mainIndex) => {
+              const mainTabStructure = structure.filter(item => item.main_tab === mainTab);
+              const mainTabVisible = !visibilityState?.mainTabs?.[mainTab];
+              
+              return (
+                <div key={mainTab} className="border rounded-lg p-4">
+                  <StructureItem
+                    label={mainTab}
+                    type="main_tab"
+                    id={mainTab}
+                    index={mainIndex}
+                    total={mainTabs.length}
+                    visible={mainTabVisible}
+                    depth={0}
+                    hasChildren={true}
+                  />
+                  {expandedItems[`main_tab-${mainTab}`] && subTabs[mainTab]?.map((subTab, subTabIndex) => {
+                    const subTabStructure = mainTabStructure.find(item => item.Tabs === subTab)?.structure;
+                    const subTabVisible = !visibilityState?.subTabs?.[subTab];
 
-                {expandedItems[`main_tab-${item.main_tab}`] && item.Tabs && (
-                  <div key={item.Tabs}>
-                    <StructureItem
-                      label={item.Tabs}
-                      type="subTab"
-                      id={item.Tabs}
-                      index={0}
-                      total={1}
-                      context={{ main_tab: item.main_tab }}
-                      visible={!visibilityState?.subTabs?.[item.Tabs]}
-                      depth={1}
-                      hasChildren={true}
-                    />
-
-
-                    {expandedItems[`subTab-${item.Tabs}`] && item.structure.sections?.map((section, sectionIndex) => (
-                      <div key={section.name}>
+                    return (
+                      <div key={subTab}>
                         <StructureItem
-                          label={section.name}
-                          type="section"
-                          id={section.name}
-                          index={sectionIndex}
-
-                          total={item.structure.sections.length}
-                          context={{ main_tab: item.main_tab, subTab: item.Tabs }}
-                          visible={!visibilityState?.sections?.[section.name]}
-                          depth={2}
+                          label={subTab}
+                          type="subTab"
+                          id={subTab}
+                          index={subTabIndex}
+                          total={subTabs[mainTab].length}
+                          context={{ main_tab: mainTab, recordId: mainTabStructure.find(item => item.Tabs === subTab)?.id }}
+                          visible={subTabVisible}
+                          depth={1}
                           hasChildren={true}
                         />
+                        {expandedItems[`subTab-${subTab}`] && subTabStructure?.sections?.map((section, sectionIndex) => {
+                          const sectionVisible = !visibilityState?.sections?.[section.name];
 
-                        {expandedItems[`section-${section.name}`] && section.subsections?.map((subsection, subsectionIndex) => (
-                          <div key={subsection.name}>
-                            <StructureItem
-                              label={subsection.name}
-                              type="subsection"
-                              id={subsection.name}
-                              index={subsectionIndex}
-                              total={section.subsections.length}
-                              context={{ main_tab: item.main_tab, subTab: item.Tabs, section: section.name }}
-                              visible={!visibilityState?.subsections?.[`${section.name}.${subsection.name}`]}
-                              depth={3}
-                              hasChildren={true}
-                            />
-
-                            {expandedItems[`subsection-${subsection.name}`] && subsection.fields?.map((field, fieldIndex) => (
+                          return (
+                            <div key={section.name}>
                               <StructureItem
-                                key={`${field.table}.${field.name}`}
-                                label={field.display || `${field.table}.${field.name}`}
-                                type="field"
-                                id={`${field.table}.${field.name}`}
-                                index={fieldIndex}
-                                total={subsection.fields.length}
-                                context={{
-                                  main_tab: item.main_tab,
-                                  subTab: item.Tabs,
-                                  section: section.name,
-                                  subsection: subsection.name
+                                label={section.name}
+                                type="section"
+                                id={section.name}
+                                index={sectionIndex}
+                                total={subTabStructure.sections.length}
+                                context={{ 
+                                  main_tab: mainTab, 
+                                  subTab: subTab,
+                                  recordId: mainTabStructure.find(item => item.Tabs === subTab)?.id 
                                 }}
-                                visible={!visibilityState?.fields?.[`${section.name}.${subsection.name}.${field.name}`]}
-                                depth={4}
+                                visible={sectionVisible}
+                                depth={2}
+                                hasChildren={true}
                               />
-                            ))}
-                          </div>
-                        ))}
+                              {expandedItems[`section-${section.name}`] && section.subsections?.map((subsection, subsectionIndex) => {
+                                const subsectionVisible = !visibilityState?.subsections?.[`${section.name}.${subsection.name}`];
+
+                                return (
+                                  <div key={subsection.name}>
+                                    <StructureItem
+                                      label={subsection.name}
+                                      type="subsection"
+                                      id={subsection.name}
+                                      index={subsectionIndex}
+                                      total={section.subsections.length}
+                                      context={{ 
+                                        main_tab: mainTab, 
+                                        subTab: subTab, 
+                                        section: section.name,
+                                        recordId: mainTabStructure.find(item => item.Tabs === subTab)?.id 
+                                      }}
+                                      visible={subsectionVisible}
+                                      depth={3}
+                                      hasChildren={true}
+                                    />
+                                    {expandedItems[`subsection-${subsection.name}`] && subsection.fields?.map((field, fieldIndex) => {
+                                      const fieldVisible = !visibilityState?.fields?.[`${section.name}.${subsection.name}.${field.name}`];
+
+                                      return (
+                                        <StructureItem
+                                          key={`${field.table}.${field.name}`}
+                                          label={field.display || `${field.table}.${field.name}`}
+                                          type="field"
+                                          id={`${field.table}.${field.name}`}
+                                          index={fieldIndex}
+                                          total={subsection.fields.length}
+                                          context={{
+                                            main_tab: mainTab,
+                                            subTab: subTab,
+                                            section: section.name,
+                                            subsection: subsection.name,
+                                            recordId: mainTabStructure.find(item => item.Tabs === subTab)?.id
+                                          }}
+                                          visible={fieldVisible}
+                                          depth={4}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
         </ScrollArea>
       </CardContent>
