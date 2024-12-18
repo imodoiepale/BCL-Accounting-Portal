@@ -3,28 +3,24 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-interface Field {
-  section: string;
-  field: string;
-  visible?: boolean;
-  [key: string]: any;
-}
-
 interface TabData {
+  id: number;
   main_tab: string;
   structure: any;
-  fields: Field[];
+  verification_status: any;
+  created_at: string;
+  updated_at: string;
 }
 
 interface SidebarTabsProps {
-  onTabChange: (tab: string, tabStructure: any) => void;
+  onTabChange: (tab: string, structure: any) => void;
 }
 
 export default function SidebarTabs({ onTabChange }: SidebarTabsProps) {
@@ -32,6 +28,11 @@ export default function SidebarTabs({ onTabChange }: SidebarTabsProps) {
   const [selectedTab, setSelectedTab] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Function to format tab name (replace 'Details' with 'Registry')
+  const formatTabName = (name: string) => {
+    return name.replace(/\bDetails\b/g, 'Registry');
+  };
 
   useEffect(() => {
     const fetchTabs = async () => {
@@ -41,15 +42,22 @@ export default function SidebarTabs({ onTabChange }: SidebarTabsProps) {
           throw new Error('Failed to fetch tabs');
         }
         const data = await response.json();
-        
-        // Log main tabs for debugging
-        console.log('Sidebar Tabs:', data.map((tab: TabData) => tab.main_tab));
-        
-        setTabs(data);
-        if (data.length > 0) {
-          const firstTab = data[0];
+
+        // Process and format the tab names
+        const formattedData = data.map((tab: TabData) => ({
+          ...tab,
+          main_tab: formatTabName(tab.main_tab)
+        }));
+
+        // Remove duplicates based on main_tab
+        const uniqueTabs = Array.from(
+          new Map(formattedData.map(tab => [tab.main_tab, tab])).values()
+        );
+
+        setTabs(uniqueTabs);
+        if (uniqueTabs.length > 0) {
+          const firstTab = uniqueTabs[0];
           setSelectedTab(firstTab.main_tab);
-          // Pass the first tab's structure when initializing
           onTabChange(firstTab.main_tab, firstTab.structure);
         }
       } catch (err) {
@@ -62,6 +70,15 @@ export default function SidebarTabs({ onTabChange }: SidebarTabsProps) {
     fetchTabs();
   }, []);
 
+  const handleTabChange = (mainTab: string) => {
+    setSelectedTab(mainTab);
+    const tabData = tabs.find(t => t.main_tab === mainTab);
+    if (tabData) {
+      onTabChange(mainTab, tabData.structure);
+      console.log(`Selected sidebar-item: ${mainTab}`);
+    }
+  };
+
   if (loading) {
     return <div className="px-4 pt-3">Loading tabs...</div>;
   }
@@ -71,29 +88,19 @@ export default function SidebarTabs({ onTabChange }: SidebarTabsProps) {
   }
 
   return (
-    <div className="w-full pt-20">
-      <Tabs
-        value={selectedTab}
-        onValueChange={(tab) => {
-          // Find the full tab data to pass its structure
-          const selectedTabData = tabs.find(t => t.main_tab === tab);
-          setSelectedTab(tab);
-          onTabChange(tab, selectedTabData?.structure || {});
-        }}
-        className="w-full"
-      >
-        <TabsList className="flex flex-col space-y-2">
-          {tabs.map((tab) => (
-            <TabsTrigger
-              key={tab.main_tab}
-              value={tab.main_tab}
-              className="w-full justify-start px-4 py-2 text-left"
-            >
-              {tab.main_tab}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+    <div className="w-full pt-20 space-y-2">
+      {tabs.map((tab) => (
+        <Button
+          key={tab.id}
+          variant={selectedTab === tab.main_tab ? "secondary" : "ghost"}
+          className={`w-full justify-start text-left px-4 py-2 ${
+            selectedTab === tab.main_tab ? 'bg-blue-50 text-blue-600' : ''
+          }`}
+          onClick={() => handleTabChange(tab.main_tab)}
+        >
+          {tab.main_tab}
+        </Button>
+      ))}
     </div>
   );
 }

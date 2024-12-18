@@ -163,6 +163,56 @@
   - Dynamic placeholder text
   - Improved record details population
 
+## [2024-12-17] - Enhanced Profile Management Structure
+
+### Added
+- Enhanced main tab mapping in profile management:
+  - Implemented nested structure for main tabs and sub-tabs
+  - Added accordion-based navigation for better organization
+  - Improved tab merging logic with proper section and field ordering
+  - Added support for verification status tracking
+  - Implemented timestamp-based updates for tab content
+
+### Updated
+- Improved API route for sidebar tabs:
+  - Enhanced tab merging logic to preserve section hierarchy
+  - Added proper sorting for sections, subsections, and fields
+  - Improved handling of verification status
+  - Added support for timestamps in tab data
+- Enhanced SidebarTabs component:
+  - Added support for nested tab structure using Accordion
+  - Improved state management for main tabs and sub-tabs
+  - Added TypeScript interfaces for better type safety
+  - Enhanced UI with better visual feedback for selected tabs
+
+### Fixed
+- Fixed issues with tab structure merging
+- Improved handling of verification status updates
+- Fixed sorting of sections and fields by order property
+- Fixed UI inconsistencies in tab selection
+
+## [2024-12-18] - Enhanced Onboarding Flow with Stages
+
+### Added
+- Implemented staged onboarding process in `OnboardingTab.tsx`
+  - Added three stages: Info (Stage 1), Docs (Stage 2), and Complete (Stage 3)
+  - Added progress bar to show completion status
+  - Added completion confirmation screen in Stage 3
+- Enhanced Stage 1 (Info) with three sub-tabs:
+  - Upload: Added template generation button and file upload
+  - Choose Existing: Added dropdown for selecting existing records
+  - New: Added dynamic form fields for new record creation
+- Improved dynamic field rendering:
+  - Added filtering for specific fields (company_name, acc_manager_position, kra_station)
+  - Enhanced dropdown and input field generation based on field configuration
+  - Improved field labeling and placeholder text
+
+### Modified
+- Restructured the tab navigation system
+- Improved the UI layout and spacing
+- Enhanced the dynamic field rendering logic
+- Added progress tracking between stages
+
 ### Completed Steps from Instructions
 - Step 10: Implemented Supabase database connection using .env configuration
 - Step 2: Completed sidebar setup
@@ -191,3 +241,36 @@
 - Step 9: Added success/failure messages
   - Implemented error handling for API calls
   - Added loading states for async operations
+
+## [2024-12-18] - Company Registry Integration
+
+### Added
+- Integrated DetailsTab component into company registry page
+  - Added tab structure fetching from profile_category_table_mapping_2 table
+  - Implemented conditional rendering based on tab structure availability
+  - Maintained existing company selection and profile viewing functionality
+  - Added error handling for tab structure fetching
+
+## [2024-12-18] - DetailsTab Integration
+
+### Added
+- Integrated company registry functionality into DetailsTab component
+  - Added conditional rendering based on selectedTab being 'company_registry'
+  - Imported and integrated CompanySidebar, Profile, and AllProfiles components
+  - Added company-specific state management and data fetching
+  - Maintained existing table and form functionality for other tabs
+
+### Changed
+- Modified DetailsTab component to handle both generic tables and company registry
+  - Updated useEffect to conditionally fetch data based on selectedTab
+  - Added separate data fetching functions for companies and generic records
+  - Enhanced form submission to handle both company and generic record updates
+
+## [2024-12-18] - DetailsTab Improvements
+
+### Changed
+- Updated DetailsTab component to handle case-insensitive tab names
+  - Added isCompanyRegistry helper function for consistent tab name checking
+  - Aligned with SidebarTabs component's tab naming convention
+  - Fixed React key warnings in form fields and dropdown options
+  - Maintained all existing company registry functionality
