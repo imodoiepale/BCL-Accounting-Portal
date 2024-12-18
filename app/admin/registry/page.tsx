@@ -18,7 +18,6 @@ const Page = () => {
   const [users, setUsers] = useState([]);  
   const [allCompaniesData, setAllCompaniesData] = useState([]);
 
-
   const handleCompanySelect = (data) => {
     if (Array.isArray(data)) {
       setCompanies(data);
@@ -68,6 +67,5 @@ const Page = () => {
     </div>
   );
 };
-
 
 export default Page;

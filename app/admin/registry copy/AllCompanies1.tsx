@@ -93,7 +93,7 @@ const AllCompanies = ({ companies }) => {
         </div>
       </div>
       <div className="overflow-auto max-h-[calc(100vh-250px)] rounded-md border border-gray-200">
-        <Table>
+        {/* <Table>
           <TableHeader className="bg-gray-50 sticky top-0 z-10">
             <TableRow>
               <TableHead className="font-bold text-gray-700">Index</TableHead>
@@ -142,7 +142,7 @@ const AllCompanies = ({ companies }) => {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table> */}
       </div>
       <div className="mt-4 text-gray-600 text-sm">
         Showing {filteredCompanies.length} of {companies.length} companies
