@@ -765,7 +765,7 @@ const OverallView: React.FC = () => {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div className={`h-[890px] ${(activeMainTab === "Company Details" || activeMainTab === "Directors Details" || activeMainTab === "Bank Details") ? "overflow-auto" : ""}`}>
+                                                    <div className={`h-[890px] ${(activeMainTab === activeMainTab === "Directors Details" || activeMainTab === "Bank Details" || "Company Details" ) ? "overflow-auto" : ""}`}>
                                                         <div className="min-w-max">
                                                             {TableWrapper}
                                                         </div>
