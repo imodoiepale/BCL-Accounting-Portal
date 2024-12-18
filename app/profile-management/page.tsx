@@ -8,9 +8,11 @@ import DetailsTab from '../components/profile-management/DetailsTab';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function ProfileManagementPage() {
   const [selectedTab, setSelectedTab] = useState('');
+  const [activeMainTab, setActiveMainTab] = useState('onboarding');
   const [tabStructure, setTabStructure] = useState<any>({});
   const [dropdownOptions, setDropdownOptions] = useState<{[key: string]: string[]}>({});
 
@@ -23,7 +25,6 @@ export default function ProfileManagementPage() {
         section.subsections.flatMap((subsection: any) => 
           subsection.fields ? 
             subsection.fields
-              // Filter out specific fields to remove
               .filter((field: any) => 
                 !['company_name', 'acc_manager_position', 'kra_station'].includes(field.name)
               )
@@ -71,24 +72,27 @@ export default function ProfileManagementPage() {
         <SidebarTabs onTabChange={handleTabChange} />
       </div>
       <div className="w-3/4 p-4 overflow-y-auto">
-        <div className="grid grid-cols-1 gap-4">
-          {/* Existing Tabs */}
-          <OnboardingTab 
-            selectedTab={selectedTab} 
-            tabStructure={tabStructure}
-          />
-          <DetailsTab 
-            selectedTab={selectedTab} 
-            tabStructure={tabStructure}
-          />
+        <div className="space-y-4">
+          <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+              <TabsTrigger value="details">Details</TabsTrigger>
+            </TabsList>
 
-          {/* Dynamic Fields Section */}
-          <div className="bg-white shadow-md rounded-lg p-6">
-            <h2 className="text-xl font-bold mb-4">{selectedTab} Details</h2>
-            <div className="grid grid-cols-2 gap-4">
-              {renderDynamicFields}
-            </div>
-          </div>
+            <TabsContent value="onboarding" className="mt-4">
+              <OnboardingTab 
+                selectedTab={selectedTab} 
+                tabStructure={tabStructure}
+              />
+            </TabsContent>
+
+            <TabsContent value="details" className="mt-4">
+              <DetailsTab 
+                selectedTab={selectedTab} 
+                tabStructure={tabStructure}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
