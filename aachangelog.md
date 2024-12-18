@@ -274,3 +274,162 @@
   - Aligned with SidebarTabs component's tab naming convention
   - Fixed React key warnings in form fields and dropdown options
   - Maintained all existing company registry functionality
+
+## [2024-01-18] - Column Management Tab Debugging Improvements
+
+### Changes
+- Enhanced debugging capabilities in [ColumnManagement](cci:1://file:///c:/Users/user/Documents/GitHub/BCL-Accounting-Portal/app/admin/overallview/components/overview/Dialogs/columnManangementTab.tsx:37:0-378:2) component
+- Added comprehensive console logging for main tabs, sub-tabs, and structures
+- Improved error handling and null-checking
+- Refined hasChildren logic for nested items
+- Used `filter()` instead of `find()` for main tab data retrieval
+
+### Implementation Details
+- Added detailed console logs to track data processing
+- Implemented more robust rendering with explicit null checks
+- Dynamic children detection based on array lengths
+- Fallback rendering for undefined structures
+
+### Motivation
+- Improve debugging capabilities
+- Enhance component's resilience to incomplete or undefined data structures
+- Provide more visibility into data processing flow
+
+## [2024-01-18] Dynamic Main Tabs and Sub Tabs Mapping
+
+### Changes
+- Enhanced [ColumnManagement](cci:1://file:///c:/Users/user/Documents/GitHub/BCL-Accounting-Portal/app/admin/overallview/components/overview/Dialogs/columnManangementTab.tsx:37:0-378:2) component to dynamically extract main tabs and sub tabs
+- Introduced `dynamicMainTabs` to generate unique main tabs from structure
+- Created `dynamicSubTabs` to map sub tabs for each main tab
+- Updated rendering logic to use dynamically generated tabs
+- Maintained existing error handling and logging mechanisms
+
+### Implementation Details
+- Used `Array.from(new Set())` to extract unique main tabs and sub tabs
+- Replaced static `mainTabs` and `subTabs` with dynamically generated arrays
+- Preserved existing component functionality and nested rendering
+- Added more robust tab discovery mechanism
+
+### Motivation
+- Improve flexibility of tab rendering
+- Ensure all tabs from the structure are displayed
+- Remove dependency on predefined tab lists
+- Support dynamic data structures with varying tab configurations
+
+## [2024-01-18] Comprehensive Structure Mapping and Logging
+
+### Changes
+- Enhanced [ColumnManagement](cci:1://file:///c:/Users/user/Documents/GitHub/BCL-Accounting-Portal/app/admin/overallview/components/overview/Dialogs/columnManangementTab.tsx:37:0-412:2) component with comprehensive structure logging
+- Added `useEffect` to capture and log full structure details
+- Implemented detailed mapping of main tabs, sub-tabs, sections, subsections, and fields
+- Ensured logging of all structure data irrespective of active main tab
+- Maintained existing rendering and interaction logic
+
+### Implementation Details
+- Created comprehensive mapping using nested `map()` and `filter()` operations
+- Logged unique main tabs and their complete hierarchical structure
+- Used `JSON.stringify()` for detailed console logging
+- Preserved all existing component functionality
+
+### Motivation
+- Provide complete visibility into the data structure
+- Debug and understand complex nested configurations
+- Support dynamic and flexible tab management
+- Improve development and troubleshooting experience
+
+## [2024-01-18] Robust Handling of Undefined Main Tabs
+
+### Changes
+- Enhanced [ColumnManagement](cci:1://file:///c:/Users/user/Documents/GitHub/BCL-Accounting-Portal/app/admin/overallview/components/overview/Dialogs/columnManangementTab.tsx:37:0-412:2) component to handle undefined main tabs
+- Added comprehensive logging of raw structure and individual structure items
+- Implemented fallback mechanisms for undefined or null main tabs
+- Created safe filtering and mapping techniques
+- Ensured complete data rendering regardless of main tab status
+
+### Implementation Details
+- Added detailed console logging of structure contents
+- Used `filter()` with additional conditions to handle undefined main tabs
+- Created `safeDynamicMainTabs` to provide a fallback 'Uncategorized' tab
+- Maintained existing nested rendering logic
+- Improved error resilience and debugging capabilities
+
+### Motivation
+- Solve issues with undefined main tabs
+- Provide complete visibility into data structure
+- Enhance component's ability to handle varied data formats
+- Improve debugging and development experience
+
+## [2024-12-18] - Column Management Structural Enhancements
+
+### Added
+- Robust main tab extraction method with multiple fallback strategies
+- Comprehensive logging for structure mapping
+- Enhanced error handling for undefined main tabs
+
+### Changed
+- Improved dynamic main tab and sub-tab extraction
+- Added safe navigation and fallback mechanisms in rendering logic
+- Enhanced debugging output with detailed structure logging
+
+### Key Improvements
+- Handle cases where `main_tab` is undefined
+- Create fallback mechanisms for missing data
+- Ensure rendering works with current data structure
+- Provide more detailed console logging for debugging
+
+### Debugging Enhancements
+- Added `extractMainTab()` function to derive main tabs from structure
+- Implemented comprehensive logging of structure details
+- Created fallback for empty or undefined main tabs
+- Added safe rendering of structure items with optional chaining
+
+### Technical Details
+- Dynamically extract unique main tabs using `Array.from(new Set())`
+- Handle nested structure with multiple levels of fallback
+- Improve type safety and error resilience in component rendering
+
+## [2024-12-18] - Column Management Main Tab Extraction Refinement
+
+### Changed
+- Enhanced `extractMainTab()` method to prioritize `Tabs` field for main tab determination
+- Improved main tab extraction logic with more precise fallback mechanisms
+
+### Key Improvements
+- Prioritize `Tabs` over `main_tab` when extracting main tabs
+- Add more robust fallback strategies for main tab identification
+- Ensure consistent and accurate main tab mapping
+
+### Technical Details
+- Updated extraction method to check `Tabs` first
+- Maintain fallback to `main_tab` and section names
+- Provide 'Uncategorized' as the absolute last resort
+
+## [2024-12-18] - Database-Driven Column Management Refactoring
+
+### Added
+- Implement database-driven main tab and structure fetching
+- Create dynamic mapping of main tabs from `profile_category_table_mapping_2`
+- Add comprehensive loading state for main tabs
+
+### Changed
+- Replace static structure mapping with dynamic database-driven approach
+- Modify component to fetch and group main tabs from database
+- Enhance structure rendering logic to work with database-fetched data
+
+### Key Improvements
+- Fetch main tabs directly from the database
+- Group tabs by main tab
+- Provide robust error handling for data fetching
+- Improve performance by reducing client-side data manipulation
+
+### Technical Details
+- Use Supabase to fetch `profile_category_table_mapping_2` data
+- Implement `reduce()` to group tabs by main tab
+- Add loading state and error handling
+- Create comprehensive logging of fetched data structure
+
+### Database Interaction
+- Select columns: `id`, `main_tab`, `Tabs`, `structure`
+- Order results by `id`
+- Group tabs dynamically based on `main_tab`
+- Handle potential null or undefined structures
