@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Settings, Upload, Download } from 'lucide-react';
 import { toast } from "sonner";
 import dynamic from 'next/dynamic';
-import { handleExport } from './components/utility';
+import { handleExport, handleImport } from './components/utility';
 
 // Dynamic imports
 const Table = dynamic(() =>
