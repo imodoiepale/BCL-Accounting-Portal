@@ -28,7 +28,6 @@ const adminNavItems = [
   { href: "/admin/registry", icon: User2Icon, label: "Registry" },
   { href: "/admin/overallview", icon: LayoutDashboardIcon, label: "Overall TableView" },
   { href: "/admin/companies", icon: User2Icon, label: "Companies" },
-  { href: "/profile-management", icon: User2Icon, label: "Registry Management" },
   {
     href: "/admin/documents",
     icon: FileIcon,
@@ -46,7 +45,6 @@ const adminNavItems = [
   { href: "/admin/template", icon: FileIcon, label: "Templates" },
   { href: "/admin/reports", icon: FileIcon, label: "Report Management" },
   { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings" },
-  // { label: "Table Settings", href: "/settings/table", icon: SettingsIcon },
 ];
 
 const userNavItems = [
