@@ -18,17 +18,91 @@ import {
   Eye,
   DownloadIcon,
   UploadIcon,
+  Search,
+  ArrowUpDown,
   ChevronDown,
   ChevronRight,
   ChevronUp,
   Download,
-  Search
-} from 'lucide-react';
-import { Card } from '@/components/ui/card';
-import toast, { Toaster } from 'react-hot-toast';
-import { DocumentActions } from './DocumentComponents';
-import { UploadModal, ViewModal, AddFieldsDialog, ExtractDetailsModal } from './DocumentModals';
-import { useVersionControl, VersionSettings } from './versionControl';
+} from "lucide-react";
+import { Card } from "@/components/ui/card";
+import toast, { Toaster } from "react-hot-toast";
+import { DocumentActions } from "./DocumentComponents";
+import {
+  UploadModal,
+  ViewModal,
+  AddFieldsDialog,
+  ExtractDetailsModal,
+} from "./DocumentModals";
+import * as XLSX from "xlsx";
+
+// Interfaces
+interface Director {
+  id: bigint;
+  company_id: bigint;
+  first_name: string | null;
+  middle_name: string | null;
+  last_name: string | null;
+  full_name: string | null;
+}
+
+interface Upload {
+  id: string;
+  userid: string;
+  kyc_document_id: string;
+  filepath: string;
+  issue_date: string;
+  expiry_date?: string;
+  value?: Record<string, any>;
+  extracted_details?: Record<string, any>;
+  created_at: string;
+}
+
+interface UploadModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onUpload: (
+    file: File,
+    extractOnUpload: boolean,
+    onProgress?: (message: string) => void
+  ) => void;
+  director: Director;
+  document: Document | null;
+  isUploading: boolean;
+}
+interface Document {
+  id: string;
+  name: string;
+  category: string;
+  subcategory: string;
+  fields?: Array<{
+    id: string;
+    name: string;
+    type: string;
+    arrayConfig?: {
+      fields: Array<{
+        id: string;
+        name: string;
+      }>;
+    };
+  }>;
+  last_extracted_details?: Record<string, any>;
+}
+
+interface ExtractedData {
+  [key: string]: any;
+}
+
+interface SortConfig {
+  key: string;
+  direction: "asc" | "desc";
+}
+
+interface AdvancedSearchFields {
+  company_name?: string;
+  director_name?: string;
+  status?: "missing" | "completed" | "";
+}
 
 export default function DirectorsKycDocumentDetails() {
   // Basic state
@@ -41,8 +115,8 @@ export default function DirectorsKycDocumentDetails() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewUrl, setViewUrl] = useState<string | null>(null);
-  const [selectedUploadCompany, setSelectedUploadCompany] =
-    useState<Company | null>(null);
+  const [selectedDirectorUpload, setSelectedDirectorUpload] =
+    useState<Director | null>(null);
   const [showExtractModal, setShowExtractModal] = useState(false);
   const [selectedExtractDocument, setSelectedExtractDocument] =
     useState<Document | null>(null);
@@ -71,23 +145,6 @@ export default function DirectorsKycDocumentDetails() {
       director_name: "",
       status: "",
     });
-  const [selectedExtractDocument, setSelectedExtractDocument] = useState<Document | null>(null);
-  const [selectedExtractUpload, setSelectedExtractUpload] = useState<Upload | null>(null);
-  const [sortColumn, setSortColumn] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [expandedCategories, setExpandedCategories] = useState({
-    'general': false,
-    'sheria-docs': false,
-    'kra-docs': false,
-  });
-
-  // Add version control
-  const {
-    expandedCompanies,
-    showAllVersions,
-    toggleCompanyVersions,
-    toggleAllVersions,
-  } = useVersionControl();
 
   const queryClient = useQueryClient();
   const parentRef = useRef<HTMLDivElement>(null);
