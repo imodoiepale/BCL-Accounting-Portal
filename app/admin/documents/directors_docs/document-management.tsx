@@ -68,14 +68,20 @@ const DocumentManagement: React.FC = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [directors, setDirectors] = useState<{ [key: number]: Director[] }>({});
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [directorDocuments, setDirectorDocuments] = useState<DirectorDocument[]>([]);
+  const [directorDocuments, setDirectorDocuments] = useState<
+    DirectorDocument[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
-  const [selectedDirector, setSelectedDirector] = useState<Director | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(
+    null
+  );
+  const [selectedDirector, setSelectedDirector] = useState<Director | null>(
+    null
+  );
   const [selectedViewData, setSelectedViewData] = useState<{
     companyName: string;
     directorName: string;
@@ -114,29 +120,31 @@ const DocumentManagement: React.FC = () => {
   const fetchCompanies = async () => {
     try {
       const { data, error } = await supabase
-        .from('acc_portal_company_duplicate')
-        .select('*')
-        .order('company_name');
-  
+        .from("acc_portal_company_duplicate")
+        .select("*")
+        .order("company_name");
+
       if (error) throw error;
       if (data) setCompanies(data);
     } catch (error) {
-      console.error('Error fetching companies:', error);
-      toast.error('Failed to fetch companies');
+      console.error("Error fetching companies:", error);
+      toast.error("Failed to fetch companies");
     }
   };
 
   const fetchDirectors = async () => {
     try {
       const { data, error } = await supabase
-        .from('acc_portal_directors_duplicate')
-        .select(`
+        .from("acc_portal_directors_duplicate")
+        .select(
+          `
           id,
           company_id,
           full_name
-        `)
-        .order('full_name');
-  
+        `
+        )
+        .order("full_name");
+
       if (error) throw error;
       if (data) {
         const directorsByCompany = data.reduce((acc, director) => {
@@ -146,12 +154,12 @@ const DocumentManagement: React.FC = () => {
           acc[director.company_id].push(director);
           return acc;
         }, {} as { [key: number]: Director[] });
-  
+
         setDirectors(directorsByCompany);
       }
     } catch (error) {
-      console.error('Error fetching directors:', error);
-      toast.error('Failed to fetch directors');
+      console.error("Error fetching directors:", error);
+      toast.error("Failed to fetch directors");
     }
   };
 
@@ -181,22 +189,21 @@ const DocumentManagement: React.FC = () => {
       setDocuments(documentsData);
       setVisibleColumns(initialVisibility);
     } catch (error) {
-      console.error('Error fetching documents:', error);
-      toast.error('Failed to fetch documents');
+      console.error("Error fetching documents:", error);
+      toast.error("Failed to fetch documents");
     }
   };
 
   const fetchDirectorDocuments = async () => {
     try {
-      const { data: directorDocsData, error: directorDocsError } = await supabase
-        .from("acc_portal_directors_documents")
-        .select("*");
+      const { data: directorDocsData, error: directorDocsError } =
+        await supabase.from("acc_portal_directors_documents").select("*");
 
       if (directorDocsError) throw directorDocsError;
       setDirectorDocuments(directorDocsData);
     } catch (error) {
-      console.error('Error fetching director documents:', error);
-      toast.error('Failed to fetch director documents');
+      console.error("Error fetching director documents:", error);
+      toast.error("Failed to fetch director documents");
     }
   };
 
@@ -207,7 +214,9 @@ const DocumentManagement: React.FC = () => {
     return isValid(date) ? format(date, "MM/dd/yyyy") : "-";
   };
 
-  const calculateDaysLeft = (expiryDateString: string | null | undefined): string | number => {
+  const calculateDaysLeft = (
+    expiryDateString: string | null | undefined
+  ): string | number => {
     if (!expiryDateString) return "-";
     const expiryDate = new Date(expiryDateString);
     if (!isValid(expiryDate)) return "-";
@@ -418,27 +427,25 @@ const DocumentManagement: React.FC = () => {
             onClick={() => setShowSettingsModal(true)}
             className="flex items-center gap-2 px-3 py-1.5 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm"
           >
-        <svg
-  className="w-4 h-4"
-  fill="none"
-  stroke="currentColor" 
-  viewBox="0 0 24 24"
->
-  <path
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    strokeWidth="2"
-    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-  />
-  <path
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    strokeWidth="2"
-    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-  />
-</svg>
-
-              
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
             Settings
           </button>
         </div>
@@ -594,12 +601,12 @@ const DocumentManagement: React.FC = () => {
               <tbody className="text-xs">
                 {/* Stats rows */}
                 <tr className="bg-gray-50">
-                  <td 
-                    className="p-2 border border-gray-300 sticky left-0 z-10 bg-gray-50" 
+                  <td
+                    className="p-2 border border-gray-300 sticky left-0 z-10 bg-gray-50"
                     colSpan={2}
                   ></td>
-                  <td 
-                    className="p-2 border border-gray-300 sticky left-[250px] z-10 bg-gray-50" 
+                  <td
+                    className="p-2 border border-gray-300 sticky left-[250px] z-10 bg-gray-50"
                     rowSpan={3}
                   ></td>
                   <td className="p-2 border border-gray-300 font-semibold text-blue-600">
@@ -619,8 +626,8 @@ const DocumentManagement: React.FC = () => {
                   )}
                 </tr>
                 <tr className="bg-gray-50">
-                  <td 
-                    className="p-2 border border-gray-300 sticky left-0 z-10 bg-gray-50" 
+                  <td
+                    className="p-2 border border-gray-300 sticky left-0 z-10 bg-gray-50"
                     colSpan={2}
                   ></td>
                   <td className="p-2 border border-gray-300 font-semibold text-orange-600">
@@ -640,8 +647,8 @@ const DocumentManagement: React.FC = () => {
                   )}
                 </tr>
                 <tr className="bg-gray-50">
-                  <td 
-                    className="p-2 border border-gray-300 sticky left-0 z-10 bg-gray-50" 
+                  <td
+                    className="p-2 border border-gray-300 sticky left-0 z-10 bg-gray-50"
                     colSpan={2}
                   ></td>
                   <td className="p-2 border border-gray-300 font-semibold text-green-600">
@@ -680,7 +687,8 @@ const DocumentManagement: React.FC = () => {
                             <td
                               className="p-2 border border-gray-300 text-center sticky left-0 z-10"
                               style={{
-                                backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                                backgroundColor:
+                                  companyIndex % 2 === 0 ? "white" : "#f9fafb",
                               }}
                               rowSpan={companyDirectors.length}
                             >
@@ -689,7 +697,8 @@ const DocumentManagement: React.FC = () => {
                             <td
                               className="p-2 border border-gray-300 sticky left-[50px] z-10"
                               style={{
-                                backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                                backgroundColor:
+                                  companyIndex % 2 === 0 ? "white" : "#f9fafb",
                               }}
                               rowSpan={companyDirectors.length}
                             >
@@ -700,7 +709,8 @@ const DocumentManagement: React.FC = () => {
                         <td
                           className="p-2 border border-gray-300 sticky left-[250px] z-10"
                           style={{
-                            backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                            backgroundColor:
+                              companyIndex % 2 === 0 ? "white" : "#f9fafb",
                           }}
                         >
                           {director.full_name}
@@ -711,8 +721,14 @@ const DocumentManagement: React.FC = () => {
                         {documents.map(
                           (doc) =>
                             visibleColumns[doc.id]?.visible && (
-                              <React.Fragment key={`${company.id}-${director.id}-${doc.id}`}>
-                                {renderDocumentDetails(company.id, director.id, doc.id)}
+                              <React.Fragment
+                                key={`${company.id}-${director.id}-${doc.id}`}
+                              >
+                                {renderDocumentDetails(
+                                  company.id,
+                                  director.id,
+                                  doc.id
+                                )}
                               </React.Fragment>
                             )
                         )}
@@ -731,7 +747,8 @@ const DocumentManagement: React.FC = () => {
                       <td
                         className="p-2 border border-gray-300 text-center sticky left-0 z-10"
                         style={{
-                          backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                          backgroundColor:
+                            companyIndex % 2 === 0 ? "white" : "#f9fafb",
                         }}
                       >
                         {companyIndex + 1}
@@ -739,7 +756,8 @@ const DocumentManagement: React.FC = () => {
                       <td
                         className="p-2 border border-gray-300 sticky left-[50px] z-10"
                         style={{
-                          backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                          backgroundColor:
+                            companyIndex % 2 === 0 ? "white" : "#f9fafb",
                         }}
                       >
                         {company.company_name}
@@ -747,7 +765,8 @@ const DocumentManagement: React.FC = () => {
                       <td
                         className="p-2 border border-gray-300 text-gray-500 italic sticky left-[250px] z-10"
                         style={{
-                          backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                          backgroundColor:
+                            companyIndex % 2 === 0 ? "white" : "#f9fafb",
                         }}
                       >
                         No directors
@@ -882,4 +901,3 @@ const DocumentManagement: React.FC = () => {
 };
 
 export default DocumentManagement;
-                          
