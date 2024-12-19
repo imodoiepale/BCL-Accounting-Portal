@@ -784,8 +784,6 @@ const DocumentManagement = () => {
     }
   };
 
-
-
   const handleDeleteDocument = async (docId: string) => {
     try {
       const upload = uploads.find(u => u.id === docId);
@@ -815,7 +813,6 @@ const DocumentManagement = () => {
       throw error;
     }
   };
-
 
   const handleUpdateDocumentType = async (docId: string, type: 'recent' | 'past') => {
     try {
