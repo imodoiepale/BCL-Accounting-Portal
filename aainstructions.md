@@ -1,44 +1,4 @@
-Instruction File for Creating Page with Main Content and Sidebar
-Objective:
-Build a new page with two sections: Main Content and Sidebar. The Sidebar will dynamically fetch the main tabs from a database table (public.profile_category_table_mapping_2), and the Main Content will contain tabs for Onboarding and Details. Users will interact with forms for adding, modifying, and uploading data based on the structure defined in the JSONB column.
 
-1. Page Layout and Sections:
-Main Content:
-Two tabs: Onboarding and Details.
-Sidebar:
-Dynamically fetches main_tab values from the table profile_category_table_mapping_2.
-Each tab corresponds to a profile category (e.g., company names, supplier names, customer names).
-Display relevant fields from the structure JSONB column of each profile category.
-2. Sidebar Setup:
-Query the Database:
-Fetch main_tab values from profile_category_table_mapping_2.
-For each main_tab, fetch related data from the structure JSONB column (such as names, bank details, and other related fields).
-For each main_tab:
-Render corresponding fields and values (e.g., dropdown lists, display names) based on the structure JSONB, particularly focusing on:
-Sections (e.g., KRA Account Manager).
-Fields under those sections (e.g., acc_manager_position, kra_station).
-Allow the user to select existing data or add new records.
-3. Onboarding Tab and Record Management:
-- Dynamic Record Selection Strategy
-  * Implement dropdown for record name selection
-  * Fetch record names dynamically from database
-  * Support multiple record types (Company, Supplier, Employee, etc.)
-- Record Name Column Mapping
-  * Define specific name columns for each record type
-  * Dynamically select appropriate table and name column
-  * Handle variations in table and column naming
-- Record Details Population
-  * Fetch and display full record details on selection
-  * Exclude system-generated fields (id, created_at, etc.)
-  * Provide read-only input field display
-- Document Upload Mechanism
-  * Simplify document upload process
-  * Provide three generic document upload fields
-  * Maintain flexibility for various document types
-- User Interface Considerations
-  * Maintain existing tab structure (Info and Docs)
-  * Provide intuitive record selection experience
-  * Ensure responsive and clean design
 4. Details Tab:
 Dynamic Data Table:
 
@@ -48,15 +8,6 @@ Add New or Modify Existing Data:
 
 Allow users to select an existing record or add a new entry.
 The form should be populated with fields as defined in the structure JSON.
-Filters:
-
-Include filters for acc, imm, sheria, and audit clients.
-5. Fetching Data:
-Fetch Dropdown Options:
-Use SQL queries to fetch relevant dropdown values based on the linked data in the structure JSON (e.g., names, banks, etc.).
-Visibility and Field Management:
-Handle field visibility based on the visibility JSON within the structure column.
-Display fields that are marked as visible in the structure, and hide those that are not.
 6. Tab Merging Strategy (Enhanced):
 - When multiple tabs have the same names, implement comprehensive merging:
   * Combine structure data including:

@@ -295,7 +295,7 @@ export function SettingsDialog({
 
     } catch (error) {
       console.error('Error toggling visibility:', error);
-      toast.error('Failed to update visibility');
+      // toast.error('Failed to update visibility');
     }
   }, [visibilitySettings, selectedTab, activeMainTab]);
 
@@ -338,7 +338,7 @@ export function SettingsDialog({
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      {uniqueTabs
+                      {Array.isArray(uniqueTabs) && uniqueTabs.length > 0 && uniqueTabs
                         .sort((a, b) => {
                           const orderA = structure.find(item => item.Tabs === a)?.order?.tab || 0;
                           const orderB = structure.find(item => item.Tabs === b)?.order?.tab || 0;
@@ -382,9 +382,9 @@ export function SettingsDialog({
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      {structure
+                      {Array.isArray(structure) && structure.length > 0 && structure
                         .filter(item => item.Tabs === selectedTab)
-                        .flatMap(item => item.sections)
+                        .flatMap(item => Array.isArray(item.sections) ? item.sections : [])
                         .sort((a, b) => a.order - b.order)
                         .map((section, sectionIndex) => (
                           <div
@@ -424,10 +424,11 @@ export function SettingsDialog({
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      {selectedSection && structure
+                      {selectedSection && Array.isArray(structure) && structure.length > 0 && structure
                         .find(item => item.Tabs === selectedTab)
                         ?.sections.find(s => s.name === selectedSection.section)
-                        ?.subsections.sort((a, b) => a.order - b.order)
+                        ?.subsections && Array.isArray(structure.find(item => item.Tabs === selectedTab)?.sections.find(s => s.name === selectedSection.section)?.subsections)
+                        ?.sort((a, b) => a.order - b.order)
                         .map((subsection, subsectionIndex) => (
                           <div
                             key={subsection.name}
@@ -543,7 +544,7 @@ export function SettingsDialog({
                             </div>
                             <div>
                               <label className="text-sm font-medium">Table Name</label>
-                              {selectedSection && selectedSubsection && structure
+                              {selectedSection && selectedSubsection && Array.isArray(structure) && structure.length > 0 && structure
                                 .filter(item =>
                                   item.Tabs === selectedTab &&
                                   item.sections_sections &&
@@ -586,7 +587,7 @@ export function SettingsDialog({
                             </div>
                           </div>
                           <DraggableColumns
-                            columnMappings={structure
+                            columnMappings={Array.isArray(structure) && structure.length > 0 && structure
                               .find(item => item.Tabs === selectedTab)
                               ?.sections
                               .find(s => s.name === selectedSection?.section)
@@ -597,7 +598,7 @@ export function SettingsDialog({
                                 [`${field.table}-${field.name}`]: field.display
                               }), {})
                             }
-                            dropdowns={structure
+                            dropdowns={Array.isArray(structure) && structure.length > 0 && structure
                               .find(item => item.Tabs === selectedTab)
                               ?.sections
                               .find(s => s.name === selectedSection?.section)
@@ -678,7 +679,7 @@ export function SettingsDialog({
                         <SelectValue placeholder="Select or Create Tab" />
                       </SelectTrigger>
                       <SelectContent>
-                        {uniqueTabs.filter(tab => tab?.trim()).map(tab => (
+                        {Array.isArray(uniqueTabs) && uniqueTabs.filter(tab => tab?.trim()).map(tab => (
                           <SelectItem key={tab} value={tab}>
                             {indexMapping.tabs[tab] || ''} {tab}
                           </SelectItem>
@@ -772,7 +773,6 @@ export function SettingsDialog({
                           <SelectValue placeholder="Select or Create Subsection" />
                         </SelectTrigger>
                         <SelectContent>
-                          {/* This is the key change - when in new tab mode, always show all subsections */}
                           {(newStructure.isNewTab
                             ? existingSubsections["all"] || []  // Show ALL subsections for new tab
                             : existingSubsections[newStructure.section] || []  // Show section-specific subsections for existing tab
@@ -815,6 +815,50 @@ export function SettingsDialog({
 
                   {/* Table Selection/Creation */}
                   <div className="space-y-3 w-full md:w-1/2 mb-4">
+                    <label className="text-sm font-medium text-gray-700">Main Tab</label>
+                    <Select
+                      value={newStructure.main_tab}
+                      onValueChange={(value) =>
+                        setNewStructure(prev => ({
+                          ...prev,
+                          main_tab: value
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full bg-white">
+                        <SelectValue placeholder="Select or Create Main Tab" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[...new Set(Array.isArray(subTabs) ? subTabs : [])] // This ensures unique main tab names
+                          .filter(tab => tab?.trim())
+                          .map(tab => (
+                            <SelectItem key={tab} value={tab}>
+                              {tab}
+                            </SelectItem>
+                          ))}
+                        <SelectItem value="new" className="text-blue-600 font-medium">
+                          + Create New Main Tab
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {newStructure.isNewMainTab && (
+                      <Input
+                        placeholder="Enter new main tab name"
+                        value={newStructure.main_tab}
+                        onChange={(e) => setNewStructure(prev => ({
+                          ...prev,
+                          main_tab: e.target.value
+                        }))}
+                        className="mt-2"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-row md:flex-row gap-4">
+                  {/* Tables Selection/Creation */}
+                  <div className="space-y-3 w-full md:w-1/2 mb-4">
                     <label className="text-sm font-medium text-gray-700">Tables and Fields</label>
                     <Button
                       onClick={() => setShowMultiSelectDialog(true)}
@@ -848,91 +892,34 @@ export function SettingsDialog({
                   </div>
                 </div>
 
-                <div className="flex flex-row md:flex-row gap-4">
-                  {/* Preview and Add Button */}
-                  <div className="pt-6 space-y-6">
-                    {(newStructure.Tabs || newStructure.isNewTab) &&
-                      (newStructure.section || newStructure.isNewSection) && (
-                        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-4">
-                          <h4 className="font-medium text-gray-900">Structure Preview</h4>
-                          <div className="flex flex-col gap-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <p className="text-sm">
-                                  <span className="font-medium text-gray-700">Tab:</span>
-                                  <span className="text-gray-600">{newStructure.Tabs || 'New Tab'}</span>
-                                </p>
-                                <p className="text-sm">
-                                  <span className="font-medium text-gray-700">Section:</span>
-                                  <span className="text-gray-600">{newStructure.section}</span>
-                                </p>
-                              </div>
-                              <div className="space-y-2">
-                                <p className="text-sm">
-                                  <span className="font-medium text-gray-700">Subsections:</span>
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {newStructure.subsections?.map(sub => (
-                                    <span key={sub} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                                      {sub}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium text-gray-700">Tables and Fields:</p>
-                              <div className="space-y-2">
-                                {selectedTables.map(table => (
-                                  <div key={table} className="border rounded-md p-2 bg-white">
-                                    <h6 className="font-medium text-sm">{table}</h6>
-                                    <div className="flex flex-wrap gap-1 mt-1">
-                                      {selectedTableFields[table]?.map(fieldName => (
-                                        <span key={fieldName} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                                          {fieldName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={() =>
-                          handleAddStructure(
-                            newStructure,
-                            supabase,
-                            activeMainTab,
-                            () => setNewStructure({
-                              section: '',
-                              subsection: '',
-                              table_name: '',
-                              Tabs: '',
-                              column_mappings: {},
-                              isNewTab: false,
-                              isNewSection: false,
-                              isNewSubsection: false,
-                              table_names: []
-                            }),
-                            setAddFieldDialogOpen,
-                            fetchStructure,
-                            onStructureChange
-                          )
-                        }
-                        className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Structure
-                      </Button>
-                    </div>
-                  </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() =>
+                      handleAddStructure(
+                        newStructure,
+                        supabase,
+                        activeMainTab,
+                        () => setNewStructure({
+                          section: '',
+                          subsection: '',
+                          table_name: '',
+                          Tabs: '',
+                          column_mappings: {},
+                          isNewTab: false,
+                          isNewSection: false,
+                          isNewSubsection: false,
+                          table_names: []
+                        }),
+                        setAddFieldDialogOpen,
+                        fetchStructure,
+                        onStructureChange
+                      )
+                    }
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Structure
+                  </Button>
                 </div>
               </div>
 
