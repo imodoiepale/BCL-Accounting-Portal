@@ -621,6 +621,91 @@ const OverallView: React.FC = () => {
         }
     };
 
+    // Overview Page Updates
+    const [localOrder, setLocalOrder] = useState({});
+    const [localVisibility, setLocalVisibility] = useState({});
+
+    useEffect(() => {
+        const fetchMainTabs = async () => {
+            const { data, error } = await supabase
+                .from('profile_category_table_mapping_2')
+                .select('*');
+            if (data) {
+                trackPositions(data);
+                trackVisibility(data);
+            }
+        };
+        fetchMainTabs();
+    }, []);
+
+    const trackPositions = (items) => {
+        const newOrder = {};
+        items.forEach((item, index) => {
+            newOrder[item.mainTab] = index;
+        });
+        setLocalOrder(newOrder);
+    };
+
+    const trackVisibility = (items) => {
+        const newVisibility = {};
+        items.forEach((item) => {
+            if (item.structure?.visibility) {
+                newVisibility[item.mainTab] = item.structure.visibility;
+            }
+        });
+        setLocalVisibility(newVisibility);
+    };
+
+    const handleReorder = (itemId, direction) => {
+        const currentIndex = localOrder[itemId];
+        const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (newIndex < 0 || newIndex >= mainTabs.length) return;
+
+        // Swap positions
+        const newOrder = { ...localOrder };
+        const items = Object.keys(newOrder);
+        [items[currentIndex], items[newIndex]] = [items[newIndex], items[currentIndex]];
+
+        // Update order numbers
+        items.forEach((item, index) => {
+            newOrder[item] = index;
+        });
+
+        setLocalOrder(newOrder);
+        // Update database with new order
+        updateOrderInDatabase(newOrder);
+    };
+
+    const updateOrderInDatabase = async (newOrder) => {
+        try {
+            await supabase
+                .from('profile_category_table_mapping_2')
+                .update({ order: newOrder })
+                .eq('main_tab', itemId);
+        } catch (error) {
+            console.error('Error updating order:', error);
+        }
+    };
+
+    const handleVisibilityChange = (itemId, newState) => {
+        const newVisibility = { ...localVisibility };
+        newVisibility[itemId] = newState;
+        setLocalVisibility(newVisibility);
+        // Update database with new visibility
+        updateVisibilityInDatabase(newVisibility);
+    };
+
+    const updateVisibilityInDatabase = async (newVisibility) => {
+        try {
+            await supabase
+                .from('profile_category_table_mapping_2')
+                .update({ visibility: newVisibility })
+                .eq('main_tab', itemId);
+        } catch (error) {
+            console.error('Error updating visibility:', error);
+        }
+    };
+
     // Effects
     useEffect(() => {
         fetchAllData();
