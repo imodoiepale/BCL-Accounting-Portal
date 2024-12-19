@@ -8,6 +8,7 @@ import { ChevronUp, ChevronDown, ChevronRight } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { supabase } from '@/lib/supabase';
 
 export const ColumnManagement = ({
   structure = [],
@@ -15,7 +16,8 @@ export const ColumnManagement = ({
   supabase,
   mainTabs = [],
   subTabs = {},
-  visibilityState = {}
+  visibilityState = {},
+  activeMainTab
 }) => {
   const [loading, setLoading] = useState(false);
   const [mainTabsData, setMainTabsData] = useState([]);
@@ -26,6 +28,109 @@ export const ColumnManagement = ({
   useEffect(() => {
     fetchMainTabs();
   }, [supabase]);
+
+  useEffect(() => {
+    const handleStateChange = (event) => {
+      const { newState } = event.detail;
+      setLocalOrder(newState);
+    };
+
+    window.addEventListener('state-changed', handleStateChange);
+    return () => {
+      window.removeEventListener('state-changed', handleStateChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const fetchStructure = async () => {
+      const { data, error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('*');
+      if (data) {
+        trackPositions(data);
+        trackVisibility(data);
+      }
+    };
+    fetchStructure();
+  }, []);
+
+  const trackPositions = (items) => {
+    const newOrder = {};
+    items.forEach((item, index) => {
+      newOrder[item.mainTab] = index;
+      item.sections.forEach((section, sectionIndex) => {
+        newOrder[section.name] = sectionIndex;
+        section.subsections.forEach((subsection, subsectionIndex) => {
+          newOrder[subsection.name] = subsectionIndex;
+        });
+      });
+    });
+    setLocalOrder(newOrder);
+  };
+
+  const trackVisibility = (items) => {
+    const newVisibility = {};
+    items.forEach((item) => {
+      newVisibility[item.mainTab] = item.structure?.visibility[item.mainTab] || true;
+      item.sections.forEach((section) => {
+        newVisibility[section.name] = section.visible;
+        section.subsections.forEach((subsection) => {
+          newVisibility[subsection.name] = subsection.visible;
+        });
+      });
+    });
+    setLocalVisibility(newVisibility);
+  };
+
+  const handleReorder = (itemId, direction) => {
+    const currentIndex = localOrder[itemId];
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= Object.keys(localOrder).length) return;
+
+    // Swap positions
+    const newOrder = { ...localOrder };
+    const items = Object.keys(newOrder);
+    [items[currentIndex], items[newIndex]] = [items[newIndex], items[currentIndex]];
+
+    // Update order numbers
+    items.forEach((item, index) => {
+      newOrder[item] = index;
+    });
+
+    setLocalOrder(newOrder);
+    // Update database with new order
+    updateOrderInDatabase(newOrder);
+  };
+
+  const updateOrderInDatabase = async (newOrder) => {
+    try {
+      await supabase
+        .from('profile_category_table_mapping_2')
+        .update({ order: newOrder })
+        .eq('main_tab', itemId);
+    } catch (error) {
+      console.error('Error updating order:', error);
+    }
+  };
+
+  const handleVisibilityChange = (itemId, newState) => {
+    const newVisibility = { ...localVisibility };
+    newVisibility[itemId] = newState;
+    setLocalVisibility(newVisibility);
+    // Update database with new visibility
+    updateVisibilityInDatabase(newVisibility);
+  };
+
+  const updateVisibilityInDatabase = async (newVisibility) => {
+    try {
+      await supabase
+        .from('profile_category_table_mapping_2')
+        .update({ visibility: newVisibility })
+        .eq('main_tab', itemId);
+    } catch (error) {
+      console.error('Error updating visibility:', error);
+    }
+  };
 
   const fetchMainTabs = async () => {
     try {
@@ -45,13 +150,16 @@ export const ColumnManagement = ({
             structures: [],
             sections: [],
             subsections: {},
-            columnMappings: {}
+            fields: {},
+            order: item.structure.order || {},
+            visibility: item.structure.visibility || {}
           };
         }
+
         acc[mainTab].tabs.push(item.Tabs);
         acc[mainTab].structures.push(item.structure);
 
-        // Process sections and subsections
+        // Process sections and subsections with order and visibility
         item.structure.sections?.forEach(section => {
           if (!acc[mainTab].sections.includes(section.name)) {
             acc[mainTab].sections.push(section.name);
@@ -59,98 +167,141 @@ export const ColumnManagement = ({
           
           acc[mainTab].subsections[section.name] = section.subsections?.map(sub => ({
             name: sub.name,
-            fields: sub.fields
+            fields: sub.fields,
+            order: sub.order,
+            visible: sub.visible
           })) || [];
+
+          // Process fields with order and visibility
+          section.subsections?.forEach(sub => {
+            sub.fields?.forEach(field => {
+              const fieldKey = `${field.table}-${field.name}`;
+              acc[mainTab].fields[fieldKey] = {
+                ...field,
+                order: field.order,
+                visible: field.visible
+              };
+            });
+          });
         });
 
         return acc;
       }, {});
 
       const mainTabsArray = Object.values(groupedMainTabs);
+      
+      // Sort mainTabs based on order from structure
+      mainTabsArray.sort((a, b) => {
+        const orderA = a.order?.main_tab || 0;
+        const orderB = b.order?.main_tab || 0;
+        return orderA - orderB;
+      });
+
       setMainTabsData(mainTabsArray);
       
-      // Initialize local state
+      // Initialize local state with actual order values
       const orderState = {};
       const visibilityState = {};
-      mainTabsArray.forEach((tab, index) => {
-        orderState[tab.mainTab] = index;
-        visibilityState[tab.mainTab] = tab.structures[0]?.visibility?.mainTab?.[tab.mainTab] ?? true;
+      
+      mainTabsArray.forEach(tab => {
+        orderState[tab.mainTab] = tab.order?.main_tab || 0;
+        visibilityState[tab.mainTab] = tab.visibility?.mainTab?.[tab.mainTab] ?? true;
       });
+
       setLocalOrder(orderState);
       setLocalVisibility(visibilityState);
+
     } catch (error) {
       console.error('Error fetching main tabs:', error);
       toast.error('Failed to fetch structure');
     }
   };
 
-  const handleReorder = async (type, itemId, direction) => {
-    const currentIndex = Object.values(localOrder).indexOf(localOrder[itemId]);
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-
-    if (newIndex >= 0 && newIndex < mainTabsData.length) {
-      // Optimistic update
-      const newOrder = { ...localOrder };
-      const items = Object.keys(newOrder);
-      [items[currentIndex], items[newIndex]] = [items[newIndex], items[currentIndex]];
-      items.forEach((item, index) => {
-        newOrder[item] = index;
-      });
-      setLocalOrder(newOrder);
-
-      try {
-        const updates = mainTabsData.map(async (tab) => {
-          const updatedStructure = {
-            ...tab.structures[0],
-            order: {
-              ...tab.structures[0].order,
-              main_tab: newOrder
+  const updateStructure = async (mainTab, newOrder, newVisibility) => {
+    try {
+      const updates = mainTabsData.map(async (tab) => {
+        // Create updated structure with new order and visibility
+        const updatedStructure = {
+          ...tab.structures[0],
+          order: {
+            ...tab.structures[0].order,
+            main_tab: newOrder
+          },
+          visibility: {
+            ...tab.structures[0].visibility,
+            mainTab: {
+              ...tab.structures[0].visibility?.mainTab,
+              [mainTab]: newVisibility[mainTab]
             }
-          };
+          }
+        };
 
-          return supabase
-            .from('profile_category_table_mapping_2')
-            .update({ structure: updatedStructure })
-            .eq('main_tab', tab.mainTab);
-        });
+        const { error } = await supabase
+          .from('profile_category_table_mapping_2')
+          .update({ structure: updatedStructure })
+          .eq('main_tab', tab.mainTab);
 
-        await Promise.all(updates);
-        toast.success('Order updated successfully');
-      } catch (error) {
-        setLocalOrder(prevOrder => ({ ...prevOrder }));
-        toast.error('Failed to update order');
-      }
+        if (error) throw error;
+      });
+
+      await Promise.all(updates);
+      
+      // Emit event to trigger overview page update
+      window.dispatchEvent(new Event('structure-updated'));
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating structure:', error);
+      return false;
     }
   };
 
+  // const handleReorder = async (type, itemId, direction) => {
+  //   const currentIndex = Object.values(localOrder).indexOf(localOrder[itemId]);
+  //   const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+  //   if (newIndex >= 0 && newIndex < mainTabsData.length) {
+  //     // Optimistic update
+  //     const newOrder = { ...localOrder };
+  //     const items = Object.keys(newOrder);
+  //     [items[currentIndex], items[newIndex]] = [items[newIndex], items[currentIndex]];
+      
+  //     // Update order numbers to match physical position
+  //     items.forEach((item, index) => {
+  //       newOrder[item] = index;
+  //     });
+      
+  //     setLocalOrder(newOrder);
+
+  //     try {
+  //       const success = await updateStructure(itemId, newOrder, localVisibility);
+  //       if (success) {
+  //         toast.success('Order updated successfully');
+  //       } else {
+  //         throw new Error('Update failed');
+  //       }
+  //     } catch (error) {
+  //       setLocalOrder(prevOrder => ({ ...prevOrder }));
+  //       toast.error('Failed to update order');
+  //     }
+  //   }
+  // };
+
   const handleVisibilityToggle = async (type, itemId) => {
-    setLocalVisibility(prev => ({
-      ...prev,
-      [itemId]: !prev[itemId]
-    }));
+    const newVisibility = {
+      ...localVisibility,
+      [itemId]: !localVisibility[itemId]
+    };
+    
+    setLocalVisibility(newVisibility);
 
     try {
-      const relevantTab = mainTabsData.find(tab => tab.mainTab === itemId);
-      if (!relevantTab) return;
-
-      const updatedStructure = {
-        ...relevantTab.structures[0],
-        visibility: {
-          ...relevantTab.structures[0].visibility,
-          mainTab: {
-            ...relevantTab.structures[0].visibility?.mainTab,
-            [itemId]: !localVisibility[itemId]
-          }
-        }
-      };
-
-      const { error } = await supabase
-        .from('profile_category_table_mapping_2')
-        .update({ structure: updatedStructure })
-        .eq('main_tab', itemId);
-
-      if (error) throw error;
-      toast.success('Visibility updated successfully');
+      const success = await updateStructure(itemId, localOrder, newVisibility);
+      if (success) {
+        toast.success('Visibility updated successfully');
+      } else {
+        throw new Error('Update failed');
+      }
     } catch (error) {
       setLocalVisibility(prev => ({
         ...prev,
@@ -285,6 +436,31 @@ export const ColumnManagement = ({
                                       </div>
                                     )) : null}
                                   </div>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleReorder('subsection', subsection.name, 'up')}
+                                      disabled={localOrder[subsection.name] === 0}
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      <ChevronUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleReorder('subsection', subsection.name, 'down')}
+                                      disabled={localOrder[subsection.name] === mainTab.subsections[section].length - 1}
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      <ChevronDown className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  <Switch
+                                    checked={localVisibility[subsection.name]}
+                                    onCheckedChange={() => handleVisibilityToggle('subsection', subsection.name)}
+                                    disabled={loading}
+                                  />
                                 </motion.div>
                               ))}
                             </div>
