@@ -68,20 +68,14 @@ const DocumentManagement: React.FC = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [directors, setDirectors] = useState<{ [key: number]: Director[] }>({});
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [directorDocuments, setDirectorDocuments] = useState<
-    DirectorDocument[]
-  >([]);
+  const [directorDocuments, setDirectorDocuments] = useState<DirectorDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(
-    null
-  );
-  const [selectedDirector, setSelectedDirector] = useState<Director | null>(
-    null
-  );
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [selectedDirector, setSelectedDirector] = useState<Director | null>(null);
   const [selectedViewData, setSelectedViewData] = useState<{
     companyName: string;
     directorName: string;
@@ -111,7 +105,7 @@ const DocumentManagement: React.FC = () => {
       ]);
     } catch (error) {
       console.error("Error fetching initial data:", error);
-      toast.error("Failed to fetch data");
+      toast.error("Failed to fetch initial data");
     } finally {
       setIsLoading(false);
     }
@@ -124,19 +118,14 @@ const DocumentManagement: React.FC = () => {
         .select('*')
         .order('company_name');
   
-      if (error) {
-        throw error;
-      }
-  
-      if (data) {
-        setCompanies(data);
-      }
+      if (error) throw error;
+      if (data) setCompanies(data);
     } catch (error) {
       console.error('Error fetching companies:', error);
       toast.error('Failed to fetch companies');
     }
   };
-  
+
   const fetchDirectors = async () => {
     try {
       const { data, error } = await supabase
@@ -148,12 +137,8 @@ const DocumentManagement: React.FC = () => {
         `)
         .order('full_name');
   
-      if (error) {
-        throw error;
-      }
-  
+      if (error) throw error;
       if (data) {
-        // Group directors by company_id
         const directorsByCompany = data.reduce((acc, director) => {
           if (!acc[director.company_id]) {
             acc[director.company_id] = [];
@@ -169,63 +154,52 @@ const DocumentManagement: React.FC = () => {
       toast.error('Failed to fetch directors');
     }
   };
-  
-  // Add this useEffect to handle initial data loading
-  useEffect(() => {
-    const loadInitialData = async () => {
-      setIsLoading(true);
-      try {
-        await Promise.all([
-          fetchCompanies(),
-          fetchDirectors(),
-          fetchDocuments(),
-          fetchDirectorDocuments(),
-        ]);
-      } catch (error) {
-        console.error('Error loading initial data:', error);
-        toast.error('Failed to load some data');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-  
-    loadInitialData();
-  }, []); // Empty dependency array for initial load only
 
   const fetchDocuments = async () => {
-    const { data: documentsData, error: documentsError } = await supabase
-      .from("acc_portal_kyc")
-      .select("*")
-      .eq("category", "directors-docs");
+    try {
+      const { data: documentsData, error: documentsError } = await supabase
+        .from("acc_portal_kyc")
+        .select("*")
+        .eq("category", "directors-docs");
 
-    if (documentsError) throw documentsError;
+      if (documentsError) throw documentsError;
 
-    const initialVisibility = documentsData.reduce((acc, doc) => {
-      acc[doc.id] = {
-        visible: true,
-        subColumns: {
-          upload: true,
-          issueDate: true,
-          expiryDate: true,
-          daysLeft: true,
-          status: true,
-        },
-      };
-      return acc;
-    }, {});
+      const initialVisibility = documentsData.reduce((acc, doc) => {
+        acc[doc.id] = {
+          visible: true,
+          subColumns: {
+            upload: true,
+            issueDate: true,
+            expiryDate: true,
+            daysLeft: true,
+            status: true,
+          },
+        };
+        return acc;
+      }, {} as VisibleColumns);
 
-    setDocuments(documentsData);
-    setVisibleColumns(initialVisibility);
+      setDocuments(documentsData);
+      setVisibleColumns(initialVisibility);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      toast.error('Failed to fetch documents');
+    }
   };
 
   const fetchDirectorDocuments = async () => {
-    const { data: directorDocsData, error: directorDocsError } = await supabase
-      .from("acc_portal_directors_documents")
-      .select("*");
+    try {
+      const { data: directorDocsData, error: directorDocsError } = await supabase
+        .from("acc_portal_directors_documents")
+        .select("*");
 
-    if (directorDocsError) throw directorDocsError;
-    setDirectorDocuments(directorDocsData);
+      if (directorDocsError) throw directorDocsError;
+      setDirectorDocuments(directorDocsData);
+    } catch (error) {
+      console.error('Error fetching director documents:', error);
+      toast.error('Failed to fetch director documents');
+    }
   };
+
   // Utility Functions
   const formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return "-";
@@ -233,9 +207,7 @@ const DocumentManagement: React.FC = () => {
     return isValid(date) ? format(date, "MM/dd/yyyy") : "-";
   };
 
-  const calculateDaysLeft = (
-    expiryDateString: string | null | undefined
-  ): string | number => {
+  const calculateDaysLeft = (expiryDateString: string | null | undefined): string | number => {
     if (!expiryDateString) return "-";
     const expiryDate = new Date(expiryDateString);
     if (!isValid(expiryDate)) return "-";
@@ -304,7 +276,6 @@ const DocumentManagement: React.FC = () => {
 
     return filteredCompanies.sort((a, b) => {
       const modifier = sortDirection === "asc" ? 1 : -1;
-
       switch (sortField) {
         case "company":
           return modifier * a.company_name.localeCompare(b.company_name);
@@ -328,7 +299,8 @@ const DocumentManagement: React.FC = () => {
 
     return doc?.status || "missing";
   };
-  // Rendering Functions
+
+  // Document Details Rendering
   const renderDocumentDetails = (
     companyId: number,
     directorId: number,
@@ -425,6 +397,7 @@ const DocumentManagement: React.FC = () => {
       </div>
     );
   }
+
   return (
     <div className="w-full h-screen p-4 bg-white flex flex-col">
       {/* Header Section */}
@@ -445,356 +418,361 @@ const DocumentManagement: React.FC = () => {
             onClick={() => setShowSettingsModal(true)}
             className="flex items-center gap-2 px-3 py-1.5 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-sm"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
+        <svg
+  className="w-4 h-4"
+  fill="none"
+  stroke="currentColor" 
+  viewBox="0 0 24 24"
+>
+  <path
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    strokeWidth="2"
+    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+  />
+  <path
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    strokeWidth="2"
+    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+  />
+</svg>
+
+              
             Settings
           </button>
         </div>
       </div>
 
-      {/* Table Section */}
+      {/* Table Section with Sticky Columns */}
       <div className="flex-1 border rounded-lg overflow-hidden flex flex-col">
-        <div className="overflow-y-auto flex-1">
-          <table className="w-full text-sm border-collapse min-w-[1500px]">
-            {/* Table Header */}
-            <thead className="sticky top-0 bg-white z-10">
-              <tr className="bg-gray-100 text-xs">
-                <th
-                  className="p-2 border border-gray-300 font-semibold text-gray-700"
-                  rowSpan={2}
-                >
-                  No.
-                </th>
-                <th
-                  className="p-2 border border-gray-300 font-semibold text-gray-700"
-                  rowSpan={2}
-                >
-                  Companies
-                </th>
-                <th
-                  className="p-2 border border-gray-300 font-semibold text-gray-700"
-                  rowSpan={2}
-                >
-                  Directors
-                </th>
-                <th
-                  className="p-2 border border-gray-300 font-semibold text-gray-700"
-                  rowSpan={2}
-                >
-                  Summary
-                </th>
-                {documents.map(
-                  (doc) =>
-                    visibleColumns[doc.id]?.visible && (
-                      <th
-                        key={doc.id}
-                        className="p-2 border border-gray-300 font-semibold text-gray-700 text-center bg-blue-50"
-                        colSpan={5}
-                      >
-                        {doc.name}
-                      </th>
-                    )
-                )}
-              </tr>
-              <tr className="bg-gray-50 text-xs">
-                {documents.map(
-                  (doc) =>
-                    visibleColumns[doc.id]?.visible && (
-                      <React.Fragment key={`header-${doc.id}`}>
-                        <th className="p-2 border border-gray-300 font-medium text-gray-600">
-                          Action
-                        </th>
+        <div className="overflow-x-auto flex-1">
+          <div className="overflow-y-auto max-h-full">
+            <table className="w-full text-sm border-collapse min-w-[1500px] relative">
+              {/* Table Header */}
+              <thead className="sticky top-0 bg-white z-20">
+                <tr className="bg-gray-100 text-xs">
+                  <th
+                    className="p-2 border border-gray-300 font-semibold text-gray-700 sticky left-0 z-20 bg-gray-100"
+                    style={{ minWidth: "50px" }}
+                    rowSpan={2}
+                  >
+                    No.
+                  </th>
+                  <th
+                    className="p-2 border border-gray-300 font-semibold text-gray-700 sticky left-[50px] z-20 bg-gray-100"
+                    style={{ minWidth: "200px" }}
+                    rowSpan={2}
+                  >
+                    Companies
+                  </th>
+                  <th
+                    className="p-2 border border-gray-300 font-semibold text-gray-700 sticky left-[250px] z-20 bg-gray-100"
+                    style={{ minWidth: "200px" }}
+                    rowSpan={2}
+                  >
+                    Directors
+                  </th>
+                  <th
+                    className="p-2 border border-gray-300 font-semibold text-gray-700"
+                    rowSpan={2}
+                  >
+                    Summary
+                  </th>
+                  {documents.map(
+                    (doc) =>
+                      visibleColumns[doc.id]?.visible && (
                         <th
-                          className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                          onClick={() => {
-                            if (sortField === "issueDate") {
-                              setSortDirection((prev) =>
-                                prev === "asc" ? "desc" : "asc"
-                              );
-                            }
-                            setSortField("issueDate");
-                          }}
+                          key={doc.id}
+                          className="p-2 border border-gray-300 font-semibold text-gray-700 text-center bg-blue-50"
+                          colSpan={5}
                         >
-                          <div className="flex items-center justify-between">
-                            Issue Date
-                            {sortField === "issueDate" &&
-                              (sortDirection === "asc" ? (
-                                <ChevronUp className="w-3 h-3" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3" />
-                              ))}
-                          </div>
+                          {doc.name}
                         </th>
-                        <th
-                          className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                          onClick={() => {
-                            if (sortField === "expiryDate") {
-                              setSortDirection((prev) =>
-                                prev === "asc" ? "desc" : "asc"
-                              );
-                            }
-                            setSortField("expiryDate");
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            Expiry Date
-                            {sortField === "expiryDate" &&
-                              (sortDirection === "asc" ? (
-                                <ChevronUp className="w-3 h-3" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3" />
-                              ))}
-                          </div>
-                        </th>
-                        <th
-                          className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                          onClick={() => {
-                            if (sortField === "daysLeft") {
-                              setSortDirection((prev) =>
-                                prev === "asc" ? "desc" : "asc"
-                              );
-                            }
-                            setSortField("daysLeft");
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            Days Left
-                            {sortField === "daysLeft" &&
-                              (sortDirection === "asc" ? (
-                                <ChevronUp className="w-3 h-3" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3" />
-                              ))}
-                          </div>
-                        </th>
-                        <th
-                          className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                          onClick={() => {
-                            if (sortField === "status") {
-                              setSortDirection((prev) =>
-                                prev === "asc" ? "desc" : "asc"
-                              );
-                            }
-                            setSortField("status");
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            Status
-                            {sortField === "status" &&
-                              (sortDirection === "asc" ? (
-                                <ChevronUp className="w-3 h-3" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3" />
-                              ))}
-                          </div>
-                        </th>
-                      </React.Fragment>
-                    )
-                )}
-              </tr>
-            </thead>
-            <tbody className="text-xs">
-              {/* Stats rows */}
-              <tr className="bg-gray-50">
-                <td className="p-2 border border-gray-300" colSpan={2}></td>
-                <td className="p-2 border border-gray-300" rowSpan={3}></td>
-                <td className="p-2 border border-gray-300 font-semibold text-blue-600">
-                  Total
-                </td>
-                {documents.map(
-                  (doc) =>
-                    visibleColumns[doc.id]?.visible && (
-                      <React.Fragment key={`total-${doc.id}`}>
+                      )
+                  )}
+                </tr>
+                <tr className="bg-gray-50 text-xs">
+                  {documents.map(
+                    (doc) =>
+                      visibleColumns[doc.id]?.visible && (
+                        <React.Fragment key={`header-${doc.id}`}>
+                          <th className="p-2 border border-gray-300 font-medium text-gray-600">
+                            Action
+                          </th>
+                          <th
+                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                            onClick={() => {
+                              if (sortField === "issueDate") {
+                                setSortDirection((prev) =>
+                                  prev === "asc" ? "desc" : "asc"
+                                );
+                              }
+                              setSortField("issueDate");
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              Issue Date
+                              {sortField === "issueDate" &&
+                                (sortDirection === "asc" ? (
+                                  <ChevronUp className="w-3 h-3" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3" />
+                                ))}
+                            </div>
+                          </th>
+                          <th
+                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                            onClick={() => {
+                              if (sortField === "expiryDate") {
+                                setSortDirection((prev) =>
+                                  prev === "asc" ? "desc" : "asc"
+                                );
+                              }
+                              setSortField("expiryDate");
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              Expiry Date
+                              {sortField === "expiryDate" &&
+                                (sortDirection === "asc" ? (
+                                  <ChevronUp className="w-3 h-3" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3" />
+                                ))}
+                            </div>
+                          </th>
+                          <th
+                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                            onClick={() => {
+                              if (sortField === "daysLeft") {
+                                setSortDirection((prev) =>
+                                  prev === "asc" ? "desc" : "asc"
+                                );
+                              }
+                              setSortField("daysLeft");
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              Days Left
+                              {sortField === "daysLeft" &&
+                                (sortDirection === "asc" ? (
+                                  <ChevronUp className="w-3 h-3" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3" />
+                                ))}
+                            </div>
+                          </th>
+                          <th
+                            className="p-2 border border-gray-300 font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
+                            onClick={() => {
+                              if (sortField === "status") {
+                                setSortDirection((prev) =>
+                                  prev === "asc" ? "desc" : "asc"
+                                );
+                              }
+                              setSortField("status");
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              Status
+                              {sortField === "status" &&
+                                (sortDirection === "asc" ? (
+                                  <ChevronUp className="w-3 h-3" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3" />
+                                ))}
+                            </div>
+                          </th>
+                        </React.Fragment>
+                      )
+                  )}
+                </tr>
+              </thead>
+
+              {/* Table Body */}
+              <tbody className="text-xs">
+                {/* Stats rows */}
+                <tr className="bg-gray-50">
+                  <td 
+                    className="p-2 border border-gray-300 sticky left-0 z-10 bg-gray-50" 
+                    colSpan={2}
+                  ></td>
+                  <td 
+                    className="p-2 border border-gray-300 sticky left-[250px] z-10 bg-gray-50" 
+                    rowSpan={3}
+                  ></td>
+                  <td className="p-2 border border-gray-300 font-semibold text-blue-600">
+                    Total
+                  </td>
+                  {documents.map(
+                    (doc) =>
+                      visibleColumns[doc.id]?.visible && (
                         <td
+                          key={`total-${doc.id}`}
                           className="p-2 border border-gray-300 text-center font-medium"
                           colSpan={5}
                         >
                           {calculateStats(doc.id).total}
                         </td>
-                      </React.Fragment>
-                    )
-                )}
-              </tr>
-              <tr className="bg-gray-50">
-                <td className="p-2 border border-gray-300" colSpan={2}></td>
-                <td className="p-2 border border-gray-300 font-semibold text-orange-600">
-                  Missing
-                </td>
-                {documents.map(
-                  (doc) =>
-                    visibleColumns[doc.id]?.visible && (
-                      <React.Fragment key={`missing-${doc.id}`}>
+                      )
+                  )}
+                </tr>
+                <tr className="bg-gray-50">
+                  <td 
+                    className="p-2 border border-gray-300 sticky left-0 z-10 bg-gray-50" 
+                    colSpan={2}
+                  ></td>
+                  <td className="p-2 border border-gray-300 font-semibold text-orange-600">
+                    Missing
+                  </td>
+                  {documents.map(
+                    (doc) =>
+                      visibleColumns[doc.id]?.visible && (
                         <td
+                          key={`missing-${doc.id}`}
                           className="p-2 border border-gray-300 text-center font-medium"
                           colSpan={5}
                         >
                           {calculateStats(doc.id).missing}
                         </td>
-                      </React.Fragment>
-                    )
-                )}
-              </tr>
-              <tr className="bg-gray-50">
-                <td className="p-2 border border-gray-300" colSpan={2}></td>
-                <td className="p-2 border border-gray-300 font-semibold text-green-600">
-                  Completed
-                </td>
-                {documents.map(
-                  (doc) =>
-                    visibleColumns[doc.id]?.visible && (
-                      <React.Fragment key={`complete-${doc.id}`}>
+                      )
+                  )}
+                </tr>
+                <tr className="bg-gray-50">
+                  <td 
+                    className="p-2 border border-gray-300 sticky left-0 z-10 bg-gray-50" 
+                    colSpan={2}
+                  ></td>
+                  <td className="p-2 border border-gray-300 font-semibold text-green-600">
+                    Completed
+                  </td>
+                  {documents.map(
+                    (doc) =>
+                      visibleColumns[doc.id]?.visible && (
                         <td
+                          key={`complete-${doc.id}`}
                           className="p-2 border border-gray-300 text-center font-medium"
                           colSpan={5}
                         >
                           {calculateStats(doc.id).complete}
                         </td>
-                      </React.Fragment>
-                    )
-                )}
-              </tr>
+                      )
+                  )}
+                </tr>
 
-              {/* Company and Director rows */}
-              {getSortedCompanies().map((company, companyIndex) => {
-                const companyDirectors = directors[company.id] || [];
-                return companyDirectors.length > 0 ? (
-                  // Map through directors if company has directors
-                  companyDirectors.map((director, directorIndex) => (
+                {/* Company and Director rows */}
+                {getSortedCompanies().map((company, companyIndex) => {
+                  const companyDirectors = directors[company.id] || [];
+                  return companyDirectors.length > 0 ? (
+                    // Map through directors if company has directors
+                    companyDirectors.map((director, directorIndex) => (
+                      <tr
+                        key={`${company.id}-${director.id}`}
+                        className={
+                          companyIndex % 2 === 0
+                            ? "bg-white hover:bg-gray-50"
+                            : "bg-gray-50 hover:bg-gray-100"
+                        }
+                      >
+                        {directorIndex === 0 && (
+                          <>
+                            <td
+                              className="p-2 border border-gray-300 text-center sticky left-0 z-10"
+                              style={{
+                                backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                              }}
+                              rowSpan={companyDirectors.length}
+                            >
+                              {companyIndex + 1}
+                            </td>
+                            <td
+                              className="p-2 border border-gray-300 sticky left-[50px] z-10"
+                              style={{
+                                backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                              }}
+                              rowSpan={companyDirectors.length}
+                            >
+                              {company.company_name}
+                            </td>
+                          </>
+                        )}
+                        <td
+                          className="p-2 border border-gray-300 sticky left-[250px] z-10"
+                          style={{
+                            backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                          }}
+                        >
+                          {director.full_name}
+                        </td>
+                        <td className="p-2 border border-gray-300 text-center">
+                          {/* Summary column */}
+                        </td>
+                        {documents.map(
+                          (doc) =>
+                            visibleColumns[doc.id]?.visible && (
+                              <React.Fragment key={`${company.id}-${director.id}-${doc.id}`}>
+                                {renderDocumentDetails(company.id, director.id, doc.id)}
+                              </React.Fragment>
+                            )
+                        )}
+                      </tr>
+                    ))
+                  ) : (
+                    // Show company with no directors
                     <tr
-                      key={`${company.id}-${director.id}`}
+                      key={`${company.id}-no-directors`}
                       className={
                         companyIndex % 2 === 0
                           ? "bg-white hover:bg-gray-50"
                           : "bg-gray-50 hover:bg-gray-100"
                       }
                     >
-                      {/* Company details - only show on first director row */}
-                      {directorIndex === 0 && (
-                        <>
-                          <td
-                            className="p-2 border border-gray-300 text-center"
-                            rowSpan={companyDirectors.length}
-                          >
-                            {companyIndex + 1}
-                          </td>
-                          <td
-                            className="p-2 border border-gray-300"
-                            rowSpan={companyDirectors.length}
-                          >
-                            {company.company_name}
-                          </td>
-                        </>
-                      )}
-
-                      {/* Director name */}
-                      <td className="p-2 border border-gray-300">
-                        {director.full_name}
+                      <td
+                        className="p-2 border border-gray-300 text-center sticky left-0 z-10"
+                        style={{
+                          backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                        }}
+                      >
+                        {companyIndex + 1}
                       </td>
-
-                      {/* Summary column */}
-                      <td className="p-2 border border-gray-300 text-center">
-                        {/* Add summary info if needed */}
+                      <td
+                        className="p-2 border border-gray-300 sticky left-[50px] z-10"
+                        style={{
+                          backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                        }}
+                      >
+                        {company.company_name}
                       </td>
-
-                      {/* Document columns */}
+                      <td
+                        className="p-2 border border-gray-300 text-gray-500 italic sticky left-[250px] z-10"
+                        style={{
+                          backgroundColor: companyIndex % 2 === 0 ? 'white' : '#f9fafb',
+                        }}
+                      >
+                        No directors
+                      </td>
+                      <td className="p-2 border border-gray-300"></td>
                       {documents.map(
                         (doc) =>
                           visibleColumns[doc.id]?.visible && (
-                            <React.Fragment
-                              key={`${company.id}-${director.id}-${doc.id}`}
-                            >
-                              {renderDocumentDetails(
-                                company.id,
-                                director.id,
-                                doc.id
-                              )}
-                            </React.Fragment>
-                          )
-                      )}
-                    </tr>
-                  ))
-                ) : (
-                  // Show company with no directors
-                  <tr
-                    key={`${company.id}-no-directors`}
-                    className={
-                      companyIndex % 2 === 0
-                        ? "bg-white hover:bg-gray-50"
-                        : "bg-gray-50 hover:bg-gray-100"
-                    }
-                  >
-                    <td className="p-2 border border-gray-300 text-center">
-                      {companyIndex + 1}
-                    </td>
-                    <td className="p-2 border border-gray-300">
-                      {company.company_name}
-                    </td>
-                    <td className="p-2 border border-gray-300 text-gray-500 italic">
-                      No directors
-                    </td>
-                    <td className="p-2 border border-gray-300">
-                      {/* Empty summary */}
-                    </td>
-                    {documents.map(
-                      (doc) =>
-                        visibleColumns[doc.id]?.visible && (
-                          <React.Fragment
-                            key={`${company.id}-no-director-${doc.id}`}
-                          >
                             <td
+                              key={`${company.id}-no-director-${doc.id}`}
                               colSpan={5}
                               className="p-2 border border-gray-300 text-center text-gray-500 italic"
                             >
                               No director data
                             </td>
-                          </React.Fragment>
-                        )
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                          )
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-
-      {/* Modals Section */}
-      {showUploadModal && (
-        <UploadModal
-          isOpen={showUploadModal}
-          onClose={() => setShowUploadModal(false)}
-          selectedCompany={selectedCompany}
-          selectedDirector={selectedDirector}
-          selectedDocument={selectedDocument}
-          onUploadComplete={fetchDirectorDocuments}
-        />
-      )}
-
-      {showViewModal && selectedViewData && (
-        <ViewModal
-          isOpen={showViewModal}
-          onClose={() => setShowViewModal(false)}
-          {...selectedViewData}
-          onDelete={fetchDirectorDocuments}
-        />
-      )}
 
       {/* Settings Modal */}
       {showSettingsModal && (
@@ -876,9 +854,32 @@ const DocumentManagement: React.FC = () => {
         </div>
       )}
 
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <UploadModal
+          isOpen={showUploadModal}
+          onClose={() => setShowUploadModal(false)}
+          selectedCompany={selectedCompany}
+          selectedDirector={selectedDirector}
+          selectedDocument={selectedDocument}
+          onUploadComplete={fetchDirectorDocuments}
+        />
+      )}
+
+      {/* View Modal */}
+      {showViewModal && selectedViewData && (
+        <ViewModal
+          isOpen={showViewModal}
+          onClose={() => setShowViewModal(false)}
+          {...selectedViewData}
+          onDelete={fetchDirectorDocuments}
+        />
+      )}
+
       <Toaster />
     </div>
   );
 };
 
 export default DocumentManagement;
+                          
