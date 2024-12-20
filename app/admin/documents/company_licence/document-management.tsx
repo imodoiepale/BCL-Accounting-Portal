@@ -854,10 +854,10 @@ const DocumentManagement = () => {
         <div className="flex items-center space-x-2">
           <Button
             onClick={() => setShowAddLicenceModal(true)}
-            className="flex items-center gap-2 px-2 py-1 text-sm"
+            className="flex items-center gap-2 px-2 py-1 text-sm bg-cyan-600"
             size="sm"
           >
-            <Plus className="w-3 h-3" />
+            <Plus className="w-3 h-3 bg-emerald-900 text-white" />
             Add New Licence
           </Button>
           <button className="flex items-center gap-1 px-2 py-1 bg-white border rounded-md shadow-sm hover:bg-gray-50 transition-colors duration-200 text-gray-700 text-xs">
