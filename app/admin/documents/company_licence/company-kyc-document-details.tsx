@@ -22,6 +22,7 @@ import {
   ChevronRight,
   ChevronUp,
   Download,
+  RefreshCw,
   Search,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -62,6 +63,63 @@ export default function CompanyKycDocumentDetails() {
     "kra-docs": false,
   });
 
+  const { refetch: refetchCompanies, isRefetching: isRefetchingCompanies } =
+    useQuery({
+      queryKey: ["companies", debouncedSearch],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("acc_portal_company_duplicate")
+          .select("id, company_name")
+          .ilike("company_name", `%${debouncedSearch}%`)
+          .limit(100);
+
+        if (error) throw error;
+        return data || [];
+      },
+      staleTime: 1000 * 60 * 5,
+      refetchInterval: 1000 * 60 * 5, // Auto refresh every 5 minutes
+    });
+
+  const { refetch: refetchDocuments, isRefetching: isRefetchingDocuments } =
+    useQuery({
+      queryKey: ["documents"],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("acc_portal_licence")
+          .select("*");
+
+        if (error) throw error;
+        return data || [];
+      },
+      staleTime: 1000 * 60 * 5,
+      refetchInterval: 1000 * 60 * 5,
+    });
+
+  const { refetch: refetchUploads, isRefetching: isRefetchingUploads } =
+    useQuery({
+      queryKey: ["uploads"],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("acc_portal_licence_uploads")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        const imageUploads = (data || []).filter((upload) =>
+          isImageFile(upload.filepath)
+        );
+
+        return imageUploads.sort((a, b) => {
+          const dateA = new Date(a.created_at || 0);
+          const dateB = new Date(b.created_at || 0);
+          return dateB.getTime() - dateA.getTime();
+        });
+      },
+      staleTime: 1000 * 60 * 5,
+      refetchInterval: 1000 * 60 * 5,
+    });
+
   // Add version control
   const {
     expandedCompanies,
@@ -95,6 +153,8 @@ export default function CompanyKycDocumentDetails() {
       return data || [];
     },
     staleTime: 1000 * 60 * 5,
+    refetchInterval: 1000 * 30, // Refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   // Documents Query
@@ -105,12 +165,12 @@ export default function CompanyKycDocumentDetails() {
         .from("acc_portal_licence")
         .select("*");
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       return data || [];
     },
     staleTime: 1000 * 60 * 5,
+    refetchInterval: 1000 * 30,
+    refetchOnWindowFocus: true,
   });
 
   // Uploads Query
@@ -124,12 +184,14 @@ export default function CompanyKycDocumentDetails() {
 
       if (error) throw error;
 
-      // Filter to only include image files
-      const imageUploads = (data || []).filter((upload) =>
-        isImageFile(upload.filepath)
-      );
+      // Filter to only include image files and properly handle licence_document_id
+      const imageUploads = (data || [])
+        .filter((upload) => isImageFile(upload.filepath))
+        .map((upload) => ({
+          ...upload,
+          kyc_document_id: upload.licence_document_id, // Map licence_document_id to kyc_document_id for consistency
+        }));
 
-      // Group by company and document, sort by date
       return imageUploads.sort((a, b) => {
         const dateA = new Date(a.created_at || 0);
         const dateB = new Date(b.created_at || 0);
@@ -137,9 +199,12 @@ export default function CompanyKycDocumentDetails() {
       });
     },
     staleTime: 1000 * 60 * 5,
+    refetchInterval: 1000 * 30,
+    refetchOnWindowFocus: true,
   });
 
   // Update Fields Mutation
+  // Update the mutation configurations to automatically refetch data
   const updateFieldsMutation = useMutation({
     mutationFn: async ({ documentId, fields }) => {
       const { data, error } = await supabase
@@ -153,10 +218,29 @@ export default function CompanyKycDocumentDetails() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["documents"]);
+      Promise.all([
+        queryClient.invalidateQueries(["documents"]),
+        queryClient.invalidateQueries(["uploads"]),
+      ]);
       toast.success("Fields updated successfully");
     },
   });
+
+  const handleRefresh = async () => {
+    try {
+      toast.promise(
+        Promise.all([refetchCompanies(), refetchDocuments(), refetchUploads()]),
+        {
+          loading: "Refreshing data...",
+          success: "Data refreshed successfully",
+          error: "Failed to refresh data",
+        }
+      );
+    } catch (error) {
+      console.error("Refresh error:", error);
+    }
+  };
+
   // Upload Mutation
   const uploadMutation = useMutation({
     mutationFn: async ({
@@ -237,10 +321,14 @@ export default function CompanyKycDocumentDetails() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["uploads"]);
+      Promise.all([
+        queryClient.invalidateQueries(["uploads"]),
+        queryClient.invalidateQueries(["documents"]),
+      ]);
       setShowExtractModal(false);
       toast.success("Details extracted successfully");
     },
+
     onError: (error) => {
       toast.error("Failed to save extracted details");
       console.error("Extraction error:", error);
@@ -291,11 +379,17 @@ export default function CompanyKycDocumentDetails() {
   };
 
   // Event Handlers
-  const handleViewDocument = async (document: Document, company: Company) => {
+  const handleViewDocument = async (document, company) => {
     const upload = uploads.find(
       (u) =>
-        u.kyc_document_id === document.id && u.userid === company.id.toString()
+        u.licence_document_id === document.id && // Update to use licence_document_id
+        u.userid === company.id.toString()
     );
+
+    if (!upload) {
+      toast.error("No document found");
+      return;
+    }
 
     try {
       const { data, error } = await supabase.storage
@@ -360,12 +454,12 @@ export default function CompanyKycDocumentDetails() {
     }
   };
 
-  const getCompanyVersions = (company: Company) => {
+  const getCompanyVersions = (company) => {
     const companyUploads = uploads.filter(
       (u) =>
-        u.kyc_document_id === selectedDocument?.id &&
+        u.licence_document_id === selectedDocument?.id && // Update to use licence_document_id
         u.userid === company.id.toString() &&
-        isImageFile(u.filepath) // Add this check
+        isImageFile(u.filepath)
     );
 
     const isExpanded = expandedCompanies.has(company.id);
@@ -564,29 +658,33 @@ export default function CompanyKycDocumentDetails() {
       />
     </li>
   );
-
   // Render Sidebar
   const renderSidebar = () => (
-    <div className="w-1/5 min-w-[200px] border-r overflow-hidden flex flex-col">
-      <div className="p-2">
-        <h2 className="text-sm font-bold mb-2">Documents</h2>
+    <div className="w-1/6 min-w-[180px] border-r overflow-hidden flex flex-col bg-gray-50 shadow-sm">
+      <div className="p-3 border-b bg-white">
+        <h2 className="text-sm font-semibold mb-2 text-gray-800">Documents</h2>
         <div className="relative">
           <Input
             type="text"
             placeholder="Search documents..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="mb-2 h-8 text-xs pl-8"
+            className="mb-1 h-7 text-xs pl-8 rounded-md border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary"
           />
-          <Search className="h-4 w-4 absolute left-2 top-2 text-gray-400" />
+          <Search className="h-3.5 w-3.5 absolute left-2.5 top-[7px] text-gray-400" />
         </div>
       </div>
 
-      <div ref={parentRef} className="overflow-y-auto flex-1">
+      <div
+        ref={parentRef}
+        className="overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+      >
         {isLoadingDocuments ? (
-          <div className="p-2 text-xs">Loading documents...</div>
+          <div className="p-3 text-xs text-gray-500 flex items-center justify-center">
+            Loading documents...
+          </div>
         ) : (
-          <ul className="space-y-1 p-2">
+          <ul className="space-y-0.5 p-2">
             {documents.map((doc) => (
               <DocumentItem
                 key={doc.id}
@@ -649,7 +747,7 @@ export default function CompanyKycDocumentDetails() {
                       <span className="text-green-700 font-bold">
                         {
                           uploads.filter(
-                            (u) => u.kyc_document_id === selectedDocument.id
+                            (u) => u.licence_document_id === selectedDocument.id // Update to use licence_document_id
                           ).length
                         }
                       </span>
@@ -690,6 +788,19 @@ export default function CompanyKycDocumentDetails() {
                   <Search className="h-4 w-4 absolute left-2 top-2 text-gray-400" />
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      queryClient.invalidateQueries(["companies"]);
+                      queryClient.invalidateQueries(["documents"]);
+                      queryClient.invalidateQueries(["uploads"]);
+                      toast.success("Data refreshed");
+                    }}
+                    className="flex items-center gap-2 h-8 text-xs"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Refresh
+                  </Button>
                   <VersionSettings
                     showAllVersions={showAllVersions}
                     onToggleAllVersions={toggleAllVersions}
@@ -835,6 +946,7 @@ export default function CompanyKycDocumentDetails() {
                                   <div className="flex items-center gap-1">
                                     {companyIndex + 1}
                                     {companyUploads.length > 1 && (
+                                      
                                       <Button
                                         variant="ghost"
                                         size="sm"
