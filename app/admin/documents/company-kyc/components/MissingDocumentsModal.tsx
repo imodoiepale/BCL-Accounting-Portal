@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { X } from 'lucide-react';
 
 interface Document {
@@ -19,17 +19,20 @@ interface MissingDocumentsModalProps {
   onUpload: (uploads: Array<{ doc: Document, file: File, issueDate?: string, expiryDate?: string }>) => void;
 }
 
+interface UploadState {
+  file: File | null;
+  issueDate?: string;
+  expiryDate?: string;
+}
+
 export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({ 
   missingDocuments, 
   companyName,
   onClose, 
   onUpload 
 }) => {
-  const [uploadStates, setUploadStates] = useState<Record<string, {
-    file: File | null;
-    issueDate?: string;
-    expiryDate?: string;
-  }>>({});
+  const [uploadStates, setUploadStates] = useState<Record<string, UploadState>>({});
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const handleFileChange = (docId: string, file: File) => {
     setUploadStates(prev => ({
@@ -37,6 +40,29 @@ export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({
       [docId]: { ...prev[docId], file }
     }));
   };
+
+  const handleDragOver = useCallback((e: React.DragEvent, docId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverId(docId);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverId(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, docId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverId(null);
+    
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      handleFileChange(docId, file);
+    }
+  }, []);
 
   const handleDateChange = (docId: string, field: 'issueDate' | 'expiryDate', value: string) => {
     setUploadStates(prev => ({
@@ -114,16 +140,45 @@ export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Select Document
                   </label>
-                  <input
-                    type="file"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleFileChange(doc.id, file);
-                      }
-                    }}
-                    className="w-full border rounded-md p-2"
-                  />
+                  <div
+                    onDragOver={(e) => handleDragOver(e, doc.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, doc.id)}
+                    className={`
+                      border-2 border-dashed rounded-md p-4 text-center transition-colors
+                      ${dragOverId === doc.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}
+                      ${uploadStates[doc.id]?.file ? 'bg-green-50' : ''}
+                      hover:border-gray-400 cursor-pointer
+                    `}
+                  >
+                    {uploadStates[doc.id]?.file ? (
+                      <div className="text-green-600">
+                        <p className="font-medium">{uploadStates[doc.id]?.file?.name}</p>
+                        <p className="text-sm">File selected - Click or drag to replace</p>
+                      </div>
+                    ) : (
+                      <div className="text-gray-600">
+                        <p className="font-medium">Drag and drop your file here</p>
+                        <p className="text-sm">or</p>
+                      </div>
+                    )}
+                    
+                    <input
+                      type="file"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleFileChange(doc.id, file);
+                        }
+                      }}
+                      className="w-full mt-2 cursor-pointer"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    />
+                    
+                    <p className="text-xs text-gray-500 mt-2">
+                      Supported formats: PDF, DOC, DOCX, JPG, PNG
+                    </p>
+                  </div>
                 </div>
 
                 {doc.document_type === 'renewal' && (
@@ -135,6 +190,7 @@ export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({
                       <input
                         type="date"
                         onChange={(e) => handleDateChange(doc.id, 'issueDate', e.target.value)}
+                        value={uploadStates[doc.id]?.issueDate || ''}
                         className="w-full border rounded-md p-2"
                       />
                     </div>
@@ -145,6 +201,7 @@ export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({
                       <input
                         type="date"
                         onChange={(e) => handleDateChange(doc.id, 'expiryDate', e.target.value)}
+                        value={uploadStates[doc.id]?.expiryDate || ''}
                         className="w-full border rounded-md p-2"
                       />
                     </div>
