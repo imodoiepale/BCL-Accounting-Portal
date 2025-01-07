@@ -53,6 +53,8 @@ const SettingsPage = () => {
   const [editingDocument, setEditingDocument] = useState(null);
   const [activeCategory, setActiveCategory] = useState("company-docs");
   const [activeSubcategory, setActiveSubcategory] = useState("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState(null);
 
   useEffect(() => {
     fetchDocuments();
@@ -126,7 +128,9 @@ const SettingsPage = () => {
           ? parseInt(newDocument.validity_days)
           : null,
       department:
-        activeCategory === "directors-docs" ? "Directors" : newDocument.department,
+        activeCategory === "directors-docs"
+          ? "Directors"
+          : newDocument.department,
     };
 
     const { data, error } = await supabase
@@ -148,6 +152,43 @@ const SettingsPage = () => {
       toast.success("Document added successfully");
     }
   };
+
+  const renderDeleteConfirmDialog = () => (
+    <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <DialogContent className="sm:max-w-[425px] p-6">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-gray-800">
+            Confirm Delete
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 mt-4">
+          <p className="text-gray-700">
+            Are you sure you want to delete this document? This action cannot be
+            undone.
+          </p>
+          <div className="flex justify-end space-x-3">
+            <Button
+              onClick={() => setIsDeleteDialogOpen(false)}
+              variant="outline"
+              className="px-4 py-2"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                handleDeleteDocument(documentToDelete);
+                setIsDeleteDialogOpen(false);
+                setDocumentToDelete(null);
+              }}
+              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white"
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
   const handleEditDocument = async () => {
     const { data, error } = await supabase
@@ -191,16 +232,15 @@ const SettingsPage = () => {
     }
   };
 
-
   const renderCategoryContent = (category, subcategories) => (
     <div className="flex flex-col">
       {subcategories.length > 0 ? (
         <Tabs defaultValue={subcategories[0].value} className="w-full">
           <TabsList className="h-12 bg-gray-50 border-b border-gray-200 sticky top-0 z-10 px-6 space-x-3">
             {subcategories.map((subcategory) => (
-              <TabsTrigger 
-                key={subcategory.value} 
-                value={subcategory.value} 
+              <TabsTrigger
+                key={subcategory.value}
+                value={subcategory.value}
                 className="px-4 py-2 text-sm font-medium rounded-lg transition-colors data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-gray-100 data-[state=active]:hover:bg-blue-700"
                 onClick={() => setActiveSubcategory(subcategory.value)}
               >
@@ -213,7 +253,9 @@ const SettingsPage = () => {
               <TabsContent key={subcategory.value} value={subcategory.value}>
                 <Card className="m-6 shadow-sm">
                   <CardHeader className="py-4 px-6">
-                    <h2 className="text-lg font-semibold text-gray-800">{subcategory.label}</h2>
+                    <h2 className="text-lg font-semibold text-gray-800">
+                      {subcategory.label}
+                    </h2>
                   </CardHeader>
                   <CardContent className="p-6">
                     {renderDocumentTable(category, subcategory.value)}
@@ -227,7 +269,9 @@ const SettingsPage = () => {
         <Card className="m-6 shadow-sm">
           <CardHeader className="py-4 px-6">
             <h2 className="text-lg font-semibold text-gray-800">
-              {category.split("-")[0].charAt(0).toUpperCase() + category.split("-")[0].slice(1)} Documents
+              {category.split("-")[0].charAt(0).toUpperCase() +
+                category.split("-")[0].slice(1)}{" "}
+              Documents
             </h2>
           </CardHeader>
           <CardContent className="p-6">
@@ -263,7 +307,7 @@ const SettingsPage = () => {
         )
       )
     );
-  
+
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4 mb-4">
@@ -294,7 +338,7 @@ const SettingsPage = () => {
               {sortDirection === "asc" ? "↑" : "↓"}
             </Button>
           </div>
-          <Button 
+          <Button
             onClick={() => setIsAddDialogOpen(true)}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
           >
@@ -371,7 +415,10 @@ const SettingsPage = () => {
                         Edit
                       </Button>
                       <Button
-                        onClick={() => handleDeleteDocument(doc.id)}
+                        onClick={() => {
+                          setDocumentToDelete(doc.id);
+                          setIsDeleteDialogOpen(true);
+                        }}
                         className="px-4 py-2 text-xs font-medium bg-red-500 hover:bg-red-600 text-white transition-colors rounded-lg shadow-sm hover:shadow"
                       >
                         Delete
@@ -395,10 +442,13 @@ const SettingsPage = () => {
             Add New Document
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          handleAddDocument();
-        }} className="space-y-4 mt-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleAddDocument();
+          }}
+          className="space-y-4 mt-4"
+        >
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
@@ -412,7 +462,7 @@ const SettingsPage = () => {
                 required
               />
             </div>
-  
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
                 Document Type
@@ -434,7 +484,7 @@ const SettingsPage = () => {
                 </SelectContent>
               </Select>
             </div>
-  
+
             {newDocument.document_type === "renewal" && (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
@@ -450,7 +500,7 @@ const SettingsPage = () => {
                 />
               </div>
             )}
-  
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
                 Department
@@ -476,7 +526,7 @@ const SettingsPage = () => {
                 </SelectContent>
               </Select>
             </div>
-  
+
             <Button
               type="submit"
               className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white"
@@ -488,7 +538,6 @@ const SettingsPage = () => {
       </DialogContent>
     </Dialog>
   );
-  
 
   const renderEditDocumentDialog = () => (
     <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -684,6 +733,7 @@ const SettingsPage = () => {
       </div>
       {renderAddDocumentDialog()}
       {renderEditDocumentDialog()}
+      {renderDeleteConfirmDialog()}
     </div>
   );
 };
