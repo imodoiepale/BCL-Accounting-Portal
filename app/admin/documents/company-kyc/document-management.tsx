@@ -1103,6 +1103,7 @@ const DocumentManagement = () => {
                 </tr>
 
                 {/* Company Rows */}
+              
                 {getSortedCompanies().map((company, index) => (
                   <tr
                     key={company.id}
