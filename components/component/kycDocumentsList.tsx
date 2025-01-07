@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 // @ts-nocheck
 "use client"
 import React, { useState, useEffect, useCallback } from 'react'
@@ -19,13 +20,17 @@ const DialogHeader = dynamic(() => import("@/components/ui/dialog").then(mod => 
 const DialogTitle = dynamic(() => import("@/components/ui/dialog").then(mod => mod.DialogTitle), { ssr: false })
 
 const formatDate = (dateString) => {
-  if (!dateString) return 'N/A';
+  if (!dateString) {
+    return 'N/A';
+  }
   const date = new Date(dateString);
   return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
 };
 
 const calculateRemainingDays = (issueDate, expiryDate) => {
-  if (!issueDate || !expiryDate) return 'N/A';
+  if (!issueDate || !expiryDate) {
+    return 'N/A';
+  }
 
   const today = new Date();
   const expiry = new Date(expiryDate);
@@ -35,10 +40,16 @@ const calculateRemainingDays = (issueDate, expiryDate) => {
 };
 
 const getDaysToExpiryColor = (days) => {
-  if (days === 'N/A') return 'text-gray-500';
+  if (days === 'N/A') {
+    return 'text-gray-500';
+  }
   const daysNum = parseInt(days);
-  if (daysNum <= 0) return 'text-red-500 font-bold';
-  if (daysNum <= 90) return 'text-blue-500';
+  if (daysNum <= 0) {
+    return 'text-red-500 font-bold';
+  }
+  if (daysNum <= 90) {
+    return 'text-blue-500';
+  }
   return 'text-green-500';
 };
 
@@ -250,7 +261,9 @@ export function KYCDocumentsList({ category, subcategory }) {
   }
 
   const sortDocuments = (docs) => {
-    if (!sortColumn) return docs
+    if (!sortColumn) {
+      return docs
+    }
 
     return [...docs].sort((a, b) => {
       let aValue = a[sortColumn]
@@ -261,14 +274,20 @@ export function KYCDocumentsList({ category, subcategory }) {
         bValue = bValue ? new Date(bValue) : new Date(0)
       }
 
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      if (aValue < bValue) {
+        return sortDirection === 'asc' ? -1 : 1
+      }
+      if (aValue > bValue) {
+        return sortDirection === 'asc' ? 1 : -1
+      }
       return 0
     })
   }
 
   const filterDocuments = (docs) => {
-    if (!searchTerm) return docs
+    if (!searchTerm) {
+      return docs
+    }
     return docs.filter(doc =>
       doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.department.toLowerCase().includes(searchTerm.toLowerCase())
@@ -459,7 +478,7 @@ export function KYCDocumentsList({ category, subcategory }) {
                 </div>
                 {!noExpiryDate && (
                   <div>
-                    <Label htmlFor="expiry_date">Expiry Date</Label>
+                    <Label htmlFor="expiry_date">Expiry Dates</Label>
                     <Input
                       id="expiry_date"
                       type="date"

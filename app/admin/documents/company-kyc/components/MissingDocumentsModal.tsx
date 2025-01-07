@@ -73,7 +73,9 @@ export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({
   };
 
   const handleSubmitAll = async () => {
-    if (!hasAnyFiles) return;
+    if (!hasAnyFiles){ 
+      return;
+    }
 
     setIsLoading(true);
 
