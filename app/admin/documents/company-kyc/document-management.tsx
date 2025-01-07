@@ -345,6 +345,7 @@ const DocumentActionCell = ({
     </div>
   );
 };
+
 const DocumentManagement = () => {
   const queryClient = useQueryClient();
 
