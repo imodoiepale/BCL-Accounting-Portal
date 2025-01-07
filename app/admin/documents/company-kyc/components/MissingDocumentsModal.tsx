@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { X, Loader } from 'lucide-react';
 
 interface Document {
   id: string;
@@ -16,7 +16,7 @@ interface MissingDocumentsModalProps {
   missingDocuments: Document[];
   companyName: string;
   onClose: () => void;
-  onUpload: (uploads: Array<{ doc: Document, file: File, issueDate?: string, expiryDate?: string }>) => void;
+  onUpload: (uploads: Array<{ doc: Document, file: File, issueDate?: string, expiryDate?: string }>) => Promise<void>;
 }
 
 interface UploadState {
@@ -33,6 +33,7 @@ export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({
 }) => {
   const [uploadStates, setUploadStates] = useState<Record<string, UploadState>>({});
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleFileChange = (docId: string, file: File) => {
     setUploadStates(prev => ({
@@ -71,24 +72,34 @@ export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({
     }));
   };
 
-  const handleSubmitAll = () => {
-    const uploads = Object.entries(uploadStates)
-      .map(([docId, state]) => {
-        const doc = missingDocuments.find(d => d.id === docId);
-        if (doc && state.file) {
-          return {
-            doc,
-            file: state.file,
-            issueDate: state.issueDate,
-            expiryDate: state.expiryDate
-          };
-        }
-        return null;
-      })
-      .filter((upload): upload is NonNullable<typeof upload> => upload !== null);
+  const handleSubmitAll = async () => {
+    if (!hasAnyFiles) return;
 
-    if (uploads.length > 0) {
-      onUpload(uploads);
+    setIsLoading(true);
+
+    try {
+      const uploads = Object.entries(uploadStates)
+        .map(([docId, state]) => {
+          const doc = missingDocuments.find(d => d.id === docId);
+          if (doc && state.file) {
+            return {
+              doc,
+              file: state.file,
+              issueDate: state.issueDate,
+              expiryDate: state.expiryDate
+            };
+          }
+          return null;
+        })
+        .filter((upload): upload is NonNullable<typeof upload> => upload !== null);
+
+      if (uploads.length > 0) {
+        await onUpload(uploads);
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -96,7 +107,7 @@ export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-6xl h-4/5 relative overflow-auto">
+      <div className="bg-white rounded-lg p-8 w-full max-w-6xl h-4/5 relative overflow-auto">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -104,26 +115,19 @@ export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({
           <X className="w-5 h-5" />
         </button>
         
-        <div className="mb-6 flex justify-between items-center">
+        <div className="mb-8 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-semibold">Missing Documents</h2>
+            <h2 className="text-2xl font-extrabold">Missing Documents</h2>
             <p className="text-gray-600 mt-1">For {companyName}</p>
           </div>
-          <button
-            onClick={handleSubmitAll}
-            disabled={!hasAnyFiles}
-            className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-          >
-            Upload All Documents
-          </button>
         </div>
-
-        <div className="grid grid-cols-2 gap-4">
+        
+        <div className="grid grid-cols-2 gap-6">
           {missingDocuments.map(doc => (
-            <div key={doc.id} className="border rounded-lg p-4 bg-gray-50">
-              <div className="flex justify-between items-center mb-2">
+            <div key={doc.id} className="bg-white rounded-lg p-4 shadow-md">
+              <div className="flex justify-between items-center mb-4">
                 <div>
-                  <h3 className="font-medium">{doc.name}</h3>
+                  <h3 className="text-lg font-bold">{doc.name}</h3>
                   <p className="text-sm text-gray-600">
                     {doc.department} - {doc.subcategory}
                   </p>
@@ -134,53 +138,47 @@ export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({
                   </span>
                 )}
               </div>
-
-              <div className="mt-4 space-y-4 bg-white p-4 rounded-lg border">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Document
-                  </label>
-                  <div
-                    onDragOver={(e) => handleDragOver(e, doc.id)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, doc.id)}
-                    className={`
-                      border-2 border-dashed rounded-md p-4 text-center transition-colors
-                      ${dragOverId === doc.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}
-                      ${uploadStates[doc.id]?.file ? 'bg-green-50' : ''}
-                      hover:border-gray-400 cursor-pointer
-                    `}
-                  >
-                    {uploadStates[doc.id]?.file ? (
-                      <div className="text-green-600">
-                        <p className="font-medium">{uploadStates[doc.id]?.file?.name}</p>
-                        <p className="text-sm">File selected - Click or drag to replace</p>
-                      </div>
-                    ) : (
-                      <div className="text-gray-600">
-                        <p className="font-medium">Drag and drop your file here</p>
-                        <p className="text-sm">or</p>
-                      </div>
-                    )}
-                    
-                    <input
-                      type="file"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          handleFileChange(doc.id, file);
-                        }
-                      }}
-                      className="w-full mt-2 cursor-pointer"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    />
-                    
-                    <p className="text-xs text-gray-500 mt-2">
-                      Supported formats: PDF, DOC, DOCX, JPG, PNG
-                    </p>
-                  </div>
+              
+              <div className="space-y-4">
+                <div
+                  onDragOver={(e) => handleDragOver(e, doc.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, doc.id)}
+                  className={`
+                    border-2 border-dashed rounded-md p-6 text-center transition-colors
+                    ${dragOverId === doc.id ? 'border-blue-500' : 'border-gray-300'}
+                    ${uploadStates[doc.id]?.file ? 'border-green-500' : ''}
+                  `}
+                >
+                  {uploadStates[doc.id]?.file ? (
+                    <div className="text-green-600">
+                      <p className="font-medium">{uploadStates[doc.id]?.file?.name}</p>
+                      <p className="text-sm">File selected - Click or drag to replace</p>
+                    </div>
+                  ) : (
+                    <div className="text-gray-600">
+                      <p className="font-medium">Drag and drop your file here</p>
+                      <p className="text-sm">or</p>
+                    </div>
+                  )}
+                  
+                  <input
+                    type="file"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleFileChange(doc.id, file);
+                      }
+                    }}
+                    className="w-full mt-2 cursor-pointer"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  />
+                  
+                  <p className="text-xs text-gray-500 mt-2">
+                    Supported formats: PDF, DOC, DOCX, JPG, PNG
+                  </p>
                 </div>
-
+                
                 {doc.document_type === 'renewal' && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -211,6 +209,23 @@ export const MissingDocumentsModal: React.FC<MissingDocumentsModalProps> = ({
             </div>
           ))}
         </div>
+        
+        <div className="flex justify-end mt-8">
+          <button
+            onClick={handleSubmitAll}
+            disabled={!hasAnyFiles}
+            className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            Upload All Documents
+          </button>
+        </div>
+        
+        {isLoading && (
+          <div className="text-center mt-4">
+            <Loader className="w-6 h-6 text-blue-500 animate-spin" />
+            <p className="text-gray-600 mt-2">Uploading documents...</p>
+          </div>
+        )}
       </div>
     </div>
   );
