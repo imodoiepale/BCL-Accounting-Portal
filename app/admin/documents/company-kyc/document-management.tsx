@@ -112,7 +112,9 @@ interface ViewModalProps {
 
 // Utility function for date parsing
 const parseDate = (dateValue: any): Date | null => {
-  if (!dateValue) return null;
+  if (!dateValue) {
+    return null;
+  }
 
   try {
     if (dateValue instanceof Date) {
@@ -389,7 +391,9 @@ const DocumentManagement = () => {
         .select("*")
         .ilike("company_name", `%${searchTerm}%`);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       return data || [];
     },
     staleTime: 1000 * 60 * 5,
@@ -413,7 +417,9 @@ const DocumentManagement = () => {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       return data || [];
     },
     staleTime: 1000 * 60 * 5,
@@ -426,7 +432,9 @@ const DocumentManagement = () => {
         .from("acc_portal_kyc_uploads")
         .select("*");
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       return data || [];
     },
   });
@@ -453,7 +461,9 @@ const DocumentManagement = () => {
               .from("kyc-documents")
               .upload(fileName, fileData.file);
 
-          if (fileError) throw fileError;
+          if (fileError) {
+            throw fileError;
+          }
 
           const uploadData = {
             userid: companyId.toString(),
@@ -470,7 +480,9 @@ const DocumentManagement = () => {
             .select()
             .single();
 
-          if (error) throw error;
+          if (error) {
+            throw error;
+          }
           results.push(data);
         } catch (error) {
           console.error("Upload error:", error);
@@ -556,14 +568,18 @@ const DocumentManagement = () => {
   const handleDeleteDocument = async (docId: string) => {
     try {
       const upload = uploads.find((u) => u.id === docId);
-      if (!upload) return;
+      if (!upload) {
+        return;
+      }
 
       // Delete from storage
       const { error: storageError } = await supabase.storage
         .from("kyc-documents")
         .remove([upload.filepath]);
 
-      if (storageError) throw storageError;
+      if (storageError) {
+        throw storageError;
+      }
 
       // Delete from database
       const { error: dbError } = await supabase
@@ -571,7 +587,9 @@ const DocumentManagement = () => {
         .delete()
         .eq("id", docId);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        throw dbError;
+      }
 
       // Invalidate queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ["uploads"] });
@@ -591,7 +609,9 @@ const DocumentManagement = () => {
         .update({ document_type: type })
         .eq("id", docId);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       // Update the local state
       setViewDocuments((prev) =>
@@ -626,7 +646,9 @@ const DocumentManagement = () => {
             .from("kyc-documents")
             .createSignedUrl(upload.filepath, 60);
 
-          if (error) throw error;
+          if (error) {
+            throw error;
+          }
 
           return {
             id: upload.id,
@@ -667,7 +689,9 @@ const DocumentManagement = () => {
         .from("kyc-documents")
         .download(upload.filepath);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       const url = window.URL.createObjectURL(data);
       const link = document.createElement("a");
@@ -1148,7 +1172,9 @@ const DocumentManagement = () => {
                                       u.userid === company.id.toString()
                                   );
 
-                                  if (!upload) return "-";
+                                  if (!upload) {
+                                    return "-";
+                                  }
 
                                   // First check extracted_details
                                   if (upload.extracted_details) {
@@ -1191,8 +1217,9 @@ const DocumentManagement = () => {
                             {visibleColumns[doc.id]?.subColumns.expiryDate && (
                               <td className="p-2 border border-gray-300 text-center text-gray-600 text-sm">
                                 {(() => {
-                                  if (doc.document_type === "one-off")
+                                  if (doc.document_type === "one-off") {
                                     return "No Expiry";
+                                  }
 
                                   const upload = uploads.find(
                                     (u) =>
@@ -1200,7 +1227,9 @@ const DocumentManagement = () => {
                                       u.userid === company.id.toString()
                                   );
 
-                                  if (!upload) return "?";
+                                  if (!upload) {
+                                    return "?";
+                                  }
 
                                   // First check extracted_details
                                   if (upload.extracted_details) {
@@ -1244,8 +1273,9 @@ const DocumentManagement = () => {
                             {visibleColumns[doc.id]?.subColumns.daysLeft && (
                               <td className="p-2 border border-gray-300 text-center text-gray-600 text-sm">
                                 {(() => {
-                                  if (doc.document_type === "one-off")
+                                  if (doc.document_type === "one-off") {
                                     return "N/A";
+                                  }
 
                                   const upload = uploads.find(
                                     (u) =>
@@ -1253,7 +1283,9 @@ const DocumentManagement = () => {
                                       u.userid === company.id.toString()
                                   );
 
-                                  if (!upload) return "-";
+                                  if (!upload) {
+                                    return "-";
+                                  }
 
                                   // First check extracted_details
                                   let expiryDate = null;
@@ -1350,7 +1382,8 @@ const DocumentManagement = () => {
                                     expiryDate = parseDate(upload.expiry_date);
                                   }
 
-                                  if (!expiryDate) return "-";
+                                  if (!expiryDate){
+                                    return "-";}
 
                                   const daysLeft = differenceInDays(
                                     expiryDate,
@@ -1410,7 +1443,9 @@ const DocumentManagement = () => {
           selectedCompany={selectedCompany}
           selectedDocument={selectedDocument}
           onUpload={async (files) => {
-            if (!selectedCompany || !selectedDocument) return;
+            if (!selectedCompany || !selectedDocument) {
+              return;
+            }
             await uploadMutation.mutateAsync({
               companyId: selectedCompany.id,
               documentId: selectedDocument.id,
