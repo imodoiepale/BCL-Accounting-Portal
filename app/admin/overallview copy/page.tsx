@@ -155,10 +155,6 @@ const OverallView: React.FC = () => {
     const [selectedCompany, setSelectedCompany] = useState(null);
     const [selectedMissingFields, setSelectedMissingFields] = useState(null);
     const sortByOrder = (items: string[], orderMapping: Record<string, number>) => {
-        if (!Array.isArray(items)) {
-            console.error('Expected an array for items:', items);
-            return [];
-        }
         return [...items].sort((a, b) => (orderMapping[a] || 0) - (orderMapping[b] || 0));
     };
 
