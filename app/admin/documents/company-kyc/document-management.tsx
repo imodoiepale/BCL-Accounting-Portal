@@ -628,7 +628,6 @@ const DocumentManagement = () => {
       throw error;
     }
   };
-
   const handleViewDocument = async (document: Document, company: Company) => {
     const documentUploads = uploads.filter(
       (u) =>
@@ -664,6 +663,8 @@ const DocumentManagement = () => {
       );
 
       setViewDocuments(documentPreviews);
+      setSelectedCompany(company); // Add this
+      setSelectedDocument(document); // Add this
       setShowDocumentViewer(true);
     } catch (error) {
       console.error("Error viewing documents:", error);
@@ -1103,7 +1104,7 @@ const DocumentManagement = () => {
                 </tr>
 
                 {/* Company Rows */}
-              
+
                 {getSortedCompanies().map((company, index) => (
                   <tr
                     key={company.id}
@@ -1384,8 +1385,9 @@ const DocumentManagement = () => {
                                     expiryDate = parseDate(upload.expiry_date);
                                   }
 
-                                  if (!expiryDate){
-                                    return "-";}
+                                  if (!expiryDate) {
+                                    return "-";
+                                  }
 
                                   const daysLeft = differenceInDays(
                                     expiryDate,
@@ -1427,13 +1429,16 @@ const DocumentManagement = () => {
         </div>
       )}
 
-      {/* Modals */}
-      {showDocumentViewer && (
+      {showDocumentViewer && selectedCompany && selectedDocument && (
         <DocumentViewer
           documents={viewDocuments}
+          companyName={selectedCompany.company_name}
+          documentName={selectedDocument.name}
           onClose={() => {
             setShowDocumentViewer(false);
             setViewDocuments([]);
+            setSelectedCompany(null); // Add this
+            setSelectedDocument(null); // Add this
           }}
           onUpdateDocumentType={handleUpdateDocumentType}
           onDelete={handleDeleteDocument}
@@ -1468,35 +1473,39 @@ const DocumentManagement = () => {
         />
       )}
 
-{showMissingDocumentsModal && selectedCompany && (
-  <MissingDocumentsModal
-    missingDocuments={missingDocuments}
-    companyName={selectedCompany.company_name}
-    onClose={() => {
-      setShowMissingDocumentsModal(false);
-      setSelectedCompany(null);
-    }}
-    onUpload={async (uploads) => {
-      // Process each upload individually
-      try {
-        await Promise.all(uploads.map(upload => 
-          uploadMutation.mutateAsync({
-            companyId: selectedCompany.id,
-            documentId: upload.doc.id, // Use the specific document ID for each file
-            files: [{
-              file: upload.file,
-              issueDate: upload.issueDate,
-              expiryDate: upload.expiryDate
-            }]
-          })
-        ));
-        setShowMissingDocumentsModal(false);
-      } catch (error) {
-        console.error('Upload error:', error);
-      }
-    }}
-  />
-)}
+      {showMissingDocumentsModal && selectedCompany && (
+        <MissingDocumentsModal
+          missingDocuments={missingDocuments}
+          companyName={selectedCompany.company_name}
+          onClose={() => {
+            setShowMissingDocumentsModal(false);
+            setSelectedCompany(null);
+          }}
+          onUpload={async (uploads) => {
+            // Process each upload individually
+            try {
+              await Promise.all(
+                uploads.map((upload) =>
+                  uploadMutation.mutateAsync({
+                    companyId: selectedCompany.id,
+                    documentId: upload.doc.id, // Use the specific document ID for each file
+                    files: [
+                      {
+                        file: upload.file,
+                        issueDate: upload.issueDate,
+                        expiryDate: upload.expiryDate,
+                      },
+                    ],
+                  })
+                )
+              );
+              setShowMissingDocumentsModal(false);
+            } catch (error) {
+              console.error("Upload error:", error);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -12,9 +12,18 @@ interface DocumentViewerProps {
   onClose: () => void;
   onUpdateDocumentType?: (docId: string, type: 'recent' | 'past') => Promise<void>;
   onDelete?: (docId: string) => Promise<void>;
+  companyName: string;
+  documentName: string;
 }
 
-export const DocumentViewer: React.FC<DocumentViewerProps> = ({ documents, onClose, onUpdateDocumentType, onDelete }) => {
+export const DocumentViewer: React.FC<DocumentViewerProps> = ({ 
+  documents, 
+  onClose, 
+  onUpdateDocumentType, 
+  onDelete,
+  companyName,
+  documentName 
+}) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
@@ -72,40 +81,50 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ documents, onClo
       <Dialog open={true} onOpenChange={onClose}>
         <DialogContent className={`max-w-[98vw] w-[1600px] max-h-[99vh] ${documents.length === 1 ? 'h-[99vh]' : 'h-[99vh]'}`}>
           <DialogHeader className="px-6 py-2">
-            <DialogTitle className="flex justify-between items-center">
-              <div className="flex flex-col">
-                <span>Document Preview ({currentIndex + 1}/{documents.length})</span>
-                <span className="text-sm text-gray-500 mt-1">
-                  {getFilenameFromPath(sortedDocs[currentIndex].filepath)}
-                </span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
-                  disabled={currentIndex === 0}
-                  className="hover:bg-violet-50"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentIndex(prev => Math.min(documents.length - 1, prev + 1))}
-                  disabled={currentIndex === documents.length - 1}
-                  className="hover:bg-violet-50"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDeleteClick(sortedDocs[currentIndex].id)}
-                  className="hover:bg-red-50 text-red-600"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+            <DialogTitle className="flex flex-col space-y-2">
+              <div className="flex justify-between items-center">
+                <div className="flex flex-col">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg font-semibold">{companyName}</span>
+                    <span className="text-gray-400">•</span>
+                    <span className="text-violet-600">{documentName}</span>
+                  </div>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <span className="text-sm text-gray-500">Document Preview ({currentIndex + 1}/{documents.length})</span>
+                    <span className="text-sm text-gray-400">•</span>
+                    <span className="text-sm text-gray-500">
+                      {getFilenameFromPath(sortedDocs[currentIndex].filepath)}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
+                    disabled={currentIndex === 0}
+                    className="hover:bg-violet-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentIndex(prev => Math.min(documents.length - 1, prev + 1))}
+                    disabled={currentIndex === documents.length - 1}
+                    className="hover:bg-violet-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteClick(sortedDocs[currentIndex].id)}
+                    className="hover:bg-red-50 text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </DialogTitle>
           </DialogHeader>
@@ -117,8 +136,9 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ documents, onClo
                   {sortedDocs.map((doc, index) => (
                     <div
                       key={doc.id}
-                      className={`cursor-pointer p-3 border rounded-lg transition-all group ${index === currentIndex ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-200'
-                        }`}
+                      className={`cursor-pointer p-3 border rounded-lg transition-all group ${
+                        index === currentIndex ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-200'
+                      }`}
                       onClick={() => setCurrentIndex(index)}
                     >
                       <div className="flex items-center justify-between mb-2">
