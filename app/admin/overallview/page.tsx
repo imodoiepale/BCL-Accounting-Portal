@@ -59,10 +59,12 @@ interface OrderSettings {
 
 const processTabData = (tableData: any, mapping: any) => {
     try {
+        // Get base company data
         const companies = tableData['acc_portal_company_duplicate'] || [];
         const relevantTables = new Set(['acc_portal_company_duplicate']);
+        const processedData = [];
 
-        // Get relevant tables for this tab
+        // Extract relevant tables from mapping structure
         if (mapping?.structure?.sections) {
             mapping.structure.sections.forEach(section => {
                 section.subsections?.forEach(subsection => {
@@ -73,40 +75,53 @@ const processTabData = (tableData: any, mapping: any) => {
             });
         }
 
-        return companies.map(company => {
-            const relatedRecords = {};
-            const allRows = [];
+        // Process each company
+        companies.forEach(company => {
+            const companyGroup = {
+                company,
+                rows: [],
+                rowSpan: 1,
+                stats: {
+                    totalFields: 0,
+                    completedFields: 0,
+                    missingFields: 0
+                }
+            };
 
-            // Create base company row
-            allRows.push({
+            // Create base company row with verification status
+            const baseRow = {
                 id: company.id,
                 company_name: company.company_name,
                 index: 1,
                 isFirstRow: true,
                 isAdditionalRow: false,
                 sourceTable: 'acc_portal_company_duplicate',
+                verification_status: company.verification_status || {},
                 ...company
-            });
+            };
 
-            // Process related tables
-            Object.keys(tableData).forEach(tableName => {
-                if (!relevantTables.has(tableName) || tableName === 'acc_portal_company_duplicate') return;
+            // Process related tables and their data
+            const relatedData = {};
+            relevantTables.forEach(tableName => {
+                if (tableName === 'acc_portal_company_duplicate') return;
 
                 const records = tableData[tableName]?.filter(
                     row => row.company_id === company.id
                 ) || [];
 
                 if (records.length > 0) {
-                    relatedRecords[`${tableName}_data`] = records;
-
+                    relatedData[`${tableName}_data`] = records;
+                    
+                    // Add additional rows for each related record
                     records.forEach((record, idx) => {
-                        allRows.push({
+                        companyGroup.rows.push({
                             id: record.id,
                             company_name: company.company_name,
                             index: idx + 1,
                             isFirstRow: false,
                             isAdditionalRow: true,
                             sourceTable: tableName,
+                            verification_status: record.verification_status || {},
                             [`${tableName}_data`]: record,
                             ...record
                         });
@@ -114,18 +129,36 @@ const processTabData = (tableData: any, mapping: any) => {
                 }
             });
 
-            // Add related records to the first row
-            allRows[0] = {
-                ...allRows[0],
-                ...relatedRecords
-            };
+            // Add related data to base row
+            baseRow.related_data = relatedData;
+            companyGroup.rows.unshift(baseRow);
+            companyGroup.rowSpan = companyGroup.rows.length;
 
-            return {
-                company: company,
-                rows: allRows,
-                rowSpan: allRows.length
-            };
+            // Calculate statistics for the company group
+            if (mapping?.structure?.sections) {
+                mapping.structure.sections.forEach(section => {
+                    section.subsections?.forEach(subsection => {
+                        subsection.fields?.forEach(field => {
+                            companyGroup.stats.totalFields++;
+                            const [tableName, fieldName] = field.name.split('.');
+                            const value = baseRow[fieldName] || 
+                                        baseRow[`${tableName}_data`]?.[fieldName] || 
+                                        relatedData[`${tableName}_data`]?.[0]?.[fieldName];
+                            
+                            if (value !== null && value !== undefined && value !== '') {
+                                companyGroup.stats.completedFields++;
+                            } else {
+                                companyGroup.stats.missingFields++;
+                            }
+                        });
+                    });
+                });
+            }
+
+            processedData.push(companyGroup);
         });
+
+        return processedData;
     } catch (error) {
         console.error('Error processing tab data:', error);
         return [];
@@ -386,8 +419,9 @@ const OverallView: React.FC = () => {
             
             if (currentMapping) {
                 const processedData = processTabData(rawTableData, currentMapping);
+                console.log('Processed Tab Data:', processedData);
                 setVisibleData(processedData);
-            }
+              }
     
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -738,8 +772,12 @@ const OverallView: React.FC = () => {
     }, []);
 
     // Table Wrapper
-    const TableWrapper = useMemo(() => (
-        <Table
+    const TableWrapper = useMemo(() => {
+        console.log('VisibleData:', visibleData);
+        console.log('ProcessedSections:', processTabSections(activeMainTab, activeSubTab));
+        
+        return (
+          <Table
             data={visibleData}
             virtualizedRowHeight={50}
             visibleRowsCount={20}
@@ -748,12 +786,13 @@ const OverallView: React.FC = () => {
             activeSubTab={activeSubTab}
             handleCompanyClick={handleCompanyClick}
             onMissingFieldsClick={(company) => {
-                setSelectedMissingFields(company);
-                setIsMissingFieldsOpen(true);
+              setSelectedMissingFields(company);
+              setIsMissingFieldsOpen(true);
             }}
             refreshData={fetchAllData}
-        />
-    ), [visibleData, activeMainTab, activeSubTab, processTabSections, handleCompanyClick]);
+          />
+        );
+      }, [visibleData, activeMainTab, activeSubTab, processTabSections, handleCompanyClick]);
 
     return (
         <div className="h-[1100px] flex flex-col">

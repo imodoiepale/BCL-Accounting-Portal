@@ -338,7 +338,7 @@ export function SettingsDialog({
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      {Array.isArray(uniqueTabs) && uniqueTabs.length > 0 && uniqueTabs
+                      {Array.isArray(uniqueTabs) && uniqueTabs.length > 0 ? uniqueTabs
                         .sort((a, b) => {
                           const orderA = structure.find(item => item.Tabs === a)?.order?.tab || 0;
                           const orderB = structure.find(item => item.Tabs === b)?.order?.tab || 0;
@@ -367,7 +367,7 @@ export function SettingsDialog({
                               />
                             </div>
                           </button>
-                        ))}
+                        )) : null}
                     </ScrollArea>
                   </CardContent>
                 </Card>
@@ -382,7 +382,7 @@ export function SettingsDialog({
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      {Array.isArray(structure) && structure.length > 0 && structure
+                      {Array.isArray(structure) && structure.length > 0 ? structure
                         .filter(item => item.Tabs === selectedTab)
                         .flatMap(item => Array.isArray(item.sections) ? item.sections : [])
                         .sort((a, b) => a.order - b.order)
@@ -410,7 +410,7 @@ export function SettingsDialog({
                               </div>
                             </div>
                           </div>
-                        ))}
+                        )) : null}
                     </ScrollArea>
                   </CardContent>
                 </Card>
@@ -424,36 +424,41 @@ export function SettingsDialog({
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      {selectedSection && Array.isArray(structure) && structure.length > 0 && structure
-                        .find(item => item.Tabs === selectedTab)
-                        ?.sections.find(s => s.name === selectedSection.section)
-                        ?.subsections && Array.isArray(structure.find(item => item.Tabs === selectedTab)?.sections.find(s => s.name === selectedSection.section)?.subsections)
-                        ?.sort((a, b) => a.order - b.order)
-                        .map((subsection, subsectionIndex) => (
-                          <div
-                            key={subsection.name}
-                            className={`mb-2 p-2 rounded cursor-pointer transition-colors ${selectedSubsection === subsection.name ? 'bg-primary/10' : 'hover:bg-gray-100'
-                              }`}
-                            onClick={() => setSelectedSubsection(subsection.name)}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex justify-between items-center w-full">
-                                {`${selectedTabIndex + 1}.${selectedSectionIndex + 1}.${subsectionIndex + 1} ${subsection.name}`}
-                                <div className="flex items-center gap-2">
-                                  <OrderControls
-                                    currentOrder={subsectionIndex}
-                                    onMoveUp={() => handleReorder('subsection', subsection.name, 'up')}
-                                    onMoveDown={() => handleReorder('subsection', subsection.name, 'down')}
-                                  />
-                                  <Switch
-                                    checked={subsection.visible}
-                                    onCheckedChange={() => toggleVisibility('subsections', subsection.name)}
-                                  />
+                      {selectedSection && Array.isArray(structure) && structure.length > 0 ? 
+                        (() => {
+                          const currentSection = structure
+                            .find(item => item.Tabs === selectedTab)
+                            ?.sections
+                            .find(s => s.name === selectedSection.section);
+                          
+                          return currentSection?.subsections && Array.isArray(currentSection.subsections) ? 
+                            currentSection.subsections
+                              .sort((a, b) => (a.order || 0) - (b.order || 0))
+                              .map((subsection, subsectionIndex) => (
+                                <div
+                                  key={subsection.name}
+                                  className={`mb-2 p-2 rounded cursor-pointer transition-colors ${selectedSubsection === subsection.name ? 'bg-primary/10' : 'hover:bg-gray-100'}`}
+                                  onClick={() => setSelectedSubsection(subsection.name)}
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex justify-between items-center w-full">
+                                      {`${selectedTabIndex + 1}.${selectedSectionIndex + 1}.${subsectionIndex + 1} ${subsection.name}`}
+                                      <div className="flex items-center gap-2">
+                                        <OrderControls
+                                          currentOrder={subsectionIndex}
+                                          onMoveUp={() => handleReorder('subsection', subsection.name, 'up')}
+                                          onMoveDown={() => handleReorder('subsection', subsection.name, 'down')}
+                                        />
+                                        <Switch
+                                          checked={subsection.visible}
+                                          onCheckedChange={() => toggleVisibility('subsections', subsection.name)}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                              )) : null;
+                        })() : null}
                     </ScrollArea>
                   </CardContent>
                 </Card>
