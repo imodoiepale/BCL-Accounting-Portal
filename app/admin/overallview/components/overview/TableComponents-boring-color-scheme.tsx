@@ -534,8 +534,8 @@ const renderDataRows = (
                 return (
                   <TableCell
                     key={`${groupIndex}-${rowIndex}-${sectionIndex}-${catIndex}-${fieldIndex}`}
-                    className={`whitespace-nowrap border border-gray-300 ${isEmpty ? 'bg-rose-50' : ''
-                      } ${isColumnLocked ? 'bg-slate-100' : ''}`}
+                    className={`whitespace-nowrap border border-gray-300 ${isEmpty ? 'bg-red-50' : ''
+                      } ${isColumnLocked ? 'bg-gray-100' : ''}`}
                   >
                     <EditableCell
                       value={isEmpty ? 'N/A' : String(value)}
@@ -563,7 +563,7 @@ const renderDataRows = (
                         }
                       }}
                       disabled={isRowVerified || isColumnLocked}
-                      textClassName={isEmpty ? 'text-rose-500' : ''}
+                      textClassName={isEmpty ? 'text-red-500' : ''}
                     />
                   </TableCell>
                 );
@@ -906,9 +906,9 @@ export const Table: React.FC<TableProps> = ({
       <>
         {/* Section Reference Row */}
         <TableRow>
-          <TableHead className="w-12 text-center sticky left-0 z-20 bg-green-50 text-slate-800 border border-gray-300">Section</TableHead>
-          <TableHead className="w-12 text-center bg-green-600 text-white border border-gray-300">Verify</TableHead>
-          <TableHead className="text-center w-20 bg-red-500 text-white border border-gray-300">Missing Fields</TableHead>
+          <TableHead className="w-12 text-center sticky left-0 z-20 bg-blue-600 text-white border border-gray-300">Sec REF</TableHead>
+          <TableHead className="w-12 text-center bg-blue-600 text-white border border-gray-300">Lock</TableHead>
+          <TableHead className="text-center w-20 bg-blue-600 text-white border border-gray-300">Missing Fields</TableHead>
           {processedSections.slice(1).map((section, index) => {
             if (section.isSeparator) return null;
             const colSpan = section.categorizedFields?.reduce((total, cat) =>
@@ -917,7 +917,7 @@ export const Table: React.FC<TableProps> = ({
             return (
               <TableHead
                 key={`sec-ref-${index}`}
-                className="text-center bg-slate-600 text-white border border-gray-300"
+                className="text-center bg-blue-600 text-white border border-gray-300"
                 colSpan={colSpan}
               >
                 {index + 1}
@@ -928,9 +928,11 @@ export const Table: React.FC<TableProps> = ({
 
         {/* Section Names Row */}
         <TableRow>
-          <TableHead className="w-12 text-center bg-green-50 border border-gray-300">Subsection</TableHead>
-          <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
+          <TableHead className="w-12 text-center bg-blue-100 border border-gray-300">Section</TableHead>
+          <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+          {/* {renderSeparatorCell(`section-sep-start-${Date.now()}`, 'section')} */}
           <TableHead className="text-center bg-red-100 border border-gray-300">Per Row</TableHead>
+          {/* {renderSeparatorCell(`section-sep-end-${Date.now()}`, 'section')} */}
           {processedSections.slice(1).map((section, index) => {
             if (section.isSeparator) return null;
             const colSpan = section.categorizedFields?.reduce((total, cat) =>
@@ -939,7 +941,7 @@ export const Table: React.FC<TableProps> = ({
             return (
               <TableHead
                 key={`section-${index}`}
-                className="text-center bg-green-50 border border-gray-300"
+                className="text-center bg-blue-100 border border-gray-300"
                 colSpan={colSpan}
               >
                 {section.name}
@@ -950,9 +952,11 @@ export const Table: React.FC<TableProps> = ({
 
         {/* Subsection Row */}
         <TableRow>
-          <TableHead className="w-12 text-center bg-green-100 border border-gray-300">Subsection</TableHead>
-          <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
+          <TableHead className="w-12 text-center bg-white border border-gray-300">Subsection</TableHead>
+          <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+          {/* {renderSeparatorCell(`cat-sep-start-${Date.now()}`, 'section')} */}
           <TableHead className="text-center bg-red-100 border border-gray-300"></TableHead>
+          {/* {renderSeparatorCell(`cat-sep-end-${Date.now()}`, 'section')} */}
           {processedSections.slice(1).map((section, sectionIndex) =>
             section.categorizedFields?.map((category, catIndex) => {
               if (category.isSeparator) return null;
@@ -961,7 +965,7 @@ export const Table: React.FC<TableProps> = ({
               return (
                 <TableHead
                   key={`subsec-${sectionIndex}-${catIndex}`}
-                  className="text-center bg-green-100 border border-gray-300"
+                  className="text-center bg-white border border-gray-300"
                   colSpan={colSpan}
                 >
                   {category.name}
@@ -973,9 +977,11 @@ export const Table: React.FC<TableProps> = ({
 
         {/* Column Reference Row */}
         <TableRow>
-          <TableHead className="w-12 text-center bg-green-200 border border-gray-300">CLM REF</TableHead>
-          <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
+          <TableHead className="w-12 text-center bg-gray-50 border border-gray-300">CLM REF</TableHead>
+          <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+          {/* {renderSeparatorCell(`col-ref-sep-start-${Date.now()}`, 'section')} */}
           <TableHead className="text-center bg-red-100 border border-gray-300"></TableHead>
+          {/* {renderSeparatorCell(`col-ref-sep-end-${Date.now()}`, 'section')} */}
           {processedSections.slice(1).map((section, sectionIndex) =>
             section.categorizedFields?.map((category, catIndex) =>
               category.fields.map((field, fieldIndex) => {
@@ -983,7 +989,7 @@ export const Table: React.FC<TableProps> = ({
                 return (
                   <TableHead
                     key={`col-ref-${sectionIndex}-${catIndex}-${fieldIndex}`}
-                    className="text-center w-40 bg-green-200 border border-gray-300"
+                    className="text-center w-40 bg-gray-50 border border-gray-300"
                   >
                     {colNumber}
                   </TableHead>
@@ -996,8 +1002,10 @@ export const Table: React.FC<TableProps> = ({
         {/* Lock Row */}
         <TableRow>
           <TableHead className="w-12 text-center bg-white border border-gray-300">Lock</TableHead>
-          <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
+          <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+          {/* {renderSeparatorCell(`lock-sep-start-${Date.now()}`, 'section')} */}
           <TableHead className="text-center bg-red-100 border border-gray-300"></TableHead>
+          {/* {renderSeparatorCell(`lock-sep-end-${Date.now()}`, 'section')} */}
           {processedSections.slice(1).map((section, sectionIndex) =>
             section.categorizedFields?.map((category, catIndex) =>
               category.fields.map((field, fieldIndex) => {
@@ -1025,8 +1033,10 @@ export const Table: React.FC<TableProps> = ({
         {/* Field Names Row */}
         <TableRow>
           <TableHead className="w-12 text-center bg-white border border-gray-300">Fieldsss</TableHead>
-          <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
+          <TableHead className='font-medium bg-green-100 text-white'></TableHead>
+          {/* {renderSeparatorCell(`col-sep-start`, 'section')} */}
           <TableHead className="text-center w-20 bg-red-100 border border-gray-300"></TableHead>
+          {/* {renderSeparatorCell(`col-sep-end`, 'section')} */}
           {processedSections.slice(1).map((section, sectionIndex) =>
             section.categorizedFields?.map((category, catIndex) =>
               category.fields.map((field, fieldIndex) => (
@@ -1084,13 +1094,13 @@ export const Table: React.FC<TableProps> = ({
             {/* Lock Column */}
             {isFirstRow && (
               <TableCell
-                className="text-center bg-emerald-100 border border-gray-300 cursor-pointer"
+                className="text-center bg-green-100 border border-gray-300 cursor-pointer"
                 rowSpan={companyGroup.rowSpan}
                 onClick={() => handleToggleRowLock(row, processedSections, setLockedRows, refreshData, lockedRows, activeMainTab, activeSubTab)}
               >
                 {isRowVerified ?
-                  <Lock className="h-5 w-5 text-rose-600 mx-auto" /> :
-                  <LockOpen className="h-5 w-5 text-emerald-600 mx-auto" />
+                  <Lock className="h-5 w-5 text-red-600 mx-auto" /> :
+                  <LockOpen className="h-5 w-5 text-green-600 mx-auto" />
                 }
               </TableCell>
             )}
@@ -1098,7 +1108,7 @@ export const Table: React.FC<TableProps> = ({
             {/* Missing Fields Column */}
             {isFirstRow && (
               <TableCell
-                className="text-center bg-rose-100 border border-gray-300 cursor-pointer"
+                className="text-center bg-red-100 border border-gray-300 cursor-pointer"
                 rowSpan={companyGroup.rowSpan}
                 onClick={() => onMissingFieldsClick(companyGroup)}
               >
@@ -1131,7 +1141,7 @@ export const Table: React.FC<TableProps> = ({
                     <TableCell
                       key={`${groupIndex}-${rowIndex}-${sectionIndex}-${catIndex}-${fieldIndex}`}
                       className={`whitespace-nowrap border border-gray-300 ${isEmpty ? 'bg-red-50' : ''
-                        } ${isColumnLocked ? 'bg-green-50' : ''}`}
+                        } ${isColumnLocked ? 'bg-gray-100' : ''}`}
                     >
                       <EditableCell
                         value={isEmpty ? 'N/A' : String(value)}
@@ -1159,7 +1169,7 @@ export const Table: React.FC<TableProps> = ({
                           }
                         }}
                         disabled={isRowVerified || isColumnLocked}
-                        textClassName={isEmpty ? 'text-rose-500' : ''}
+                        textClassName={isEmpty ? 'text-red-500' : ''}
                       />
                     </TableCell>
                   );
