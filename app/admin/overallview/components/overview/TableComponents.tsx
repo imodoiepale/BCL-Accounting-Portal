@@ -30,12 +30,68 @@ interface SortConfig {
   field: string | null;
   direction: 'asc' | 'desc' | null;
 }
-// Utility function to format dates
-const formatDate = (dateString: string) => {
+// Utility function to handle Excel date numbers and format dates
+const formatDate = (dateString: string | number) => {
   if (!dateString) return '';
-  const date = new Date(dateString);
-  return format(date, 'dd/MM/yyyy'); // Format as needed
+  
+  try {
+    let date: Date;
+
+    // Handle Excel date number (number of days since 1900-01-01)
+    if (typeof dateString === 'number' || !isNaN(Number(dateString))) {
+      const excelDate = Number(dateString);
+      if (excelDate > 59) { // Excel bug: treats 1900 as a leap year
+        date = new Date((excelDate - 25569) * 86400 * 1000);
+      } else {
+        date = new Date((excelDate - 25568) * 86400 * 1000);
+      }
+    } else {
+      // Handle date string formats (including dd/mm/yyyy)
+      const parts = dateString.split(/[-\/]/);
+      if (parts.length === 3) {
+        // Check if it's in dd/mm/yyyy format
+        if (parts[2].length === 4) {
+          date = new Date(
+            parseInt(parts[2]), // year
+            parseInt(parts[1]) - 1, // month (0-based)
+            parseInt(parts[0]) // day
+          );
+        } else {
+          // Try standard date parsing
+          date = new Date(dateString);
+        }
+      } else {
+        date = new Date(dateString);
+      }
+    }
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return dateString;
+    }
+
+    // Format as dd-mm-yyyy
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+
+    return `${day}-${month}-${year}`;
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return dateString;
+  }
 };
+
+// Helper function to check if a field is a date field
+const isDateField = (fieldName: string): boolean => {
+  const lowerFieldName = fieldName.toLowerCase();
+  return lowerFieldName.includes('date') ||
+    lowerFieldName.endsWith('_at') ||
+    lowerFieldName.endsWith('_on') ||
+    lowerFieldName.endsWith('_to') ||
+    lowerFieldName.endsWith('_from');
+};
+
 // Utility function to render separator cells
 export const renderSeparatorCell = (key: string, type: 'section' | 'category' | 'mini' = 'section', rowSpan: number = 1) => {
   const separatorWidths = {
@@ -293,7 +349,7 @@ const initializeVerificationStates = async (
 };
 
 // Render statistics rows
-const renderStatisticsRows = (data: any[], processedSections: any[]) => {
+const renderStatisticsRows = (data: any[], processedSections: any[], activeMainTab?: string) => {
   return (
     <>
       <TableRow>
@@ -306,11 +362,26 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
         {processedSections.slice(1).map((section, sectionIndex) =>
           section.categorizedFields?.map((category, catIndex) =>
             category.fields.map((field, fieldIndex) => {
+              // Skip index fields in company details tab
+              if (activeMainTab?.toLowerCase() === 'company details' && field.name.endsWith('.index')) {
+                return null;
+              }
               const stats = calculateFieldStatistics(field.name, data);
+              const isCompanyName = field.name.endsWith('.company_name');
+              const isIndex = field.name.endsWith('.index');
+
               return (
                 <TableCell
                   key={`total-${sectionIndex}-${catIndex}-${fieldIndex}`}
-                  className="text-center font-medium text-blue-600 bg-blue-50 border border-gray-300"
+                  className={`
+                    text-center font-medium text-blue-600 bg-blue-50 border border-gray-300
+                    ${isCompanyName ? 'sticky left-[144px] z-8 bg-blue-50' : ''}
+                    ${isIndex ? 'sticky left-[294px] z-8 bg-blue-50' : ''}
+                  `}
+                  style={{
+                    left: isCompanyName ? '144px' : isIndex ? '294px' : 'auto',
+                    position: isCompanyName || isIndex ? 'sticky' : 'static'
+                  }}
                 >
                   {stats.total}
                 </TableCell>
@@ -332,11 +403,25 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
         {processedSections.slice(1).map((section, sectionIndex) =>
           section.categorizedFields?.map((category, catIndex) =>
             category.fields.map((field, fieldIndex) => {
+              if (activeMainTab?.toLowerCase() === 'company details' && field.name.endsWith('.index')) {
+                return null;
+              }
               const stats = calculateFieldStatistics(field.name, data);
+              const isCompanyName = field.name.endsWith('.company_name');
+              const isIndex = field.name.endsWith('.index');
+
               return (
                 <TableCell
                   key={`completed-${sectionIndex}-${catIndex}-${fieldIndex}`}
-                  className="text-center font-medium text-green-600 bg-green-50 border border-gray-300"
+                  className={`
+                    text-center font-medium text-green-600 bg-green-50 border border-gray-300
+                    ${isCompanyName ? 'sticky left-[144px] z-8 bg-green-50' : ''}
+                    ${isIndex ? 'sticky left-[294px] z-8 bg-green-50' : ''}
+                  `}
+                  style={{
+                    left: isCompanyName ? '144px' : isIndex ? '294px' : 'auto',
+                    position: isCompanyName || isIndex ? 'sticky' : 'static'
+                  }}
                 >
                   {stats.completed}
                 </TableCell>
@@ -358,11 +443,25 @@ const renderStatisticsRows = (data: any[], processedSections: any[]) => {
         {processedSections.slice(1).map((section, sectionIndex) =>
           section.categorizedFields?.map((category, catIndex) =>
             category.fields.map((field, fieldIndex) => {
+              if (activeMainTab?.toLowerCase() === 'company details' && field.name.endsWith('.index')) {
+                return null;
+              }
               const stats = calculateFieldStatistics(field.name, data);
+              const isCompanyName = field.name.endsWith('.company_name');
+              const isIndex = field.name.endsWith('.index');
+
               return (
                 <TableCell
                   key={`missing-${sectionIndex}-${catIndex}-${fieldIndex}`}
-                  className="text-center font-medium text-red-600 bg-red-50 border border-gray-300"
+                  className={`
+                    text-center font-medium text-red-600 bg-red-50 border border-gray-300
+                    ${isCompanyName ? 'sticky left-[144px] z-8 bg-red-50' : ''}
+                    ${isIndex ? 'sticky left-[294px] z-8 bg-red-50' : ''}
+                  `}
+                  style={{
+                    left: isCompanyName ? '144px' : isIndex ? '294px' : 'auto',
+                    position: isCompanyName || isIndex ? 'sticky' : 'static'
+                  }}
                 >
                   {stats.pending}
                 </TableCell>
@@ -454,6 +553,7 @@ const handleToggleRowLock = async (
   }
 };
 
+// Render data rows
 const renderDataRows = (
   data: any[],
   handleCompanyClick: any,
@@ -472,9 +572,10 @@ const renderDataRows = (
       const tableName = row.sourceTable || getTableName(row);
       const rowId = row.id || row[`${tableName}_data`]?.id;
       const isRowVerified = lockedRows[`${tableName}_${rowId}`]?.is_verified;
+      const missingFieldsCount = isFirstRow ? calculateMissingFieldsForRow(row, processedSections) : 0;
 
       return (
-        <TableRow key={`${groupIndex}-${rowIndex}`}>
+        <TableRow key={`${groupIndex}-${rowIndex}`} className={`hover:bg-gray-50 ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
           {/* Index Column */}
           {isFirstRow && (
             <TableCell
@@ -488,13 +589,13 @@ const renderDataRows = (
           {/* Lock Column */}
           {isFirstRow && (
             <TableCell
-              className="text-center border border-gray-300"
+              className="text-center bg-emerald-100 border border-gray-300 cursor-pointer"
               rowSpan={companyGroup.rowSpan}
               onClick={() => handleToggleRowLock(row, processedSections, setLockedRows, refreshData, lockedRows, activeMainTab, activeSubTab)}
             >
               {isRowVerified ?
-                <Lock className="h-5 w-5 text-red-600 mx-auto" /> :
-                <LockOpen className="h-5 w-5 text-green-600 mx-auto" />
+                <Lock className="h-5 w-5 text-rose-600 mx-auto" /> :
+                <LockOpen className="h-5 w-5 text-emerald-600 mx-auto" />
               }
             </TableCell>
           )}
@@ -502,7 +603,7 @@ const renderDataRows = (
           {/* Missing Fields Column */}
           {isFirstRow && (
             <TableCell
-              className="text-center border border-gray-300 cursor-pointer bg-red-50/70" // Lighter red
+              className="text-center bg-rose-100 border border-gray-300 cursor-pointer"
               rowSpan={companyGroup.rowSpan}
               onClick={() => onMissingFieldsClick(companyGroup)}
             >
@@ -517,7 +618,7 @@ const renderDataRows = (
                 const [fieldTableName, columnName] = field.name.split('.');
                 let value;
 
-                // Get value from the correct data source
+                // Get value based on data structure
                 if (row.isAdditionalRow && row.sourceTable === fieldTableName) {
                   value = row[columnName];
                 } else if (row[`${fieldTableName}_data`]) {
@@ -530,15 +631,46 @@ const renderDataRows = (
 
                 const isColumnLocked = lockedColumns[`field_${fieldTableName}.${columnName}`]?.is_verified;
                 const isEmpty = value === null || value === undefined || value === '';
+                const isCompanyName = columnName === 'company_name';
+                const isIndex = columnName === 'index';
+                const isDate = isDateField(columnName);
+                
+                // Format display value based on column type
+                let displayValue = value;
+                if (isCompanyName) {
+                  displayValue = getCompanyNamePrefix(String(value));
+                } else if (isDate && value) {
+                  displayValue = formatDate(String(value));
+                }
+                
+                const fullValue = isDate && value ? formatDate(String(value)) : String(value);
+
+                // Skip index column after company_name for company details tab
+                if (activeMainTab?.toLowerCase() === 'company details' && isIndex) {
+                  return null;
+                }
 
                 return (
                   <TableCell
                     key={`${groupIndex}-${rowIndex}-${sectionIndex}-${catIndex}-${fieldIndex}`}
-                    className={`whitespace-nowrap border border-gray-300 ${isEmpty ? 'bg-rose-50' : ''
-                      } ${isColumnLocked ? 'bg-slate-100' : ''}`}
+                    className={`
+                      relative border border-gray-300 
+                      ${isEmpty ? 'bg-red-50' : ''} 
+                      ${isColumnLocked ? 'bg-green-50' : ''}
+                      ${isCompanyName ? 'sticky left-[144px] z-8 bg-white' : ''}
+                      ${isIndex ? 'sticky left-[294px] z-8 bg-white' : ''}
+                      hover:bg-gray-50 transition-colors
+                      w-[150px] max-w-[150px] px-3 py-2
+                      overflow-hidden text-ellipsis whitespace-nowrap
+                    `}
+                    style={{
+                      left: isCompanyName ? '144px' : isIndex ? '294px' : 'auto',
+                      position: isCompanyName || isIndex ? 'sticky' : 'static'
+                    }}
+                    title={fullValue}
                   >
                     <EditableCell
-                      value={isEmpty ? 'N/A' : String(value)}
+                      value={isEmpty ? 'N/A' : String(displayValue)}
                       onSave={async (newValue) => {
                         if (isRowVerified || isColumnLocked) {
                           toast.error("This field is locked and cannot be edited");
@@ -563,8 +695,21 @@ const renderDataRows = (
                         }
                       }}
                       disabled={isRowVerified || isColumnLocked}
-                      textClassName={isEmpty ? 'text-rose-500' : ''}
+                      textClassName={`
+                        ${isEmpty ? 'text-rose-500' : ''}
+                        truncate
+                      `}
                     />
+                    {/* Simple white hover tooltip for long content */}
+                    {value && value.length > 20 && (
+                      <div className="
+                        absolute left-0 -top-8 hidden hover:block
+                        bg-white text-gray-900 p-2 rounded shadow-lg text-sm
+                        max-w-[300px] z-50 whitespace-normal border border-gray-200
+                      ">
+                        {fullValue}
+                      </div>
+                    )}
                   </TableCell>
                 );
               })
@@ -653,6 +798,227 @@ const findFieldInStructure = (structure: any, tableName: string, fieldName: stri
     }
   }
   return null;
+};
+
+// Add this utility function near the top with other utility functions
+const getCompanyNamePrefix = (companyName: string) => {
+  if (!companyName) return '';
+  const words = companyName.split(' ');
+  if (words.length <= 2) return companyName;
+  return words.slice(0, 2).join(' ') + '...';
+};
+
+const renderHeaders = (
+  processedSections: any[],
+  sortConfig: SortConfig,
+  handleSort: (field: string) => void,
+  handleToggleColumnLock: (columnName: string) => void,
+  lockedColumns: Record<string, boolean>,
+  lockedRows: Record<string, boolean>,
+  activeMainTab: string
+) => {
+  let columnCounter = 1;
+
+  return (
+    <>
+      {/* Section Reference Row */}
+      <TableRow>
+        <TableHead className="w-12 text-center sticky left-0 z-20 bg-yellow-50 text-slate-800 border border-gray-300">Sec Ref</TableHead>
+        <TableHead className="w-12 text-center bg-green-600 text-white border border-gray-300">Verify</TableHead>
+        <TableHead className="text-center w-20 bg-red-500 text-white border border-gray-300">Missing Fields</TableHead>
+        {processedSections.slice(1).map((section, index) => {
+          if (section.isSeparator) return null;
+          
+          const fields = section.categorizedFields?.flatMap(cat => 
+            !cat.isSeparator ? cat.fields.filter(field => 
+              !(activeMainTab?.toLowerCase() === 'company details' && field.name.endsWith('.index'))
+            ) : []
+          );
+          
+          const colSpan = fields?.length || 0;
+
+          return (
+            <TableHead
+              key={`sec-ref-${index}`}
+              className="text-center bg-yellow-50 text-slate-800 border border-gray-300"
+              colSpan={colSpan}
+            >
+              {index + 1}
+            </TableHead>
+          );
+        })}
+      </TableRow>
+
+      {/* Section Names Row */}
+      <TableRow>
+        <TableHead className="w-12 text-center bg-blue-600 text-white border border-gray-300">Section</TableHead>
+        <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
+        <TableHead className="text-center bg-red-100 border border-gray-300">Per Row</TableHead>
+        {processedSections.slice(1).map((section, index) => {
+          if (section.isSeparator) return null;
+          
+          const fields = section.categorizedFields?.flatMap(cat => 
+            !cat.isSeparator ? cat.fields.filter(field => 
+              !(activeMainTab?.toLowerCase() === 'company details' && field.name.endsWith('.index'))
+            ) : []
+          );
+          
+          const colSpan = fields?.length || 0;
+
+          return (
+            <TableHead
+              key={`section-${index}`}
+              className="text-center bg-blue-600 text-white border border-gray-300"
+              colSpan={colSpan}
+            >
+              {section.name}
+            </TableHead>
+          );
+        })}
+      </TableRow>
+
+      {/* Subsection Row */}
+      <TableRow>
+        <TableHead className="w-12 text-center bg-blue-100 text-slate-800 border border-gray-300">Subsection</TableHead>
+        <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
+        <TableHead className="text-center bg-red-100 border border-gray-300"></TableHead>
+        {processedSections.slice(1).map((section, sectionIndex) =>
+          section.categorizedFields?.map((category, catIndex) => {
+            if (category.isSeparator) return null;
+            
+            const fields = category.fields.filter(field => 
+              !(activeMainTab?.toLowerCase() === 'company details' && field.name.endsWith('.index'))
+            );
+            
+            const colSpan = fields.length;
+
+            return (
+              <TableHead
+                key={`subsec-${sectionIndex}-${catIndex}`}
+                className="text-center bg-blue-100 text-slate-800 border border-gray-300"
+                colSpan={colSpan}
+              >
+                {category.name}
+              </TableHead>
+            );
+          })
+        )}
+      </TableRow>
+
+      {/* Column Reference Row */}
+      <TableRow>
+        <TableHead className="w-12 text-center bg-yellow-50 text-slate-800 border border-gray-300">CLM REF</TableHead>
+        <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
+        <TableHead className="text-center bg-red-100 border border-gray-300"></TableHead>
+        {processedSections.slice(1).map((section, sectionIndex) =>
+          section.categorizedFields?.map((category, catIndex) =>
+            category.fields.map((field, fieldIndex) => {
+              if (activeMainTab?.toLowerCase() === 'company details' && field.name.endsWith('.index')) {
+                return null;
+              }
+              const colNumber = columnCounter++;
+              const isCompanyName = field.name.endsWith('.company_name');
+              const isIndex = field.name.endsWith('.index');
+
+              return (
+                <TableHead
+                  key={`col-ref-${sectionIndex}-${catIndex}-${fieldIndex}`}
+                  className={`
+                    text-center w-40 bg-yellow-50 text-slate-800 border border-gray-300
+                    ${isCompanyName ? 'sticky left-[144px] z-8 bg-yellow-50' : ''}
+                    ${isIndex ? 'sticky left-[294px] z-8 bg-yellow-50' : ''}
+                  `}
+                  style={{
+                    left: isCompanyName ? '144px' : isIndex ? '294px' : 'auto',
+                    position: isCompanyName || isIndex ? 'sticky' : 'static'
+                  }}
+                >
+                  {colNumber}
+                </TableHead>
+              );
+            })
+          )
+        )}
+      </TableRow>
+
+      {/* Lock Row */}
+      <TableRow>
+        <TableHead className="w-12 text-center bg-red-100 text-slate-800 border border-gray-300">Lock</TableHead>
+        <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
+        <TableHead className="text-center bg-red-100 border border-gray-300"></TableHead>
+        {processedSections.slice(1).map((section, sectionIndex) =>
+          section.categorizedFields?.map((category, catIndex) =>
+            category.fields.map((field, fieldIndex) => {
+              if (activeMainTab?.toLowerCase() === 'company details' && field.name.endsWith('.index')) {
+                return null;
+              }
+              const [fieldTableName, columnName] = field.name.split('.');
+              const isColumnLocked = lockedColumns[`field_${fieldTableName}.${columnName}`]?.is_verified;
+              const isCompanyName = field.name.endsWith('.company_name');
+              const isIndex = field.name.endsWith('.index');
+
+              return (
+                <TableHead
+                  key={`lock-${sectionIndex}-${catIndex}-${fieldIndex}`}
+                  className={`
+                    text-center w-40 bg-red-100 text-slate-800 border border-gray-300 cursor-pointer hover:bg-gray-50
+                    ${isCompanyName ? 'sticky left-[144px] z-8 bg-red-100' : ''}
+                    ${isIndex ? 'sticky left-[294px] z-8 bg-red-100' : ''}
+                  `}
+                  style={{
+                    left: isCompanyName ? '144px' : isIndex ? '294px' : 'auto',
+                    position: isCompanyName || isIndex ? 'sticky' : 'static'
+                  }}
+                  onClick={() => handleToggleColumnLock(`${fieldTableName}.${columnName}`)}
+                >
+                  {isColumnLocked ? (
+                    <Lock className="h-5 w-5 text-red-600 mx-auto" />
+                  ) : (
+                    <LockOpen className="h-5 w-5 text-green-600 mx-auto" />
+                  )}
+                </TableHead>
+              );
+            })
+          )
+        )}
+      </TableRow>
+
+      {/* Field Names Row */}
+      <TableRow>
+        <TableHead className="w-12 text-center bg-blue-500 text-white border border-gray-300">Fields</TableHead>
+        <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
+        <TableHead className="text-center w-20 bg-red-100 border border-gray-300"></TableHead>
+        {processedSections.slice(1).map((section, sectionIndex) =>
+          section.categorizedFields?.map((category, catIndex) =>
+            category.fields.map((field, fieldIndex) => {
+              if (activeMainTab?.toLowerCase() === 'company details' && field.name.endsWith('.index')) {
+                return null;
+              }
+              const isCompanyName = field.name.endsWith('.company_name');
+              const isIndex = field.name.endsWith('.index');
+
+              return (
+                <TableHead
+                  key={`field-${sectionIndex}-${catIndex}-${fieldIndex}`}
+                  className={`
+                    text-center w-40 bg-blue-500 text-white border border-gray-300
+                    ${isCompanyName ? 'sticky left-[144px] z-8 bg-blue-500' : ''}
+                    ${isIndex ? 'sticky left-[294px] z-8 bg-white text-slate-800' : ''}
+                  `}
+                  style={{
+                    left: isCompanyName ? '144px' : isIndex ? '294px' : 'auto',
+                    position: isCompanyName || isIndex ? 'sticky' : 'static'
+                  }}
+                >
+                  {field.label || field.name.split('.')[1]}
+                </TableHead>
+              );
+            })
+          )
+        )}
+      </TableRow>
+    </>
+  );
 };
 
 // Updated Table component with sticky headers
@@ -892,286 +1258,6 @@ export const Table: React.FC<TableProps> = ({
     }
   };
 
-  const renderHeaders = (
-    processedSections: any[],
-    sortConfig: SortConfig,
-    handleSort: (field: string) => void,
-    handleToggleColumnLock: (columnName: string) => void,
-    lockedColumns: Record<string, boolean>,
-    lockedRows: Record<string, boolean>
-  ) => {
-    let columnCounter = 1;
-
-    return (
-      <>
-        {/* Section Reference Row */}
-        <TableRow>
-          <TableHead className="w-12 text-center sticky left-0 z-20 bg-green-50 text-slate-800 border border-gray-300">Section</TableHead>
-          <TableHead className="w-12 text-center bg-green-600 text-white border border-gray-300">Verify</TableHead>
-          <TableHead className="text-center w-20 bg-red-500 text-white border border-gray-300">Missing Fields</TableHead>
-          {processedSections.slice(1).map((section, index) => {
-            if (section.isSeparator) return null;
-            const colSpan = section.categorizedFields?.reduce((total, cat) =>
-              total + (!cat.isSeparator ? cat.fields.length : 0), 0);
-
-            return (
-              <TableHead
-                key={`sec-ref-${index}`}
-                className="text-center bg-slate-600 text-white border border-gray-300"
-                colSpan={colSpan}
-              >
-                {index + 1}
-              </TableHead>
-            );
-          })}
-        </TableRow>
-
-        {/* Section Names Row */}
-        <TableRow>
-          <TableHead className="w-12 text-center bg-green-50 border border-gray-300">Subsection</TableHead>
-          <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
-          <TableHead className="text-center bg-red-100 border border-gray-300">Per Row</TableHead>
-          {processedSections.slice(1).map((section, index) => {
-            if (section.isSeparator) return null;
-            const colSpan = section.categorizedFields?.reduce((total, cat) =>
-              total + (!cat.isSeparator ? cat.fields.length : 0), 0);
-
-            return (
-              <TableHead
-                key={`section-${index}`}
-                className="text-center bg-green-50 border border-gray-300"
-                colSpan={colSpan}
-              >
-                {section.name}
-              </TableHead>
-            );
-          })}
-        </TableRow>
-
-        {/* Subsection Row */}
-        <TableRow>
-          <TableHead className="w-12 text-center bg-green-100 border border-gray-300">Subsection</TableHead>
-          <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
-          <TableHead className="text-center bg-red-100 border border-gray-300"></TableHead>
-          {processedSections.slice(1).map((section, sectionIndex) =>
-            section.categorizedFields?.map((category, catIndex) => {
-              if (category.isSeparator) return null;
-              const colSpan = category.fields.length;
-
-              return (
-                <TableHead
-                  key={`subsec-${sectionIndex}-${catIndex}`}
-                  className="text-center bg-green-100 border border-gray-300"
-                  colSpan={colSpan}
-                >
-                  {category.name}
-                </TableHead>
-              );
-            })
-          )}
-        </TableRow>
-
-        {/* Column Reference Row */}
-        <TableRow>
-          <TableHead className="w-12 text-center bg-green-200 border border-gray-300">CLM REF</TableHead>
-          <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
-          <TableHead className="text-center bg-red-100 border border-gray-300"></TableHead>
-          {processedSections.slice(1).map((section, sectionIndex) =>
-            section.categorizedFields?.map((category, catIndex) =>
-              category.fields.map((field, fieldIndex) => {
-                const colNumber = columnCounter++;
-                return (
-                  <TableHead
-                    key={`col-ref-${sectionIndex}-${catIndex}-${fieldIndex}`}
-                    className="text-center w-40 bg-green-200 border border-gray-300"
-                  >
-                    {colNumber}
-                  </TableHead>
-                );
-              })
-            )
-          )}
-        </TableRow>
-
-        {/* Lock Row */}
-        <TableRow>
-          <TableHead className="w-12 text-center bg-white border border-gray-300">Lock</TableHead>
-          <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
-          <TableHead className="text-center bg-red-100 border border-gray-300"></TableHead>
-          {processedSections.slice(1).map((section, sectionIndex) =>
-            section.categorizedFields?.map((category, catIndex) =>
-              category.fields.map((field, fieldIndex) => {
-                const [fieldTableName, columnName] = field.name.split('.');
-                const isColumnLocked = lockedColumns[`field_${fieldTableName}.${columnName}`]?.is_verified;
-
-                return (
-                  <TableHead
-                    key={`lock-${sectionIndex}-${catIndex}-${fieldIndex}`}
-                    className="text-center w-40 bg-white border border-gray-300 cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleToggleColumnLock(`${fieldTableName}.${columnName}`)}
-                  >
-                    {isColumnLocked ? (
-                      <Lock className="h-5 w-5 text-red-600 mx-auto" />
-                    ) : (
-                      <LockOpen className="h-5 w-5 text-green-600 mx-auto" />
-                    )}
-                  </TableHead>
-                );
-              })
-            )
-          )}
-        </TableRow>
-
-        {/* Field Names Row */}
-        <TableRow>
-          <TableHead className="w-12 text-center bg-white border border-gray-300">Fieldsss</TableHead>
-          <TableHead className='font-medium bg-green-100 text-slate-800'></TableHead>
-          <TableHead className="text-center w-20 bg-red-100 border border-gray-300"></TableHead>
-          {processedSections.slice(1).map((section, sectionIndex) =>
-            section.categorizedFields?.map((category, catIndex) =>
-              category.fields.map((field, fieldIndex) => (
-                <TableHead
-                  key={`field-${sectionIndex}-${catIndex}-${fieldIndex}`}
-                  className="text-center w-40 bg-white border border-gray-300"
-                >
-                  {field.label || field.name.split('.')[1]}
-                </TableHead>
-              ))
-            )
-          )}
-        </TableRow>
-      </>
-    );
-  };
-
-  const renderDataRows = (
-    data: any[],
-    handleCompanyClick: any,
-    onMissingFieldsClick: any,
-    processedSections: any[],
-    refreshData: any,
-    lockedRows: any,
-    lockedColumns: any,
-    activeMainTab: string,
-    activeSubTab: string,
-    setLockedRows: any
-  ) => {
-    if (!Array.isArray(data)) {
-      console.error('Data is not an array:', data);
-      return null;
-    }
-
-    return data.map((companyGroup, groupIndex) =>
-      companyGroup.rows.map((row, rowIndex) => {
-        const isFirstRow = rowIndex === 0;
-        const tableName = row.sourceTable || getTableName(row);
-        const rowId = row.id || row[`${tableName}_data`]?.id;
-        const isRowVerified = lockedRows[`${tableName}_${rowId}`]?.is_verified;
-        const missingFieldsCount = isFirstRow ? calculateMissingFieldsForRow(row, processedSections) : 0;
-
-        return (
-          <TableRow key={`${groupIndex}-${rowIndex}`} className={`hover:bg-gray-50 ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-            {/* Index Column */}
-            {isFirstRow && (
-              <TableCell
-                className="whitespace-nowrap font-medium text-center border border-gray-300"
-                rowSpan={companyGroup.rowSpan}
-              >
-                {groupIndex + 1}
-              </TableCell>
-            )}
-
-            {/* Lock Column */}
-            {isFirstRow && (
-              <TableCell
-                className="text-center bg-emerald-100 border border-gray-300 cursor-pointer"
-                rowSpan={companyGroup.rowSpan}
-                onClick={() => handleToggleRowLock(row, processedSections, setLockedRows, refreshData, lockedRows, activeMainTab, activeSubTab)}
-              >
-                {isRowVerified ?
-                  <Lock className="h-5 w-5 text-rose-600 mx-auto" /> :
-                  <LockOpen className="h-5 w-5 text-emerald-600 mx-auto" />
-                }
-              </TableCell>
-            )}
-
-            {/* Missing Fields Column */}
-            {isFirstRow && (
-              <TableCell
-                className="text-center bg-rose-100 border border-gray-300 cursor-pointer"
-                rowSpan={companyGroup.rowSpan}
-                onClick={() => onMissingFieldsClick(companyGroup)}
-              >
-                {missingFieldsCount}
-              </TableCell>
-            )}
-
-            {/* Data Fields */}
-            {processedSections.slice(1).map((section, sectionIndex) =>
-              section.categorizedFields?.map((category, catIndex) =>
-                category.fields.map((field, fieldIndex) => {
-                  const [fieldTableName, columnName] = field.name.split('.');
-                  let value;
-
-                  // Get value based on data structure
-                  if (row.isAdditionalRow && row.sourceTable === fieldTableName) {
-                    value = row[columnName];
-                  } else if (row[`${fieldTableName}_data`]) {
-                    value = row[`${fieldTableName}_data`][columnName];
-                  } else if (row.related_data?.[`${fieldTableName}_data`]?.[0]) {
-                    value = row.related_data[`${fieldTableName}_data`][0][columnName];
-                  } else {
-                    value = row[columnName];
-                  }
-
-                  const isColumnLocked = lockedColumns[`field_${fieldTableName}.${columnName}`]?.is_verified;
-                  const isEmpty = value === null || value === undefined || value === '';
-
-                  return (
-                    <TableCell
-                      key={`${groupIndex}-${rowIndex}-${sectionIndex}-${catIndex}-${fieldIndex}`}
-                      className={`whitespace-nowrap border border-gray-300 ${isEmpty ? 'bg-red-50' : ''
-                        } ${isColumnLocked ? 'bg-green-50' : ''}`}
-                    >
-                      <EditableCell
-                        value={isEmpty ? 'N/A' : String(value)}
-                        onSave={async (newValue) => {
-                          if (isRowVerified || isColumnLocked) {
-                            toast.error("This field is locked and cannot be edited");
-                            return;
-                          }
-                          try {
-                            const { error } = await supabase
-                              .from(fieldTableName)
-                              .update({
-                                [columnName]: newValue,
-                                updated_at: new Date().toISOString(),
-                                updated_by: 'current_user'
-                              })
-                              .eq('id', rowId);
-
-                            if (error) throw error;
-                            refreshData();
-                            toast.success("Field updated successfully");
-                          } catch (error) {
-                            console.error('Error updating field:', error);
-                            toast.error("Failed to update field");
-                          }
-                        }}
-                        disabled={isRowVerified || isColumnLocked}
-                        textClassName={isEmpty ? 'text-rose-500' : ''}
-                      />
-                    </TableCell>
-                  );
-                })
-              )
-            )}
-          </TableRow>
-        );
-      })
-    );
-  };
-
   if (!processedSections || !Array.isArray(processedSections)) {
     return null;
   }
@@ -1188,9 +1274,10 @@ export const Table: React.FC<TableProps> = ({
                 handleSort,
                 handleToggleColumnLock,
                 lockedRows,
-                lockedColumns
+                lockedColumns,
+                activeMainTab
               )}
-              {renderStatisticsRows(data, localProcessedSections)}
+              {renderStatisticsRows(data, localProcessedSections, activeMainTab)}
             </TableHeader>
             <TableBody>
               {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, localProcessedSections, refreshData, lockedRows, lockedColumns, activeMainTab, activeSubTab, setLockedRows)}
