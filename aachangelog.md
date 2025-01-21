@@ -1,5 +1,61 @@
 # BCL Accounting Portal Changelog
 
+## [1.6.0] - 2025-01-21
+
+### Added
+- Implemented new state management system using Zustand
+  - Created centralized store for settings management
+  - Added type-safe state updates
+  - Improved state synchronization
+- Enhanced Settings Dialog with improved architecture
+  - Separated concerns into multiple files
+  - Added proper TypeScript interfaces
+  - Improved error handling
+
+### Changed
+- Refactored visibility and order management
+  - Moved to atomic state updates
+  - Added optimistic updates for better UX
+  - Improved error recovery
+- Enhanced UI/UX consistency
+  - Updated component styling
+  - Added proper loading states
+  - Improved error feedback
+
+### Technical Details
+- Added `settingsStore.ts` for centralized state management
+- Updated `visibilityHandler.ts` with new state system
+- Created `NewSettingsDialog.tsx` with improved architecture
+- Added comprehensive TypeScript interfaces
+- Implemented atomic database updates
+
+## [1.5.0] - 2024-01-18
+
+### Added
+- Enhanced Settings Dialog with improved structure management
+  - Hierarchical navigation for tabs, sections, and subsections
+  - Drag-and-drop reordering functionality
+  - Visibility toggles at all levels
+  - Column management with field mapping
+  - Multi-select dialog for table and field selection
+  - Improved state synchronization across components
+
+### Changed
+- Updated UI components to follow modern design principles
+  - Implemented consistent spacing and typography
+  - Enhanced responsive layouts
+  - Added accessible color schemes
+  - Improved visual hierarchy
+- Optimized state management for better performance
+- Enhanced error handling and validation
+
+### Technical Details
+- Added new state management system for order tracking
+- Implemented atomic database updates
+- Enhanced component structure with TypeScript interfaces
+- Added comprehensive error handling
+- Improved component reusability
+
 ## [1.4.1] - 2025-01-14
 
 ### Changed

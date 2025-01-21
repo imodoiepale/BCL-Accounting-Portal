@@ -159,6 +159,95 @@ Let me know which parts you'd like me to expand on or help implement!
 
 # BCL Accounting Portal Implementation Guidelines
 
+## Code Integration Guidelines
+
+### 1. Step-by-Step Implementation Process
+Every code integration must follow these steps:
+
+#### A. Pre-Implementation
+1. **Dependency Validation**
+   - Check package.json for required dependencies
+   - Verify version compatibility
+   - Document any new dependencies needed
+
+2. **Code Style Verification**
+   - Ensure TypeScript types are properly defined
+   - Follow project's ESLint configuration
+   - Maintain consistent naming conventions
+
+3. **Version Control Preparation**
+   - Create feature branch from latest main
+   - Document branch naming convention
+   - Plan commit structure
+
+#### B. Implementation
+1. **Component Development**
+   - Create modular components
+   - Implement proper TypeScript interfaces
+   - Add comprehensive error handling
+   - Include loading states
+
+2. **State Management**
+   - Use appropriate state management solution
+   - Implement proper data flow
+   - Add error boundaries
+   - Handle side effects consistently
+
+3. **UI/UX Implementation**
+   - Follow design system guidelines
+   - Ensure responsive design
+   - Implement accessibility features
+   - Add loading and error states
+
+#### C. Post-Implementation
+1. **Testing**
+   - Add unit tests for new components
+   - Verify backward compatibility
+   - Test across different screen sizes
+   - Validate accessibility
+
+2. **Documentation**
+   - Update technical documentation
+   - Add inline code comments
+   - Update changelog
+   - Document any breaking changes
+
+### 2. UI/UX Standards
+When implementing UI components:
+
+#### A. Component Library Usage
+- Use Next.js for framework
+- Implement Tailwind CSS for styling
+- Utilize Lucide for icons
+- Leverage ShadcnUI components
+
+#### B. Design Principles
+- Maintain consistent spacing
+- Follow typography hierarchy
+- Use accessible color schemes
+- Implement responsive layouts
+
+#### C. Component Structure
+- Create atomic components
+- Implement proper prop interfaces
+- Add loading states
+- Handle errors gracefully
+
+### 3. Feature Preservation
+When adding or modifying features:
+
+#### A. Compatibility Checks
+- Verify existing functionality
+- Test integration points
+- Validate data flow
+- Check performance impact
+
+#### B. Testing Requirements
+- Add regression tests
+- Implement integration tests
+- Verify backward compatibility
+- Document test cases
+
 ## Core Implementation Principles
 
 ### 1. Step-by-Step Implementation & Code Integration
