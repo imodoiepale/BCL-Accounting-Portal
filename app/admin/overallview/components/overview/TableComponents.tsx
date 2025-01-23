@@ -15,6 +15,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import SidebarTableView from './SidebarTableView';
 import { Lock, LockOpen } from 'lucide-react';
+import { Settings } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 import { handleFieldVerification } from './handleFieldVerification';
 interface TableProps {
   data: any[];
@@ -24,6 +26,7 @@ interface TableProps {
   refreshData: () => Promise<void>;
   activeMainTab: string;  // Ensure this is string
   activeSubTab: string;
+  onSettingsClick?: () => void;
 }
 
 interface SortConfig {
@@ -234,7 +237,7 @@ const initializeFieldVerificationStates = async (
       .from('profile_category_table_mapping_2')
       .select('structure')
       .eq('main_tab', activeMainTab)
-      .eq('Tabs', activeSubTab)
+      .eq('sub_tab', activeSubTab)
       .single();
 
     if (!mappingData) return;
@@ -1030,6 +1033,7 @@ export const Table: React.FC<TableProps> = ({
   activeSubTab = '', // Provide default value
   processedSections = [], // Provide default empty array
   onMissingFieldsClick,
+  onSettingsClick,
 }) => {
 
   const [sortConfig, setSortConfig] = useState<{
@@ -1179,7 +1183,7 @@ export const Table: React.FC<TableProps> = ({
         .from('profile_category_table_mapping_2')
         .select('*')
         .eq('main_tab', activeMainTab)
-        .eq('Tabs', activeSubTab)
+        .eq('sub_tab', activeSubTab)
         .single();
 
       if (fetchError) throw fetchError;
@@ -1263,29 +1267,31 @@ export const Table: React.FC<TableProps> = ({
   }
 
   return (
-    <Card className="shadow border rounded-none">
-      <CardContent className="p-0 h-[900px]">
-        <ScrollArea className="h-[900px]">
-          <UITable>
-            <TableHeader className="sticky top-0 z-10 bg-white border-b">
-              {renderHeaders(
-                localProcessedSections,
-                sortConfig,
-                handleSort,
-                handleToggleColumnLock,
-                lockedRows,
-                lockedColumns,
-                activeMainTab
-              )}
-              {renderStatisticsRows(data, localProcessedSections, activeMainTab)}
-            </TableHeader>
-            <TableBody>
-              {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, localProcessedSections, refreshData, lockedRows, lockedColumns, activeMainTab, activeSubTab, setLockedRows)}
-            </TableBody>
-          </UITable>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+    <div className="relative">
+      <Card className="shadow border rounded-none">
+        <CardContent className="p-0 h-[900px]">
+          <ScrollArea className="h-[900px]">
+            <UITable>
+              <TableHeader className="sticky top-0 z-10 bg-white border-b">
+                {renderHeaders(
+                  localProcessedSections,
+                  sortConfig,
+                  handleSort,
+                  handleToggleColumnLock,
+                  lockedRows,
+                  lockedColumns,
+                  activeMainTab
+                )}
+                {renderStatisticsRows(data, localProcessedSections, activeMainTab)}
+              </TableHeader>
+              <TableBody>
+                {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, localProcessedSections, refreshData, lockedRows, lockedColumns, activeMainTab, activeSubTab, setLockedRows)}
+              </TableBody>
+            </UITable>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

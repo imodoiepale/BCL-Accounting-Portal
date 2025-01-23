@@ -121,7 +121,7 @@ export const groupDataByCategory = (fields: any[]) => {
           const { data: mappings, error: mappingError } = await supabase
               .from('profile_category_table_mapping_2')
               .select('*')
-              .eq('Tabs', activeSubTab)
+              .eq('sub_tab', activeSubTab)
               .eq('main_tab', activeMainTab);
 
           if (mappingError) throw mappingError;
@@ -320,7 +320,7 @@ export const handleImport = async (file: File, activeMainTab: string, activeSubT
                       company_id: company.id,
                       company_name: company.name
                   };
-              
+　　 　 　 　
                   dataToUpdate.get(tableName)?.push(recordToUpdate);
               }
           }
@@ -473,7 +473,7 @@ export const getMissingFields = (row: any, processedSections: any[]) => {
             category.fields.forEach(field => {
               const [tableName, columnName] = field.name.split('.');
               let value;
-　　 　　　　　　// For acc_portal_company_duplicate table
+　　 　　　　　　　// For acc_portal_company_duplicate table
               if (row.isAdditionalRow && row.sourceTable === tableName) {
                 value = row[columnName];
               } else if (row[`${tableName}_data`]) {

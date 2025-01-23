@@ -31,7 +31,7 @@ export const handleFieldVerification = async (
         .from('profile_category_table_mapping_2')
         .select('structure')
         .eq('main_tab', mainTab)
-        .eq('Tabs', subTab)
+        .eq('sub_tab', subTab)
         .single();
   
       if (mappingError) {
@@ -71,7 +71,7 @@ export const handleFieldVerification = async (
             if (isMatch) {
               fieldFound = true;
               console.log('Found matching field:', fieldObj.name);
-              
+　　 　 　 　
               return {
                 ...fieldObj,
                 verification: {
