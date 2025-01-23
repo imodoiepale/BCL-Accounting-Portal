@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Settings, Upload, Download } from 'lucide-react';
 import { toast } from "sonner";
 import dynamic from 'next/dynamic';
+import { StructureService } from '@/services/structureService_v2';
+import type { Structure, StructureMapping } from '@/types/structure_v2';
 import { handleExport, handleImport } from './components/utility';
 
 // Dynamic imports
@@ -21,7 +23,6 @@ const Table = dynamic(() =>
 const SettingsDialog = dynamic(() =>
     import('./components/overview/Dialogs/settingsDialog').then(mod => mod.SettingsDialog || mod.default), {
     ssr: false,
-    loading: () => <div>Loading settings...</div>
 });
 
 const MissingFieldsDialog = dynamic(() =>
@@ -57,19 +58,19 @@ interface OrderSettings {
     fields: Record<string, number>;
 }
 
-const processTabData = (tableData: any, mapping: any) => {
+const processTabData = (tableData: any, structure: Structure | null) => {
     try {
         // Get base company data
         const companies = tableData['acc_portal_company_duplicate'] || [];
         const relevantTables = new Set(['acc_portal_company_duplicate']);
         const processedData = [];
 
-        // Extract relevant tables from mapping structure
-        if (mapping?.structure?.sections) {
-            mapping.structure.sections.forEach(section => {
+        // Extract relevant tables from structure
+        if (structure?.sections) {
+            structure.sections.forEach(section => {
                 section.subsections?.forEach(subsection => {
-                    subsection.tables?.forEach(table => {
-                        relevantTables.add(table);
+                    subsection.fields?.forEach(field => {
+                        relevantTables.add(field.table);
                     });
                 });
             });
@@ -88,7 +89,7 @@ const processTabData = (tableData: any, mapping: any) => {
                 }
             };
 
-            // Create base company row with verification status
+            // Create base company row
             const baseRow = {
                 id: company.id,
                 company_name: company.company_name,
@@ -100,58 +101,28 @@ const processTabData = (tableData: any, mapping: any) => {
                 ...company
             };
 
-            // Process related tables and their data
-            const relatedData = {};
-            relevantTables.forEach(tableName => {
-                if (tableName === 'acc_portal_company_duplicate') return;
+            companyGroup.rows.push(baseRow);
 
-                const records = tableData[tableName]?.filter(
-                    row => row.company_id === company.id
-                ) || [];
-
-                if (records.length > 0) {
-                    relatedData[`${tableName}_data`] = records;
-                    
-                    // Add additional rows for each related record
-                    records.forEach((record, idx) => {
-                        companyGroup.rows.push({
-                            id: record.id,
-                            company_name: company.company_name,
-                            index: idx + 1,
-                            isFirstRow: false,
-                            isAdditionalRow: true,
-                            sourceTable: tableName,
-                            verification_status: record.verification_status || {},
-                            [`${tableName}_data`]: record,
-                            ...record
-                        });
-                    });
-                }
-            });
-
-            // Add related data to base row
-            baseRow.related_data = relatedData;
-            companyGroup.rows.unshift(baseRow);
-            companyGroup.rowSpan = companyGroup.rows.length;
-
-            // Calculate statistics for the company group
-            if (mapping?.structure?.sections) {
-                mapping.structure.sections.forEach(section => {
-                    section.subsections?.forEach(subsection => {
-                        subsection.fields?.forEach(field => {
-                            companyGroup.stats.totalFields++;
-                            const [tableName, fieldName] = field.name.split('.');
-                            const value = baseRow[fieldName] || 
-                                        baseRow[`${tableName}_data`]?.[fieldName] || 
-                                        relatedData[`${tableName}_data`]?.[0]?.[fieldName];
-                            
-                            if (value !== null && value !== undefined && value !== '') {
-                                companyGroup.stats.completedFields++;
-                            } else {
-                                companyGroup.stats.missingFields++;
+            // Process fields from structure
+            if (structure?.sections) {
+                structure.sections.forEach(section => {
+                    if (structure.visibility.sections[section.name]) {
+                        section.subsections.forEach(subsection => {
+                            if (structure.visibility.subsections[subsection.name]) {
+                                subsection.fields.forEach(field => {
+                                    if (structure.visibility.fields[field.name]) {
+                                        companyGroup.stats.totalFields++;
+                                        const value = tableData[field.table]?.[field.column];
+                                        if (value !== undefined && value !== null && value !== '') {
+                                            companyGroup.stats.completedFields++;
+                                        } else {
+                                            companyGroup.stats.missingFields++;
+                                        }
+                                    }
+                                });
                             }
                         });
-                    });
+                    }
                 });
             }
 
@@ -173,10 +144,14 @@ const OverallView: React.FC = () => {
     const [companies, setCompanies] = useState<any[]>([]);
     const [activeMainTab, setActiveMainTab] = useState<string>('');
     const [activeSubTab, setActiveSubTab] = useState<string>('');
-    const [structure, setStructure] = useState<any[]>([]);
-    const [processedStructure, setProcessedStructure] = useState<any>(null);
+    const [structure, setStructure] = useState<Structure | null>(null);
     const [loading, setLoading] = useState(true);
-    const [visibilityState, setVisibilityState] = useState({});
+    const [visibilityState, setVisibilityState] = useState({
+        tabs: {},
+        sections: {},
+        subsections: {},
+        fields: {}
+    });
     const [orderState, setOrderState] = useState({});
     const [mainTabs, setMainTabs] = useState<string[]>([]);
     const [subTabs, setSubTabs] = useState<{ [key: string]: string[] }>({});
@@ -187,6 +162,10 @@ const OverallView: React.FC = () => {
     const [isMissingFieldsOpen, setIsMissingFieldsOpen] = useState(false);
     const [selectedCompany, setSelectedCompany] = useState(null);
     const [selectedMissingFields, setSelectedMissingFields] = useState(null);
+    const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
+    const [localOrder, setLocalOrder] = useState({});
+    const [localVisibility, setLocalVisibility] = useState({});
+
     const sortByOrder = (items: string[], orderMapping: Record<string, number>) => {
         if (!Array.isArray(items)) {
             console.error('Expected an array for items:', items);
@@ -222,247 +201,128 @@ const OverallView: React.FC = () => {
     const fetchAllData = async () => {
         try {
             setLoading(true);
-    
-            // 1. Fetch mappings and companies data in parallel
-            const [mappingsResponse, companiesResponse] = await Promise.all([
-                supabase
-                    .from('profile_category_table_mapping_2')
-                    .select('*')
-                    .order('main_tab')
-                    .order('Tabs'),
-                supabase
-                    .from('acc_portal_company_duplicate')
-                    .select('*')
-                    .order('id')
-            ]);
-    
-            const mappingsData = mappingsResponse.data || [];
-            const companiesData = companiesResponse.data || [];
-            
-            setMappings(mappingsData);
-            setCompanies(companiesData);
-    
-            if (!mappingsData || !companiesData) {
-                throw new Error('No data found');
+            console.log('Fetching data for:', { activeMainTab, activeSubTab });
+
+            // Fetch companies data
+            const { data: companies, error: companiesError } = await supabase
+                .from('acc_portal_company_duplicate')
+                .select('*')
+                .order('company_name', { ascending: true });
+
+            if (companiesError) throw companiesError;
+            console.log('Fetched companies:', companies?.length);
+
+            // Process the company data
+            const processedData = companies.map(company => ({
+                rows: [{
+                    ...company,
+                    acc_portal_company_duplicate_data: company
+                }],
+                rowSpan: 1
+            }));
+
+            // Update company data state
+            setVisibleData(processedData);
+
+            // If no tabs are selected, show only default columns
+            if (!activeMainTab || !activeSubTab) {
+                const defaultStructure = {
+                    sections: [{
+                        name: "Default",
+                        isSeparator: false,
+                        categorizedFields: [{
+                            name: "Company Details",
+                            isSeparator: false,
+                            fields: [{
+                                name: "acc_portal_company_duplicate.company_name",
+                                label: "Company Name"
+                            }]
+                        }]
+                    }]
+                };
+                setMainSections(defaultStructure.sections);
+                return;
             }
-    
-            // 2. Get all unique tables from mappings
-            const tables = new Set(['acc_portal_company_duplicate']);
-            mappingsData.forEach(mapping => {
-                if (mapping.structure?.sections) {
-                    mapping.structure.sections.forEach(section => {
-                        section.subsections?.forEach(subsection => {
-                            subsection.tables?.forEach(table => tables.add(table));
-                        });
-                    });
-                }
-            });
-    
-            // 3. Fetch all table data in parallel
-            const tableResponses = await Promise.all(
-                Array.from(tables).map(table => {
-                    console.log('Fetching data for table:', table);
-                    return supabase.from(table).select('*').order('id');
-                })
-            );
-    
-            // 4. Combine all table data
-            const rawTableData = tableResponses.reduce((acc, response, index) => {
-                acc[Array.from(tables)[index]] = response.data;
-                return acc;
-            }, {});
-    
-            // 5. Store the raw table data
-            setAllData(rawTableData);
-    
-            // 6. Process visibility settings
-            const aggregatedVisibility = {
-                tabs: {},
-                sections: {},
-                subsections: {},
-                fields: {}
-            };
-    
-            // 7. Process order settings
-            const aggregatedOrder = {
-                mainTabs: {},
-                subTabs: {},
-                sections: {},
-                subsections: {},
-                fields: {}
-            };
-    
-            // 8. Process tabs mapping
-            const mainTabsSet = new Set(mappingsData.map(m => m.main_tab));
-            const subTabsMap = {};
-    
-            // 9. Process all mappings
-            mappingsData.forEach(mapping => {
-                // Process main tab visibility and order
-                if (mapping.structure?.visibility?.tabs) {
-                    aggregatedVisibility.tabs = {
-                        ...aggregatedVisibility.tabs,
-                        ...mapping.structure.visibility.tabs
-                    };
-                }
-    
-                if (mapping.structure?.order?.mainTabs) {
-                    aggregatedOrder.mainTabs = {
-                        ...aggregatedOrder.mainTabs,
-                        ...mapping.structure.order.mainTabs
-                    };
-                }
-    
-                // Process sub tabs
-                if (mapping.main_tab) {
-                    if (!subTabsMap[mapping.main_tab]) {
-                        subTabsMap[mapping.main_tab] = [];
-                    }
-                    if (mapping.Tabs && !subTabsMap[mapping.main_tab].includes(mapping.Tabs)) {
-                        subTabsMap[mapping.main_tab].push(mapping.Tabs);
-                        if (mapping.structure?.order?.subTabs) {
-                            aggregatedOrder.subTabs[mapping.Tabs] = mapping.structure.order.subTabs[mapping.Tabs] || 0;
-                        }
-                    }
-                }
-    
-                // Process sections, subsections, and fields
-                if (mapping.structure?.sections) {
-                    mapping.structure.sections.forEach(section => {
-                        if (section.visible !== undefined) {
-                            aggregatedVisibility.sections[section.name] = section.visible;
-                        }
-                        if (section.order !== undefined) {
-                            aggregatedOrder.sections[section.name] = section.order;
-                        }
-    
-                        section.subsections?.forEach(subsection => {
-                            if (subsection.visible !== undefined) {
-                                aggregatedVisibility.subsections[subsection.name] = subsection.visible;
-                            }
-                            if (subsection.order !== undefined) {
-                                aggregatedOrder.subsections[subsection.name] = subsection.order;
-                            }
-    
-                            subsection.fields?.forEach(field => {
-                                const fieldKey = `${field.table}.${field.name}`;
-                                if (field.visible !== undefined) {
-                                    aggregatedVisibility.fields[fieldKey] = field.visible;
-                                }
-                                if (field.order !== undefined) {
-                                    aggregatedOrder.fields[fieldKey] = field.order;
-                                }
-                            });
-                        });
-                    });
-                }
-            });
-    
-            // 10. Process main tabs with visibility and order
-            const visibleMainTabs = Array.from(mainTabsSet)
-                .filter(tab => aggregatedVisibility.tabs[tab] !== false)
-                .sort((a, b) => (aggregatedOrder.mainTabs[a] || 0) - (aggregatedOrder.mainTabs[b] || 0));
-    
-            // 11. Process sub tabs with visibility and order
-            const processedSubTabs = Object.entries(subTabsMap).reduce((acc, [mainTab, subTabsList]) => {
-                const visibleSubTabs = subTabsList
-                    .filter(tab => aggregatedVisibility.tabs[tab] !== false)
-                    .sort((a, b) => (aggregatedOrder.subTabs[a] || 0) - (aggregatedOrder.subTabs[b] || 0));
-    
-                if (visibleSubTabs.length > 0) {
-                    acc[mainTab] = visibleSubTabs;
-                }
-                return acc;
-            }, {});
-    
-            // 12. Set processed data to state
-            setMainTabs(visibleMainTabs);
-            setSubTabs(processedSubTabs);
-            setStructure(mappingsData);
-            setVisibilityState(aggregatedVisibility);
-            setOrderState(aggregatedOrder);
-    
-            // 13. Process sections and subsections
-            const visibleSections = mappingsData.reduce((acc, mapping) => {
-                if (mapping.structure?.sections) {
-                    mapping.structure.sections
-                        .filter(section => aggregatedVisibility.sections[section.name] !== false)
-                        .forEach(section => {
-                            acc.add(section.name);
-                            section.subsections
-                                ?.filter(subsection => aggregatedVisibility.subsections[subsection.name] !== false)
-                                .forEach(subsection => {
-                                    acc.add(subsection.name);
-                                });
-                        });
-                }
-                return acc;
-            }, new Set());
-    
-            setMainSections(Array.from(visibleSections));
-    
-            // 14. Set initial active tabs if needed
-            if (!activeMainTab && visibleMainTabs.length > 0) {
-                const firstMainTab = visibleMainTabs[0];
-                setActiveMainTab(firstMainTab);
-    
-                const firstSubTab = processedSubTabs[firstMainTab]?.[0];
-                if (firstSubTab) {
-                    setActiveSubTab(firstSubTab);
-                }
+
+            // Fetch mapping data for selected tabs
+            const { data: mappingData, error: mappingError } = await supabase
+                .from('profile_category_table_mapping_2')
+                .select('*')
+                .eq('main_tab', activeMainTab)
+                .eq('sub_tab', activeSubTab);
+
+            if (mappingError) throw mappingError;
+            console.log('Mapping data:', mappingData);
+
+            if (mappingData && mappingData.length > 0 && mappingData[0].structure?.sections) {
+                const processedStructure = processStructureForUI(mappingData[0].structure);
+                setMainSections(processedStructure.sections);
+                setStructure(mappingData);
             }
-    
-            // 15. Process data for current tab
-            const currentMapping = mappingsData.find(m => 
-                m.main_tab === activeMainTab && m.Tabs === activeSubTab
-            );
-            
-            if (currentMapping) {
-                const processedData = processTabData(rawTableData, currentMapping);
-                console.log('Processed Tab Data:', processedData);
-                setVisibleData(processedData);
-              }
-    
+
         } catch (error) {
             console.error('Error fetching data:', error);
-            toast.error('Failed to load data');
+            toast.error('Failed to fetch data');
         } finally {
             setLoading(false);
         }
     };
 
-    // Add helper function for structure processing
+    // Helper function for structure processing
     const processStructureForUI = (structure) => {
-        return {
-            sections: structure.sections.map(section => ({
-                ...section,
-                subsections: section.subsections
-                    .filter(subsection =>
-                        structure.visibility?.subsections?.[subsection.name] !== false
-                    )
-                    .sort((a, b) =>
-                        (structure.order?.subsections?.[a.name] || 0) -
-                        (structure.order?.subsections?.[b.name] || 0)
-                    )
-                    .map(subsection => ({
-                        ...subsection,
-                        fields: subsection.fields
-                            .filter(field =>
-                                structure.visibility?.fields?.[`${field.table}.${field.name}`] !== false
-                            )
-                            .sort((a, b) =>
-                                (structure.order?.fields?.[`${a.table}.${a.name}`] || 0) -
-                                (structure.order?.fields?.[`${b.table}.${b.name}`] || 0)
-                            )
-                    }))
+        if (!structure) return { sections: [] };
+
+        // Process the structure sections
+        const processedSections = structure.sections.map(section => ({
+            name: section.name,
+            isSeparator: false,
+            categorizedFields: section.subsections?.map(subsection => ({
+                name: subsection.name,
+                isSeparator: false,
+                fields: subsection.fields?.map(field => ({
+                    name: `${field.table}.${field.name}`,
+                    label: field.label || field.name,
+                    table: field.table,
+                    type: field.type || 'text',
+                    validation: field.validation || {}
+                }))
             }))
-                .filter(section =>
-                    structure.visibility?.sections?.[section.name] !== false
-                )
-                .sort((a, b) =>
-                    (structure.order?.sections?.[a.name] || 0) -
-                    (structure.order?.sections?.[b.name] || 0)
-                ),
+        }));
+
+        // Add company_name as the first field in the first category of the first section
+        if (processedSections.length > 0 && 
+            processedSections[0].categorizedFields && 
+            processedSections[0].categorizedFields.length > 0) {
+            
+            processedSections[0].categorizedFields[0].fields = [
+                {
+                    name: 'acc_portal_company_duplicate.company_name',
+                    label: 'Company Name',
+                    table: 'acc_portal_company_duplicate',
+                    type: 'text'
+                },
+                ...(processedSections[0].categorizedFields[0].fields || [])
+            ];
+        } else {
+            // If no sections exist, create a default section with company_name
+            processedSections.unshift({
+                name: "Default",
+                isSeparator: false,
+                categorizedFields: [{
+                    name: "Company Details",
+                    isSeparator: false,
+                    fields: [{
+                        name: "acc_portal_company_duplicate.company_name",
+                        label: "Company Name",
+                        table: "acc_portal_company_duplicate",
+                        type: "text"
+                    }]
+                }]
+            });
+        }
+
+        return {
+            sections: processedSections,
             visibility: structure.visibility || {},
             order: structure.order || {},
             relationships: structure.relationships || {}
@@ -473,15 +333,36 @@ const OverallView: React.FC = () => {
     const handleTabChange = useCallback((mainTab: string, subTab: string) => {
         setActiveMainTab(mainTab);
         setActiveSubTab(subTab);
-    
+
         const relevantMapping = structure.find(m =>
-            m.main_tab === mainTab && m.Tabs === subTab
+            m.main_tab === mainTab && m.sub_tab === subTab
         );
-    
+
         if (relevantMapping && allData) {
-            // Process the stored raw data for the new tab
-            const processedData = processTabData(allData, relevantMapping);
-            setVisibleData(processedData);
+            useEffect(() => {
+                const processData = () => {
+                    if (!allData) return;
+
+                    const processedData = allData.map(company => ({
+                        rows: company.rows.map(row => ({
+                            ...row,
+                            // Ensure company data is properly mapped
+                            acc_portal_company_duplicate_data: {
+                                ...row.acc_portal_company_duplicate_data,
+                                company_name: row.company_name || row.acc_portal_company_duplicate_data?.company_name || ''
+                            }
+                        })),
+                        rowSpan: company.rowSpan
+                    }));
+
+                    console.log('Processed Data:', JSON.stringify(processedData[0], null, 2));
+                    setVisibleData(processedData);
+                };
+
+                if (allData) {
+                    processData();
+                }
+            }, [allData]);
         }
     }, [allData, structure]);
 
@@ -496,116 +377,85 @@ const OverallView: React.FC = () => {
 
     // Structure Processing
     const processTabSections = useCallback((mainTab: string | undefined | null, subTab: string) => {
-        if (!mainTab) return [];
+        // Always include the default section with company name
+        const defaultSection = {
+            name: 'Company Info',
+            label: 'Company Info',
+            isSeparator: false,
+            categorizedFields: [{
+                name: 'Basic Details',
+                isSeparator: false,
+                fields: [{
+                    name: 'acc_portal_company_duplicate.company_name',
+                    label: 'Company Name',
+                    table: 'acc_portal_company_duplicate',
+                    type: 'text',
+                    column: 'company_name'
+                }]
+            }]
+        };
+
+        // If no main tab, return only default section
+        if (!mainTab) {
+            return [defaultSection];
+        }
 
         const mainTabLower = mainTab.toLowerCase();
         const isSpecialView = ['employee details', 'customer details', 'supplier details'].includes(mainTabLower);
 
-        const processedSections = [
-            {
-                name: 'index',
-                label: 'Index',
-                categorizedFields: []
-            },
-            {
-                isSeparator: true,
-                name: 'company-name-separator'
-            }
-        ];
+        // Start with the default section
+        const processedSections = [defaultSection];
 
-        if (!isSpecialView) {
-            processedSections.push({
-                name: '',
-                label: '',
-                categorizedFields: [{
-                    category: '',
-                    fields: [{
-                        name: 'acc_portal_company_duplicate.company_name',
-                        label: 'Company Name',
-                        table: 'acc_portal_company_duplicate',
-                        column: 'company_name',
-                        subCategory: 'Company Info'
-                    }, {
-                        name: 'acc_portal_company_duplicate.index',
-                        label: 'Index',
-                        table: 'acc_portal_company_duplicate',
-                        column: 'index',
-                        subCategory: 'Company Info'
-                    }]
-                }]
-            });
-        }
+        // Add separator after default section
+        processedSections.push({
+            isSeparator: true,
+            name: 'default-separator'
+        });
 
-        const relevantMapping = structure.find(item =>
-            item?.Tabs === subTab &&
-            item?.main_tab === mainTab
-        );
+        // If we have structure data, add it
+        if (structure && structure.length > 0) {
+            const relevantStructure = structure.find(s => 
+                s.main_tab === mainTab && s.sub_tab === subTab
+            );
 
-        if (relevantMapping?.structure?.sections) {
-            const { sections } = relevantMapping.structure;
+            if (relevantStructure?.structure?.sections) {
+                relevantStructure.structure.sections.forEach(section => {
+                    if (!section.subsections || section.subsections.length === 0) return;
 
-            sections.forEach((section, index) => {
-                if (visibilityState.sections[section.name] === false) return;
-
-                if (section?.subsections) {
-                    const processedSubsections = [];
-
-                    section.subsections.forEach(subsection => {
-                        if (visibilityState.subsections[subsection.name] === false) return;
-
-                        let fields = subsection?.fields
-                            ?.filter(field => {
-                                const fieldKey = `${field.table}.${field.name}`;
-                                return visibilityState.fields[fieldKey] !== false;
-                            })
-                            .map(field => ({
+                    processedSections.push({
+                        name: section.name,
+                        label: section.name,
+                        isSeparator: false,
+                        categorizedFields: section.subsections.map(subsection => ({
+                            name: subsection.name,
+                            isSeparator: false,
+                            fields: (subsection.fields || []).map(field => ({
                                 name: `${field.table}.${field.name}`,
-                                label: field.display,
+                                label: field.label || field.name,
                                 table: field.table,
-                                column: field.name,
-                                dropdownOptions: field.dropdownOptions || [],
-                                subCategory: subsection.name
-                            })) || [];
-
-                        if (fields.length > 0) {
-                            fields = fields.sort((a, b) => {
-                                const orderA = orderState.fields[`${a.table}.${a.column}`] || 0;
-                                const orderB = orderState.fields[`${b.table}.${b.column}`] || 0;
-                                return orderA - orderB;
-                            });
-
-                            processedSubsections.push({
-                                category: subsection.name,
-                                fields: fields
-                            });
-                        }
+                                type: field.type || 'text',
+                                column: field.name
+                            }))
+                        })).filter(cat => cat.fields && cat.fields.length > 0)
                     });
 
-                    if (processedSubsections.length > 0) {
-                        processedSections.push({
-                            name: section.name,
-                            label: section.name,
-                            categorizedFields: processedSubsections
-                        });
-
-                        if (index < sections.length - 1) {
-                            processedSections.push({
-                                isSeparator: true,
-                                name: `${section.name}-separator`
-                            });
-                        }
-                    }
-                }
-            });
+                    // Add separator between sections
+                    processedSections.push({
+                        isSeparator: true,
+                        name: `${section.name}-separator`
+                    });
+                });
+            }
         }
 
-        return processedSections.sort((a, b) => {
-            if (a.isSeparator || b.isSeparator) return 0;
-            const orderA = orderState.sections[a.name] || 0;
-            const orderB = orderState.sections[b.name] || 0;
-            return orderA - orderB;
-        });
-    }, [structure, visibilityState, orderState]);
+        // Remove the last separator if it exists
+        if (processedSections.length > 0 && processedSections[processedSections.length - 1].isSeparator) {
+            processedSections.pop();
+        }
+
+        console.log('Processed Sections:', JSON.stringify(processedSections, null, 2));
+        return processedSections;
+    }, [structure]);
 
     // Structure Update Handler
     const handleStructureUpdate = async () => {
@@ -614,8 +464,7 @@ const OverallView: React.FC = () => {
             const { data: mappings } = await supabase
                 .from('profile_category_table_mapping_2')
                 .select('*')
-                .order('main_tab')
-                .order('Tabs');
+                .order('main_tab');
 
             if (!mappings) throw new Error('No data found');
 
@@ -628,10 +477,10 @@ const OverallView: React.FC = () => {
                 if (!mapping) return;
 
                 if (mapping.main_tab) mainTabsSet.add(mapping.main_tab);
-                if (mapping.main_tab && mapping.Tabs) {
+                if (mapping.main_tab && mapping.sub_tab) {
                     if (!subTabsMap[mapping.main_tab]) subTabsMap[mapping.main_tab] = [];
-                    if (!subTabsMap[mapping.main_tab].includes(mapping.Tabs)) {
-                        subTabsMap[mapping.main_tab].push(mapping.Tabs);
+                    if (!subTabsMap[mapping.main_tab].includes(mapping.sub_tab)) {
+                        subTabsMap[mapping.main_tab].push(mapping.sub_tab);
                     }
                 }
 
@@ -659,21 +508,257 @@ const OverallView: React.FC = () => {
         }
     };
 
-    // Overview Page Updates
-    const [localOrder, setLocalOrder] = useState({});
-    const [localVisibility, setLocalVisibility] = useState({});
+    // Fetch structure data
+    const fetchStructureData = useCallback(async () => {
+        try {
+            if (!activeMainTab && !activeSubTab) {
+                // Set default structure for empty state
+                setStructure([{
+                    main_tab: '',
+                    sub_tab: '',
+                    structure: {
+                        sections: [{
+                            name: 'Company Info',
+                            subsections: [{
+                                name: 'Basic Details',
+                                fields: [{
+                                    name: 'company_name',
+                                    label: 'Company Name',
+                                    table: 'acc_portal_company_duplicate',
+                                    type: 'text'
+                                }]
+                            }]
+                        }]
+                    }
+                }]);
+                return;
+            }
 
-    useEffect(() => {
-        const fetchMainTabs = async () => {
-            const { data, error } = await supabase
+            const { data: structureData, error } = await supabase
                 .from('profile_category_table_mapping_2')
-                .select('*');
-            if (data) {
-                trackPositions(data);
-                trackVisibility(data);
+                .select('structure')
+                .eq('main_tab', activeMainTab)
+                .eq('sub_tab', activeSubTab)
+                .single();
+
+            if (error) throw error;
+
+            if (structureData) {
+                setStructure([structureData]);
+            }
+        } catch (error) {
+            console.error('Error fetching structure:', error);
+        }
+    }, [activeMainTab, activeSubTab, supabase]);
+
+    // Call fetchStructureData when tabs change
+    useEffect(() => {
+        fetchStructureData();
+    }, [fetchStructureData, activeMainTab, activeSubTab]);
+
+    // Initialize tabs
+    useEffect(() => {
+        const initializeTabs = async () => {
+            try {
+                const { data: tabData } = await supabase
+                    .from('profile_category_table_mapping_2')
+                    .select('main_tab, sub_tab, structure')
+                    .order('main_tab');
+
+                if (tabData) {
+                    // Process main tabs and visibility
+                    const uniqueMainTabs = [...new Set(tabData.map(item => item.main_tab))];
+                    setMainTabs(uniqueMainTabs);
+
+                    // Initialize visibility state from structure
+                    const initialVisibility = {
+                        tabs: {},
+                        sections: {},
+                        subsections: {},
+                        fields: {}
+                    };
+
+                    tabData.forEach(item => {
+                        if (item.structure?.visibility) {
+                            // Merge maintabs visibility
+                            if (item.structure.visibility.maintabs) {
+                                Object.entries(item.structure.visibility.maintabs).forEach(([tab, visible]) => {
+                                    initialVisibility.tabs[tab] = visible;
+                                });
+                            }
+                            // Merge other visibility settings
+                            if (item.structure.visibility.sections) {
+                                Object.assign(initialVisibility.sections, item.structure.visibility.sections);
+                            }
+                            if (item.structure.visibility.subsections) {
+                                Object.assign(initialVisibility.subsections, item.structure.visibility.subsections);
+                            }
+                            if (item.structure.visibility.fields) {
+                                Object.assign(initialVisibility.fields, item.structure.visibility.fields);
+                            }
+                        }
+                    });
+
+                    setVisibilityState(initialVisibility);
+
+                    // Process sub tabs
+                    const subTabMap: { [key: string]: string[] } = {};
+                    tabData.forEach(item => {
+                        if (!subTabMap[item.main_tab]) {
+                            subTabMap[item.main_tab] = [];
+                        }
+                        if (item.sub_tab && !subTabMap[item.main_tab].includes(item.sub_tab)) {
+                            subTabMap[item.main_tab].push(item.sub_tab);
+                        }
+                    });
+                    setSubTabs(subTabMap);
+
+                    // Set initial active tabs
+                    if (uniqueMainTabs.length > 0) {
+                        const firstMainTab = uniqueMainTabs[0];
+                        const firstSubTab = subTabMap[firstMainTab]?.[0] || '';
+                        setActiveMainTab(firstMainTab);
+                        setActiveSubTab(firstSubTab);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching tabs:', error);
             }
         };
-        fetchMainTabs();
+
+        initializeTabs();
+    }, [supabase]);
+
+    // Table Wrapper
+    const TableWrapper = useMemo(() => {
+        const sections = processTabSections(activeMainTab, activeSubTab);
+        console.log('VisibleData:', visibleData);
+        console.log('ProcessedSections:', sections);
+
+        return (
+            <Table
+                data={visibleData}
+                virtualizedRowHeight={50}
+                visibleRowsCount={20}
+                processedSections={sections}
+                activeMainTab={activeMainTab}
+                activeSubTab={activeSubTab}
+                handleCompanyClick={handleCompanyClick}
+                onMissingFieldsClick={(company) => {
+                    setSelectedMissingFields(company);
+                    setIsMissingFieldsOpen(true);
+                }}
+                refreshData={fetchAllData}
+                onSettingsClick={() => setIsSettingsDialogOpen(true)}
+            />
+        );
+    }, [visibleData, activeMainTab, activeSubTab, processTabSections, handleCompanyClick]);
+
+    // Tabs rendering
+    const renderTabs = useMemo(() => {
+        return (
+            <Tabs defaultValue={mainTabs[0]} value={activeMainTab} className="h-full flex flex-col">
+                <TabsList className="w-full grid-cols-[repeat(auto-fit,minmax(0,1fr))] grid bg-gray-100 rounded-lg p-1">
+                    {mainTabs
+                        .filter(tab => visibilityState.tabs[tab] !== false)
+                        .map(tab => (
+                            <TabsTrigger
+                                key={tab}
+                                value={tab}
+                                disabled={loading}
+                                onClick={() => {
+                                    const firstSubTab = subTabs[tab]?.[0] || '';
+                                    handleTabChange(tab, firstSubTab);
+                                }}
+                                className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
+                            >
+                                {tab}
+                            </TabsTrigger>
+                        ))}
+                </TabsList>
+                <TabsContent value={activeMainTab} className="h-full">
+                    <div className="h-full flex flex-col">
+                        <div className="flex gap-4 p-6">
+                            <Button
+                                className="flex items-center gap-2"
+                                onClick={() => setIsSettingsDialogOpen(true)}
+                            >
+                                <Settings className="h-4 w-4" />
+                                Settings
+                            </Button>
+                            <Button
+                                onClick={() => setIsImportDialogOpen(true)}
+                                className="flex items-center gap-2"
+                            >
+                                <Upload className="h-4 w-4" />
+                                Import
+                            </Button>
+                            <Button
+                                onClick={() => handleExport(activeMainTab, activeSubTab)}
+                                className="flex items-center gap-2"
+                            >
+                                <Download className="h-4 w-4" />
+                                Export
+                            </Button>
+                        </div>
+
+                        <div className="flex-1 overflow-hidden">
+                            <Tabs
+                                defaultValue={subTabs[activeMainTab]?.[0]}
+                                value={activeSubTab}
+                                className="h-full flex flex-col"
+                            >
+                                <TabsList className="w-full grid grid-cols-10 bg-gray-100 rounded-lg p-1">
+                                    {(subTabs[activeMainTab] || [])
+                                        .filter(tab => visibilityState.tabs[tab] !== false)
+                                        .map(tab => (
+                                            <TabsTrigger
+                                                key={tab}
+                                                value={tab}
+                                                disabled={loading}
+                                                onClick={() => handleTabChange(activeMainTab, tab)}
+                                                className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
+                                            >
+                                                {tab}
+                                            </TabsTrigger>
+                                        ))}
+                                </TabsList>
+                                <TabsContent value={activeSubTab} className="h-full data-[state=active]:flex-1">
+                                    <Card className="h-[890px] flex flex-col">
+                                        <CardContent className="flex-1 p-0 overflow-hidden">
+                                            {loading ? (
+                                                <div className="flex items-center justify-center h-full">
+                                                    <div className="text-center">
+                                                        <h3 className="text-lg font-medium">Loading data...</h3>
+                                                        <p className="text-gray-500 mt-2">Please wait</p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className={`h-[890px] ${(activeMainTab === "Directors Details" || activeMainTab === "Bank Details" || activeMainTab === "Company Details") ? "overflow-auto" : ""}`}>
+                                                    <div className="min-w-max">
+                                                        {TableWrapper}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
+                            </Tabs>
+                        </div>
+                    </div>
+                </TabsContent>
+            </Tabs>
+        );
+    }, [mainTabs, activeMainTab, visibilityState.tabs, subTabs, loading, activeSubTab, TableWrapper]);
+
+    useEffect(() => {
+        if (activeMainTab && activeSubTab) {
+            fetchAllData();
+        }
+    }, [activeMainTab, activeSubTab]);
+
+    useEffect(() => {
+        fetchAllData();
     }, []);
 
     const trackPositions = (items) => {
@@ -746,10 +831,6 @@ const OverallView: React.FC = () => {
 
     // Effects
     useEffect(() => {
-        fetchAllData();
-    }, []);
-
-    useEffect(() => {
         const handleStructureUpdate = () => {
             fetchAllData();
         };
@@ -771,145 +852,13 @@ const OverallView: React.FC = () => {
         };
     }, []);
 
-    // Table Wrapper
-    const TableWrapper = useMemo(() => {
-        console.log('VisibleData:', visibleData);
-        console.log('ProcessedSections:', processTabSections(activeMainTab, activeSubTab));
-        
-        return (
-          <Table
-            data={visibleData}
-            virtualizedRowHeight={50}
-            visibleRowsCount={20}
-            processedSections={processTabSections(activeMainTab, activeSubTab)}
-            activeMainTab={activeMainTab}
-            activeSubTab={activeSubTab}
-            handleCompanyClick={handleCompanyClick}
-            onMissingFieldsClick={(company) => {
-              setSelectedMissingFields(company);
-              setIsMissingFieldsOpen(true);
-            }}
-            refreshData={fetchAllData}
-          />
-        );
-      }, [visibleData, activeMainTab, activeSubTab, processTabSections, handleCompanyClick]);
-
     return (
-        <div className="h-[1100px] flex flex-col">
-            <Tabs defaultValue={mainTabs[0]} value={activeMainTab} className="h-full flex flex-col">
-                {mainTabs.length > 0 ? (
-                    <TabsList className="w-full grid-cols-[repeat(auto-fit,minmax(0,1fr))] grid bg-gray-100 rounded-lg p-1">
-                        {mainTabs
-                            .filter(tab => visibilityState.tabs[tab] !== false)
-                            .map(tab => (
-                                <TabsTrigger
-                                    key={tab}
-                                    value={tab}
-                                    disabled={loading}
-                                    onClick={() => {
-                                        const firstSubTab = subTabs[tab]?.[0] || '';
-                                        handleTabChange(tab, firstSubTab);
-                                    }}
-                                    className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
-                                >
-                                    {tab}
-                                </TabsTrigger>
-                            ))}
-                    </TabsList>
-                ) : (
-                    <div>No tabs available</div>
-                )}
+        <>
+            <div className="h-[1100px] flex flex-col">
+                {renderTabs}
+            </div>
 
-                <TabsContent value={activeMainTab} className="h-full">
-                    <div className="h-full flex flex-col">
-                        <div className="flex gap-4 p-6">
-                            <Suspense fallback={<div>Loading settings...</div>}>
-                                <SettingsDialog
-                                    mainTabs={mainTabs}
-                                    mainSections={mainSections}
-                                    mainSubsections={mainSubsections}
-                                    onStructureChange={handleStructureUpdate}
-                                    activeMainTab={activeMainTab}
-                                    activeSubTab={activeSubTab}
-                                    subTabs={subTabs[activeMainTab] || []}
-                                    processedSections={processTabSections(activeMainTab, activeSubTab)}
-                                    visibilityState={visibilityState}
-                                    orderState={orderState}
-                                    onVisibilityChange={setVisibilityState}
-                                    onOrderChange={setOrderState}
-                                />
-                            </Suspense>
-
-                            <div className="flex gap-2">
-                                <Button
-                                    onClick={() => setIsImportDialogOpen(true)}
-                                    className="flex items-center gap-2"
-                                >
-                                    <Upload className="h-4 w-4" />
-                                    Import
-                                </Button>
-                                <Button
-                                    onClick={() => handleExport(activeMainTab, activeSubTab)}
-                                    className="flex items-center gap-2"
-                                >
-                                    <Download className="h-4 w-4" />
-                                    Export
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-hidden">
-                            <Tabs
-                                defaultValue={subTabs[activeMainTab]?.[0]}
-                                value={activeSubTab}
-                                className="h-full flex flex-col"
-                            > <TabsList className="w-full grid grid-cols-10 bg-gray-100 rounded-lg p-1">
-                                    {(subTabs[activeMainTab] || [])
-                                        .filter(tab => visibilityState.tabs[tab] !== false)
-                                        .map(tab => (
-                                            <TabsTrigger
-                                                key={tab}
-                                                value={tab}
-                                                disabled={loading}
-                                                onClick={() => handleTabChange(activeMainTab, tab)}
-                                                className="px-4 py-2 text-sm font-medium hover:bg-white hover:text-primary transition-colors"
-                                            >
-                                                {tab}
-                                            </TabsTrigger>
-                                        ))}
-                                </TabsList>
-                                <div className="flex-1 overflow-hidden">
-                                    <TabsContent
-                                        value={activeSubTab}
-                                        className="h-full data-[state=active]:flex-1"
-                                    >
-                                        <Card className="h-[890px] flex flex-col">
-                                            <CardContent className="flex-1 p-0 overflow-hidden">
-                                                {loading ? (
-                                                    <div className="flex items-center justify-center h-full">
-                                                        <div className="text-center">
-                                                            <h3 className="text-lg font-medium">Loading data...</h3>
-                                                            <p className="text-gray-500 mt-2">Please wait</p>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className={`h-[890px] ${(activeMainTab === activeMainTab === "Directors Details" || activeMainTab === "Bank Details" || "Company Details" ) ? "overflow-auto" : ""}`}>
-                                                        <div className="min-w-max">
-                                                            {TableWrapper}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                    </TabsContent>
-                                </div>
-                            </Tabs>
-                        </div>
-                    </div>
-                </TabsContent>
-            </Tabs>
-
-            <Suspense fallback={null}>
+            <Suspense>
                 {isImportDialogOpen && (
                     <ImportDialog
                         isOpen={true}
@@ -938,8 +887,26 @@ const OverallView: React.FC = () => {
                         onSave={handleSave}
                     />
                 )}
+                {isSettingsDialogOpen && (
+                    <SettingsDialog
+                        isOpen={isSettingsDialogOpen}
+                        onClose={() => setIsSettingsDialogOpen(false)}
+                        mainTabs={mainTabs}
+                        mainSections={mainSections}
+                        mainSubsections={mainSubsections}
+                        onStructureChange={handleStructureUpdate}
+                        activeMainTab={activeMainTab}
+                        activeSubTab={activeSubTab}
+                        subTabs={subTabs[activeMainTab] || []}
+                        processedSections={processTabSections(activeMainTab, activeSubTab)}
+                        visibilityState={visibilityState}
+                        orderState={orderState}
+                        onVisibilityChange={setVisibilityState}
+                        onOrderChange={setOrderState}
+                    />
+                )}
             </Suspense>
-        </div>
+        </>
     );
 };
 

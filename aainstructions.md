@@ -147,6 +147,93 @@ Here’s a step-by-step guide for prompting an AI to implement the outlined upda
 
 ---
 
+### **Settings Dialog Implementation Guide**
+
+## Overview
+The Settings Dialog is a comprehensive component that allows users to manage the structure of the application, including main tabs, sub tabs, sections, subsections, and fields. It provides drag-and-drop functionality, visibility controls, and real-time updates.
+
+## Implementation Steps
+
+### 1. Component Structure Setup
+- Create SettingsDialog.tsx as a client component
+- Import necessary UI components from shadcn/ui
+- Set up the basic dialog structure with tabs
+
+### 2. State Management
+- Initialize state for:
+  - Selected items (main tab, sub tab, section, subsection)
+  - Structure data
+  - Dialog visibility
+  - Edit mode states
+
+### 3. Database Integration
+- Set up Supabase client connection
+- Implement CRUD operations for structure management
+- Handle data persistence and updates
+
+### 4. Drag and Drop Implementation
+- Install and configure @hello-pangea/dnd
+- Set up DragDropContext for each level
+- Implement drag handlers for reordering
+- Update database on order changes
+
+### 5. Visibility Controls
+- Add toggle switches for each item
+- Implement visibility state management
+- Update database on visibility changes
+
+### 6. Edit Functionality
+- Create edit dialogs for each level
+- Implement update operations
+- Add validation and error handling
+
+### 7. UI/UX Considerations
+- Implement responsive grid layout
+- Add scroll areas for content overflow
+- Provide visual feedback for selections
+- Include loading states and error handling
+
+### 8. Testing and Validation
+- Test all CRUD operations
+- Verify drag and drop functionality
+- Check visibility toggles
+- Validate database updates
+
+## Best Practices
+1. Always maintain data consistency between UI and database
+2. Implement optimistic updates for better UX
+3. Handle errors gracefully with user feedback
+4. Follow component hierarchy for proper state management
+5. Use TypeScript interfaces for type safety
+
+## UI Components Used
+- Dialog, DialogContent, DialogHeader
+- Tabs, TabsList, TabsTrigger
+- Button, Switch
+- ScrollArea
+- Input, Label
+- Select components
+
+## Error Handling
+1. Implement try-catch blocks for database operations
+2. Show toast notifications for success/error states
+3. Validate input data before updates
+4. Handle edge cases in drag and drop operations
+
+## Performance Considerations
+1. Use optimistic updates for immediate feedback
+2. Implement proper loading states
+3. Handle large datasets with virtualization
+4. Optimize database queries
+
+## Maintenance
+1. Regular testing of all functionality
+2. Update dependencies as needed
+3. Monitor database performance
+4. Handle backward compatibility
+
+---
+
 ### **Additional Feature Implementation**  
 **Ask for more specific features:**  
 - “Would you like detailed database queries for atomic updates?”  
@@ -418,3 +505,173 @@ When adding or modifying features:
   - [ ] Component documentation
   - [ ] Deployment guide
   - [ ] Maintenance procedures
+
+---
+
+# Settings Dialog Technical Implementation Guide
+
+## Component Architecture
+
+### Core Components
+1. `SettingsDialog`: Main container component
+2. `DraggableList`: Reusable component for drag-and-drop lists
+3. `EditSheet`: Component for editing items
+4. `FieldListItem`: Component for rendering field items
+
+### State Management
+```typescript
+interface StructureItem {
+  id: string;
+  name: string;
+  order: number;
+  visible: boolean;
+  type: 'maintab' | 'subtab' | 'section' | 'subsection' | 'field';
+  table?: string;
+  parent?: {
+    maintab?: string;
+    subtab?: string;
+    section?: string;
+    subsection?: string;
+  };
+}
+```
+
+## Implementation Steps
+
+### 1. Database Schema Setup
+```typescript
+interface DatabaseStructure {
+  order: {
+    maintabs?: number[];
+    subtabs?: { [maintab: string]: number[] };
+    sections?: { [subtab: string]: number[] };
+    subsections?: { [section: string]: number[] };
+    fields?: { [subsection: string]: number[] };
+  };
+  visibility: {
+    maintabs?: { [id: string]: boolean };
+    subtabs?: { [id: string]: boolean };
+    sections?: { [id: string]: boolean };
+    subsections?: { [id: string]: boolean };
+    fields?: { [id: string]: boolean };
+  };
+  sections: Array<{
+    name: string;
+    subsections: Array<{
+      name: string;
+      fields: Array<{
+        name: string;
+        table: string;
+        column: string;
+      }>;
+    }>;
+  }>;
+}
+```
+
+### 2. Data Fetching and State Management
+1. Initialize structure state with empty arrays/objects
+2. Fetch data on component mount
+3. Transform database data to component structure
+4. Implement optimistic updates
+
+### 3. Drag and Drop Implementation
+1. Configure DragDropContext for each section
+2. Handle drag end events
+3. Update local state and database
+4. Maintain order consistency
+
+### 4. CRUD Operations
+1. Create new items
+   - Generate unique IDs
+   - Set default values
+   - Update parent references
+2. Update items
+   - Validate input
+   - Handle parent-child relationships
+3. Delete items
+   - Handle cascading deletes
+   - Update related items
+
+### 5. Visibility Management
+1. Toggle visibility state
+2. Update database structure
+3. Handle parent-child visibility relationships
+
+### 6. UI Components Integration
+1. Use shadcn/ui components
+2. Implement responsive grid layout
+3. Add scroll areas for content overflow
+4. Implement loading states
+
+## Error Handling
+
+### Database Operations
+```typescript
+try {
+  const { error } = await supabase
+    .from('profile_category_table_mapping_2')
+    .update({ structure: dbStructure })
+    .eq('id', 1);
+
+  if (error) throw error;
+  toast.success('Structure updated successfully');
+} catch (error) {
+  console.error('Error updating structure:', error);
+  toast.error('Failed to update structure');
+}
+```
+
+### Validation Rules
+1. Name is required for all items
+2. Table name required for fields
+3. Parent references must exist
+4. Order values must be unique
+
+## Performance Optimizations
+
+### State Updates
+1. Use optimistic updates
+2. Batch database operations
+3. Implement debounced saves
+4. Cache frequently accessed data
+
+### UI Rendering
+1. Virtualize long lists
+2. Lazy load components
+3. Memoize expensive computations
+4. Use efficient CSS selectors
+
+## Testing Strategy
+
+### Unit Tests
+1. Test CRUD operations
+2. Validate state transformations
+3. Test error handling
+4. Verify drag and drop logic
+
+### Integration Tests
+1. Test database interactions
+2. Verify UI updates
+3. Test parent-child relationships
+4. Validate visibility changes
+
+### UI Tests
+1. Test responsive layout
+2. Verify accessibility
+3. Test keyboard navigation
+4. Validate loading states
+
+## Deployment Considerations
+
+### Database Migration
+1. Create necessary tables
+2. Add required indexes
+3. Set up foreign key constraints
+4. Handle data versioning
+
+### Performance Monitoring
+1. Track database query performance
+2. Monitor component render times
+3. Track error rates
+4. Monitor user interactions

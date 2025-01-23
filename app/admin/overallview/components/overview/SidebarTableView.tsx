@@ -531,187 +531,190 @@ export const SidebarTableView = ({
   );
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '300px 1fr' }}>
-      {/* Sidebar */}
-      <div className="w-[300px] border-r bg-white flex-shrink-0 overflow-hidden">
-        <div className="h-full flex flex-col">
-          <div className="p-4">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-              <input
-                type="text"
-                placeholder="Search companies..."
-                className="w-full pl-8 pr-4 py-2 border rounded-md focus-visible:ring-0"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-          <ScrollArea className="h-[calc(100vh-100px)]">
-            <div className="space-y-1 p-4">
-              {filteredCompanies.map((company, index) => (
-                <Button
-                  key={company.company.id}
-                  variant={selectedCompanyIndex === index ? "default" : "ghost"}
-                  className="w-full justify-start font-normal"
-                  onClick={() => setSelectedCompanyIndex(index)}
-                >
-                  {company.company.company_name}
-                </Button>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-
-      </div>
-
-      {/* Main Content */}
+    <div className="flex flex-col h-full">
       <div className="flex-1 overflow-hidden">
-        {selectedCompanyData ? (
-          <Card className="h-full rounded-none border-0">
-            <CardContent className="p-0">
-              <div className="h-[calc(100vh-32px)] overflow-auto">
-                <div className="min-w-max overflow-visible">
-                  <UITable>
-                    {renderTableHeaders()}
-                    <TableBody className='overflow-auto'>
-                      {selectedCompanyData.rows.length > 0 ? selectedCompanyData.rows.map((row, rowIndex) => (
-                        <TableRow key={rowIndex} className="hover:bg-gray-50">
-                          {/* Field Cell */}
-                          <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white">
-                            {rowIndex + 1}
-                          </TableCell>
-                          <TableCell
-                            className="w-10 cursor-pointer hover:bg-gray-100"
-                            onClick={() => {
-                              const tableName = getTableName(row);
-                              const rowId = row.id || row[`${tableName}_data`]?.id;
-                              const verificationKey = `${tableName}_${rowId}`;
-                              const isRowLocked = lockedRows[verificationKey]?.is_verified || false;
-
-                              handleToggleRowLock(
-                                row,
-                                processedSections,
-                                setLockedRows,
-                                refreshData,
-                                lockedRows,
-                                activeMainTab,
-                                activeSubTab
-                              );
-                            }}
-                          >
-                            {lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]?.is_verified ? (
-                              <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
-                            ) : (
-                              <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
-                            )}
-                          </TableCell>
-                          {/* Separator */}
-                          {renderSeparatorCell(`row-sep-start-${rowIndex}`, 'section')}
-
-                          {/* Missing Fields */}
-                          <TableCell
-                            className="whitespace-nowrap cursor-pointer hover:bg-gray-100 sticky left-[50px] z-0 bg-white"
-                            onClick={() => onMissingFieldsClick(selectedCompanyData)}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-red-600">
-                                {calculateMissingFields(row)}
-                              </span>
-                              <span className="text-black">Missing Fields</span>
-                            </div>
-                          </TableCell>
-                          {renderSeparatorCell(`row-sep-end-${rowIndex}`, 'section')}
-
-                          {/* Field Values */}
-                          {processedSections.slice(1).map((section, sIndex) =>
-                            section.categorizedFields?.map((category, cIndex) =>
-                              category.fields?.map((field, fIndex) => {
-                                const [tableName, columnName] = field.name.split('.');
-                                let value;
-                                if (row.isAdditionalRow && row.sourceTable === tableName) {
-                                  value = row[columnName];
-                                } else if (row[`${tableName}_data`]) {
-                                  value = row[`${tableName}_data`][columnName];
-                                } else {
-                                  value = row[columnName];
-                                }
-
-                                const uniqueKey = `cell_${rowIndex}_${sIndex}_${cIndex}_${fIndex}_${field.table}_${field.name}`;
-
-                                return (
-                                  <TableCell key={uniqueKey}>
-                                    <EditableCell
-                                      value={value}
-                                      onSave={async (newValue) => {
-                                        const tableName = getTableName(row);
-                                        const rowId = row.id || row[`${tableName}_data`]?.id;
-                                        const isRowLocked = lockedRows[`${tableName}_${rowId}`]?.is_verified;
-                                        const isColumnLocked = lockedColumns[`field_${tableName}.${columnName}`]?.is_verified;
-
-                                        if (isRowLocked || isColumnLocked) {
-                                          toast.error("This field is locked and cannot be edited");
-                                          return;
-                                        }
-
-                                        try {
-                                          const { error } = await supabase
-                                            .from(tableName)
-                                            .update({ [columnName]: newValue })
-                                            .eq('id', row.id);
-                                          if (error) throw error;
-                                          refreshData();
-                                        } catch (error) {
-                                          console.error('Error updating:', error);
-                                          toast.error('Update failed');
-                                        }
-                                      }}
-                                      fieldName={field.name}
-                                      field={field}
-                                      dropdownOptions={field.dropdownOptions}
-                                      rowId={row.id}
-                                      companyName={row.company_name}
-                                      refreshData={refreshData}
-                                      activeMainTab={activeMainTab}
-                                      activeSubTab={activeSubTab}
-                                      disabled={
-                                        lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]?.is_verified ||
-                                        lockedColumns[`field_${tableName}.${columnName}`]?.is_verified
-                                      }
-                                      verificationStatus={
-                                        lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]?.is_verified
-                                          ? lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]
-                                          : lockedColumns[`field_${tableName}.${columnName}`]
-                                      }
-                                    />
-                                  </TableCell>
-                                );
-                              })
-                            )
-                          )}
-                        </TableRow>
-                      )) : (
-                        <TableRow>
-                          <TableCell colSpan={9999} className="text-center py-8 text-gray-500">
-                            Select a company from the sidebar
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </UITable>
+        <div className="grid h-full" style={{ gridTemplateColumns: '300px 1fr' }}>
+          {/* Sidebar */}
+          <div className="w-[300px] border-r bg-white flex-shrink-0 overflow-hidden">
+            <div className="h-full flex flex-col">
+              <div className="p-4">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+                  <input
+                    type="text"
+                    placeholder="Search companies..."
+                    className="w-full pl-8 pr-4 py-2 border rounded-md focus-visible:ring-0"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-gray-500">Select a company from the sidebar</p>
+              <ScrollArea className="h-[calc(100vh-100px)]">
+                <div className="space-y-1 p-4">
+                  {filteredCompanies.map((company, index) => (
+                    <Button
+                      key={company.company.id}
+                      variant={selectedCompanyIndex === index ? "default" : "ghost"}
+                      className="w-full justify-start font-normal"
+                      onClick={() => setSelectedCompanyIndex(index)}
+                    >
+                      {company.company.company_name}
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+
           </div>
-        )}
+
+          {/* Main Content */}
+          <div className="flex-1 overflow-hidden">
+            {selectedCompanyData ? (
+              <Card className="h-full rounded-none border-0">
+                <CardContent className="p-0">
+                  <div className="h-[calc(100vh-32px)] overflow-auto">
+                    <div className="min-w-max overflow-visible">
+                      <UITable>
+                        {renderTableHeaders()}
+                        <TableBody className='overflow-auto'>
+                          {selectedCompanyData.rows.length > 0 ? selectedCompanyData.rows.map((row, rowIndex) => (
+                            <TableRow key={rowIndex} className="hover:bg-gray-50">
+                              {/* Field Cell */}
+                              <TableCell className="whitespace-nowrap font-medium sticky left-0 z-0 bg-white">
+                                {rowIndex + 1}
+                              </TableCell>
+                              <TableCell
+                                className="w-10 cursor-pointer hover:bg-gray-100"
+                                onClick={() => {
+                                  const tableName = getTableName(row);
+                                  const rowId = row.id || row[`${tableName}_data`]?.id;
+                                  const verificationKey = `${tableName}_${rowId}`;
+                                  const isRowLocked = lockedRows[verificationKey]?.is_verified || false;
+
+                                  handleToggleRowLock(
+                                    row,
+                                    processedSections,
+                                    setLockedRows,
+                                    refreshData,
+                                    lockedRows,
+                                    activeMainTab,
+                                    activeSubTab
+                                  );
+                                }}
+                              >
+                                {lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]?.is_verified ? (
+                                  <Lock className="h-7 w-7 text-green-600 bg-green-200 rounded-sm p-[6px]" />
+                                ) : (
+                                  <LockOpen className="h-7 w-7 text-red-600 bg-red-200 rounded-sm p-[6px]" />
+                                )}
+                              </TableCell>
+                              {/* Separator */}
+                              {renderSeparatorCell(`row-sep-start-${rowIndex}`, 'section')}
+
+                              {/* Missing Fields */}
+                              <TableCell
+                                className="whitespace-nowrap cursor-pointer hover:bg-gray-100 sticky left-[50px] z-0 bg-white"
+                                onClick={() => onMissingFieldsClick(selectedCompanyData)}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-red-600">
+                                    {calculateMissingFields(row)}
+                                  </span>
+                                  <span className="text-black">Missing Fields</span>
+                                </div>
+                              </TableCell>
+                              {renderSeparatorCell(`row-sep-end-${rowIndex}`, 'section')}
+
+                              {/* Field Values */}
+                              {processedSections.slice(1).map((section, sIndex) =>
+                                section.categorizedFields?.map((category, cIndex) =>
+                                  category.fields?.map((field, fIndex) => {
+                                    const [tableName, columnName] = field.name.split('.');
+                                    let value;
+                                    if (row.isAdditionalRow && row.sourceTable === tableName) {
+                                      value = row[columnName];
+                                    } else if (row[`${tableName}_data`]) {
+                                      value = row[`${tableName}_data`][columnName];
+                                    } else {
+                                      value = row[columnName];
+                                    }
+
+                                    const uniqueKey = `cell_${rowIndex}_${sIndex}_${cIndex}_${fIndex}_${field.table}_${field.name}`;
+
+                                    return (
+                                      <TableCell key={uniqueKey}>
+                                        <EditableCell
+                                          value={value}
+                                          onSave={async (newValue) => {
+                                            const tableName = getTableName(row);
+                                            const rowId = row.id || row[`${tableName}_data`]?.id;
+                                            const isRowLocked = lockedRows[`${tableName}_${rowId}`]?.is_verified;
+                                            const isColumnLocked = lockedColumns[`field_${tableName}.${columnName}`]?.is_verified;
+
+                                            if (isRowLocked || isColumnLocked) {
+                                              toast.error("This field is locked and cannot be edited");
+                                              return;
+                                            }
+
+                                            try {
+                                              const { error } = await supabase
+                                                .from(tableName)
+                                                .update({ [columnName]: newValue })
+                                                .eq('id', row.id);
+                                              if (error) throw error;
+                                              refreshData();
+                                            } catch (error) {
+                                              console.error('Error updating:', error);
+                                              toast.error('Update failed');
+                                            }
+                                          }}
+                                          fieldName={field.name}
+                                          field={field}
+                                          dropdownOptions={field.dropdownOptions}
+                                          rowId={row.id}
+                                          companyName={row.company_name}
+                                          refreshData={refreshData}
+                                          activeMainTab={activeMainTab}
+                                          activeSubTab={activeSubTab}
+                                          disabled={
+                                            lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]?.is_verified ||
+                                            lockedColumns[`field_${tableName}.${columnName}`]?.is_verified
+                                          }
+                                          verificationStatus={
+                                            lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]?.is_verified
+                                              ? lockedRows[`${getTableName(row)}_${row.id || row[`${getTableName(row)}_data`]?.id}`]
+                                              : lockedColumns[`field_${tableName}.${columnName}`]
+                                          }
+                                        />
+                                      </TableCell>
+                                    );
+                                  })
+                                )
+                              )}
+                            </TableRow>
+                          )) : (
+                            <TableRow>
+                              <TableCell colSpan={9999} className="text-center py-8 text-gray-500">
+                                Select a company from the sidebar
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </UITable>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-gray-500">Select a company from the sidebar</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
 export default SidebarTableView;
-
