@@ -4,7 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface TableColumn {
+  table_name: string;
+  column_name: string;
+  data_type: string;
+}
 
 interface MultiSelectDialogProps {
   showMultiSelectDialog: boolean;
@@ -22,10 +28,10 @@ interface MultiSelectDialogProps {
 export const MultiSelectDialog: React.FC<MultiSelectDialogProps> = ({
   showMultiSelectDialog,
   setShowMultiSelectDialog,
-  selectedTables,
-  selectedTableFields,
-  tables,
-  tableColumns,
+  selectedTables = [],
+  selectedTableFields = {},
+  tables = [],
+  tableColumns = [],
   setSelectedTables,
   setSelectedTableFields,
   setNewStructure,
@@ -35,23 +41,8 @@ export const MultiSelectDialog: React.FC<MultiSelectDialogProps> = ({
   const [tempSelectedFields, setTempSelectedFields] = useState<{ [table: string]: string[] }>(selectedTableFields);
   const [tableSearchQuery, setTableSearchQuery] = useState('');
   const [fieldSearchQuery, setFieldSearchQuery] = useState('');
-  
-  useEffect(() => {
-    if (initialData) {
-      // Set initial selections based on the data
-      const selectedTabs = Object.keys(initialData).map(key => key.split('.')[0]);
-      setTempSelectedTables([...new Set(selectedTabs)]);
-      
-      const fields = Object.keys(initialData).reduce((acc, key) => {
-        const [table, field] = key.split('.');
-        if (!acc[table]) acc[table] = [];
-        acc[table].push(field);
-        return acc;
-      }, {});
-      setTempSelectedFields(fields);
-    }
-  }, [initialData]);
 
+  // Initialize state when dialog opens
   useEffect(() => {
     if (showMultiSelectDialog) {
       setTempSelectedTables(selectedTables);
@@ -59,13 +50,45 @@ export const MultiSelectDialog: React.FC<MultiSelectDialogProps> = ({
     }
   }, [showMultiSelectDialog, selectedTables, selectedTableFields]);
 
-  const filteredTables = tables.filter(table =>
-    table.toLowerCase().includes(tableSearchQuery.toLowerCase())
-  );
+  // Handle initial data only once on mount
+  useEffect(() => {
+    if (initialData && showMultiSelectDialog) {
+      const selectedTabs = Object.keys(initialData).map(key => key.split('.')[0]);
+      const uniqueTables = [...new Set(selectedTabs)];
+      
+      const fields = Object.keys(initialData).reduce((acc, key) => {
+        const [table, field] = key.split('.');
+        if (!acc[table]) acc[table] = [];
+        acc[table].push(field);
+        return acc;
+      }, {} as { [key: string]: string[] });
+      
+      setTempSelectedTables(uniqueTables);
+      setTempSelectedFields(fields);
+    }
+  }, [initialData, showMultiSelectDialog]);
+
+  const getFilteredTables = () => {
+    if (!tables || !Array.isArray(tables)) return [];
+    return tables.filter(table => 
+      table && typeof table === 'string' && 
+      table.toLowerCase().includes((tableSearchQuery || '').toLowerCase())
+    );
+  };
+
+  const getFilteredColumns = (tableName: string) => {
+    if (!tableColumns || !Array.isArray(tableColumns)) return [];
+    return tableColumns.filter(col => 
+      col && col.table_name === tableName && 
+      col.column_name && typeof col.column_name === 'string' &&
+      col.column_name.toLowerCase().includes((fieldSearchQuery || '').toLowerCase())
+    );
+  };
 
   const handleSelectAllTables = (checked: boolean) => {
+    const filtered = getFilteredTables();
     if (checked) {
-      setTempSelectedTables(filteredTables);
+      setTempSelectedTables(filtered);
     } else {
       setTempSelectedTables([]);
       setTempSelectedFields({});
@@ -73,14 +96,10 @@ export const MultiSelectDialog: React.FC<MultiSelectDialogProps> = ({
   };
 
   const handleSelectAllFields = (tableName: string, checked: boolean) => {
-    const tableFields = tableColumns
-      .filter(col => col.table_name === tableName)
-      .filter(col => col.column_name.toLowerCase().includes(fieldSearchQuery.toLowerCase()))
-      .map(col => col.column_name);
-
+    const tableFields = getFilteredColumns(tableName);
     setTempSelectedFields(prev => ({
       ...prev,
-      [tableName]: checked ? tableFields : []
+      [tableName]: checked ? tableFields.map(f => f.column_name) : []
     }));
   };
 
@@ -88,6 +107,8 @@ export const MultiSelectDialog: React.FC<MultiSelectDialogProps> = ({
     if (!fieldName) return '';
     return fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
+
+  const filteredTables = getFilteredTables();
 
   return (
     <Dialog open={showMultiSelectDialog} onOpenChange={setShowMultiSelectDialog}>
@@ -101,12 +122,12 @@ export const MultiSelectDialog: React.FC<MultiSelectDialogProps> = ({
           <div className="border rounded-lg p-4 bg-white shadow-sm">
             <h4 className="font-medium mb-4 text-lg text-gray-800">Select Tables</h4>
             <div className="mb-4">
-              <input
+              <Input
                 type="text"
                 placeholder="Search tables..."
                 value={tableSearchQuery}
                 onChange={(e) => setTableSearchQuery(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md text-sm"
+                className="w-full"
               />
             </div>
             <div className="flex items-center gap-2 p-2 border-b">
@@ -158,19 +179,17 @@ export const MultiSelectDialog: React.FC<MultiSelectDialogProps> = ({
           <div className="border rounded-lg p-4 bg-white shadow-sm">
             <h4 className="font-medium mb-4 text-lg text-gray-800">Select Fields</h4>
             <div className="mb-4">
-              <input
+              <Input
                 type="text"
                 placeholder="Search fields..."
                 value={fieldSearchQuery}
                 onChange={(e) => setFieldSearchQuery(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md text-sm"
+                className="w-full"
               />
             </div>
             <ScrollArea className="h-[400px]">
               {tempSelectedTables.map((tableName, index) => {
-                const tableFields = tableColumns
-                  .filter(col => col.table_name === tableName)
-                  .filter(col => col.column_name.toLowerCase().includes(fieldSearchQuery.toLowerCase()));
+                const tableFields = getFilteredColumns(tableName);
                 return (
                   <div key={tableName}>
                     <div className="bg-gray-50 p-3 rounded-t-lg border-b-2 border-primary/20">
@@ -178,7 +197,9 @@ export const MultiSelectDialog: React.FC<MultiSelectDialogProps> = ({
                         <input
                           type="checkbox"
                           id={`select-all-fields-${tableName}`}
-                          checked={tableFields.length > 0 && tableFields.every(field => tempSelectedFields[tableName]?.includes(field.column_name))}
+                          checked={tableFields.length > 0 && tableFields.every(field => 
+                            tempSelectedFields[tableName]?.includes(field.column_name)
+                          )}
                           onChange={(e) => handleSelectAllFields(tableName, e.target.checked)}
                           className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                         />
@@ -246,7 +267,7 @@ export const MultiSelectDialog: React.FC<MultiSelectDialogProps> = ({
                     acc[`${table}.${field}`] = formatFieldName(field);
                   });
                   return acc;
-                }, {})
+                }, {} as { [key: string]: string })
               }));
               setShowMultiSelectDialog(false);
             }}
