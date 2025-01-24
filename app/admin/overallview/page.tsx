@@ -390,18 +390,20 @@ const OverallView: React.FC = () => {
                     label: 'Company Name',
                     table: 'acc_portal_company_duplicate',
                     type: 'text',
-                    column: 'company_name'
+                    column: 'company_name',
+                    isDefault: true // Mark as default column
                 }]
             }]
         };
 
-        // If no main tab, return only default section
-        if (!mainTab) {
+        // If no structure data, return only default section
+        if (!structure || structure.length === 0) {
             return [defaultSection];
         }
 
-        const mainTabLower = mainTab.toLowerCase();
-        const isSpecialView = ['employee details', 'customer details', 'supplier details'].includes(mainTabLower);
+        const relevantStructure = structure.find(s => 
+            s.main_tab === mainTab && s.sub_tab === subTab
+        );
 
         // Start with the default section
         const processedSections = [defaultSection];
@@ -412,40 +414,34 @@ const OverallView: React.FC = () => {
             name: 'default-separator'
         });
 
-        // If we have structure data, add it
-        if (structure && structure.length > 0) {
-            const relevantStructure = structure.find(s => 
-                s.main_tab === mainTab && s.sub_tab === subTab
-            );
+        // Add structure sections if they exist
+        if (relevantStructure?.structure?.sections) {
+            relevantStructure.structure.sections.forEach(section => {
+                if (!section.subsections || section.subsections.length === 0) return;
 
-            if (relevantStructure?.structure?.sections) {
-                relevantStructure.structure.sections.forEach(section => {
-                    if (!section.subsections || section.subsections.length === 0) return;
-
-                    processedSections.push({
-                        name: section.name,
-                        label: section.name,
+                processedSections.push({
+                    name: section.name,
+                    label: section.name,
+                    isSeparator: false,
+                    categorizedFields: section.subsections.map(subsection => ({
+                        name: subsection.name,
                         isSeparator: false,
-                        categorizedFields: section.subsections.map(subsection => ({
-                            name: subsection.name,
-                            isSeparator: false,
-                            fields: (subsection.fields || []).map(field => ({
-                                name: `${field.table}.${field.name}`,
-                                label: field.label || field.name,
-                                table: field.table,
-                                type: field.type || 'text',
-                                column: field.name
-                            }))
-                        })).filter(cat => cat.fields && cat.fields.length > 0)
-                    });
-
-                    // Add separator between sections
-                    processedSections.push({
-                        isSeparator: true,
-                        name: `${section.name}-separator`
-                    });
+                        fields: (subsection.fields || []).map(field => ({
+                            name: `${field.table}.${field.name}`,
+                            label: field.label || field.name,
+                            table: field.table,
+                            type: field.type || 'text',
+                            column: field.name
+                        }))
+                    })).filter(cat => cat.fields && cat.fields.length > 0)
                 });
-            }
+
+                // Add separator between sections
+                processedSections.push({
+                    isSeparator: true,
+                    name: `${section.name}-separator`
+                });
+            });
         }
 
         // Remove the last separator if it exists

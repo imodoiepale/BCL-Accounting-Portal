@@ -35,6 +35,16 @@ interface StructureItem {
   };
 }
 
+interface Section {
+  name: string;
+  id?: string;
+  fields?: Array<{
+    name: string;
+    table: string;
+    column: string;
+  }>;
+}
+
 interface DatabaseStructure {
   order: {
     maintabs?: number[];
@@ -241,8 +251,8 @@ interface SettingsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   mainTabs: string[];
-  mainSections: any[];
-  mainSubsections: any[];
+  mainSections: Section[];
+  mainSubsections: Section[];
   onStructureChange: () => void;
   activeMainTab: string;
   activeSubTab: string;
@@ -292,6 +302,102 @@ export function SettingsDialog({
     fields: {}
   });
 
+  const [formState, setFormState] = useState({
+    tab: '',
+    section: '',
+    mainTab: '',
+    selectedTables: [] as string[],
+    selectedFields: {} as { [table: string]: string[] }
+  });
+
+  const handleFormChange = (field: string, value: string) => {
+    setFormState(prev => ({ ...prev, [field]: value }));
+
+    // Reset new item input when switching away from 'new'
+    if (value !== 'new') {
+      setNewItemInputs(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const getFormValue = (field: string) => {
+    if (formState[field] === 'new') {
+      return newItemInputs[field];
+    }
+    return formState[field];
+  };
+
+  const handleSubmitNewStructure = async () => {
+    try {
+      // Get actual values, either from selection or new input
+      const mainTabValue = getFormValue('mainTab');
+      const tabValue = getFormValue('tab');
+      const sectionValue = getFormValue('section');
+
+      if (!mainTabValue || !tabValue || !sectionValue) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      // Convert the new structure to the required format
+      const newStructureData = {
+        main_tab: mainTabValue,
+        sub_tab: tabValue,
+        structure: {
+          order: {
+            maintabs: { [mainTabValue]: 0 },
+            subtabs: { [tabValue]: 0 },
+            sections: { [sectionValue]: 0 }
+          },
+          visibility: {
+            maintabs: { [mainTabValue]: true },
+            subtabs: { [tabValue]: true },
+            sections: { [sectionValue]: true }
+          },
+          sections: [
+            {
+              name: sectionValue,
+              subsections: []
+            }
+          ]
+        }
+      };
+
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .insert(newStructureData);
+
+      if (error) throw error;
+
+      toast.success('New structure created successfully');
+      setIsOpen(false);
+      // Reset the form
+      setFormState({
+        mainTab: '',
+        tab: '',
+        section: '',
+        selectedTables: [],
+        selectedFields: {}
+      });
+      setNewItemInputs({
+        mainTab: '',
+        tab: '',
+        section: ''
+      });
+    } catch (error) {
+      console.error('Error creating new structure:', error);
+      toast.error('Failed to create new structure');
+    }
+  };
+
+  const handleTablesFieldsSelect = (tables: string[], fields: { [table: string]: string[] }) => {
+    setFormState(prev => ({
+      ...prev,
+      selectedTables: tables,
+      selectedFields: fields
+    }));
+    setIsSelectTablesDialogOpen(false);
+  };
+
   const [newStructure, setNewStructure] = useState({
     mainTabName: '',
     subTabName: '',
@@ -299,6 +405,18 @@ export function SettingsDialog({
     subsectionName: '',
     selectedTables: [] as string[],
     selectedFields: {} as { [table: string]: string[] }
+  });
+
+  const [selectedTables, setSelectedTables] = useState<string[]>([]);
+  const [selectedFields, setSelectedFields] = useState<{ [table: string]: string[] }>({});
+
+  const [editingItem, setEditingItem] = useState<{ type: string; item: StructureItem } | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  const [newItemInputs, setNewItemInputs] = useState({
+    mainTab: '',
+    tab: '',
+    section: ''
   });
 
   useEffect(() => {
@@ -899,45 +1017,96 @@ export function SettingsDialog({
         <DialogHeader>
           <DialogTitle>Select Tables and Fields</DialogTitle>
         </DialogHeader>
-        <SelectTablesAndFieldsDialog
-          onSelect={async (selectedFields) => {
-            try {
-              const newFields = Object.entries(selectedFields).flatMap(([table, fields]) =>
-                fields.map((field: string) => ({
-                  id: `field-${Date.now()}-${field}`,
-                  name: field,
-                  order: 0,
-                  visible: true,
-                  type: 'field' as const,
-                  table,
-                  parent: {
-                    maintab: selectedMainTab,
-                    subtab: selectedSubTab,
-                    section: selectedSection,
-                    subsection: selectedSubSection
-                  }
-                }))
-              );
-
-              const updatedStructure = { ...structure };
-              if (!updatedStructure.fields[selectedSubSection!]) {
-                updatedStructure.fields[selectedSubSection!] = [];
-              }
-              updatedStructure.fields[selectedSubSection!].push(...newFields);
-
-              setStructure(updatedStructure);
-              await handleUpdateStructure(updatedStructure);
+        <div className="p-4">
+          <SelectTablesAndFieldsDialog
+            isOpen={isSelectTablesDialogOpen}
+            onClose={() => setIsSelectTablesDialogOpen(false)}
+            onSelect={(tables, fields) => {
+              handleTablesFieldsSelect(tables, fields);
               setIsSelectTablesDialogOpen(false);
-              toast.success('Fields added successfully');
-            } catch (error) {
-              console.error('Error adding fields:', error);
-              toast.error('Failed to add fields');
-            }
-          }}
-        />
+            }}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );
+
+  const EditDialog = () => {
+    const [name, setName] = useState(editingItem?.item.name || '');
+
+    return (
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit {editingItem?.type}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={`Enter ${editingItem?.type} name`}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!editingItem) return;
+
+                try {
+                  const updatedStructure = { ...structure };
+                  let items: StructureItem[] = [];
+
+                  switch (editingItem.type) {
+                    case 'maintab':
+                      items = updatedStructure.maintabs;
+                      break;
+                    case 'subtab':
+                      items = updatedStructure.subtabs[selectedMainTab!];
+                      break;
+                    case 'section':
+                      items = updatedStructure.sections[selectedSubTab!];
+                      break;
+                    case 'subsection':
+                      items = updatedStructure.subsections[selectedSection!];
+                      break;
+                    case 'field':
+                      items = updatedStructure.fields[selectedSubSection!];
+                      break;
+                  }
+
+                  const item = items.find(i => i.id === editingItem.item.id);
+                  if (item) {
+                    item.name = name;
+                  }
+
+                  setStructure(updatedStructure);
+                  await handleUpdateStructure(updatedStructure);
+                  setIsEditDialogOpen(false);
+                  toast.success('Item updated successfully');
+                } catch (error) {
+                  console.error('Error updating item:', error);
+                  toast.error('Failed to update item');
+                }
+              }}
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  const handleEditItem = (type: string, item: StructureItem) => {
+    setEditingItem({ type, item });
+    setIsEditDialogOpen(true);
+  };
 
   const renderStructureTab = () => (
     <div className="grid grid-cols-[2fr,2fr,2fr,2fr,3fr] gap-4">
@@ -985,9 +1154,9 @@ export function SettingsDialog({
                   />
                   <Button variant="ghost" size="icon" onClick={(e) => {
                     e.stopPropagation();
-                    // Add edit logic
+                    handleEditItem('maintab', tab);
                   }}>
-                    <Pencil className="h-4 w-4" />
+                    <Edit2 className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => {
                     e.stopPropagation();
@@ -1036,7 +1205,7 @@ export function SettingsDialog({
                 <div className="flex items-center gap-2">
                   <Switch checked={subtab.visible} />
                   <Button variant="ghost" size="icon">
-                    <Pencil className="h-4 w-4" />
+                    <Edit2 className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="icon" className="text-destructive">
                     <Trash2 className="h-4 w-4" />
@@ -1081,7 +1250,7 @@ export function SettingsDialog({
                 <div className="flex items-center gap-2">
                   <Switch checked={section.visible} />
                   <Button variant="ghost" size="icon">
-                    <Pencil className="h-4 w-4" />
+                    <Edit2 className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="icon" className="text-destructive">
                     <Trash2 className="h-4 w-4" />
@@ -1123,7 +1292,7 @@ export function SettingsDialog({
                 <div className="flex items-center gap-2">
                   <Switch checked={subsection.visible} />
                   <Button variant="ghost" size="icon">
-                    <Pencil className="h-4 w-4" />
+                    <Edit2 className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="icon" className="text-destructive">
                     <Trash2 className="h-4 w-4" />
@@ -1287,869 +1456,142 @@ export function SettingsDialog({
     </div>
   );
 
-  const renderNewStructureTab = () => {
-    const [useExisting, setUseExisting] = useState(false);
-    const [selectedExistingMainTab, setSelectedExistingMainTab] = useState<string | null>(null);
-    const [selectedItems, setSelectedItems] = useState<{
-      subtabs: string[];
-      sections: string[];
-      subsections: { [section: string]: string[] };
-    }>({
-      subtabs: [],
-      sections: [],
-      subsections: {},
-    });
+  const renderNewStructureForm = () => (
+    <div className="space-y-6 p-4">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium">Add New Structure</h3>
+          <Button 
+            variant="default" 
+            size="sm"
+            onClick={handleSubmitNewStructure}
+          >
+            Add Structure
+          </Button>
+        </div>
 
-    return (
-      <div className="space-y-6 p-4">
-        <div className="space-y-4">
-          <div>
-            <Label>New Main Tab Name</Label>
-            <Input
-              value={newStructure.mainTabName}
-              onChange={(e) =>
-                setNewStructure((prev) => ({ ...prev, mainTabName: e.target.value }))
-              }
-              placeholder="Enter main tab name"
-            />
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="useExisting"
-              checked={useExisting}
-              onCheckedChange={(checked) => setUseExisting(checked as boolean)}
-            />
-            <Label htmlFor="useExisting">Use structure from existing main tab</Label>
-          </div>
-
-          {useExisting ? (
-            <div className="space-y-4">
-              <div>
-                <Label>Select Main Tab to Copy From</Label>
+        <div className="grid gap-4">
+          <div className="grid gap-2">
+            <Label>Main Tab</Label>
+            <div className="flex gap-2">
+              <div className="flex-1">
                 <Select
-                  value={selectedExistingMainTab || ''}
-                  onValueChange={setSelectedExistingMainTab}
+                  value={formState.mainTab}
+                  onValueChange={(value) => handleFormChange('mainTab', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a main tab" />
+                    <SelectValue placeholder="Select Main Tab" />
                   </SelectTrigger>
                   <SelectContent>
-                    {structure.maintabs.map((tab) => (
-                      <SelectItem key={tab.id} value={tab.name}>
-                        {tab.name}
+                    <SelectItem value="new">+ Create New</SelectItem>
+                    {mainSubsections.map((subsection) => (
+                      <SelectItem key={subsection.name} value={subsection.name}>
+                        {subsection.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
-              {selectedExistingMainTab && (
-                <>
-                  <div>
-                    <Label>Select Sub Tabs</Label>
-                    <ScrollArea className="h-[200px] border rounded-md p-2">
-                      {structure.subtabs[selectedExistingMainTab]?.map((subtab) => (
-                        <div key={subtab.id} className="flex items-center space-x-2 py-1">
-                          <Checkbox
-                            checked={selectedItems.subtabs.includes(subtab.name)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedItems((prev) => ({
-                                  ...prev,
-                                  subtabs: [...prev.subtabs, subtab.name],
-                                }));
-                              } else {
-                                setSelectedItems((prev) => ({
-                                  ...prev,
-                                  subtabs: prev.subtabs.filter((t) => t !== subtab.name),
-                                }));
-                              }
-                            }}
-                          />
-                          <span>{subtab.name}</span>
-                        </div>
-                      ))}
-                    </ScrollArea>
-                  </div>
-
-                  <div>
-                    <Label>Select Sections and Subsections</Label>
-                    <ScrollArea className="h-[300px] border rounded-md p-2">
-                      {selectedItems.subtabs.map((subtab) => (
-                        <div key={subtab} className="space-y-2 py-2">
-                          <h4 className="font-medium">{subtab}</h4>
-                          {structure.sections[subtab]?.map((section) => (
-                            <div key={section.id} className="ml-4 space-y-2">
-                              <div className="flex items-center space-x-2">
-                                <Checkbox
-                                  checked={selectedItems.sections.includes(section.name)}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setSelectedItems((prev) => ({
-                                        ...prev,
-                                        sections: [...prev.sections, section.name],
-                                      }));
-                                    } else {
-                                      setSelectedItems((prev) => ({
-                                        ...prev,
-                                        sections: prev.sections.filter((s) => s !== section.name),
-                                      }));
-                                    }
-                                  }}
-                                />
-                                <span>{section.name}</span>
-                              </div>
-                              {structure.subsections[section.name]?.map((subsection) => (
-                                <div key={subsection.id} className="ml-4 flex items-center space-x-2">
-                                  <Checkbox
-                                    checked={selectedItems.subsections[section.name]?.includes(
-                                      subsection.name
-                                    )}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setSelectedItems((prev) => ({
-                                          ...prev,
-                                          subsections: {
-                                            ...prev.subsections,
-                                            [section.name]: [
-                                              ...(prev.subsections[section.name] || []),
-                                              subsection.name,
-                                            ],
-                                          },
-                                        }));
-                                      } else {
-                                        setSelectedItems((prev) => ({
-                                          ...prev,
-                                          subsections: {
-                                            ...prev.subsections,
-                                            [section.name]: prev.subsections[
-                                              section.name
-                                            ].filter((s) => s !== subsection.name),
-                                          },
-                                        }));
-                                      }
-                                    }}
-                                  />
-                                  <span>{subsection.name}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                    </ScrollArea>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <Label>Sub Tab Name</Label>
-                <Input
-                  value={newStructure.subTabName}
-                  onChange={(e) =>
-                    setNewStructure((prev) => ({ ...prev, subTabName: e.target.value }))
-                  }
-                  placeholder="Enter sub tab name"
-                />
-              </div>
-              <div>
-                <Label>Section Name</Label>
-                <Input
-                  value={newStructure.sectionName}
-                  onChange={(e) =>
-                    setNewStructure((prev) => ({ ...prev, sectionName: e.target.value }))
-                  }
-                  placeholder="Enter section name"
-                />
-              </div>
-              <div>
-                <Label>Subsection Name</Label>
-                <Input
-                  value={newStructure.subsectionName}
-                  onChange={(e) =>
-                    setNewStructure((prev) => ({ ...prev, subsectionName: e.target.value }))
-                  }
-                  placeholder="Enter subsection name"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setIsOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={async () => {
-              if (useExisting) {
-                await handleCreateFromExisting(
-                  selectedExistingMainTab!,
-                  selectedItems,
-                  newStructure.mainTabName
-                );
-              } else {
-                await handleSubmitNewStructure();
-              }
-            }}
-            disabled={
-              !newStructure.mainTabName ||
-              (!useExisting
-                ? !newStructure.subTabName ||
-                  !newStructure.sectionName ||
-                  !newStructure.subsectionName
-                : !selectedExistingMainTab ||
-                  selectedItems.subtabs.length === 0 ||
-                  selectedItems.sections.length === 0)
-            }
-          >
-            Create Structure
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
-  const handleCreateFromExisting = async (
-    sourceMainTab: string,
-    selectedItems: {
-      subtabs: string[];
-      sections: string[];
-      subsections: { [section: string]: string[] };
-    },
-    newMainTabName: string
-  ) => {
-    try {
-      const newStructureData = {
-        main_tab: newMainTabName,
-        sub_tab: selectedItems.subtabs[0], // Using the first selected subtab
-        structure: {
-          order: {
-            maintabs: { [newMainTabName]: structure.maintabs.length },
-            subtabs: {},
-            sections: {},
-            subsections: {},
-          },
-          visibility: {
-            maintabs: { [newMainTabName]: true },
-            subtabs: {},
-            sections: {},
-            subsections: {},
-          },
-          sections: [] as any[],
-        },
-      };
-
-      // Copy selected subtabs, sections, and subsections
-      selectedItems.subtabs.forEach((subtab, index) => {
-        newStructureData.structure.order.subtabs[subtab] = index;
-        newStructureData.structure.visibility.subtabs[subtab] = true;
-
-        const sections = structure.sections[subtab]?.filter((section) =>
-          selectedItems.sections.includes(section.name)
-        );
-
-        sections?.forEach((section, sectionIndex) => {
-          newStructureData.structure.order.sections[section.name] = sectionIndex;
-          newStructureData.structure.visibility.sections[section.name] = true;
-
-          const subsections = structure.subsections[section.name]?.filter((subsection) =>
-            selectedItems.subsections[section.name]?.includes(subsection.name)
-          );
-
-          const newSection = {
-            name: section.name,
-            subsections: subsections?.map((subsection, subsectionIndex) => {
-              newStructureData.structure.order.subsections[subsection.name] = subsectionIndex;
-              newStructureData.structure.visibility.subsections[subsection.name] = true;
-
-              return {
-                name: subsection.name,
-                fields: structure.fields[subsection.name]?.map((field) => ({
-                  name: field.name,
-                  table: field.table,
-                  column: field.name,
-                })),
-              };
-            }),
-          };
-
-          newStructureData.structure.sections.push(newSection);
-        });
-      });
-
-      const { error } = await supabase
-        .from('profile_category_table_mapping_2')
-        .insert(newStructureData);
-
-      if (error) throw error;
-
-      toast.success('New structure created successfully');
-      setIsOpen(false);
-      fetchData(); // Refresh the data
-    } catch (error) {
-      console.error('Error creating structure from existing:', error);
-      toast.error('Failed to create structure');
-    }
-  };
-
-  const handleSubmitNewStructure = async () => {
-    try {
-      // Convert the new structure to the required format
-      const newStructureData = {
-        main_tab: newStructure.mainTabName,
-        sub_tab: newStructure.subTabName,
-        structure: {
-          order: {
-            maintabs: { [newStructure.mainTabName]: 0 },
-            subtabs: { [newStructure.subTabName]: 0 },
-            sections: { [newStructure.sectionName]: 0 },
-            subsections: { [newStructure.subsectionName]: 0 }
-          },
-          visibility: {
-            maintabs: { [newStructure.mainTabName]: true },
-            subtabs: { [newStructure.subTabName]: true },
-            sections: { [newStructure.sectionName]: true },
-            subsections: { [newStructure.subsectionName]: true }
-          },
-          sections: [
-            {
-              name: newStructure.sectionName,
-              subsections: [
-                {
-                  name: newStructure.subsectionName,
-                  fields: Object.entries(newStructure.selectedFields).flatMap(([table, fields]) =>
-                    fields.map((field: string) => ({
-                      name: field,
-                      table: table,
-                      column: field
-                    }))
-                  )
-                }
-              ]
-            }
-          ]
-        }
-      };
-
-      const { error } = await supabase
-        .from('profile_category_table_mapping_2')
-        .insert(newStructureData);
-
-      if (error) throw error;
-
-      toast.success('New structure created successfully');
-      setIsOpen(false);
-      // Reset the form
-      setNewStructure({
-        mainTabName: '',
-        subTabName: '',
-        sectionName: '',
-        subsectionName: '',
-        selectedTables: [],
-        selectedFields: {}
-      });
-    } catch (error) {
-      console.error('Error creating new structure:', error);
-      toast.error('Failed to create new structure');
-    }
-  };
-
-  const handleDeleteItem = async (type: string, id: string) => {
-    try {
-      const updatedStructure = { ...structure };
-      
-      switch (type) {
-        case 'maintab':
-          updatedStructure.maintabs = structure.maintabs.filter(tab => tab.id !== id);
-          break;
-        case 'subtab':
-          if (selectedMainTab) {
-            updatedStructure.subtabs[selectedMainTab] = structure.subtabs[selectedMainTab].filter(tab => tab.id !== id);
-          }
-          break;
-        case 'section':
-          if (selectedSubTab) {
-            updatedStructure.sections[selectedSubTab] = structure.sections[selectedSubTab].filter(section => section.id !== id);
-          }
-          break;
-        case 'subsection':
-          if (selectedSection) {
-            updatedStructure.subsections[selectedSection] = structure.subsections[selectedSection].filter(subsection => subsection.id !== id);
-          }
-          break;
-        case 'field':
-          if (selectedSubSection) {
-            updatedStructure.fields[selectedSubSection] = structure.fields[selectedSubSection].filter(field => field.id !== id);
-          }
-          break;
-      }
-
-      setStructure(updatedStructure);
-      await handleUpdateStructure(updatedStructure);
-      toast.success('Item deleted successfully');
-    } catch (error) {
-      console.error('Error deleting item:', error);
-      toast.error('Failed to delete item');
-    }
-  };
-
-  const handleEditItem = (type: string, item: StructureItem) => {
-    setEditingItem({ type, item });
-    setIsEditDialogOpen(true);
-  };
-
-  const handleMoveItem = async (type: string, id: string, direction: 'up' | 'down') => {
-    try {
-      const updatedStructure = { ...structure };
-      let items: StructureItem[] = [];
-      
-      switch (type) {
-        case 'maintab':
-          items = updatedStructure.maintabs;
-          break;
-        case 'subtab':
-          items = updatedStructure.subtabs[selectedMainTab!];
-          break;
-        case 'section':
-          items = updatedStructure.sections[selectedSubTab!];
-          break;
-        case 'subsection':
-          items = updatedStructure.subsections[selectedSection!];
-          break;
-        case 'field':
-          items = updatedStructure.fields[selectedSubSection!];
-          break;
-      }
-
-      const index = items.findIndex(item => item.id === id);
-      if (index === -1) return;
-
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
-      if (newIndex < 0 || newIndex >= items.length) return;
-
-      const item = items[index];
-      items.splice(index, 1);
-      items.splice(newIndex, 0, item);
-
-      // Update order values
-      items.forEach((item, idx) => {
-        item.order = idx;
-      });
-
-      setStructure(updatedStructure);
-      await handleUpdateStructure(updatedStructure);
-    } catch (error) {
-      console.error('Error moving item:', error);
-      toast.error('Failed to move item');
-    }
-  };
-
-  const FieldListItem = ({ field, index }: { field: StructureItem; index: number }) => (
-    <Draggable draggableId={field.id} index={index}>
-      {(provided) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          className="grid grid-cols-[auto,2fr,2fr,auto] gap-2 p-2 items-center hover:bg-muted/50"
-        >
-          <div className="flex items-center gap-2">
-            <div {...provided.dragHandleProps}>
-              <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-            </div>
-          <div className="flex flex-col gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4"
-              onClick={() => handleMoveItem('field', field.id, 'up')}
-              disabled={index === 0}
-            >
-              <ChevronUp className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4"
-              onClick={() => handleMoveItem('field', field.id, 'down')}
-              disabled={index === structure.fields[selectedSubSection!].length - 1}
-            >
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-          </div>
-          <span className="text-sm text-muted-foreground">{index + 1}</span>
-        </div>
-        <div className="text-sm font-medium">{field.name}</div>
-        <div className="text-sm text-muted-foreground">{field.table}</div>
-        <div className="flex items-center gap-2">
-          <Switch
-            checked={field.visible}
-            onCheckedChange={(checked) => {
-              const updatedFields = structure.fields[selectedSubSection!].map(f =>
-                f.id === field.id ? { ...f, visible: checked } : f
-              );
-              setStructure(prev => ({ ...prev, fields: { ...prev.fields, [selectedSubSection!]: updatedFields } }));
-              handleUpdateStructure(prev => ({ ...prev, fields: { ...prev.fields, [selectedSubSection!]: updatedFields } }));
-            }}
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => handleEditItem('field', field)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-destructive"
-            onClick={() => handleDeleteItem('field', field.id)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    )}
-  </Draggable>
-);
-
-  const handleVisibilityChange = async (item: StructureItem, visible: boolean) => {
-    const updatedStructure = { ...structure };
-    
-    // Update visibility in the structure
-    switch (item.type) {
-      case 'maintab':
-        updatedStructure.maintabs = updatedStructure.maintabs.map(tab =>
-          tab.id === item.id ? { ...tab, visible } : tab
-        );
-        break;
-      case 'subtab':
-        if (item.parent?.maintab) {
-          updatedStructure.subtabs[item.parent.maintab] = updatedStructure.subtabs[item.parent.maintab].map(
-            tab => (tab.id === item.id ? { ...tab, visible } : tab)
-          );
-        }
-        break;
-      case 'section':
-        if (item.parent?.subtab) {
-          updatedStructure.sections[item.parent.subtab] = updatedStructure.sections[item.parent.subtab].map(
-            section => (section.id === item.id ? { ...section, visible } : section)
-          );
-        }
-        break;
-      case 'subsection':
-        if (item.parent?.section) {
-          updatedStructure.subsections[item.parent.section] = updatedStructure.subsections[item.parent.section].map(
-            subsection => (subsection.id === item.id ? { ...subsection, visible } : subsection)
-          );
-        }
-        break;
-      case 'field':
-        if (item.parent?.subsection) {
-          updatedStructure.fields[item.parent.subsection] = updatedStructure.fields[item.parent.subsection].map(
-            field => (field.id === item.id ? { ...field, visible } : field)
-          );
-        }
-        break;
-    }
-
-    setStructure(updatedStructure);
-
-    try {
-      // Save to database
-      const { error } = await supabase
-        .from('profile_category_table_mapping_2')
-        .update({
-          structure: {
-            ...structure,
-            visibility: {
-              maintabs: Object.fromEntries(
-                updatedStructure.maintabs.map(tab => [tab.id, tab.visible])
-              ),
-              subtabs: Object.fromEntries(
-                Object.values(updatedStructure.subtabs)
-                  .flat()
-                  .map(tab => [tab.id, tab.visible])
-              ),
-              sections: Object.fromEntries(
-                Object.values(updatedStructure.sections)
-                  .flat()
-                  .map(section => [section.id, section.visible])
-              ),
-              subsections: Object.fromEntries(
-                Object.values(updatedStructure.subsections)
-                  .flat()
-                  .map(subsection => [subsection.id, subsection.visible])
-              ),
-              fields: Object.fromEntries(
-                Object.values(updatedStructure.fields)
-                  .flat()
-                  .map(field => [field.id, field.visible])
-              )
-            }
-          }
-        })
-        .eq('id', 1);
-
-      if (error) throw error;
-      toast.success('Visibility updated successfully');
-    } catch (error) {
-      console.error('Error updating visibility:', error);
-      toast.error('Failed to update visibility');
-    }
-  };
-
-  const [editingItem, setEditingItem] = useState<{ type: string; item: StructureItem } | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-
-  const EditDialog = () => {
-    const [name, setName] = useState(editingItem?.item.name || '');
-
-    return (
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit {editingItem?.type}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={`Enter ${editingItem?.type} name`}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                if (!editingItem) return;
-
-                try {
-                  const updatedStructure = { ...structure };
-                  let items: StructureItem[] = [];
-
-                  switch (editingItem.type) {
-                    case 'maintab':
-                      items = updatedStructure.maintabs;
-                      break;
-                    case 'subtab':
-                      items = updatedStructure.subtabs[selectedMainTab!];
-                      break;
-                    case 'section':
-                      items = updatedStructure.sections[selectedSubTab!];
-                      break;
-                    case 'subsection':
-                      items = updatedStructure.subsections[selectedSection!];
-                      break;
-                    case 'field':
-                      items = updatedStructure.fields[selectedSubSection!];
-                      break;
-                  }
-
-                  const item = items.find(i => i.id === editingItem.item.id);
-                  if (item) {
-                    item.name = name;
-                  }
-
-                  setStructure(updatedStructure);
-                  await handleUpdateStructure(updatedStructure);
-                  setIsEditDialogOpen(false);
-                  toast.success('Item updated successfully');
-                } catch (error) {
-                  console.error('Error updating item:', error);
-                  toast.error('Failed to update item');
-                }
-              }}
-            >
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  };
-
-  const handleStructureUpdate = async (updatedStructure: any) => {
-    try {
-      const { error } = await supabase
-        .from('profile_category_table_mapping_2')
-        .update({
-          structure: updatedStructure,
-          updated_at: new Date().toISOString()
-        })
-        .eq('main_tab', activeMainTab)
-        .eq('sub_tab', activeSubTab);
-
-      if (error) throw error;
-      
-      onStructureChange();
-      toast.success('Structure updated successfully');
-    } catch (error) {
-      console.error('Error updating structure:', error);
-      toast.error('Failed to update structure');
-    }
-  };
-
-  const handleVisibilityUpdate = async (type: string, id: string, visible: boolean) => {
-    try {
-      const newVisibilityState = {
-        ...visibilityState,
-        [type]: {
-          ...visibilityState[type],
-          [id]: visible
-        }
-      };
-      
-      onVisibilityChange(newVisibilityState);
-      
-      const updatedStructure = {
-        ...structure,
-        visibility: newVisibilityState
-      };
-      
-      await handleStructureUpdate(updatedStructure);
-    } catch (error) {
-      console.error('Error updating visibility:', error);
-      toast.error('Failed to update visibility');
-    }
-  };
-
-  const handleOrderUpdate = async (type: string, items: StructureItem[]) => {
-    try {
-      const newOrder = items.reduce((acc, item, index) => ({
-        ...acc,
-        [item.id]: index
-      }), {});
-
-      const newOrderState = {
-        ...orderState,
-        [type]: newOrder
-      };
-      
-      onOrderChange(newOrderState);
-      
-      const updatedStructure = {
-        ...structure,
-        order: newOrderState
-      };
-      
-      await handleStructureUpdate(updatedStructure);
-    } catch (error) {
-      console.error('Error updating order:', error);
-      toast.error('Failed to update order');
-    }
-  };
-
-  const renderSubsections = useCallback(() => {
-    console.log('Rendering subsections with:', {
-      processedSections,
-      activeMainTab,
-      activeSubTab
-    });
-
-    if (!processedSections || !activeMainTab || !activeSubTab) {
-      console.log('Missing required props');
-      return null;
-    }
-
-    // Get all subsections from all sections
-    const allSubsections = processedSections.reduce((acc, section) => {
-      if (section.subsections) {
-        acc.push(...section.subsections);
-      }
-      return acc;
-    }, []);
-
-    console.log('All subsections:', allSubsections);
-
-    if (!allSubsections.length) {
-      return <div>No subsections found</div>;
-    }
-
-    return (
-      <div className="space-y-4">
-        {allSubsections.map((subsection, index) => {
-          console.log('Rendering subsection:', subsection);
-          return (
-            <div
-              key={subsection.id || `subsection-${index}`}
-              className={cn(
-                "p-4 rounded-lg border",
-                visibilityState.subsections?.[subsection.id] === false
-                  ? "bg-muted/50"
-                  : "bg-background"
-              )}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium">{subsection.name}</h3>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={visibilityState.subsections?.[subsection.id] !== false}
-                    onCheckedChange={(checked) =>
-                      handleVisibilityUpdate('subsections', subsection.id, checked)
-                    }
+              {formState.mainTab === 'new' && (
+                <div className="flex-1">
+                  <Input
+                    placeholder="Enter new main tab name"
+                    value={newItemInputs.mainTab}
+                    onChange={(e) => setNewItemInputs(prev => ({ ...prev, mainTab: e.target.value }))}
                   />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleEditSubsection(subsection)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
                 </div>
-              </div>
-              
-              <DraggableList
-                items={subsection.fields.map((field, fieldIndex) => ({
-                  id: `${field.table}-${field.name}`,
-                  name: field.label || field.name,
-                  order: orderState.fields?.[`${subsection.id}-${field.table}-${field.name}`] ?? fieldIndex,
-                  visible: visibilityState.fields?.[`${subsection.id}-${field.table}-${field.name}`] !== false,
-                  type: 'field',
-                  table: field.table,
-                  parent: {
-                    maintab: activeMainTab,
-                    subtab: activeSubTab,
-                    section: subsection.name,
-                    subsection: subsection.name
-                  }
-                }))}
-                type="fields"
-                onEdit={handleEditField}
-                onDelete={handleDeleteField}
-                onVisibilityChange={(item, visible) =>
-                  handleVisibilityUpdate('fields', `${subsection.id}-${item.table}-${item.name}`, visible)
-                }
-                onDragEnd={(result) => {
-                  if (!result.destination) return;
-                  const items = Array.from(subsection.fields);
-                  const [reorderedItem] = items.splice(result.source.index, 1);
-                  items.splice(result.destination.index, 0, reorderedItem);
-                  handleOrderUpdate('fields', items.map((field, index) => ({
-                    id: `${subsection.id}-${field.table}-${field.name}`,
-                    name: field.label || field.name,
-                    order: index,
-                    visible: visibilityState.fields?.[`${subsection.id}-${field.table}-${field.name}`] !== false,
-                    type: 'field',
-                    table: field.table
-                  })));
-                }}
-              />
+              )}
             </div>
-          );
-        })}
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Tab</Label>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Select 
+                  value={formState.tab}
+                  onValueChange={(value) => handleFormChange('tab', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Tab" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">+ Create New</SelectItem>
+                    {mainTabs.map((tab) => (
+                      <SelectItem key={tab} value={tab}>
+                        {tab}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {formState.tab === 'new' && (
+                <div className="flex-1">
+                  <Input
+                    placeholder="Enter new tab name"
+                    value={newItemInputs.tab}
+                    onChange={(e) => setNewItemInputs(prev => ({ ...prev, tab: e.target.value }))}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Section</Label>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Select
+                  value={formState.section}
+                  onValueChange={(value) => handleFormChange('section', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">+ Create New</SelectItem>
+                    {mainSections.map((section) => (
+                      <SelectItem key={section.name} value={section.name}>
+                        {section.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {formState.section === 'new' && (
+                <div className="flex-1">
+                  <Input
+                    placeholder="Enter new section name"
+                    value={newItemInputs.section}
+                    onChange={(e) => setNewItemInputs(prev => ({ ...prev, section: e.target.value }))}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Tables and Fields</Label>
+            <div className="flex items-center gap-2">
+              <Input 
+                placeholder="Select Tables and Fields"
+                readOnly
+                value={formState.selectedTables.length > 0 ? `${formState.selectedTables.length} tables selected` : ''}
+                onClick={() => setIsSelectTablesDialogOpen(true)}
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsSelectTablesDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
-    );
-  }, [processedSections, activeMainTab, activeSubTab, visibilityState, orderState]);
+    </div>
+  );
 
   return (
     <>
@@ -2170,14 +1612,14 @@ export function SettingsDialog({
           <div className="flex-1 overflow-hidden">
             <Tabs defaultValue="structure" className="h-full flex flex-col" value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="px-6 border-b">
-                <TabsTrigger value="structure">Structure</TabsTrigger>
                 <TabsTrigger value="new">New Structure</TabsTrigger>
+                <TabsTrigger value="structure">Structure</TabsTrigger>
               </TabsList>
               <TabsContent value="structure" className="flex-1 p-6 overflow-auto">
                 {renderStructureTab()}
               </TabsContent>
               <TabsContent value="new" className="flex-1 p-6 overflow-auto">
-                {renderNewStructureTab()}
+                {renderNewStructureForm()}
               </TabsContent>
             </Tabs>
           </div>
@@ -2185,15 +1627,27 @@ export function SettingsDialog({
       </Dialog>
 
       {isSelectTablesDialogOpen && (
-        <SelectTablesAndFieldsDialog
-          isOpen={isSelectTablesDialogOpen}
-          onClose={() => setIsSelectTablesDialogOpen(false)}
-          onSelect={handleTablesSelected}
-        />
+        <Dialog open={isSelectTablesDialogOpen} onOpenChange={setIsSelectTablesDialogOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Select Tables and Fields</DialogTitle>
+            </DialogHeader>
+            <div className="p-4">
+              <SelectTablesAndFieldsDialog
+                isOpen={isSelectTablesDialogOpen}
+                onClose={() => setIsSelectTablesDialogOpen(false)}
+                onSelect={(tables, fields) => {
+                  handleTablesFieldsSelect(tables, fields);
+                  setIsSelectTablesDialogOpen(false);
+                }}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
-      {editingItem && <EditDialog />}
+
+      {isEditDialogOpen && <EditDialog />}
       <AddDialog />
-      <SelectTablesDialog />
     </>
   );
 }
