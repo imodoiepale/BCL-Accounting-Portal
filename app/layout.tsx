@@ -15,9 +15,9 @@ const queryClient = new QueryClient()
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   const pathname = usePathname()
 
   // Check if current path starts with /mail/policy-terms
@@ -54,11 +54,11 @@ export default function RootLayout({
                 <main className="flex-grow overflow-auto">
                   <div className="min-w-[640px] p-4">
                     {children}
-                    <Toaster />
                   </div>
                 </main>
               </div>
             </div>
+            <Toaster />
           </body>
         </html>
       </QueryClientProvider>
