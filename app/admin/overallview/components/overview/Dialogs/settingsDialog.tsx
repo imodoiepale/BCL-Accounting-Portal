@@ -596,6 +596,20 @@ export function SettingsDialog({
     fetchStructureData();
   }, [supabase]);
 
+  useEffect(() => {
+    if (structure?.maintabs?.length > 0) {
+      const firstMainTab = structure.maintabs[0].name;
+      const firstSubTab = structure.subtabs.find(tab => tab.parent.maintab === firstMainTab)?.name;
+      const firstSection = structure.sections.find(section => section.parent.subtab === firstSubTab)?.name;
+      const firstSubSection = structure.subsections.find(subsection => subsection.parent.section === firstSection)?.name;
+
+      setSelectedMainTab(firstMainTab);
+      setSelectedSubTab(firstSubTab);
+      setSelectedSection(firstSection);
+      setSelectedSubSection(firstSubSection);
+    }
+  }, [structure]);
+
   const handleMainTabSelect = (maintabName: string) => {
     setSelectedMainTab(maintabName);
     setSelectedSubTab(null);
@@ -1097,84 +1111,146 @@ export function SettingsDialog({
     setEditingField({ type, value: currentValue });
   };
 
-  const handleInlineEditSubmit = (e: React.KeyboardEvent | React.FocusEvent) => {
+  const handleInlineEditSubmit = async (e: React.KeyboardEvent | React.FocusEvent) => {
     if (e.type === 'keydown' && (e as React.KeyboardEvent).key !== 'Enter') {
       return;
     }
 
-    if (!editingField.type || editingField.value === '') return;
-
-    switch (editingField.type) {
-      case 'maintab':
-        setStructure(prev => ({
-          ...prev,
-          maintabs: prev.maintabs.map(tab =>
-            tab.name === selectedMainTab ? { ...tab, name: editingField.value } : tab
-          )
-        }));
-        setSelectedMainTab(editingField.value);
-        break;
-      case 'subtab':
-        setStructure(prev => ({
-          ...prev,
-          subtabs: prev.subtabs.map(subtab =>
-            subtab.name === selectedSubTab ? { ...subtab, name: editingField.value } : subtab
-          )
-        }));
-        setSelectedSubTab(editingField.value);
-        break;
-      case 'section':
-        setStructure(prev => ({
-          ...prev,
-          sections: prev.sections.map(section =>
-            section.name === selectedSection ? { ...section, name: editingField.value } : section
-          )
-        }));
-        setSelectedSection(editingField.value);
-        break;
-      case 'subsection':
-        setStructure(prev => ({
-          ...prev,
-          subsections: prev.subsections.map(subsection =>
-            subsection.name === selectedSubSection ? { ...subsection, name: editingField.value } : subsection
-          )
-        }));
-        setSelectedSubSection(editingField.value);
-        break;
+    if (!editingField.value || editingField.value === '') {
+      setEditingField({ type: '', value: '' });
+      return;
     }
 
-    setEditingField({ type: null, value: '' });
-  };
+    try {
+      const { data: currentData } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('*')
+        .eq('main_tab', selectedMainTab)
+        .eq('sub_tab', selectedSubTab)
+        .single();
 
-  const getEffectiveVisibility = (item: any, type: string, structure: any) => {
-    if (!structure?.visibility) return true;
+      if (!currentData) return;
 
-    const visibility = structure.visibility;
-    const itemVisible = visibility[type]?.[item.name] ?? true;
+      // Create updated structure with new name
+      const updatedStructure = { ...currentData.structure };
+      const oldValue = editingField.type === 'maintab' ? selectedMainTab :
+                      editingField.type === 'subtab' ? selectedSubTab :
+                      editingField.type === 'section' ? selectedSection :
+                      selectedSubSection;
 
-    switch (type) {
-      case 'fields':
-        return itemVisible &&
-          (visibility.subsections?.[item.parent?.subsection] ?? true) &&
-          (visibility.sections?.[item.parent?.section] ?? true) &&
-          (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
-          (visibility.maintabs?.[item.parent?.maintab] ?? true);
-      case 'subsections':
-        return itemVisible &&
-          (visibility.sections?.[item.parent?.section] ?? true) &&
-          (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
-          (visibility.maintabs?.[item.parent?.maintab] ?? true);
-      case 'sections':
-        return itemVisible &&
-          (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
-          (visibility.maintabs?.[item.parent?.maintab] ?? true);
-      case 'subtabs':
-        return itemVisible &&
-          (visibility.maintabs?.[item.parent?.maintab] ?? true);
-      case 'maintabs':
-        return itemVisible;
-      default:
-        return true;
+      // Update names in all relevant places
+      switch (editingField.type) {
+        case 'maintab':
+          // Update in maintabs array
+          updatedStructure.maintabs = updatedStructure.maintabs.map(tab =>
+            tab.name === oldValue ? { ...tab, name: editingField.value } : tab
+          );
+          // Update in subtabs parent references
+          updatedStructure.subtabs = updatedStructure.subtabs.map(tab =>
+            tab.parent.maintab === oldValue ? { ...tab, parent: { ...tab.parent, maintab: editingField.value } } : tab
+          );
+          // Update in order
+          if (updatedStructure.order.maintabs[oldValue] !== undefined) {
+            updatedStructure.order.maintabs[editingField.value] = updatedStructure.order.maintabs[oldValue];
+            delete updatedStructure.order.maintabs[oldValue];
+          }
+          // Update in visibility
+          if (updatedStructure.visibility.maintabs[oldValue] !== undefined) {
+            updatedStructure.visibility.maintabs[editingField.value] = updatedStructure.visibility.maintabs[oldValue];
+            delete updatedStructure.visibility.maintabs[oldValue];
+          }
+          break;
+
+        case 'subtab':
+          // Update in subtabs array
+          updatedStructure.subtabs = updatedStructure.subtabs.map(tab =>
+            tab.name === oldValue ? { ...tab, name: editingField.value } : tab
+          );
+          // Update in sections parent references
+          updatedStructure.sections = updatedStructure.sections.map(section =>
+            section.parent.subtab === oldValue ? { ...section, parent: { ...section.parent, subtab: editingField.value } } : section
+          );
+          // Update in order
+          if (updatedStructure.order.subtabs[oldValue] !== undefined) {
+            updatedStructure.order.subtabs[editingField.value] = updatedStructure.order.subtabs[oldValue];
+            delete updatedStructure.order.subtabs[oldValue];
+          }
+          // Update in visibility
+          if (updatedStructure.visibility.subtabs[oldValue] !== undefined) {
+            updatedStructure.visibility.subtabs[editingField.value] = updatedStructure.visibility.subtabs[oldValue];
+            delete updatedStructure.visibility.subtabs[oldValue];
+          }
+          break;
+
+        case 'section':
+          // Update in sections array
+          updatedStructure.sections = updatedStructure.sections.map(section =>
+            section.name === oldValue ? { ...section, name: editingField.value } : section
+          );
+          // Update in subsections parent references
+          updatedStructure.subsections = updatedStructure.subsections.map(subsection =>
+            subsection.parent.section === oldValue ? { ...subsection, parent: { ...subsection.parent, section: editingField.value } } : subsection
+          );
+          // Update in order
+          if (updatedStructure.order.sections[oldValue] !== undefined) {
+            updatedStructure.order.sections[editingField.value] = updatedStructure.order.sections[oldValue];
+            delete updatedStructure.order.sections[oldValue];
+          }
+          // Update in visibility
+          if (updatedStructure.visibility.sections[oldValue] !== undefined) {
+            updatedStructure.visibility.sections[editingField.value] = updatedStructure.visibility.sections[oldValue];
+            delete updatedStructure.visibility.sections[oldValue];
+          }
+          break;
+
+        case 'subsection':
+          // Update in subsections array
+          updatedStructure.subsections = updatedStructure.subsections.map(subsection =>
+            subsection.name === oldValue ? { ...subsection, name: editingField.value } : subsection
+          );
+          // Update in order
+          if (updatedStructure.order.subsections[oldValue] !== undefined) {
+            updatedStructure.order.subsections[editingField.value] = updatedStructure.order.subsections[oldValue];
+            delete updatedStructure.order.subsections[oldValue];
+          }
+          // Update in visibility
+          if (updatedStructure.visibility.subsections[oldValue] !== undefined) {
+            updatedStructure.visibility.subsections[editingField.value] = updatedStructure.visibility.subsections[oldValue];
+            delete updatedStructure.visibility.subsections[oldValue];
+          }
+          break;
+      }
+
+      // Update the database with new structure and name
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({
+          [editingField.type === 'maintab' ? 'main_tab' :
+           editingField.type === 'subtab' ? 'sub_tab' : 'structure']: 
+           editingField.type === 'maintab' || editingField.type === 'subtab' ? 
+           editingField.value : updatedStructure
+        })
+        .eq('main_tab', selectedMainTab)
+        .eq('sub_tab', selectedSubTab);
+
+      if (error) throw error;
+
+      // Update local state
+      setStructure(updatedStructure);
+
+      // Update selected item if necessary
+      if (editingField.type === 'maintab') setSelectedMainTab(editingField.value);
+      if (editingField.type === 'subtab') setSelectedSubTab(editingField.value);
+      if (editingField.type === 'section') setSelectedSection(editingField.value);
+      if (editingField.type === 'subsection') setSelectedSubSection(editingField.value);
+
+      // Clear editing state
+      setEditingField({ type: '', value: '' });
+
+      toast.success('Name updated successfully');
+    } catch (error) {
+      console.error('Error updating name:', error);
+      toast.error('Failed to update name');
     }
   };
 
@@ -1597,6 +1673,10 @@ export function SettingsDialog({
         </div>
 
         <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Selected Items</h3>
+          </div>
+          {renderSelectedItems()}
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-lg font-semibold">Column Mappings</h4>
             <Button
@@ -1680,212 +1760,340 @@ export function SettingsDialog({
     );
   };
 
-  const renderNewStructureForm = () => (
-    <div className="space-y-6 p-4">
-      <div className="grid grid-cols-[1fr,1fr] gap-8">
-        {/* Selection Form */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium">Add New Structure</h3>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleSubmitNewStructure}
-            >
-              Add Structure
-            </Button>
-          </div>
-
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Main Tab</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={formState.mainTab}
-                  onValueChange={(value) => handleFormChange('mainTab', value)}
-                >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select Main Tab" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new">+ Create New</SelectItem>
-                    {structure.maintabs.map((tab) => (
-                      <SelectItem key={tab.id} value={tab.name}>
-                        {tab.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {formState.mainTab === 'new' && (
-                  <Input
-                    placeholder="Enter new main tab name"
-                    value={newItemInputs.mainTab}
-                    onChange={(e) => setNewItemInputs(prev => ({ ...prev, mainTab: e.target.value }))}
-                  />
-                )}
-              </div>
+  const renderNewStructureForm = () => {
+    return (
+      <div className="space-y-6 p-4">
+        <div className="grid grid-cols-[1fr,1fr] gap-8">
+          {/* Selection Form */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">Add New Structure</h3>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleSubmitNewStructure}
+              >
+                Add Structure
+              </Button>
             </div>
 
-            <div className="grid gap-2">
-              <Label>Sub Tab</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={formState.tab}
-                  onValueChange={(value) => handleFormChange('tab', value)}
-                >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select Sub Tab" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new">+ Create New</SelectItem>
-                    {structure.subtabs
-                      .filter(tab => !formState.mainTab || tab.parent.maintab === formState.mainTab)
-                      .map((tab) => (
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label>Main Tab</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={formState.mainTab}
+                    onValueChange={(value) => handleFormChange('mainTab', value)}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select Main Tab" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">+ Create New</SelectItem>
+                      {structure.maintabs.map((tab) => (
                         <SelectItem key={tab.id} value={tab.name}>
                           {tab.name}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
-                {formState.tab === 'new' && (
-                  <Input
-                    placeholder="Enter new sub tab name"
-                    value={newItemInputs.tab}
-                    onChange={(e) => setNewItemInputs(prev => ({ ...prev, tab: e.target.value }))}
-                  />
-                )}
+                    </SelectContent>
+                  </Select>
+                  {formState.mainTab === 'new' && (
+                    <Input
+                      placeholder="Enter new main tab name"
+                      value={newItemInputs.mainTab}
+                      onChange={(e) => setNewItemInputs(prev => ({ ...prev, mainTab: e.target.value }))}
+                    />
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="grid gap-2">
-              <Label>Section</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={formState.section}
-                  onValueChange={(value) => handleFormChange('section', value)}
-                >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select Section" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new">+ Create New</SelectItem>
-                    {structure.sections
-                      .filter(section => !formState.tab || section.parent.subtab === formState.tab)
-                      .map((section) => (
-                        <SelectItem key={section.id} value={section.name}>
-                          {section.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                {formState.section === 'new' && (
-                  <Input
-                    placeholder="Enter new section name"
-                    value={newItemInputs.section}
-                    onChange={(e) => setNewItemInputs(prev => ({ ...prev, section: e.target.value }))}
-                  />
-                )}
+              <div className="grid gap-2">
+                <Label>Sub Tab</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={formState.tab}
+                    onValueChange={(value) => handleFormChange('tab', value)}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select Sub Tab" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">+ Create New</SelectItem>
+                      {structure.subtabs
+                        .filter(tab => !formState.mainTab || tab.parent.maintab === formState.mainTab)
+                        .map((tab) => (
+                          <SelectItem key={tab.id} value={tab.name}>
+                            {tab.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {formState.tab === 'new' && (
+                    <Input
+                      placeholder="Enter new sub tab name"
+                      value={newItemInputs.tab}
+                      onChange={(e) => setNewItemInputs(prev => ({ ...prev, tab: e.target.value }))}
+                    />
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="grid gap-2">
-              <Label>Subsection</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={formState.subsection}
-                  onValueChange={(value) => handleFormChange('subsection', value)}
-                >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select Subsection" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new">+ Create New</SelectItem>
-                    {structure.subsections
-                      .filter(subsection => !formState.section || subsection.parent.section === formState.section)
-                      .map((subsection) => (
-                        <SelectItem key={subsection.id} value={subsection.name}>
-                          {subsection.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                {formState.subsection === 'new' && (
-                  <Input
-                    placeholder="Enter new subsection name"
-                    value={newItemInputs.subsection}
-                    onChange={(e) => setNewItemInputs(prev => ({ ...prev, subsection: e.target.value }))}
-                  />
-                )}
+              <div className="grid gap-2">
+                <Label>Section</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={formState.section}
+                    onValueChange={(value) => handleFormChange('section', value)}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select Section" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">+ Create New</SelectItem>
+                      {structure.sections
+                        .filter(section => !formState.tab || section.parent.subtab === formState.tab)
+                        .map((section) => (
+                          <SelectItem key={section.id} value={section.name}>
+                            {section.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {formState.section === 'new' && (
+                    <Input
+                      placeholder="Enter new section name"
+                      value={newItemInputs.section}
+                      onChange={(e) => setNewItemInputs(prev => ({ ...prev, section: e.target.value }))}
+                    />
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="grid gap-2">
-              <Label>Tables and Fields</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Select Tables and Fields"
-                  readOnly
-                  value={formState.selectedTables.length > 0 ? `${formState.selectedTables.length} tables selected` : ''}
-                  onClick={() => formState.subsection ? setIsSelectTablesDialogOpen(true) : toast.error('Please select a subsection first')}
-                  className="w-[200px]"
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => formState.subsection ? setIsSelectTablesDialogOpen(true) : toast.error('Please select a subsection first')}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
+              <div className="grid gap-2">
+                <Label>Subsection</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={formState.subsection}
+                    onValueChange={(value) => handleFormChange('subsection', value)}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select Subsection" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">+ Create New</SelectItem>
+                      {structure.subsections
+                        .filter(subsection => !formState.section || subsection.parent.section === formState.section)
+                        .map((subsection) => (
+                          <SelectItem key={subsection.id} value={subsection.name}>
+                            {subsection.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {formState.subsection === 'new' && (
+                    <Input
+                      placeholder="Enter new subsection name"
+                      value={newItemInputs.subsection}
+                      onChange={(e) => setNewItemInputs(prev => ({ ...prev, subsection: e.target.value }))}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Tables and Fields</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Select Tables and Fields"
+                    readOnly
+                    value={formState.selectedTables.length > 0 ? `${formState.selectedTables.length} tables selected` : ''}
+                    onClick={() => formState.subsection ? setIsSelectTablesDialogOpen(true) : toast.error('Please select a subsection first')}
+                    className="w-[200px]"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => formState.subsection ? setIsSelectTablesDialogOpen(true) : toast.error('Please select a subsection first')}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Preview Panel */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Structure Preview</h3>
+            <div className="border rounded-md p-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Main Tab</Label>
+                <div className="p-2 bg-muted rounded-md">
+                  {formState.mainTab === 'new' ? newItemInputs.mainTab : formState.mainTab || 'Not selected'}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Sub Tab</Label>
+                <div className="p-2 bg-muted rounded-md">
+                  {formState.tab === 'new' ? newItemInputs.tab : formState.tab || 'Not selected'}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Section</Label>
+                <div className="p-2 bg-muted rounded-md">
+                  {formState.section === 'new' ? newItemInputs.section : formState.section || 'Not selected'}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Subsection</Label>
+                <div className="p-2 bg-muted rounded-md">
+                  {formState.subsection === 'new' ? newItemInputs.subsection : formState.subsection || 'Not selected'}
+                </div>
+              </div>
+
+              {formState.selectedTables.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Selected Tables</Label>
+                  <ScrollArea className="h-[200px] border rounded-md p-2">
+                    {formState.selectedTables.map((table) => (
+                      <div key={table} className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded-md">
+                        <span>{table}</span>
+                        <div className="ml-4 text-sm text-muted-foreground">
+                          {formState.selectedFields[table]?.length || 0} fields selected
+                        </div>
+                      </div>
+                    ))}
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const getEffectiveVisibility = (item: any, type: string, structure: any) => {
+    if (!structure?.visibility) return true;
+
+    const visibility = structure.visibility;
+    const itemVisible = visibility[type]?.[item.name] ?? true;
+
+    switch (type) {
+      case 'fields':
+        return itemVisible &&
+          (visibility.subsections?.[item.parent?.subsection] ?? true) &&
+          (visibility.sections?.[item.parent?.section] ?? true) &&
+          (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
+          (visibility.maintabs?.[item.parent?.maintab] ?? true);
+      case 'subsections':
+        return itemVisible &&
+          (visibility.sections?.[item.parent?.section] ?? true) &&
+          (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
+          (visibility.maintabs?.[item.parent?.maintab] ?? true);
+      case 'sections':
+        return itemVisible &&
+          (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
+          (visibility.maintabs?.[item.parent?.maintab] ?? true);
+      case 'subtabs':
+        return itemVisible &&
+          (visibility.maintabs?.[item.parent?.maintab] ?? true);
+      case 'maintabs':
+        return itemVisible;
+      default:
+        return true;
+    }
+  };
+
+  const renderSelectedItems = () => (
+    <div className="border rounded-md p-4 space-y-4 mb-4">
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>Main Tab</Label>
+          <div className="flex items-center mb-2 gap-2">
+            {editingField.type === 'maintab' ? (
+              <Input
+                value={editingField.value}
+                onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                onKeyDown={handleInlineEditSubmit}
+                onBlur={handleInlineEditSubmit}
+                autoFocus
+              />
+            ) : (
+              <div
+                className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
+                onDoubleClick={() => handleInlineEdit('maintab', selectedMainTab || '')}
+              >
+                {selectedMainTab || 'Not selected'}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Preview Panel */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Structure Preview</h3>
-          <div className="border rounded-md p-4 space-y-4">
-            <div className="space-y-2">
-              <Label>Main Tab</Label>
-              <div className="p-2 bg-muted rounded-md">
-                {formState.mainTab === 'new' ? newItemInputs.mainTab : formState.mainTab || 'Not selected'}
+        <div className="space-y-2">
+          <Label>Sub Tab</Label>
+          <div className="flex items-center mb-2 gap-2">
+            {editingField.type === 'subtab' ? (
+              <Input
+                value={editingField.value}
+                onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                onKeyDown={handleInlineEditSubmit}
+                onBlur={handleInlineEditSubmit}
+                autoFocus
+              />
+            ) : (
+              <div
+                className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
+                onDoubleClick={() => handleInlineEdit('subtab', selectedSubTab || '')}
+              >
+                {selectedSubTab || 'Not selected'}
               </div>
-            </div>
+            )}
+          </div>
+        </div>
 
-            <div className="space-y-2">
-              <Label>Sub Tab</Label>
-              <div className="p-2 bg-muted rounded-md">
-                {formState.tab === 'new' ? newItemInputs.tab : formState.tab || 'Not selected'}
+        <div className="space-y-2">
+          <Label>Section</Label>
+          <div className="flex items-center mb-2 gap-2">
+            {editingField.type === 'section' ? (
+              <Input
+                value={editingField.value}
+                onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                onKeyDown={handleInlineEditSubmit}
+                onBlur={handleInlineEditSubmit}
+                autoFocus
+              />
+            ) : (
+              <div
+                className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
+                onDoubleClick={() => handleInlineEdit('section', selectedSection || '')}
+              >
+                {selectedSection || 'Not selected'}
               </div>
-            </div>
+            )}
+          </div>
+        </div>
 
-            <div className="space-y-2">
-              <Label>Section</Label>
-              <div className="p-2 bg-muted rounded-md">
-                {formState.section === 'new' ? newItemInputs.section : formState.section || 'Not selected'}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Subsection</Label>
-              <div className="p-2 bg-muted rounded-md">
-                {formState.subsection === 'new' ? newItemInputs.subsection : formState.subsection || 'Not selected'}
-              </div>
-            </div>
-
-            {formState.selectedTables.length > 0 && (
-              <div className="space-y-2">
-                <Label>Selected Tables</Label>
-                <ScrollArea className="h-[200px] border rounded-md p-2">
-                  {formState.selectedTables.map((table) => (
-                    <div key={table} className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded-md">
-                      <span>{table}</span>
-                      <div className="ml-4 text-sm text-muted-foreground">
-                        {formState.selectedFields[table]?.length || 0} fields selected
-                      </div>
-                    </div>
-                  ))}
-                </ScrollArea>
+        <div className="space-y-2">
+          <Label>Subsection</Label>
+          <div className="flex items-center mb-2 gap-2">
+            {editingField.type === 'subsection' ? (
+              <Input
+                value={editingField.value}
+                onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                onKeyDown={handleInlineEditSubmit}
+                onBlur={handleInlineEditSubmit}
+                autoFocus
+              />
+            ) : (
+              <div
+                className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
+                onDoubleClick={() => handleInlineEdit('subsection', selectedSubSection || '')}
+              >
+                {selectedSubSection || 'Not selected'}
               </div>
             )}
           </div>
