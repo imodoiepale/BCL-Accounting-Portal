@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ChevronUp, ChevronDown, Plus, GripVertical, Settings, Edit2, Trash2, Pencil } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, GripVertical, Settings, Trash2, Pencil } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -84,10 +84,9 @@ interface DraggableListProps {
   onDragEnd: (result: any) => void;
 }
 
-const DraggableList: React.FC<DraggableListProps> = ({
+const DraggableList = ({
   items,
   type,
-  onEdit,
   onDelete,
   onVisibilityChange,
   onDragEnd
@@ -120,21 +119,12 @@ const DraggableList: React.FC<DraggableListProps> = ({
                       <Switch
                         checked={item.visible}
                         onCheckedChange={(checked) => onVisibilityChange(item, checked)}
-                        aria-label={`Toggle ${item.name} visibility`}
                       />
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => onEdit(item)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
                         onClick={() => onDelete(item)}
-                        className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="text-destructive opacity-0 group-hover:opacity-100"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -292,11 +282,11 @@ export function SettingsDialog({
   const [newItemName, setNewItemName] = useState('');
   const [isSelectTablesDialogOpen, setIsSelectTablesDialogOpen] = useState(false);
   const [structure, setStructure] = useState<{
-    maintabs: Array<{ id: string; name: string; visible: boolean }>;
-    subtabs: Array<{ id: string; name: string; visible: boolean; parent: { maintab: string } }>;
-    sections: Array<{ id: string; name: string; visible: boolean; parent: { maintab: string; subtab: string } }>;
-    subsections: Array<{ id: string; name: string; visible: boolean; parent: { maintab: string; subtab: string; section: string } }>;
-    fields: Array<{ id: string; name: string; table: string; visible: boolean; parent: { maintab: string; subtab: string; section: string; subsection: string } }>;
+    maintabs: Array<{ id: string; name: string; visible: boolean; order: number }>;
+    subtabs: Array<{ id: string; name: string; visible: boolean; order: number; parent: { maintab: string } }>;
+    sections: Array<{ id: string; name: string; visible: boolean; order: number; parent: { maintab: string; subtab: string } }>;
+    subsections: Array<{ id: string; name: string; visible: boolean; order: number; parent: { maintab: string; subtab: string; section: string } }>;
+    fields: Array<{ id: string; name: string; table: string; visible: boolean; order: number; parent: { maintab: string; subtab: string; section: string; subsection: string } }>;
   }>({
     maintabs: [],
     subtabs: [],
@@ -305,20 +295,29 @@ export function SettingsDialog({
     fields: []
   });
 
-  const [formState, setFormState] = useState({
+  interface FormState {
+    mainTab: string;
+    tab: string;
+    section: string;
+    subsection: string;
+    selectedTables: string[];
+    selectedFields: { [table: string]: string[] };
+  }
+
+  const [formState, setFormState] = useState<FormState>({
     mainTab: '',
     tab: '',
     section: '',
     subsection: '',
-    selectedTables: [] as string[],
-    selectedFields: {} as { [table: string]: string[] }
+    selectedTables: [],
+    selectedFields: {}
   });
 
   const [newItemInputs, setNewItemInputs] = useState({
     mainTab: '',
     tab: '',
     section: '',
-    subsection: ''
+    subsection: '',
   });
 
   const handleFormChange = (field: string, value: string) => {
@@ -449,7 +448,6 @@ export function SettingsDialog({
 
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [selectedFields, setSelectedFields] = useState<{ [table: string]: string[] }>({});
-
   const [editingItem, setEditingItem] = useState<{ type: string; item: StructureItem } | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editItemName, setEditItemName] = useState('');
@@ -469,37 +467,51 @@ export function SettingsDialog({
           return;
         }
 
-        // Process the data to maintain relationships
+        // Process the data to maintain relationships and visibility
         const processedData = data.reduce((acc, item) => {
-          // Add main tab and its subtabs
+          const structure = item.structure || {};
+          const visibility = structure.visibility || {};
+          const order = structure.order || {};
+
+          // Add main tab with visibility
           if (item.main_tab) {
             if (!acc.maintabs.has(item.main_tab)) {
-              acc.maintabs.add(item.main_tab);
+              acc.maintabs.add({
+                name: item.main_tab,
+                visible: visibility.maintabs?.[item.main_tab] ?? true,
+                order: order.maintabs?.[item.main_tab] ?? 0
+              });
             }
-            
+
             if (item.sub_tab) {
               acc.subtabs.add({
                 name: item.sub_tab,
+                visible: visibility.subtabs?.[item.sub_tab] ?? true,
+                order: order.subtabs?.[item.sub_tab] ?? 0,
                 parent: { maintab: item.main_tab }
               });
 
-              // Process sections from structure
-              if (item.structure?.sections) {
-                item.structure.sections.forEach((section: any) => {
+              // Process sections with visibility
+              if (structure.sections) {
+                structure.sections.forEach((section: any) => {
                   if (section.name) {
                     acc.sections.add({
                       name: section.name,
-                      parent: { 
+                      visible: visibility.sections?.[section.name] ?? true,
+                      order: order.sections?.[section.name] ?? 0,
+                      parent: {
                         maintab: item.main_tab,
-                        subtab: item.sub_tab 
+                        subtab: item.sub_tab
                       }
                     });
 
-                    // Process subsections
+                    // Process subsections with visibility
                     section.subsections?.forEach((subsection: any) => {
                       if (subsection.name) {
                         acc.subsections.add({
                           name: subsection.name,
+                          visible: visibility.subsections?.[subsection.name] ?? true,
+                          order: order.subsections?.[subsection.name] ?? 0,
                           parent: {
                             maintab: item.main_tab,
                             subtab: item.sub_tab,
@@ -507,12 +519,14 @@ export function SettingsDialog({
                           }
                         });
 
-                        // Process fields
+                        // Process fields with visibility
                         subsection.fields?.forEach((field: any) => {
                           acc.fields.add({
                             name: field.name,
                             table: field.table,
                             column: field.column,
+                            visible: visibility.fields?.[field.name] ?? true,
+                            order: order.fields?.[field.name] ?? 0,
                             parent: {
                               maintab: item.main_tab,
                               subtab: item.sub_tab,
@@ -530,41 +544,45 @@ export function SettingsDialog({
           }
           return acc;
         }, {
-          maintabs: new Set<string>(),
+          maintabs: new Set<any>(),
           subtabs: new Set<any>(),
           sections: new Set<any>(),
           subsections: new Set<any>(),
           fields: new Set<any>()
         });
 
-        // Convert Sets to arrays with IDs
+        // Convert Sets to arrays and sort by order
         const structureData = {
-          maintabs: Array.from(processedData.maintabs).map((name, id) => ({ 
-            id: String(id), 
-            name 
-          })),
-          subtabs: Array.from(processedData.subtabs).map((item: any, id) => ({ 
-            id: String(id), 
-            name: item.name,
-            parent: item.parent 
-          })),
-          sections: Array.from(processedData.sections).map((item: any, id) => ({ 
-            id: String(id), 
-            name: item.name,
-            parent: item.parent 
-          })),
-          subsections: Array.from(processedData.subsections).map((item: any, id) => ({ 
-            id: String(id), 
-            name: item.name,
-            parent: item.parent 
-          })),
-          fields: Array.from(processedData.fields).map((item: any, id) => ({ 
-            id: String(id), 
-            name: item.name,
-            table: item.table,
-            column: item.column,
-            parent: item.parent 
-          }))
+          maintabs: Array.from(processedData.maintabs)
+            .sort((a, b) => a.order - b.order)
+            .map((item, id) => ({
+              id: String(id),
+              ...item
+            })),
+          subtabs: Array.from(processedData.subtabs)
+            .sort((a, b) => a.order - b.order)
+            .map((item, id) => ({
+              id: String(id),
+              ...item
+            })),
+          sections: Array.from(processedData.sections)
+            .sort((a, b) => a.order - b.order)
+            .map((item, id) => ({
+              id: String(id),
+              ...item
+            })),
+          subsections: Array.from(processedData.subsections)
+            .sort((a, b) => a.order - b.order)
+            .map((item, id) => ({
+              id: String(id),
+              ...item
+            })),
+          fields: Array.from(processedData.fields)
+            .sort((a, b) => a.order - b.order)
+            .map((item, id) => ({
+              id: String(id),
+              ...item
+            }))
         };
 
         setStructure(structureData);
@@ -602,25 +620,25 @@ export function SettingsDialog({
 
   // Filter functions for each level
   const getSubTabsForMainTab = (maintabName: string) => {
-    return structure.subtabs.filter(subtab => 
+    return structure.subtabs.filter(subtab =>
       subtab.parent?.maintab === maintabName
     );
   };
 
   const getSectionsForSubTab = (subtabName: string) => {
-    return structure.sections.filter(section => 
+    return structure.sections.filter(section =>
       section.parent?.subtab === subtabName
     );
   };
 
   const getSubsectionsForSection = (sectionName: string) => {
-    return structure.subsections.filter(subsection => 
+    return structure.subsections.filter(subsection =>
       subsection.parent?.section === sectionName
     );
   };
 
   const getFieldsForSubsection = (subsectionName: string) => {
-    return structure.fields.filter(field => 
+    return structure.fields.filter(field =>
       field.parent?.subsection === subsectionName
     );
   };
@@ -629,140 +647,79 @@ export function SettingsDialog({
     if (!result.destination) return;
 
     const { source, destination, type } = result;
-    let updatedStructure = { ...structure };
-
-    const reorder = (list: StructureItem[], startIndex: number, endIndex: number) => {
-      const result = Array.from(list);
-      const [removed] = result.splice(startIndex, 1);
-      result.splice(endIndex, 0, removed);
-      return result;
-    };
-
-    switch (type) {
-      case 'maintabs':
-        updatedStructure.maintabs = reorder(
-          structure.maintabs,
-          source.index,
-          destination.index
-        );
-        break;
-      case 'subtabs':
-        if (selectedMainTab) {
-          updatedStructure.maintabs = updatedStructure.maintabs.map(tab => 
-            tab.name === selectedMainTab ? { ...tab, subtabs: reorder(tab.subtabs, source.index, destination.index) } : tab
-          );
-        }
-        break;
-      case 'sections':
-        if (selectedSubTab) {
-          updatedStructure.sections = updatedStructure.sections.map(section => 
-            section.name === selectedSubTab ? { ...section, subsections: reorder(section.subsections, source.index, destination.index) } : section
-          );
-        }
-        break;
-      case 'subsections':
-        if (selectedSection) {
-          updatedStructure.subsections = updatedStructure.subsections.map(subsection => 
-            subsection.name === selectedSection ? { ...subsection, fields: reorder(subsection.fields, source.index, destination.index) } : subsection
-          );
-        }
-        break;
-      case 'fields':
-        if (selectedSubSection) {
-          updatedStructure.fields[selectedSubSection] = reorder(
-            structure.fields[selectedSubSection],
-            source.index,
-            destination.index
-          );
-        }
-        break;
-    }
-
-    // Update order values
-    const updateOrders = (items: StructureItem[]) => {
-      items.forEach((item, index) => {
-        item.order = index;
-      });
-    };
-
-    // Update orders for all affected items
-    if (type === 'maintabs') {
-      updateOrders(updatedStructure.maintabs);
-    } else if (type === 'subtabs' && selectedMainTab) {
-      updateOrders(updatedStructure.maintabs.find(tab => tab.name === selectedMainTab)?.subtabs || []);
-    } else if (type === 'sections' && selectedSubTab) {
-      updateOrders(updatedStructure.sections.find(section => section.name === selectedSubTab)?.subsections || []);
-    } else if (type === 'subsections' && selectedSection) {
-      updateOrders(updatedStructure.subsections.find(subsection => subsection.name === selectedSection)?.fields || []);
-    } else if (type === 'fields' && selectedSubSection) {
-      updateOrders(updatedStructure.fields[selectedSubSection]);
-    }
-
-    setStructure(updatedStructure);
 
     try {
-      // Save to database
+      // Get current structure
+      const { data: currentData } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('structure')
+        .eq('main_tab', selectedMainTab)
+        .eq('sub_tab', selectedSubTab)
+        .single();
+
+      if (!currentData) return;
+
+      const updatedStructure = { ...currentData.structure };
+      let items;
+
+      // Get the correct items array based on type
+      switch (type) {
+        case 'maintabs':
+          items = structure.maintabs;
+          break;
+        case 'subtabs':
+          items = structure.subtabs;
+          break;
+        case 'sections':
+          items = structure.sections;
+          break;
+        case 'subsections':
+          items = structure.subsections;
+          break;
+      }
+
+      // Perform the reorder
+      const [removed] = items.splice(source.index, 1);
+      items.splice(destination.index, 0, removed);
+
+      // Update order in structure
+      const newOrder = {};
+      items.forEach((item, index) => {
+        newOrder[item.name] = index;
+      });
+
+      // Update the appropriate order object
+      switch (type) {
+        case 'maintabs':
+          updatedStructure.order.maintabs = newOrder;
+          break;
+        case 'subtabs':
+          updatedStructure.order.subtabs = newOrder;
+          break;
+        case 'sections':
+          updatedStructure.order.sections = newOrder;
+          break;
+        case 'subsections':
+          updatedStructure.order.subsections = newOrder;
+          break;
+      }
+
+      // Update database
       const { error } = await supabase
         .from('profile_category_table_mapping_2')
-        .update({
-          structure: {
-            order: {
-              maintabs: updatedStructure.maintabs.map(tab => tab.order),
-              subtabs: Object.fromEntries(
-                Object.entries(updatedStructure.maintabs).map(([key, tabs]) => [
-                  key,
-                  tabs.subtabs.map(tab => tab.order)
-                ])
-              ),
-              sections: Object.fromEntries(
-                Object.entries(updatedStructure.sections).map(([key, sections]) => [
-                  key,
-                  sections.subsections.map(section => section.order)
-                ])
-              ),
-              subsections: Object.fromEntries(
-                Object.entries(updatedStructure.subsections).map(([key, subsections]) => [
-                  key,
-                  subsections.fields.map(subsection => subsection.order)
-                ])
-              ),
-              fields: Object.fromEntries(
-                Object.entries(updatedStructure.fields).map(([key, fields]) => [
-                  key,
-                  fields.map(field => field.order)
-                ])
-              )
-            },
-            visibility: {
-              maintabs: Object.fromEntries(
-                updatedStructure.maintabs.map(tab => [tab.id, tab.visible])
-              ),
-              subtabs: Object.fromEntries(
-                Object.values(updatedStructure.maintabs)
-                  .flat()
-                  .map(tab => [tab.id, tab.visible])
-              ),
-              sections: Object.fromEntries(
-                Object.values(updatedStructure.sections)
-                  .flat()
-                  .map(section => [section.id, section.visible])
-              ),
-              subsections: Object.fromEntries(
-                Object.values(updatedStructure.subsections)
-                  .flat()
-                  .map(subsection => [subsection.id, subsection.visible])
-              ),
-              fields: Object.fromEntries(
-                Object.values(updatedStructure.fields)
-                  .flat()
-                  .map(field => [field.id, field.visible])
-              )
-            }
-          }
-        })
-        .eq('id', 1);
+        .update({ structure: updatedStructure })
+        .eq('main_tab', selectedMainTab)
+        .eq('sub_tab', selectedSubTab);
 
       if (error) throw error;
+
+      // Update local state
+      setStructure(prev => ({
+        ...prev,
+        [type]: items,
+        order: updatedStructure.order
+      }));
+
       toast.success('Order updated successfully');
     } catch (error) {
       console.error('Error updating order:', error);
@@ -779,7 +736,7 @@ export function SettingsDialog({
     const newItems = [...items];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     [newItems[index], newItems[newIndex]] = [newItems[newIndex], newItems[index]];
-    
+
     // Update order values
     newItems.forEach((item, idx) => {
       item.order = idx;
@@ -842,12 +799,12 @@ export function SettingsDialog({
         if (!selectedMainTab || !selectedSubTab) return;
         setStructure(prev => ({
           ...prev,
-          sections: [...prev.sections, { 
-            ...newItem, 
-            parent: { 
+          sections: [...prev.sections, {
+            ...newItem,
+            parent: {
               maintab: selectedMainTab,
-              subtab: selectedSubTab 
-            } 
+              subtab: selectedSubTab
+            }
           }]
         }));
         break;
@@ -855,13 +812,13 @@ export function SettingsDialog({
         if (!selectedMainTab || !selectedSubTab || !selectedSection) return;
         setStructure(prev => ({
           ...prev,
-          subsections: [...prev.subsections, { 
-            ...newItem, 
-            parent: { 
+          subsections: [...prev.subsections, {
+            ...newItem,
+            parent: {
               maintab: selectedMainTab,
               subtab: selectedSubTab,
-              section: selectedSection 
-            } 
+              section: selectedSection
+            }
           }]
         }));
         break;
@@ -885,7 +842,7 @@ export function SettingsDialog({
         <div className="space-y-4">
           <div>
             <Label>Name</Label>
-            <Input 
+            <Input
               placeholder={`Enter ${selectedItemType} name`}
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
@@ -894,7 +851,7 @@ export function SettingsDialog({
           {selectedItemType === 'subtab' && (
             <div>
               <Label>Parent Main Tab</Label>
-              <Select 
+              <Select
                 value={selectedMainTab || ''}
                 onValueChange={(value) => setSelectedMainTab(value)}
               >
@@ -915,7 +872,7 @@ export function SettingsDialog({
             <>
               <div>
                 <Label>Parent Main Tab</Label>
-                <Select 
+                <Select
                   value={selectedMainTab || ''}
                   onValueChange={(value) => setSelectedMainTab(value)}
                 >
@@ -933,7 +890,7 @@ export function SettingsDialog({
               </div>
               <div>
                 <Label>Parent Sub Tab</Label>
-                <Select 
+                <Select
                   value={selectedSubTab || ''}
                   onValueChange={(value) => setSelectedSubTab(value)}
                   disabled={!selectedMainTab}
@@ -958,7 +915,7 @@ export function SettingsDialog({
             <>
               <div>
                 <Label>Parent Main Tab</Label>
-                <Select 
+                <Select
                   value={selectedMainTab || ''}
                   onValueChange={(value) => setSelectedMainTab(value)}
                 >
@@ -976,7 +933,7 @@ export function SettingsDialog({
               </div>
               <div>
                 <Label>Parent Sub Tab</Label>
-                <Select 
+                <Select
                   value={selectedSubTab || ''}
                   onValueChange={(value) => setSelectedSubTab(value)}
                   disabled={!selectedMainTab}
@@ -997,7 +954,7 @@ export function SettingsDialog({
               </div>
               <div>
                 <Label>Parent Section</Label>
-                <Select 
+                <Select
                   value={selectedSection || ''}
                   onValueChange={(value) => setSelectedSection(value)}
                   disabled={!selectedSubTab}
@@ -1007,8 +964,8 @@ export function SettingsDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {structure.sections
-                      .filter(section => 
-                        section.parent.maintab === selectedMainTab && 
+                      .filter(section =>
+                        section.parent.maintab === selectedMainTab &&
                         section.parent.subtab === selectedSubTab
                       )
                       .map((section) => (
@@ -1060,7 +1017,7 @@ export function SettingsDialog({
         case 'maintab':
           setStructure(prev => ({
             ...prev,
-            maintabs: prev.maintabs.map(tab => 
+            maintabs: prev.maintabs.map(tab =>
               tab.name === selectedMainTab ? { ...tab, name: editItemName } : tab
             )
           }));
@@ -1069,7 +1026,7 @@ export function SettingsDialog({
         case 'subtab':
           setStructure(prev => ({
             ...prev,
-            subtabs: prev.subtabs.map(subtab => 
+            subtabs: prev.subtabs.map(subtab =>
               subtab.name === selectedSubTab ? { ...subtab, name: editItemName } : subtab
             )
           }));
@@ -1078,7 +1035,7 @@ export function SettingsDialog({
         case 'section':
           setStructure(prev => ({
             ...prev,
-            sections: prev.sections.map(section => 
+            sections: prev.sections.map(section =>
               section.name === selectedSection ? { ...section, name: editItemName } : section
             )
           }));
@@ -1087,7 +1044,7 @@ export function SettingsDialog({
         case 'subsection':
           setStructure(prev => ({
             ...prev,
-            subsections: prev.subsections.map(subsection => 
+            subsections: prev.subsections.map(subsection =>
               subsection.name === selectedSubSection ? { ...subsection, name: editItemName } : subsection
             )
           }));
@@ -1131,10 +1088,144 @@ export function SettingsDialog({
     );
   };
 
-  const handleEditClick = (type: 'maintab' | 'subtab' | 'section' | 'subsection', currentName: string) => {
-    setEditItemType(type);
-    setEditItemName(currentName);
-    setIsEditDialogOpen(true);
+  const [editingField, setEditingField] = useState<{
+    type: 'maintab' | 'subtab' | 'section' | 'subsection' | null;
+    value: string;
+  }>({ type: null, value: '' });
+
+  const handleInlineEdit = (type: 'maintab' | 'subtab' | 'section' | 'subsection', currentValue: string) => {
+    setEditingField({ type, value: currentValue });
+  };
+
+  const handleInlineEditSubmit = (e: React.KeyboardEvent | React.FocusEvent) => {
+    if (e.type === 'keydown' && (e as React.KeyboardEvent).key !== 'Enter') {
+      return;
+    }
+
+    if (!editingField.type || editingField.value === '') return;
+
+    switch (editingField.type) {
+      case 'maintab':
+        setStructure(prev => ({
+          ...prev,
+          maintabs: prev.maintabs.map(tab =>
+            tab.name === selectedMainTab ? { ...tab, name: editingField.value } : tab
+          )
+        }));
+        setSelectedMainTab(editingField.value);
+        break;
+      case 'subtab':
+        setStructure(prev => ({
+          ...prev,
+          subtabs: prev.subtabs.map(subtab =>
+            subtab.name === selectedSubTab ? { ...subtab, name: editingField.value } : subtab
+          )
+        }));
+        setSelectedSubTab(editingField.value);
+        break;
+      case 'section':
+        setStructure(prev => ({
+          ...prev,
+          sections: prev.sections.map(section =>
+            section.name === selectedSection ? { ...section, name: editingField.value } : section
+          )
+        }));
+        setSelectedSection(editingField.value);
+        break;
+      case 'subsection':
+        setStructure(prev => ({
+          ...prev,
+          subsections: prev.subsections.map(subsection =>
+            subsection.name === selectedSubSection ? { ...subsection, name: editingField.value } : subsection
+          )
+        }));
+        setSelectedSubSection(editingField.value);
+        break;
+    }
+
+    setEditingField({ type: null, value: '' });
+  };
+
+  const handleVisibilityChange = async (item: StructureItem, visible: boolean) => {
+    try {
+      // Get current structure
+      const { data: currentData } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('structure')
+        .eq('main_tab', selectedMainTab)
+        .eq('sub_tab', selectedSubTab)
+        .single();
+
+      if (!currentData) return;
+
+      const updatedStructure = { ...currentData.structure };
+      
+      // Update visibility in the appropriate section
+      switch (item.type) {
+        case 'maintab':
+          updatedStructure.visibility.maintabs[item.name] = visible;
+          break;
+        case 'subtab':
+          updatedStructure.visibility.subtabs[item.name] = visible;
+          break;
+        case 'section':
+          updatedStructure.visibility.sections[item.name] = visible;
+          break;
+        case 'subsection':
+          updatedStructure.visibility.subsections[item.name] = visible;
+          break;
+        case 'field':
+          updatedStructure.visibility.fields[item.name] = visible;
+          break;
+      }
+
+      // Update database
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({ structure: updatedStructure })
+        .eq('main_tab', selectedMainTab)
+        .eq('sub_tab', selectedSubTab);
+
+      if (error) throw error;
+
+      // Update local state
+      setStructure(prev => {
+        const newStructure = { ...prev };
+        switch (item.type) {
+          case 'maintab':
+            newStructure.maintabs = prev.maintabs.map(tab => 
+              tab.name === item.name ? { ...tab, visible } : tab
+            );
+            break;
+          case 'subtab':
+            newStructure.subtabs = prev.subtabs.map(subtab => 
+              subtab.name === item.name ? { ...subtab, visible } : subtab
+            );
+            break;
+          case 'section':
+            newStructure.sections = prev.sections.map(section => 
+              section.name === item.name ? { ...section, visible } : section
+            );
+            break;
+          case 'subsection':
+            newStructure.subsections = prev.subsections.map(subsection => 
+              subsection.name === item.name ? { ...subsection, visible } : subsection
+            );
+            break;
+          case 'field':
+            newStructure.fields = prev.fields.map(field => 
+              field.name === item.name ? { ...field, visible } : field
+            );
+            break;
+        }
+        return newStructure;
+      });
+
+      toast.success('Visibility updated successfully');
+    } catch (error) {
+      console.error('Error updating visibility:', error);
+      toast.error('Failed to update visibility');
+    }
   };
 
   const renderStructureTab = () => {
@@ -1164,7 +1255,7 @@ export function SettingsDialog({
                   </div>
                   <div className="flex items-center gap-2">
                     <Switch checked={tab.visible} />
-                    <Button variant="ghost" size="icon" onClick={() => handleEditClick('maintab', tab.name)}>
+                    <Button variant="ghost" size="icon" onClick={() => handleInlineEdit('maintab', tab.name)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="icon" className="text-destructive">
@@ -1200,10 +1291,14 @@ export function SettingsDialog({
                     <span>{subtab.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Switch checked={subtab.visible} />
-                    <Button variant="ghost" size="icon" onClick={() => handleEditClick('subtab', subtab.name)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <Switch
+                      checked={subtab.visible}
+                      onCheckedChange={(checked) => handleVisibilityChange({
+                        type: 'subtab',
+                        name: subtab.name,
+                        id: subtab.id
+                      }, checked)}
+                    />
                     <Button variant="ghost" size="icon" className="text-destructive">
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -1237,10 +1332,14 @@ export function SettingsDialog({
                     <span>{section.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Switch checked={section.visible} />
-                    <Button variant="ghost" size="icon" onClick={() => handleEditClick('section', section.name)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <Switch
+                      checked={section.visible}
+                      onCheckedChange={(checked) => handleVisibilityChange({
+                        type: 'section',
+                        name: section.name,
+                        id: section.id
+                      }, checked)}
+                    />
                     <Button variant="ghost" size="icon" className="text-destructive">
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -1274,10 +1373,14 @@ export function SettingsDialog({
                     <span>{subsection.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Switch checked={subsection.visible} />
-                    <Button variant="ghost" size="icon" onClick={() => handleEditClick('subsection', subsection.name)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <Switch
+                      checked={subsection.visible}
+                      onCheckedChange={(checked) => handleVisibilityChange({
+                        type: 'subsection',
+                        name: subsection.name,
+                        id: subsection.id
+                      }, checked)}
+                    />
                     <Button variant="ghost" size="icon" className="text-destructive">
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -1294,85 +1397,145 @@ export function SettingsDialog({
           </div>
           {selectedSubSection && (
             <div className="border rounded-md p-4 space-y-4 mb-4">
-              <div className=" gap-4">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Main Tab</Label>
                   <div className="flex items-center mb-2 gap-2">
-                    <Input value={selectedMainTab || ''} readOnly />
-                    <Button variant="ghost" size="icon" onClick={() => handleEditClick('maintab', selectedMainTab)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    {editingField.type === 'maintab' ? (
+                      <Input
+                        value={editingField.value}
+                        onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                        onKeyDown={handleInlineEditSubmit}
+                        onBlur={handleInlineEditSubmit}
+                        autoFocus
+                      />
+                    ) : (
+                      <div
+                        className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
+                        onDoubleClick={() => handleInlineEdit('maintab', selectedMainTab)}
+                      >
+                        {selectedMainTab}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Sub Tab</Label>
                   <div className="flex items-center mb-2 gap-2">
-                    <Input value={selectedSubTab || ''} readOnly />
-                    <Button variant="ghost" size="icon" onClick={() => handleEditClick('subtab', selectedSubTab)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    {editingField.type === 'subtab' ? (
+                      <Input
+                        value={editingField.value}
+                        onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                        onKeyDown={handleInlineEditSubmit}
+                        onBlur={handleInlineEditSubmit}
+                        autoFocus
+                      />
+                    ) : (
+                      <div
+                        className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
+                        onDoubleClick={() => handleInlineEdit('subtab', selectedSubTab)}
+                      >
+                        {selectedSubTab}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Section</Label>
                   <div className="flex items-center mb-2 gap-2">
-                    <Input value={selectedSection || ''} readOnly />
-                    <Button variant="ghost" size="icon" onClick={() => handleEditClick('section', selectedSection)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    {editingField.type === 'section' ? (
+                      <Input
+                        value={editingField.value}
+                        onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                        onKeyDown={handleInlineEditSubmit}
+                        onBlur={handleInlineEditSubmit}
+                        autoFocus
+                      />
+                    ) : (
+                      <div
+                        className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
+                        onDoubleClick={() => handleInlineEdit('section', selectedSection)}
+                      >
+                        {selectedSection}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Subsection</Label>
                   <div className="flex items-center mb-2 gap-2">
-                    <Input value={selectedSubSection || ''} readOnly />
-                    <Button variant="ghost" size="icon" onClick={() => handleEditClick('subsection', selectedSubSection)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    {editingField.type === 'subsection' ? (
+                      <Input
+                        value={editingField.value}
+                        onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                        onKeyDown={handleInlineEditSubmit}
+                        onBlur={handleInlineEditSubmit}
+                        autoFocus
+                      />
+                    ) : (
+                      <div
+                        className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
+                        onDoubleClick={() => handleInlineEdit('subsection', selectedSubSection)}
+                      >
+                        {selectedSubSection}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
           )}
-         
-         <h4 className="text-lg font-semibold">Column Mappings</h4>
+
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-lg font-semibold">Column Mappings</h4>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSelectTablesDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Fields
+            </Button>
+          </div>
           <div className="border rounded-md">
             <div className="p-4">
-              <div className="grid grid-cols-[auto,2fr,2fr,auto] gap-2 p-2 font-medium">
-                <div>Order</div>
-                <div>Name</div>
-                <div>Table</div>
-                <div>Actions</div>
+              <div className="bg-muted/50 rounded-md mb-2">
+                <div className="grid grid-cols-[auto,2fr,2fr,auto] gap-4 p-3 font-medium">
+                  <div>Order</div>
+                  <div>Name</div>
+                  <div>Table</div>
+                  <div>Actions</div>
+                </div>
               </div>
-              <ScrollArea className="h-[300px]">
+              <ScrollArea className="h-[400px] pr-4">
                 <DragDropContext onDragEnd={handleDragEnd}>
                   <Droppable droppableId="fields">
                     {(provided) => (
                       <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className="divide-y"
+                        className="space-y-2"
                       >
                         {getFieldsForSubsection(selectedSubSection).map((field, index) => (
-                          <Draggable 
-                            key={field.id} 
-                            draggableId={field.id} 
+                          <Draggable
+                            key={field.id}
+                            draggableId={field.id}
                             index={index}
                           >
                             {(provided) => (
                               <div
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
-                                className="grid grid-cols-[auto,2fr,2fr,auto] gap-2 p-2 items-center hover:bg-muted/50"
+                                className="grid grid-cols-[auto,2fr,2fr,auto] gap-4 p-3 bg-white rounded-md border items-center hover:bg-muted/50 transition-colors"
                               >
                                 <div className="flex items-center gap-2">
                                   <div {...provided.dragHandleProps}>
                                     <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
                                   </div>
-                                  <span>{index + 1}</span>
+                                  <span className="font-medium">{index + 1}</span>
                                 </div>
-                                <span>{field.name}</span>
-                                <span>{field.table}</span>
+                                <span className="truncate">{field.name}</span>
+                                <span className="truncate text-muted-foreground">{field.table}</span>
                                 <div className="flex items-center gap-2">
                                   <Switch checked={field.visible} />
                                   <Button variant="ghost" size="icon">
@@ -1406,15 +1569,15 @@ export function SettingsDialog({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-medium">Add New Structure</h3>
-            <Button 
-              variant="default" 
+            <Button
+              variant="default"
               size="sm"
               onClick={handleSubmitNewStructure}
             >
               Add Structure
             </Button>
           </div>
-  
+
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label>Main Tab</Label>
@@ -1444,21 +1607,20 @@ export function SettingsDialog({
                 )}
               </div>
             </div>
-  
+
             <div className="grid gap-2">
               <Label>Sub Tab</Label>
               <div className="flex gap-2">
                 <Select
                   value={formState.tab}
                   onValueChange={(value) => handleFormChange('tab', value)}
-                  disabled={!formState.mainTab}
                 >
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="Select Sub Tab" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="new">+ Create New</SelectItem>
-                    {formState.mainTab && structure.subtabs[formState.mainTab]?.map((tab) => (
+                    {structure.subtabs.map((tab) => (
                       <SelectItem key={tab.id} value={tab.name}>
                         {tab.name}
                       </SelectItem>
@@ -1474,21 +1636,20 @@ export function SettingsDialog({
                 )}
               </div>
             </div>
-  
+
             <div className="grid gap-2">
               <Label>Section</Label>
               <div className="flex gap-2">
                 <Select
                   value={formState.section}
                   onValueChange={(value) => handleFormChange('section', value)}
-                  disabled={!formState.tab}
                 >
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="Select Section" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="new">+ Create New</SelectItem>
-                    {formState.tab && structure.sections[formState.tab]?.map((section) => (
+                    {structure.sections.map((section) => (
                       <SelectItem key={section.id} value={section.name}>
                         {section.name}
                       </SelectItem>
@@ -1504,21 +1665,50 @@ export function SettingsDialog({
                 )}
               </div>
             </div>
-  
+
+            <div className="grid gap-2">
+              <Label>Subsection</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={formState.subsection}
+                  onValueChange={(value) => handleFormChange('subsection', value)}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Select Subsection" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">+ Create New</SelectItem>
+                    {structure.subsections.map((subsection) => (
+                      <SelectItem key={subsection.id} value={subsection.name}>
+                        {subsection.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formState.subsection === 'new' && (
+                  <Input
+                    placeholder="Enter new subsection name"
+                    value={newItemInputs.subsection}
+                    onChange={(e) => setNewItemInputs(prev => ({ ...prev, subsection: e.target.value }))}
+                  />
+                )}
+              </div>
+            </div>
+
             <div className="grid gap-2">
               <Label>Tables and Fields</Label>
               <div className="flex items-center gap-2">
-                <Input 
+                <Input
                   placeholder="Select Tables and Fields"
                   readOnly
                   value={formState.selectedTables.length > 0 ? `${formState.selectedTables.length} tables selected` : ''}
-                  onClick={() => setIsSelectTablesDialogOpen(true)}
+                  onClick={() => formState.subsection ? setIsSelectTablesDialogOpen(true) : toast.error('Please select a subsection first')}
                   className="w-[200px]"
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setIsSelectTablesDialogOpen(true)}
+                  onClick={() => formState.subsection ? setIsSelectTablesDialogOpen(true) : toast.error('Please select a subsection first')}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -1526,7 +1716,7 @@ export function SettingsDialog({
             </div>
           </div>
         </div>
-  
+
         {/* Preview Panel */}
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Structure Preview</h3>
@@ -1537,21 +1727,28 @@ export function SettingsDialog({
                 {formState.mainTab === 'new' ? newItemInputs.mainTab : formState.mainTab || 'Not selected'}
               </div>
             </div>
-  
+
             <div className="space-y-2">
               <Label>Sub Tab</Label>
               <div className="p-2 bg-muted rounded-md">
                 {formState.tab === 'new' ? newItemInputs.tab : formState.tab || 'Not selected'}
               </div>
             </div>
-  
+
             <div className="space-y-2">
               <Label>Section</Label>
               <div className="p-2 bg-muted rounded-md">
                 {formState.section === 'new' ? newItemInputs.section : formState.section || 'Not selected'}
               </div>
             </div>
-  
+
+            <div className="space-y-2">
+              <Label>Subsection</Label>
+              <div className="p-2 bg-muted rounded-md">
+                {formState.subsection === 'new' ? newItemInputs.subsection : formState.subsection || 'Not selected'}
+              </div>
+            </div>
+
             {formState.selectedTables.length > 0 && (
               <div className="space-y-2">
                 <Label>Selected Tables</Label>
@@ -1572,6 +1769,22 @@ export function SettingsDialog({
       </div>
     </div>
   );
+
+  const handleUpdateStructure = async (structure: any) => {
+    try {
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({ structure });
+
+      if (error) throw error;
+
+      toast.success('Structure updated successfully');
+    } catch (error) {
+      console.error('Error updating structure:', error);
+      toast.error('Failed to update structure');
+    }
+  };
+
   return (
     <>
       <Button variant="outline" size="sm" onClick={() => setIsOpen(true)}>
@@ -1587,7 +1800,7 @@ export function SettingsDialog({
               Manage your table structure, sections, and column visibility settings
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="flex-1 overflow-hidden">
             <Tabs defaultValue="structure" className="h-full flex flex-col" value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="px-6 border-b">
