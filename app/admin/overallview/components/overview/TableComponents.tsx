@@ -811,6 +811,42 @@ const getCompanyNamePrefix = (companyName: string) => {
   return words.slice(0, 2).join(' ') + '...';
 };
 
+const isItemVisible = (structure: any, item: any, type: string) => {
+  if (!structure?.visibility) return true;
+  const visibility = structure.visibility;
+
+  const itemVisible = visibility[type]?.[item.name] ?? true;
+
+  switch (type) {
+    case 'fields':
+      return itemVisible &&
+        (visibility.subsections?.[item.parent?.subsection] ?? true) &&
+        (visibility.sections?.[item.parent?.section] ?? true) &&
+        (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
+        (visibility.maintabs?.[item.parent?.maintab] ?? true);
+    case 'subsections':
+      return itemVisible &&
+        (visibility.sections?.[item.parent?.section] ?? true) &&
+        (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
+        (visibility.maintabs?.[item.parent?.maintab] ?? true);
+    case 'sections':
+      return itemVisible &&
+        (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
+        (visibility.maintabs?.[item.parent?.maintab] ?? true);
+    case 'subtabs':
+      return itemVisible &&
+        (visibility.maintabs?.[item.parent?.maintab] ?? true);
+    case 'maintabs':
+      return itemVisible;
+    default:
+      return true;
+  }
+};
+
+const filterVisibleItems = (items: any[], type: string, structure: any) => {
+  return items.filter(item => isItemVisible(structure, item, type));
+};
+
 const renderHeaders = (
   processedSections: any[],
   sortConfig: SortConfig,
@@ -818,7 +854,8 @@ const renderHeaders = (
   handleToggleColumnLock: (columnName: string) => void,
   lockedColumns: Record<string, boolean>,
   lockedRows: Record<string, boolean>,
-  activeMainTab: string
+  activeMainTab: string,
+  structure: any
 ) => {
   let columnCounter = 1;
 
@@ -1090,6 +1127,50 @@ export const Table: React.FC<TableProps> = ({
     }));
   };
 
+  const isMainTabVisible = (mainTab: string, structure: any) => {
+    if (!structure?.visibility?.maintabs) return true;
+    return structure.visibility.maintabs[mainTab] ?? true;
+  };
+
+  const renderTable = (data: any[], processedSections: any[]) => {
+    if (!data || data.length === 0) return null;
+
+    // Check if the current main tab is visible
+    const currentMainTab = data[0]?.main_tab;
+    const isVisible = isMainTabVisible(currentMainTab, data[0]?.structure);
+
+    if (!isVisible) {
+      return (
+        <div className="text-center py-4 text-muted-foreground">
+          This tab is currently hidden. Enable it in settings to view its content.
+        </div>
+      );
+    }
+
+    return (
+      <UITable>
+        <TableHeader className="sticky top-0 z-10 bg-white border-b">
+          {renderHeaders(
+            localProcessedSections,
+            sortConfig,
+            handleSort,
+            (columnName: string) => {
+              handleToggleColumnLock(columnName);
+            },
+            lockedColumns,
+            lockedRows,
+            currentMainTab,
+            data[0].structure
+          )}
+          {renderStatisticsRows(data, localProcessedSections, currentMainTab)}
+        </TableHeader>
+        <TableBody>
+          {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, localProcessedSections, refreshData, lockedRows, lockedColumns, currentMainTab, activeSubTab, setLockedRows)}
+        </TableBody>
+      </UITable>
+    );
+  };
+
   if (useSidebarLayout) {
     return (
       <SidebarTableView
@@ -1104,164 +1185,6 @@ export const Table: React.FC<TableProps> = ({
     );
   }
 
-  const handleVerification = async (type: 'field' | 'row' | 'section', id: string, mainTab: string, subTab: string) => {
-    try {
-      const { data: currentMapping } = await supabase
-        .from('profile_category_table_mapping_2')
-        .select('structure')
-        .eq('main_tab', mainTab)
-        .eq('Tabs', subTab)
-        .single();
-
-      if (!currentMapping) return;
-
-      let updatedStructure = { ...currentMapping.structure };
-
-      if (type === 'field') {
-        // Update field verification
-        updatedStructure.sections = updatedStructure.sections.map(section => ({
-          ...section,
-          subsections: section.subsections.map(subsection => ({
-            ...subsection,
-            fields: subsection.fields.map(field =>
-              field.name === id ? {
-                ...field,
-                verification: {
-                  is_verified: !field.verification?.is_verified,
-                  verified_at: new Date().toISOString(),
-                  verified_by: 'current_user' // Replace with actual user
-                }
-              } : field
-            )
-          }))
-        }));
-
-        // Update the top-level verification status
-        updatedStructure.verification = {
-          ...updatedStructure.verification,
-          field_verified: true,
-          verified_at: new Date().toISOString(),
-          verified_by: 'current_user'
-        };
-      }
-
-      // console.log('Updated structure:', updatedStructure);
-
-      const { error } = await supabase
-        .from('profile_category_table_mapping_2')
-        .update({
-          structure: {
-            ...updatedStructure,
-            order: updatedStructure.order,
-            visibility: updatedStructure.visibility,
-            relationships: updatedStructure.relationships
-          }
-        })
-        .eq('main_tab', mainTab)
-        .eq('Tabs', subTab);
-
-      if (error) throw error;
-      // console.log('Verification update successful');
-      toast.success(`${type} verification updated`);
-    } catch (error) {
-      console.error('Verification error:', error);
-      toast.error('Verification update failed');
-    }
-  };
-  const handleToggleColumnLock = async (columnName: string) => {
-    try {
-      let tableName, fieldName;
-      const parts = columnName.split('.');
-      if (parts.length >= 2) {
-        tableName = parts[0];
-        fieldName = parts[parts.length - 1];
-      } else {
-        throw new Error('Invalid column name format');
-      }
-
-      const { data: mappingData, error: fetchError } = await supabase
-        .from('profile_category_table_mapping_2')
-        .select('*')
-        .eq('main_tab', activeMainTab)
-        .eq('sub_tab', activeSubTab)
-        .single();
-
-      if (fetchError) throw fetchError;
-      if (!mappingData) throw new Error('No mapping data found');
-
-      const fieldKey = `field_${tableName}.${fieldName}`;
-      const currentVerificationState = lockedColumns[fieldKey]?.is_verified || false;
-
-      const updatedStructure = JSON.parse(JSON.stringify(mappingData.structure));
-      let fieldUpdated = false;
-
-      updatedStructure.sections = updatedStructure.sections.map(section => ({
-        ...section,
-        subsections: section.subsections?.map(subsection => ({
-          ...subsection,
-          fields: subsection.fields?.map(field => {
-            if (field.table === tableName && field.name === fieldName) {
-              fieldUpdated = true;
-              return {
-                ...field,
-                verification: {
-                  is_verified: !currentVerificationState,
-                  verified_at: new Date().toISOString(),
-                  verified_by: 'current_user'
-                }
-              };
-            }
-            return field;
-          })
-        }))
-      }));
-
-      if (!fieldUpdated) {
-        throw new Error(`Field ${fieldName} not found in structure for table ${tableName}`);
-      }
-
-      const { error: updateError } = await supabase
-        .from('profile_category_table_mapping_2')
-        .update({
-          structure: updatedStructure
-        })
-        .eq('id', mappingData.id);
-
-      if (updateError) throw updateError;
-
-      setLockedColumns(prev => ({
-        ...prev,
-        [fieldKey]: {
-          is_verified: !currentVerificationState,
-          verified_at: new Date().toISOString(),
-          verified_by: 'current_user'
-        }
-      }));
-
-      const rowKeys = Object.keys(lockedRows);
-      const updatedLockedRows = { ...lockedRows };
-      rowKeys.forEach(key => {
-        if (key.startsWith(tableName)) {
-          updatedLockedRows[key] = {
-            ...updatedLockedRows[key],
-            [`${fieldName}_locked`]: !currentVerificationState
-          };
-        }
-      });
-      setLockedRows(updatedLockedRows);
-
-      toast.success(`Column ${!currentVerificationState ? 'locked' : 'unlocked'} successfully`);
-
-      if (typeof refreshData === 'function') {
-        await refreshData();
-      }
-
-    } catch (error) {
-      console.error('Error in handleToggleColumnLock:', error);
-      toast.error(`Failed to update column verification: ${(error as Error).message}`);
-    }
-  };
-
   if (!processedSections || !Array.isArray(processedSections)) {
     return null;
   }
@@ -1271,23 +1194,7 @@ export const Table: React.FC<TableProps> = ({
       <Card className="shadow border rounded-none">
         <CardContent className="p-0 h-[900px]">
           <ScrollArea className="h-[900px]">
-            <UITable>
-              <TableHeader className="sticky top-0 z-10 bg-white border-b">
-                {renderHeaders(
-                  localProcessedSections,
-                  sortConfig,
-                  handleSort,
-                  handleToggleColumnLock,
-                  lockedRows,
-                  lockedColumns,
-                  activeMainTab
-                )}
-                {renderStatisticsRows(data, localProcessedSections, activeMainTab)}
-              </TableHeader>
-              <TableBody>
-                {renderDataRows(sortedData, handleCompanyClick, onMissingFieldsClick, localProcessedSections, refreshData, lockedRows, lockedColumns, activeMainTab, activeSubTab, setLockedRows)}
-              </TableBody>
-            </UITable>
+            {renderTable(data, localProcessedSections)}
           </ScrollArea>
         </CardContent>
       </Card>

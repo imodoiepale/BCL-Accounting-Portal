@@ -1146,6 +1146,38 @@ export function SettingsDialog({
     setEditingField({ type: null, value: '' });
   };
 
+  const getEffectiveVisibility = (item: any, type: string, structure: any) => {
+    if (!structure?.visibility) return true;
+
+    const visibility = structure.visibility;
+    const itemVisible = visibility[type]?.[item.name] ?? true;
+
+    switch (type) {
+      case 'fields':
+        return itemVisible &&
+          (visibility.subsections?.[item.parent?.subsection] ?? true) &&
+          (visibility.sections?.[item.parent?.section] ?? true) &&
+          (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
+          (visibility.maintabs?.[item.parent?.maintab] ?? true);
+      case 'subsections':
+        return itemVisible &&
+          (visibility.sections?.[item.parent?.section] ?? true) &&
+          (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
+          (visibility.maintabs?.[item.parent?.maintab] ?? true);
+      case 'sections':
+        return itemVisible &&
+          (visibility.subtabs?.[item.parent?.subtab] ?? true) &&
+          (visibility.maintabs?.[item.parent?.maintab] ?? true);
+      case 'subtabs':
+        return itemVisible &&
+          (visibility.maintabs?.[item.parent?.maintab] ?? true);
+      case 'maintabs':
+        return itemVisible;
+      default:
+        return true;
+    }
+  };
+
   const handleVisibilityChange = async (item: StructureItem, visible: boolean) => {
     try {
       // Get current structure
@@ -1159,23 +1191,101 @@ export function SettingsDialog({
       if (!currentData) return;
 
       const updatedStructure = { ...currentData.structure };
+      const visibility = updatedStructure.visibility;
       
-      // Update visibility in the appropriate section
+      // Update visibility based on item type and hierarchy
       switch (item.type) {
         case 'maintab':
-          updatedStructure.visibility.maintabs[item.name] = visible;
+          // Main tab affects everything
+          visibility.maintabs[item.name] = visible;
+          
+          // When turning maintab ON, restore all child items to visible
+          // When turning OFF, hide all child items
+          structure.subtabs
+            .filter(subtab => subtab.parent.maintab === item.name)
+            .forEach(subtab => {
+              visibility.subtabs[subtab.name] = visible;
+              
+              structure.sections
+                .filter(section => section.parent.subtab === subtab.name)
+                .forEach(section => {
+                  visibility.sections[section.name] = visible;
+                  
+                  structure.subsections
+                    .filter(subsection => subsection.parent.section === section.name)
+                    .forEach(subsection => {
+                      visibility.subsections[subsection.name] = visible;
+                      
+                      structure.fields
+                        .filter(field => field.parent.subsection === subsection.name)
+                        .forEach(field => {
+                          visibility.fields[field.name] = visible;
+                        });
+                    });
+                });
+            });
           break;
+
         case 'subtab':
-          updatedStructure.visibility.subtabs[item.name] = visible;
+          // Subtab affects sections, subsections, and fields
+          visibility.subtabs[item.name] = visible;
+          
+          // Find all sections under this subtab
+          structure.sections
+            .filter(section => section.parent.subtab === item.name)
+            .forEach(section => {
+              visibility.sections[section.name] = visible;
+              
+              // Find all subsections under these sections
+              structure.subsections
+                .filter(subsection => subsection.parent.section === section.name)
+                .forEach(subsection => {
+                  visibility.subsections[subsection.name] = visible;
+                  
+                  // Find all fields under these subsections
+                  structure.fields
+                    .filter(field => field.parent.subsection === subsection.name)
+                    .forEach(field => {
+                      visibility.fields[field.name] = visible;
+                    });
+                });
+            });
           break;
+
         case 'section':
-          updatedStructure.visibility.sections[item.name] = visible;
+          // Section affects subsections and fields
+          visibility.sections[item.name] = visible;
+          
+          // Find all subsections under this section
+          structure.subsections
+            .filter(subsection => subsection.parent.section === item.name)
+            .forEach(subsection => {
+              visibility.subsections[subsection.name] = visible;
+              
+              // Find all fields under these subsections
+              structure.fields
+                .filter(field => field.parent.subsection === subsection.name)
+                .forEach(field => {
+                  visibility.fields[field.name] = visible;
+                });
+            });
           break;
+
         case 'subsection':
-          updatedStructure.visibility.subsections[item.name] = visible;
+          // Subsection only affects fields
+          visibility.subsections[item.name] = visible;
+          
+          // Find all fields under this subsection
+          structure.fields
+            .filter(field => field.parent.subsection === item.name)
+            .forEach(field => {
+              visibility.fields[field.name] = visible;
+            });
           break;
+
         case 'field':
-          updatedStructure.visibility.fields[item.name] = visible;
+          // Fields don't affect anything else
+          visibility.fields[item.name] = visible;
           break;
       }
 
@@ -1188,36 +1298,28 @@ export function SettingsDialog({
 
       if (error) throw error;
 
-      // Update local state
+      // Update local state with the exact same visibility states we just set
       setStructure(prev => {
         const newStructure = { ...prev };
-        switch (item.type) {
-          case 'maintab':
-            newStructure.maintabs = prev.maintabs.map(tab => 
-              tab.name === item.name ? { ...tab, visible } : tab
-            );
-            break;
-          case 'subtab':
-            newStructure.subtabs = prev.subtabs.map(subtab => 
-              subtab.name === item.name ? { ...subtab, visible } : subtab
-            );
-            break;
-          case 'section':
-            newStructure.sections = prev.sections.map(section => 
-              section.name === item.name ? { ...section, visible } : section
-            );
-            break;
-          case 'subsection':
-            newStructure.subsections = prev.subsections.map(subsection => 
-              subsection.name === item.name ? { ...subsection, visible } : subsection
-            );
-            break;
-          case 'field':
-            newStructure.fields = prev.fields.map(field => 
-              field.name === item.name ? { ...field, visible } : field
-            );
-            break;
-        }
+        
+        // Helper function to update visibility of items
+        const updateItems = (items: any[], type: string) => {
+          return items.map(item => {
+            const isVisible = visibility[type]?.[item.name] ?? true;
+            return {
+              ...item,
+              visible: isVisible
+            };
+          });
+        };
+
+        // Update all item types
+        newStructure.maintabs = updateItems(prev.maintabs, 'maintabs');
+        newStructure.subtabs = updateItems(prev.subtabs, 'subtabs');
+        newStructure.sections = updateItems(prev.sections, 'sections');
+        newStructure.subsections = updateItems(prev.subsections, 'subsections');
+        newStructure.fields = updateItems(prev.fields, 'fields');
+
         return newStructure;
       });
 
@@ -1225,6 +1327,102 @@ export function SettingsDialog({
     } catch (error) {
       console.error('Error updating visibility:', error);
       toast.error('Failed to update visibility');
+    }
+  };
+
+  const handleMainTabVisibilityChange = async (mainTab: string, visible: boolean) => {
+    try {
+      // Get current structure for this main tab
+      const { data: currentData } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('structure')
+        .eq('main_tab', mainTab)
+        .single();
+
+      if (!currentData) return;
+
+      const updatedStructure = { ...currentData.structure };
+      const visibility = updatedStructure.visibility;
+
+      // Update main tab visibility
+      visibility.maintabs = {
+        ...visibility.maintabs,
+        [mainTab]: visible
+      };
+
+      if (!visible) {
+        // Hide all child elements
+        structure.subtabs
+          .filter(subtab => subtab.parent.maintab === mainTab)
+          .forEach(subtab => {
+            visibility.subtabs[subtab.name] = false;
+            
+            structure.sections
+              .filter(section => section.parent.subtab === subtab.name)
+              .forEach(section => {
+                visibility.sections[section.name] = false;
+                
+                structure.subsections
+                  .filter(subsection => subsection.parent.section === section.name)
+                  .forEach(subsection => {
+                    visibility.subsections[subsection.name] = false;
+                    
+                    structure.fields
+                      .filter(field => field.parent.subsection === subsection.name)
+                      .forEach(field => {
+                        visibility.fields[field.name] = false;
+                      });
+                  });
+              });
+          });
+      }
+
+      // Update database
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({ structure: updatedStructure })
+        .eq('main_tab', mainTab);
+
+      if (error) throw error;
+
+      // Update local state
+      setStructure(prev => {
+        const newStructure = { ...prev };
+        const updateVisibility = (items: any[], type: string) => {
+          return items.map(item => ({
+            ...item,
+            visible: getEffectiveVisibility(item, type, updatedStructure)
+          }));
+        };
+
+        newStructure.maintabs = updateVisibility(prev.maintabs, 'maintabs');
+        newStructure.subtabs = updateVisibility(prev.subtabs, 'subtabs');
+        newStructure.sections = updateVisibility(prev.sections, 'sections');
+        newStructure.subsections = updateVisibility(prev.subsections, 'subsections');
+        newStructure.fields = updateVisibility(prev.fields, 'fields');
+
+        return newStructure;
+      });
+
+      toast.success('Main tab visibility updated successfully');
+    } catch (error) {
+      console.error('Error updating main tab visibility:', error);
+      toast.error('Failed to update main tab visibility');
+    }
+  };
+
+  const handleUpdateStructure = async (structure: any) => {
+    try {
+      const { error } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({ structure });
+
+      if (error) throw error;
+
+      toast.success('Structure updated successfully');
+    } catch (error) {
+      console.error('Error updating structure:', error);
+      toast.error('Failed to update structure');
     }
   };
 
@@ -1254,7 +1452,14 @@ export function SettingsDialog({
                     <span>{tab.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Switch checked={tab.visible} />
+                    <Switch 
+                      checked={tab.visible} 
+                      onCheckedChange={(checked) => handleVisibilityChange({
+                        type: 'maintab',
+                        name: tab.name,
+                        id: tab.id
+                      }, checked)}
+                    />
                     <Button variant="ghost" size="icon" onClick={() => handleInlineEdit('maintab', tab.name)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -1392,100 +1597,6 @@ export function SettingsDialog({
         </div>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Selected Items</h3>
-          </div>
-          {selectedSubSection && (
-            <div className="border rounded-md p-4 space-y-4 mb-4">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Main Tab</Label>
-                  <div className="flex items-center mb-2 gap-2">
-                    {editingField.type === 'maintab' ? (
-                      <Input
-                        value={editingField.value}
-                        onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
-                        onKeyDown={handleInlineEditSubmit}
-                        onBlur={handleInlineEditSubmit}
-                        autoFocus
-                      />
-                    ) : (
-                      <div
-                        className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
-                        onDoubleClick={() => handleInlineEdit('maintab', selectedMainTab)}
-                      >
-                        {selectedMainTab}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Sub Tab</Label>
-                  <div className="flex items-center mb-2 gap-2">
-                    {editingField.type === 'subtab' ? (
-                      <Input
-                        value={editingField.value}
-                        onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
-                        onKeyDown={handleInlineEditSubmit}
-                        onBlur={handleInlineEditSubmit}
-                        autoFocus
-                      />
-                    ) : (
-                      <div
-                        className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
-                        onDoubleClick={() => handleInlineEdit('subtab', selectedSubTab)}
-                      >
-                        {selectedSubTab}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Section</Label>
-                  <div className="flex items-center mb-2 gap-2">
-                    {editingField.type === 'section' ? (
-                      <Input
-                        value={editingField.value}
-                        onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
-                        onKeyDown={handleInlineEditSubmit}
-                        onBlur={handleInlineEditSubmit}
-                        autoFocus
-                      />
-                    ) : (
-                      <div
-                        className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
-                        onDoubleClick={() => handleInlineEdit('section', selectedSection)}
-                      >
-                        {selectedSection}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Subsection</Label>
-                  <div className="flex items-center mb-2 gap-2">
-                    {editingField.type === 'subsection' ? (
-                      <Input
-                        value={editingField.value}
-                        onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
-                        onKeyDown={handleInlineEditSubmit}
-                        onBlur={handleInlineEditSubmit}
-                        autoFocus
-                      />
-                    ) : (
-                      <div
-                        className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
-                        onDoubleClick={() => handleInlineEdit('subsection', selectedSubSection)}
-                      >
-                        {selectedSubSection}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-lg font-semibold">Column Mappings</h4>
             <Button
@@ -1537,7 +1648,14 @@ export function SettingsDialog({
                                 <span className="truncate">{field.name}</span>
                                 <span className="truncate text-muted-foreground">{field.table}</span>
                                 <div className="flex items-center gap-2">
-                                  <Switch checked={field.visible} />
+                                  <Switch
+                                    checked={field.visible}
+                                    onCheckedChange={(checked) => handleVisibilityChange({
+                                      type: 'field',
+                                      name: field.name,
+                                      id: field.id
+                                    }, checked)}
+                                  />
                                   <Button variant="ghost" size="icon">
                                     <Pencil className="h-4 w-4" />
                                   </Button>
@@ -1620,11 +1738,13 @@ export function SettingsDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="new">+ Create New</SelectItem>
-                    {structure.subtabs.map((tab) => (
-                      <SelectItem key={tab.id} value={tab.name}>
-                        {tab.name}
-                      </SelectItem>
-                    ))}
+                    {structure.subtabs
+                      .filter(tab => !formState.mainTab || tab.parent.maintab === formState.mainTab)
+                      .map((tab) => (
+                        <SelectItem key={tab.id} value={tab.name}>
+                          {tab.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 {formState.tab === 'new' && (
@@ -1649,11 +1769,13 @@ export function SettingsDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="new">+ Create New</SelectItem>
-                    {structure.sections.map((section) => (
-                      <SelectItem key={section.id} value={section.name}>
-                        {section.name}
-                      </SelectItem>
-                    ))}
+                    {structure.sections
+                      .filter(section => !formState.tab || section.parent.subtab === formState.tab)
+                      .map((section) => (
+                        <SelectItem key={section.id} value={section.name}>
+                          {section.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 {formState.section === 'new' && (
@@ -1678,11 +1800,13 @@ export function SettingsDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="new">+ Create New</SelectItem>
-                    {structure.subsections.map((subsection) => (
-                      <SelectItem key={subsection.id} value={subsection.name}>
-                        {subsection.name}
-                      </SelectItem>
-                    ))}
+                    {structure.subsections
+                      .filter(subsection => !formState.section || subsection.parent.section === formState.section)
+                      .map((subsection) => (
+                        <SelectItem key={subsection.id} value={subsection.name}>
+                          {subsection.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 {formState.subsection === 'new' && (
@@ -1769,21 +1893,6 @@ export function SettingsDialog({
       </div>
     </div>
   );
-
-  const handleUpdateStructure = async (structure: any) => {
-    try {
-      const { error } = await supabase
-        .from('profile_category_table_mapping_2')
-        .update({ structure });
-
-      if (error) throw error;
-
-      toast.success('Structure updated successfully');
-    } catch (error) {
-      console.error('Error updating structure:', error);
-      toast.error('Failed to update structure');
-    }
-  };
 
   return (
     <>
