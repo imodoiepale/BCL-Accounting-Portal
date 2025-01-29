@@ -508,6 +508,7 @@ const OverallView: React.FC = () => {
     const fetchStructureData = useCallback(async () => {
         try {
             if (!activeMainTab && !activeSubTab) {
+                console.log('No active tabs - using default structure');
                 // Set default structure for empty state
                 setStructure([{
                     main_tab: '',
@@ -529,24 +530,112 @@ const OverallView: React.FC = () => {
                 }]);
                 return;
             }
-
+    
             const { data: structureData, error } = await supabase
                 .from('profile_category_table_mapping_2')
                 .select('structure')
                 .eq('main_tab', activeMainTab)
                 .eq('sub_tab', activeSubTab)
                 .single();
-
+    
             if (error) throw error;
-
-            if (structureData) {
-                setStructure([structureData]);
+    
+            console.log('Fetched structure data:', structureData);
+    
+            if (structureData?.structure) {
+                const visibility = structureData.structure.visibility || {};
+                
+                // Log visibility settings
+                console.log('Visibility Settings:', {
+                    maintabs: visibility.maintabs || {},
+                    sections: visibility.sections || {},
+                    subsections: visibility.subsections || {},
+                    fields: visibility.fields || {}
+                });
+    
+                // Check if main tab is visible
+                const isMainTabVisible = visibility.maintabs?.[activeMainTab] !== false;
+                console.log(`Main tab ${activeMainTab} visibility:`, isMainTabVisible);
+    
+                if (!isMainTabVisible) {
+                    console.log('Main tab is not visible, skipping structure processing');
+                    return;
+                }
+    
+                // Filter the structure based on visibility
+                const filteredStructure = {
+                    ...structureData.structure,
+                    sections: structureData.structure.sections
+                        .filter(section => {
+                            const isSectionVisible = visibility.sections?.[section.name] !== false;
+                            console.log(`Section ${section.name} visibility:`, isSectionVisible);
+                            return isSectionVisible;
+                        })
+                        .map(section => ({
+                            ...section,
+                            subsections: section.subsections
+                                ?.filter(subsection => {
+                                    const isSubsectionVisible = visibility.subsections?.[subsection.name] !== false;
+                                    console.log(`Subsection ${subsection.name} visibility:`, isSubsectionVisible);
+                                    return isSubsectionVisible;
+                                })
+                                .map(subsection => ({
+                                    ...subsection,
+                                    fields: subsection.fields
+                                        ?.filter(field => {
+                                            const isFieldVisible = visibility.fields?.[field.name] !== false;
+                                            console.log(`Field ${field.name} visibility:`, isFieldVisible);
+                                            return isFieldVisible;
+                                        })
+                                }))
+                                .filter(subsection => subsection.fields?.length > 0)
+                        }))
+                        .filter(section => section.subsections?.length > 0)
+                };
+    
+                console.log('Filtered Structure:', {
+                    visibleSections: filteredStructure.sections.map(s => s.name),
+                    totalSections: filteredStructure.sections.length,
+                    totalSubsections: filteredStructure.sections.reduce((acc, s) => acc + (s.subsections?.length || 0), 0),
+                    totalFields: filteredStructure.sections.reduce((acc, s) => 
+                        acc + s.subsections?.reduce((sacc, ss) => 
+                            sacc + (ss.fields?.length || 0), 0) || 0, 0)
+                });
+    
+                // Only set the structure if there are visible sections
+                if (filteredStructure.sections.length > 0) {
+                    setStructure([{
+                        ...structureData,
+                        structure: filteredStructure
+                    }]);
+                } else {
+                    console.log('No visible sections found, using default structure');
+                    // Set default structure if no visible sections
+                    setStructure([{
+                        main_tab: activeMainTab,
+                        sub_tab: activeSubTab,
+                        structure: {
+                            sections: [{
+                                name: 'Company Info',
+                                subsections: [{
+                                    name: 'Basic Details',
+                                    fields: [{
+                                        name: 'company_name',
+                                        label: 'Company Name',
+                                        table: 'acc_portal_company_duplicate',
+                                        type: 'text'
+                                    }]
+                                }]
+                            }]
+                        }
+                    }]);
+                }
             }
         } catch (error) {
             console.error('Error fetching structure:', error);
+            toast.error('Failed to fetch structure data');
         }
     }, [activeMainTab, activeSubTab, supabase]);
-
     // Call fetchStructureData when tabs change
     useEffect(() => {
         fetchStructureData();
