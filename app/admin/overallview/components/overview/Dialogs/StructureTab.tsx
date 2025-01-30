@@ -1,15 +1,18 @@
 // @ts-nocheck
 "use client";
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { toast } from 'sonner';
-import { supabase } from '@/lib/supabaseClient';
-import { Label } from '@/components/ui/label';
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabaseClient";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { SelectTablesAndFieldsDialog } from './SelectTablesAndFieldsDialog';
 
 interface StructureItem {
     id: string;
@@ -32,8 +35,6 @@ interface StructureTabProps {
     onAdd: (item: StructureItem) => Promise<void>;
     onEdit: (item: StructureItem) => Promise<void>;
     onDelete: (item: StructureItem) => Promise<void>;
-    onVisibilityChange: (item: StructureItem, visible: boolean) => Promise<void>;
-    onDragEnd: (result: any) => Promise<void>;
     parentItem?: StructureItem;
     onSelect?: (item: StructureItem) => void;
     selectedItem?: string | null;
@@ -48,8 +49,6 @@ export function StructureTab({
     onAdd,
     onEdit,
     onDelete,
-    onVisibilityChange,
-    onDragEnd,
     parentItem,
     onSelect,
     selectedItem,
@@ -77,150 +76,197 @@ export function StructureTab({
     const [editingField, setEditingField] = useState<{
         type: 'maintab' | 'subtab' | 'section' | 'subsection' | null;
         value: string;
-    }>({ type: null, value: '' });
+        id?: string;
+    }>({ type: null, value: '', id: undefined });
+    const [selectedItemType, setSelectedItemType] = useState<'maintab' | 'subtab' | 'section' | 'subsection' | 'field' | null>(null);
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+
+    const handleInlineEdit = (type: 'maintab' | 'subtab' | 'section' | 'subsection', value: string, id?: string) => {
+        setEditingField({ type, value, id });
+    };
+
+    const handleInlineEditSubmit = async (e: React.KeyboardEvent<HTMLInputElement> | React.FocusEvent<HTMLInputElement>) => {
+        if ('key' in e && e.key !== 'Enter') return;
+
+        if (editingField.type && editingField.value.trim()) {
+            await onEdit({
+                type: editingField.type,
+                name: editingField.value.trim(),
+                id: editingField.id || '',
+                visible: true,
+                parent: {
+                    maintab: selectedMainTab || undefined,
+                    subtab: selectedSubTab || undefined,
+                    section: selectedSection || undefined,
+                    subsection: selectedSubSection || undefined
+                }
+            });
+        }
+        setEditingField({ type: null, value: '', id: undefined });
+    };
+
     const handleAddClick = (type: 'maintab' | 'subtab' | 'section' | 'subsection' | 'field') => {
         setSelectedItemType(type);
         setIsAddDialogOpen(true);
     };
-    useEffect(() => {
-        const fetchStructureData = async () => {
-            try {
-                const { data, error } = await supabase
-                    .from('profile_category_table_mapping_2')
-                    .select('*');
 
-                if (error) throw error;
-
-                if (!data || data.length === 0) {
-                    console.error('No data returned from query');
-                    return;
+    const handleAddSubmit = async (name: string) => {
+        if (selectedItemType && name.trim()) {
+            await onAdd({
+                type: selectedItemType,
+                name: name.trim(),
+                id: String(Date.now()),
+                visible: true,
+                parent: {
+                    maintab: selectedMainTab || undefined,
+                    subtab: selectedSubTab || undefined,
+                    section: selectedSection || undefined,
+                    subsection: selectedSubSection || undefined
                 }
+            });
+            setIsAddDialogOpen(false);
+            setSelectedItemType(null);
+        }
+    };
 
-                // Process the data to maintain relationships and visibility
-                const processedData = data.reduce((acc, item) => {
-                    const structure = item.structure || {};
-                    const visibility = structure.visibility || {};
-                    const order = structure.order || {};
+    const fetchStructureData = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('profile_category_table_mapping_2')
+                .select('*');
 
-                    // Add main tab with visibility
-                    if (item.main_tab) {
-                        if (!acc.maintabs.has(item.main_tab)) {
-                            acc.maintabs.add({
-                                name: item.main_tab,
-                                visible: visibility.maintabs?.[item.main_tab] ?? true,
-                                order: order.maintabs?.[item.main_tab] ?? 0
-                            });
-                        }
+            if (error) throw error;
 
-                        if (item.sub_tab) {
-                            acc.subtabs.add({
-                                name: item.sub_tab,
-                                visible: visibility.subtabs?.[item.sub_tab] ?? true,
-                                order: order.subtabs?.[item.sub_tab] ?? 0,
-                                parent: { maintab: item.main_tab }
-                            });
+            if (!data || data.length === 0) {
+                console.error('No data returned from query');
+                return;
+            }
 
-                            // Process sections with visibility
-                            if (structure.sections) {
-                                structure.sections.forEach((section: any) => {
-                                    if (section.name) {
-                                        acc.sections.add({
-                                            name: section.name,
-                                            visible: visibility.sections?.[section.name] ?? true,
-                                            order: order.sections?.[section.name] ?? 0,
-                                            parent: {
-                                                maintab: item.main_tab,
-                                                subtab: item.sub_tab
-                                            }
-                                        });
+            // Process the data to maintain relationships and visibility
+            const processedData = data.reduce((acc, item) => {
+                const structure = item.structure || {};
+                const visibility = structure.visibility || {};
+                const order = structure.order || {};
 
-                                        // Process subsections with visibility
-                                        section.subsections?.forEach((subsection: any) => {
-                                            if (subsection.name) {
-                                                acc.subsections.add({
-                                                    name: subsection.name,
-                                                    visible: visibility.subsections?.[subsection.name] ?? true,
-                                                    order: order.subsections?.[subsection.name] ?? 0,
+                // Add main tab with visibility
+                if (item.main_tab) {
+                    if (!acc.maintabs.has(item.main_tab)) {
+                        acc.maintabs.add({
+                            name: item.main_tab,
+                            visible: visibility.maintabs?.[item.main_tab] ?? true,
+                            order: order.maintabs?.[item.main_tab] ?? 0
+                        });
+                    }
+
+                    if (item.sub_tab) {
+                        acc.subtabs.add({
+                            name: item.sub_tab,
+                            visible: visibility.subtabs?.[item.sub_tab] ?? true,
+                            order: order.subtabs?.[item.sub_tab] ?? 0,
+                            parent: { maintab: item.main_tab }
+                        });
+
+                        // Process sections with visibility
+                        if (structure.sections) {
+                            structure.sections.forEach((section: any) => {
+                                if (section.name) {
+                                    acc.sections.add({
+                                        name: section.name,
+                                        visible: visibility.sections?.[section.name] ?? true,
+                                        order: order.sections?.[section.name] ?? 0,
+                                        parent: {
+                                            maintab: item.main_tab,
+                                            subtab: item.sub_tab
+                                        }
+                                    });
+
+                                    // Process subsections with visibility
+                                    section.subsections?.forEach((subsection: any) => {
+                                        if (subsection.name) {
+                                            acc.subsections.add({
+                                                name: subsection.name,
+                                                visible: visibility.subsections?.[subsection.name] ?? true,
+                                                order: order.subsections?.[subsection.name] ?? 0,
+                                                parent: {
+                                                    maintab: item.main_tab,
+                                                    subtab: item.subtab,
+                                                    section: section.name
+                                                }
+                                            });
+
+                                            // Process fields with visibility
+                                            subsection.fields?.forEach((field: any) => {
+                                                acc.fields.add({
+                                                    name: field.name,
+                                                    table: field.table,
+                                                    visible: visibility.fields?.[field.name] ?? true,
+                                                    order: order.fields?.[field.name] ?? 0,
                                                     parent: {
                                                         maintab: item.main_tab,
                                                         subtab: item.subtab,
-                                                        section: section.name
+                                                        section: section.name,
+                                                        subsection: subsection.name
                                                     }
                                                 });
-
-                                                // Process fields with visibility
-                                                subsection.fields?.forEach((field: any) => {
-                                                    acc.fields.add({
-                                                        name: field.name,
-                                                        table: field.table,
-                                                        visible: visibility.fields?.[field.name] ?? true,
-                                                        order: order.fields?.[field.name] ?? 0,
-                                                        parent: {
-                                                            maintab: item.main_tab,
-                                                            subtab: item.subtab,
-                                                            section: section.name,
-                                                            subsection: subsection.name
-                                                        }
-                                                    });
-                                                });
-                                            }
-                                        });
-                                    }
-                                });
-                            }
+                                            });
+                                        }
+                                    });
+                                }
+                            });
                         }
                     }
-                    return acc;
-                }, {
-                    maintabs: new Set<any>(),
-                    subtabs: new Set<any>(),
-                    sections: new Set<any>(),
-                    subsections: new Set<any>(),
-                    fields: new Set<any>()
-                });
+                }
+                return acc;
+            }, {
+                maintabs: new Set<any>(),
+                subtabs: new Set<any>(),
+                sections: new Set<any>(),
+                subsections: new Set<any>(),
+                fields: new Set<any>()
+            });
 
-                // Convert Sets to arrays and sort by order
-                const structureData = {
-                    maintabs: Array.from(processedData.maintabs)
-                        .sort((a, b) => a.order - b.order)
-                        .map((item, id) => ({
-                            id: String(id),
-                            ...item
-                        })),
-                    subtabs: Array.from(processedData.subtabs)
-                        .sort((a, b) => a.order - b.order)
-                        .map((item, id) => ({
-                            id: String(id),
-                            ...item
-                        })),
-                    sections: Array.from(processedData.sections)
-                        .sort((a, b) => a.order - b.order)
-                        .map((item, id) => ({
-                            id: String(id),
-                            ...item
-                        })),
-                    subsections: Array.from(processedData.subsections)
-                        .sort((a, b) => a.order - b.order)
-                        .map((item, id) => ({
-                            id: String(id),
-                            ...item
-                        })),
-                    fields: Array.from(processedData.fields)
-                        .sort((a, b) => a.order - b.order)
-                        .map((item, id) => ({
-                            id: String(id),
-                            ...item
-                        }))
-                };
+            // Convert Sets to arrays and sort by order
+            const structureData = {
+                maintabs: Array.from(processedData.maintabs)
+                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    .map((item, id) => ({
+                        id: String(id),
+                        ...item
+                    })),
+                subtabs: Array.from(processedData.subtabs)
+                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    .map((item, id) => ({
+                        id: String(id),
+                        ...item
+                    })),
+                sections: Array.from(processedData.sections)
+                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    .map((item, id) => ({
+                        id: String(id),
+                        ...item
+                    })),
+                subsections: Array.from(processedData.subsections)
+                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    .map((item, id) => ({
+                        id: String(id),
+                        ...item
+                    })),
+                fields: Array.from(processedData.fields)
+                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    .map((item, id) => ({
+                        id: String(id),
+                        ...item
+                    }))
+            };
 
-                setStructure(structureData);
-                console.log('Structure loaded:', structureData);
-            } catch (error) {
-                console.error('Error fetching structure data:', error);
-                toast.error('Failed to load structure data');
-            }
-        };
+            setStructure(structureData);
+        } catch (error) {
+            console.error('Error fetching structure data:', error);
+            toast.error('Failed to load structure data');
+        }
+    };
 
+    useEffect(() => {
         fetchStructureData();
     }, [supabase]);
 
@@ -259,7 +305,7 @@ export function StructureTab({
     const handleSubsectionSelect = (subsectionName: string) => {
         setSelectedSubSection(subsectionName);
     };
-    // Filter functions for each level
+    
     const getSubTabsForMainTab = (maintabName: string) => {
         return structure.subtabs.filter(subtab =>
             subtab.parent?.maintab === maintabName
@@ -282,284 +328,7 @@ export function StructureTab({
         return structure.fields.filter(field =>
             field.parent?.subsection === subsectionName
         );
-    };
-    const handleVisibilityChange = async (item: StructureItem, visible: boolean) => {
-        try {
-            let query = supabase
-                .from('profile_category_table_mapping_2')
-                .select('*')
-                .order('created_at', { ascending: true });
-    
-            if (item.type === 'maintab') {
-                query = query.eq('main_tab', item.name);
-            } else {
-                query = query
-                    .eq('main_tab', item.parent?.maintab)
-                    .eq('sub_tab', item.parent?.subtab);
-            }
-    
-            const { data: records, error: fetchError } = await query;
-    
-            if (fetchError) throw fetchError;
-    
-            if (!records || records.length === 0) {
-                console.error('No matching records found');
-                toast.error('Failed to update visibility: No matching records found');
-                return;
-            }
-    
-            // Update all matching records
-            for (const record of records) {
-                const updatedStructure = { ...record.structure };
-                const visibility = updatedStructure.visibility || {};
-    
-                // Initialize visibility objects if they don't exist
-                const types = ['maintabs', 'subtabs', 'sections', 'subsections', 'fields'];
-                types.forEach(type => {
-                    visibility[type] = visibility[type] || {};
-                });
-    
-                // Check parent visibility when trying to show an item
-                if (visible && item.type !== 'maintab') {
-                    const { isVisible, parentType } = getParentVisibility(item);
-                    if (!isVisible) {
-                        toast.error(`Cannot enable visibility while ${parentType} is hidden`);
-                        return;
-                    }
-                }
-    
-                // Update visibility for the current item
-                visibility[`${item.type}s`][item.name] = visible;
-    
-                // Update children visibility based on parent state
-                const updateChildrenVisibility = (items: StructureItem[], type: string, parentName: string, parentType: string) => {
-                    items.forEach(childItem => {
-                        if (childItem.parent) {
-                            const isChild = parentType === 'maintab' ? childItem.parent.maintab === parentName :
-                                          parentType === 'subtab' ? childItem.parent.subtab === parentName :
-                                          parentType === 'section' ? childItem.parent.section === parentName :
-                                          parentType === 'subsection' ? childItem.parent.subsection === parentName : false;
-    
-                            if (isChild) {
-                                visibility[type][childItem.name] = visible;
-                            }
-                        }
-                    });
-                };
-    
-                // Cascade visibility changes to all children
-                switch (item.type) {
-                    case 'maintab': {
-                        // Update subtabs
-                        const subtabs = getSubTabsForMainTab(item.name);
-                        updateChildrenVisibility(subtabs, 'subtabs', item.name, 'maintab');
-    
-                        // Update sections under those subtabs
-                        subtabs.forEach(subtab => {
-                            const sections = getSectionsForSubTab(subtab.name);
-                            updateChildrenVisibility(sections, 'sections', subtab.name, 'subtab');
-    
-                            // Update subsections under those sections
-                            sections.forEach(section => {
-                                const subsections = getSubsectionsForSection(section.name);
-                                updateChildrenVisibility(subsections, 'subsections', section.name, 'section');
-    
-                                // Update fields under those subsections
-                                subsections.forEach(subsection => {
-                                    const fields = getFieldsForSubsection(subsection.name);
-                                    updateChildrenVisibility(fields, 'fields', subsection.name, 'subsection');
-                                });
-                            });
-                        });
-                        break;
-                    }
-                    case 'subtab': {
-                        const sections = getSectionsForSubTab(item.name);
-                        updateChildrenVisibility(sections, 'sections', item.name, 'subtab');
-    
-                        sections.forEach(section => {
-                            const subsections = getSubsectionsForSection(section.name);
-                            updateChildrenVisibility(subsections, 'subsections', section.name, 'section');
-    
-                            subsections.forEach(subsection => {
-                                const fields = getFieldsForSubsection(subsection.name);
-                                updateChildrenVisibility(fields, 'fields', subsection.name, 'subsection');
-                            });
-                        });
-                        break;
-                    }
-                    case 'section': {
-                        const subsections = getSubsectionsForSection(item.name);
-                        updateChildrenVisibility(subsections, 'subsections', item.name, 'section');
-    
-                        subsections.forEach(subsection => {
-                            const fields = getFieldsForSubsection(subsection.name);
-                            updateChildrenVisibility(fields, 'fields', subsection.name, 'subsection');
-                        });
-                        break;
-                    }
-                    case 'subsection': {
-                        const fields = getFieldsForSubsection(item.name);
-                        updateChildrenVisibility(fields, 'fields', item.name, 'subsection');
-                        break;
-                    }
-                }
-    
-                // Update database
-                const { error: updateError } = await supabase
-                    .from('profile_category_table_mapping_2')
-                    .update({ 
-                        structure: {
-                            ...updatedStructure,
-                            visibility
-                        }
-                    })
-                    .eq('id', record.id);
-    
-                if (updateError) throw updateError;
-            }
-    
-            // Update local state
-            setStructure(prev => {
-                const newStructure = { ...prev };
-                
-                const updateItemAndChildren = (items: any[], type: string, parentName: string, parentType: string) => {
-                    return items.map(currentItem => {
-                        const isTarget = currentItem.name === item.name;
-                        const isChild = currentItem.parent && (
-                            parentType === 'maintab' ? currentItem.parent.maintab === parentName :
-                            parentType === 'subtab' ? currentItem.parent.subtab === parentName :
-                            parentType === 'section' ? currentItem.parent.section === parentName :
-                            parentType === 'subsection' ? currentItem.parent.subsection === parentName : false
-                        );
-    
-                        return {
-                            ...currentItem,
-                            visible: isTarget || isChild ? visible : currentItem.visible
-                        };
-                    });
-                };
-    
-                if (item.type === 'maintab') {
-                    newStructure.maintabs = updateItemAndChildren(prev.maintabs, 'maintabs', item.name, 'maintab');
-                    newStructure.subtabs = updateItemAndChildren(prev.subtabs, 'subtabs', item.name, 'maintab');
-                    newStructure.sections = updateItemAndChildren(prev.sections, 'sections', item.name, 'maintab');
-                    newStructure.subsections = updateItemAndChildren(prev.subsections, 'subsections', item.name, 'maintab');
-                    newStructure.fields = updateItemAndChildren(prev.fields, 'fields', item.name, 'maintab');
-                } else {
-                    newStructure[`${item.type}s`] = updateItemAndChildren(
-                        prev[`${item.type}s`],
-                        `${item.type}s`,
-                        item.name,
-                        item.type
-                    );
-                }
-    
-                return newStructure;
-            });
-    
-            toast.success('Visibility updated successfully');
-        } catch (error) {
-            console.error('Error updating visibility:', error);
-            toast.error('Failed to update visibility');
-        }
-    };
-
-    const handleMainTabVisibilityChange = async (mainTab: string, visible: boolean) => {
-        try {
-            // Get current structure for this main tab
-            const { data: currentData } = await supabase
-                .from('profile_category_table_mapping_2')
-                .select('structure')
-                .eq('main_tab', mainTab)
-                .single();
-
-            if (!currentData) return;
-
-            const updatedStructure = { ...currentData.structure };
-            const visibility = updatedStructure.visibility;
-
-            // Update main tab visibility
-            visibility.maintabs = {
-                ...visibility.maintabs,
-                [mainTab]: visible
-            };
-
-            if (!visible) {
-                // Hide all child elements
-                structure.subtabs
-                    .filter(subtab => subtab.parent.maintab === mainTab)
-                    .forEach(subtab => {
-                        visibility.subtabs[subtab.name] = false;
-
-                        structure.sections
-                            .filter(section => section.parent.subtab === subtab.name)
-                            .forEach(section => {
-                                visibility.sections[section.name] = false;
-
-                                structure.subsections
-                                    .filter(subsection => subsection.parent.section === section.name)
-                                    .forEach(subsection => {
-                                        visibility.subsections[subsection.name] = false;
-
-                                        structure.fields
-                                            .filter(field => field.parent.subsection === subsection.name)
-                                            .forEach(field => {
-                                                visibility.fields[field.name] = false;
-                                            });
-                                    });
-                            });
-                    });
-            }
-
-            // Update database
-            const { error } = await supabase
-                .from('profile_category_table_mapping_2')
-                .update({ structure: updatedStructure })
-                .eq('main_tab', mainTab);
-
-            if (error) throw error;
-
-            // Update local state
-            setStructure(prev => {
-                const newStructure = { ...prev };
-                const updateVisibility = (items: any[], type: string) => {
-                    return items.map(item => ({
-                        ...item,
-                        visible: getEffectiveVisibility(item, type, updatedStructure)
-                    }));
-                };
-
-                newStructure.maintabs = updateVisibility(prev.maintabs, 'maintabs');
-                newStructure.subtabs = updateVisibility(prev.subtabs, 'subtabs');
-                newStructure.sections = updateVisibility(prev.sections, 'sections');
-                newStructure.subsections = updateVisibility(prev.subsections, 'subsections');
-                newStructure.fields = updateVisibility(prev.fields, 'fields');
-
-                return newStructure;
-            });
-
-            toast.success('Main tab visibility updated successfully');
-        } catch (error) {
-            console.error('Error updating main tab visibility:', error);
-            toast.error('Failed to update main tab visibility');
-        }
-    };
-
-    const handleUpdateStructure = async (structure: any) => {
-        try {
-            const { error } = await supabase
-                .from('profile_category_table_mapping_2')
-                .update({ structure });
-
-            if (error) throw error;
-
-            toast.success('Structure updated successfully');
-        } catch (error) {
-            console.error('Error updating structure:', error);
-            toast.error('Failed to update structure');
-        }
-    };
+    };    
 
     const handleTablesFieldsSelect = useCallback((tables: string[], fields: { [table: string]: string[] }) => {
         setFormState(prev => ({
@@ -569,6 +338,7 @@ export function StructureTab({
         }));
         setIsSelectTablesDialogOpen(false);
     }, []);
+
     const renderSelectedItems = () => (
         <div className="border rounded-md p-4 space-y-4 mb-4">
             <div className="space-y-4">
@@ -586,7 +356,7 @@ export function StructureTab({
                         ) : (
                             <div
                                 className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
-                                onDoubleClick={() => handleInlineEdit('maintab', selectedMainTab || '')}
+                                onDoubleClick={() => handleInlineEdit('maintab', selectedMainTab || '', selectedMainTab || undefined)}
                             >
                                 {selectedMainTab || 'Not selected'}
                             </div>
@@ -608,7 +378,7 @@ export function StructureTab({
                         ) : (
                             <div
                                 className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
-                                onDoubleClick={() => handleInlineEdit('subtab', selectedSubTab || '')}
+                                onDoubleClick={() => handleInlineEdit('subtab', selectedSubTab || '', selectedSubTab || undefined)}
                             >
                                 {selectedSubTab || 'Not selected'}
                             </div>
@@ -630,7 +400,7 @@ export function StructureTab({
                         ) : (
                             <div
                                 className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
-                                onDoubleClick={() => handleInlineEdit('section', selectedSection || '')}
+                                onDoubleClick={() => handleInlineEdit('section', selectedSection || '', selectedSection || undefined)}
                             >
                                 {selectedSection || 'Not selected'}
                             </div>
@@ -652,7 +422,7 @@ export function StructureTab({
                         ) : (
                             <div
                                 className="flex-1 px-3 py-2 border rounded-md cursor-pointer hover:bg-muted/50"
-                                onDoubleClick={() => handleInlineEdit('subsection', selectedSubSection || '')}
+                                onDoubleClick={() => handleInlineEdit('subsection', selectedSubSection || '', selectedSubSection || undefined)}
                             >
                                 {selectedSubSection || 'Not selected'}
                             </div>
@@ -682,133 +452,322 @@ export function StructureTab({
             </DialogContent>
         </Dialog>
     );
-    const handleDragEnd = async (result: any) => {
-        if (!result.destination) return;
-        
+    const getFieldsForMainTab = (maintabName: string) => {
+        return structure.fields.filter(field => 
+          field.parent?.maintab === maintabName
+        );
+      };
+      
+      const getFieldsForSubTab = (subtabName: string) => {
+        return structure.fields.filter(field => 
+          field.parent?.subtab === subtabName
+        );
+      };
+      
+      const getFieldsForSection = (sectionName: string) => {
+        return structure.fields.filter(field => 
+          field.parent?.section === sectionName
+        );
+      };
+      
+      const getSectionsForMainTab = (maintabName: string) => {
+        return structure.sections.filter(section => 
+          section.parent?.maintab === maintabName
+        );
+      };
+      
+      const getSubsectionsForMainTab = (maintabName: string) => {
+        return structure.subsections.filter(subsection => 
+          subsection.parent?.maintab === maintabName
+        );
+      };
+      
+      const getSubsectionsForSubTab = (subtabName: string) => {
+        return structure.subsections.filter(subsection => 
+          subsection.parent?.subtab === subtabName
+        );
+      };
+
+    const handleVisibilityChange = async (item: StructureItem, visible: boolean) => {
         try {
-            const { type, source, destination } = result;
-            
-            // Ensure we have valid structure data
-            if (!structure || !structure[type]) {
-                console.error('Invalid structure data for drag and drop');
+            // 1. Check parent visibility first
+            const parents = getParentItems(item);
+            const parentVisibilityCheck = parents.every(parent => {
+                const parentItems = structure[`${parent.type}s`] as any[];
+                const parentItem = parentItems.find(p => p.name === parent.name);
+                return parentItem?.visible;
+            });
+
+            if (visible && !parentVisibilityCheck) {
+                const hiddenParent = parents.find(parent => {
+                    const parentItems = structure[`${parent.type}s`] as any[];
+                    const parentItem = parentItems.find(p => p.name === parent.name);
+                    return !parentItem?.visible;
+                });
+                toast.error(`Cannot enable visibility while ${hiddenParent?.type} is hidden`);
                 return;
             }
-    
-            // Create a copy of the items array
-            const items = Array.from(structure[type]);
-            
-            // Perform the reorder
-            const [removed] = items.splice(source.index, 1);
-            items.splice(destination.index, 0, removed);
-    
-            // Update the order of items
-            const updates = items.map((item, index) => ({
-                ...item,
-                order: index
-            }));
-    
-            // Get the current record
-            const { data: currentRecord, error: fetchError } = await supabase
+
+            // 2. Get the current record
+            const { data: records, error: fetchError } = await supabase
                 .from('profile_category_table_mapping_2')
                 .select('*')
-                .eq('main_tab', removed.parent?.maintab)
-                .eq('sub_tab', removed.parent?.subtab)
-                .single();
-    
+                .eq('main_tab', item.parent?.maintab || item.name);
+
             if (fetchError) throw fetchError;
-    
-            // Update the structure with new order
-            const updatedStructure = {
-                ...currentRecord.structure,
-                order: {
-                    ...currentRecord.structure.order,
-                    [type]: updates.reduce((acc, item) => ({
-                        ...acc,
-                        [item.name]: item.order
-                    }), {})
+
+            // 3. Handle record creation if needed
+            if (!records || records.length === 0) {
+                const newStructure = {
+                    maintabs: [],
+                    subtabs: [],
+                    sections: [],
+                    subsections: [],
+                    fields: [],
+                    order: {
+                        fields: {},
+                        subtabs: {},
+                        maintabs: {},
+                        sections: {},
+                        subsections: {}
+                    },
+                    visibility: {
+                        fields: {},
+                        subtabs: {},
+                        maintabs: {
+                            [item.name]: visible
+                        },
+                        sections: {},
+                        subsections: {}
+                    }
+                };
+
+                const { error: insertError } = await supabase
+                    .from('profile_category_table_mapping_2')
+                    .insert({
+                        main_tab: item.parent?.maintab || item.name,
+                        sub_tab: item.parent?.subtab || 'default',
+                        structure: newStructure
+                    });
+
+                if (insertError) throw insertError;
+                await fetchStructureData();
+                toast.success('Visibility updated successfully');
+                return;
+            }
+
+            // 4. Update all matching records
+            const updatePromises = records.map(async (record) => {
+                const updatedStructure = { ...record.structure };
+                
+                if (!updatedStructure.visibility) {
+                    updatedStructure.visibility = {
+                        fields: {},
+                        subtabs: {},
+                        maintabs: {},
+                        sections: {},
+                        subsections: {}
+                    };
                 }
-            };
-    
-            // Update the database
-            const { error: updateError } = await supabase
-                .from('profile_category_table_mapping_2')
-                .update({ structure: updatedStructure })
-                .eq('id', currentRecord.id);
-    
-            if (updateError) throw updateError;
-    
-            // Update local state
-            setStructure(prev => ({
-                ...prev,
-                [type]: updates
-            }));
-    
-            toast.success('Order updated successfully');
+
+                // Update visibility for the current item
+                updatedStructure.visibility[`${item.type}s`] = {
+                    ...updatedStructure.visibility[`${item.type}s`],
+                    [item.name]: visible
+                };
+
+                // Get all child items that should be affected
+                const children = getChildItems(item);
+
+                // Update all children to match parent's visibility
+                children.forEach(child => {
+                    updatedStructure.visibility[`${child.type}s`] = {
+                        ...updatedStructure.visibility[`${child.type}s`],
+                        ...child.items.reduce((acc, childItem) => ({
+                            ...acc,
+                            [childItem.name]: visible
+                        }), {})
+                    };
+                });
+
+                return supabase
+                    .from('profile_category_table_mapping_2')
+                    .update({ structure: updatedStructure })
+                    .eq('id', record.id);
+            });
+
+            // 5. Execute all updates
+            await Promise.all(updatePromises);
+            await fetchStructureData();
+            toast.success('Visibility updated successfully');
         } catch (error) {
-            console.error('Error updating order:', error);
-            toast.error('Failed to update order');
+            console.error('Error updating visibility:', error);
+            toast.error('Failed to update visibility');
         }
     };
 
-    const getParentVisibility = (item: StructureItem): { isVisible: boolean; parentType: string | null } => {
-        const getItemVisibility = (type: string, name: string | undefined) => {
-            if (!name) return true;
-            const items = structure[`${type}s` as keyof typeof structure] as Array<any>;
-            return items.find(i => i.name === name)?.visible ?? true;
-        };
-    
-        switch (item.type) {
+    const onDragEnd = async (result: any) => {
+        if (!result.destination) return;
+
+        const { source, destination, type } = result;
+        if (source.index === destination.index) return;
+
+        let items: any[] = [];
+        switch (type) {
             case 'maintab':
-                return { isVisible: true, parentType: null };
-    
-            case 'subtab': {
-                const maintabVisible = getItemVisibility('maintab', item.parent?.maintab);
-                return {
-                    isVisible: maintabVisible,
-                    parentType: !maintabVisible ? 'main tab' : null
-                };
-            }
-    
-            case 'section': {
-                const maintabVisible = getItemVisibility('maintab', item.parent?.maintab);
-                const subtabVisible = getItemVisibility('subtab', item.parent?.subtab);
-                return {
-                    isVisible: maintabVisible && subtabVisible,
-                    parentType: !maintabVisible ? 'main tab' : 
-                               !subtabVisible ? 'sub tab' : null
-                };
-            }
-    
-            case 'subsection': {
-                const maintabVisible = getItemVisibility('maintab', item.parent?.maintab);
-                const subtabVisible = getItemVisibility('subtab', item.parent?.subtab);
-                const sectionVisible = getItemVisibility('section', item.parent?.section);
-                return {
-                    isVisible: maintabVisible && subtabVisible && sectionVisible,
-                    parentType: !maintabVisible ? 'main tab' : 
-                               !subtabVisible ? 'sub tab' : 
-                               !sectionVisible ? 'section' : null
-                };
-            }
-    
-            case 'field': {
-                const maintabVisible = getItemVisibility('maintab', item.parent?.maintab);
-                const subtabVisible = getItemVisibility('subtab', item.parent?.subtab);
-                const sectionVisible = getItemVisibility('section', item.parent?.section);
-                const subsectionVisible = getItemVisibility('subsection', item.parent?.subsection);
-                return {
-                    isVisible: maintabVisible && subtabVisible && sectionVisible && subsectionVisible,
-                    parentType: !maintabVisible ? 'main tab' : 
-                               !subtabVisible ? 'sub tab' : 
-                               !sectionVisible ? 'section' : 
-                               !subsectionVisible ? 'subsection' : null
-                };
-            }
-    
-            default:
-                return { isVisible: true, parentType: null };
+                items = [...structure.maintabs];
+                break;
+            case 'subtab':
+                items = getSubTabsForMainTab(selectedMainTab || '');
+                break;
+            case 'section':
+                items = getSectionsForSubTab(selectedSubTab || '');
+                break;
+            case 'subsection':
+                items = getSubsectionsForSection(selectedSection || '');
+                break;
+            case 'field':
+                items = getFieldsForSubsection(selectedSubSection || '');
+                break;
+        }
+
+        const [reorderedItem] = items.splice(source.index, 1);
+        items.splice(destination.index, 0, reorderedItem);
+
+        // Update the order in the database
+        try {
+            const { error } = await supabase
+                .from('structure')
+                .update({ order: destination.index })
+                .eq('id', reorderedItem.id);
+
+            if (error) throw error;
+
+            // Update local state
+            setStructure(prev => {
+                const newStructure = { ...prev };
+                switch (type) {
+                    case 'maintab':
+                        newStructure.maintabs = items;
+                        break;
+                    case 'subtab':
+                        if (selectedMainTab) {
+                            const mainTabIndex = newStructure.maintabs.findIndex(t => t.name === selectedMainTab);
+                            if (mainTabIndex !== -1) {
+                                newStructure.maintabs[mainTabIndex].subtabs = items;
+                            }
+                        }
+                        break;
+                    case 'section':
+                        if (selectedMainTab && selectedSubTab) {
+                            const mainTabIndex = newStructure.maintabs.findIndex(t => t.name === selectedMainTab);
+                            if (mainTabIndex !== -1) {
+                                const subTabIndex = newStructure.maintabs[mainTabIndex].subtabs.findIndex(t => t.name === selectedSubTab);
+                                if (subTabIndex !== -1) {
+                                    newStructure.maintabs[mainTabIndex].subtabs[subTabIndex].sections = items;
+                                }
+                            }
+                        }
+                        break;
+                    case 'subsection':
+                        if (selectedMainTab && selectedSubTab && selectedSection) {
+                            const mainTabIndex = newStructure.maintabs.findIndex(t => t.name === selectedMainTab);
+                            if (mainTabIndex !== -1) {
+                                const subTabIndex = newStructure.maintabs[mainTabIndex].subtabs.findIndex(t => t.name === selectedSubTab);
+                                if (subTabIndex !== -1) {
+                                    const sectionIndex = newStructure.maintabs[mainTabIndex].subtabs[subTabIndex].sections.findIndex(s => s.name === selectedSection);
+                                    if (sectionIndex !== -1) {
+                                        newStructure.maintabs[mainTabIndex].subtabs[subTabIndex].sections[sectionIndex].subsections = items;
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                }
+                return newStructure;
+            });
+        } catch (error) {
+            console.error('Error updating item order:', error);
+            toast.error('Failed to update item order');
         }
     };
+
+    const getParentItems = (item: StructureItem) => {
+        const parents: { type: string; name: string }[] = [];
+        
+        if (item.parent?.maintab) {
+            parents.push({ type: 'maintab', name: item.parent.maintab });
+        }
+        if (item.parent?.subtab) {
+            parents.push({ type: 'subtab', name: item.parent.subtab });
+        }
+        if (item.parent?.section) {
+            parents.push({ type: 'section', name: item.parent.section });
+        }
+        if (item.parent?.subsection) {
+            parents.push({ type: 'subsection', name: item.parent.subsection });
+        }
+        
+        return parents;
+    };
+
+    const getChildItems = (item: StructureItem) => {
+        const children: { type: string; items: any[] }[] = [];
+        
+        switch (item.type) {
+            case 'maintab':
+                children.push({ 
+                    type: 'subtab', 
+                    items: structure.subtabs.filter(st => st.parent?.maintab === item.name) 
+                });
+                children.push({ 
+                    type: 'section', 
+                    items: structure.sections.filter(s => s.parent?.maintab === item.name) 
+                });
+                children.push({ 
+                    type: 'subsection', 
+                    items: structure.subsections.filter(ss => ss.parent?.maintab === item.name) 
+                });
+                children.push({ 
+                    type: 'field', 
+                    items: structure.fields.filter(f => f.parent?.maintab === item.name) 
+                });
+                break;
+            case 'subtab':
+                children.push({ 
+                    type: 'section', 
+                    items: structure.sections.filter(s => s.parent?.subtab === item.name) 
+                });
+                children.push({ 
+                    type: 'subsection', 
+                    items: structure.subsections.filter(ss => ss.parent?.subtab === item.name) 
+                });
+                children.push({ 
+                    type: 'field', 
+                    items: structure.fields.filter(f => f.parent?.subtab === item.name) 
+                });
+                break;
+            case 'section':
+                children.push({ 
+                    type: 'subsection', 
+                    items: structure.subsections.filter(ss => ss.parent?.section === item.name) 
+                });
+                children.push({ 
+                    type: 'field', 
+                    items: structure.fields.filter(f => f.parent?.section === item.name) 
+                });
+                break;
+            case 'subsection':
+                children.push({ 
+                    type: 'field', 
+                    items: structure.fields.filter(f => f.parent?.subsection === item.name) 
+                });
+                break;
+        }
+        
+        return children;
+    };
+
     return (
         <div className="grid grid-cols-[2fr,2fr,2fr,2fr,3fr] gap-4">
             <div className="space-y-4">
@@ -819,41 +778,63 @@ export function StructureTab({
                     </Button>
                 </div>
                 <ScrollArea className="h-[70vh] border rounded-md">
-                    <div className="p-4 space-y-2">
-                        {structure.maintabs.map((tab) => (
-                            <div
-                                key={tab.id}
-                                className={cn(
-                                    "flex items-center justify-between p-2 rounded-md cursor-pointer",
-                                    selectedMainTab === tab.name ? "bg-blue-100" : "hover:bg-muted"
-                                )}
-                                onClick={() => handleMainTabSelect(tab.name)}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                                    <span>{tab.name}</span>
+                    <DragDropContext onDragEnd={(result) => onDragEnd({ ...result, type: 'maintab' })}>
+                        <Droppable droppableId="maintabs">
+                            {(provided) => (
+                                <div ref={provided.innerRef} {...provided.droppableProps} className="p-4 space-y-2">
+                                    {structure.maintabs.map((tab, index) => (
+                                        <Draggable key={tab.id} draggableId={tab.id} index={index}>
+                                            {(provided) => (
+                                                <div
+                                                    ref={provided.innerRef}
+                                                    {...provided.draggableProps}
+                                                    className={cn(
+                                                        "flex items-center justify-between p-2 rounded-md cursor-pointer",
+                                                        selectedMainTab === tab.name ? "bg-blue-100" : "hover:bg-muted"
+                                                    )}
+                                                    onClick={() => handleMainTabSelect(tab.name)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <div {...provided.dragHandleProps}>
+                                                            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                                                        </div>
+                                                        <span>{tab.name}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Switch
+                                                            checked={tab.visible}
+                                                            onCheckedChange={(checked) => handleVisibilityChange({
+                                                                type: 'maintab',
+                                                                name: tab.name,
+                                                                id: tab.id,
+                                                                visible: tab.visible,
+                                                                parent: {}
+                                                            }, checked)}
+                                                        />
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="text-destructive"
+                                                            onClick={() => onDelete({
+                                                                type: 'maintab',
+                                                                name: tab.name,
+                                                                id: tab.id,
+                                                                visible: tab.visible,
+                                                                parent: {}
+                                                            })}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </Draggable>
+                                    ))}
+                                    {provided.placeholder}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={tab.visible}
-                                        onCheckedChange={(checked) => handleVisibilityChange({
-                                            type: 'maintab',
-                                            name: tab.name,
-                                            id: tab.id,
-                                            visible: tab.visible,
-                                            parent: {}
-                                        }, checked)}
-                                    />
-                                    <Button variant="ghost" size="icon" onClick={() => handleInlineEdit('maintab', tab.name)}>
-                                        <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="text-destructive">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                            )}
+                        </Droppable>
+                    </DragDropContext>
                 </ScrollArea>
             </div>
 
@@ -865,58 +846,68 @@ export function StructureTab({
                     </Button>
                 </div>
                 <ScrollArea className="h-[70vh] border rounded-md">
-                    <div className="p-4 space-y-2">
-                        {selectedMainTab && getSubTabsForMainTab(selectedMainTab).map((subtab) => (
-                            <div
-                                key={subtab.id}
-                                className={cn(
-                                    "flex items-center justify-between p-2 rounded-md cursor-pointer",
-                                    selectedSubTab === subtab.name ? "bg-blue-100" : "hover:bg-muted"
-                                )}
-                                onClick={() => handleSubTabSelect(subtab.name)}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                                    <span>{subtab.name}</span>
+                    <DragDropContext onDragEnd={(result) => onDragEnd({ ...result, type: 'subtab' })}>
+                        <Droppable droppableId="subtabs">
+                            {(provided) => (
+                                <div ref={provided.innerRef} {...provided.droppableProps} className="p-4 space-y-2">
+                                    {selectedMainTab && getSubTabsForMainTab(selectedMainTab).map((subtab, index) => (
+                                        <Draggable key={subtab.id} draggableId={subtab.id} index={index}>
+                                            {(provided) => (
+                                                <div
+                                                    ref={provided.innerRef}
+                                                    {...provided.draggableProps}
+                                                    className={cn(
+                                                        "flex items-center justify-between p-2 rounded-md cursor-pointer",
+                                                        selectedSubTab === subtab.name ? "bg-blue-100" : "hover:bg-muted"
+                                                    )}
+                                                    onClick={() => handleSubTabSelect(subtab.name)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <div {...provided.dragHandleProps}>
+                                                            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                                                        </div>
+                                                        <span>{subtab.name}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Switch
+                                                            checked={subtab.visible}
+                                                            onCheckedChange={(checked) => handleVisibilityChange({
+                                                                type: 'subtab',
+                                                                name: subtab.name,
+                                                                id: subtab.id,
+                                                                visible: subtab.visible,
+                                                                parent: {
+                                                                    maintab: selectedMainTab
+                                                                }
+                                                            }, checked)}
+                                                            disabled={!structure.maintabs.find(t => t.name === selectedMainTab)?.visible}
+                                                        />
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="text-destructive"
+                                                            onClick={() => onDelete({
+                                                                type: 'subtab',
+                                                                name: subtab.name,
+                                                                id: subtab.id,
+                                                                visible: subtab.visible,
+                                                                parent: {
+                                                                    maintab: selectedMainTab
+                                                                }
+                                                            })}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </Draggable>
+                                    ))}
+                                    {provided.placeholder}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={subtab.visible}
-                                        onCheckedChange={(checked) => {
-                                            const { isVisible, parentType } = getParentVisibility({
-                                                type: 'subtab',
-                                                name: subtab.name,
-                                                id: subtab.id,
-                                                visible: subtab.visible,
-                                                parent: {
-                                                    maintab: selectedMainTab
-                                                }
-                                            });
-
-                                            if (!isVisible && checked) {
-                                                toast.error(`Cannot enable visibility while ${parentType} is hidden`);
-                                                return;
-                                            }
-
-                                            handleVisibilityChange({
-                                                type: 'subtab',
-                                                name: subtab.name,
-                                                id: subtab.id,
-                                                visible: subtab.visible,
-                                                parent: {
-                                                    maintab: selectedMainTab
-                                                }
-                                            }, checked);
-                                        }}
-                                        disabled={!structure.maintabs.find(t => t.name === selectedMainTab)?.visible}
-                                    />
-                                    <Button variant="ghost" size="icon" className="text-destructive">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                            )}
+                        </Droppable>
+                    </DragDropContext>
                 </ScrollArea>
             </div>
 
@@ -928,60 +919,71 @@ export function StructureTab({
                     </Button>
                 </div>
                 <ScrollArea className="h-[70vh] border rounded-md">
-                    <div className="p-4 space-y-2">
-                        {selectedSubTab && getSectionsForSubTab(selectedSubTab).map((section) => (
-                            <div
-                                key={section.id}
-                                className={cn(
-                                    "flex items-center justify-between p-2 rounded-md cursor-pointer",
-                                    selectedSection === section.name ? "bg-blue-100" : "hover:bg-muted"
-                                )}
-                                onClick={() => handleSectionSelect(section.name)}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                                    <span>{section.name}</span>
+                    <DragDropContext onDragEnd={(result) => onDragEnd({ ...result, type: 'section' })}>
+                        <Droppable droppableId="sections">
+                            {(provided) => (
+                                <div ref={provided.innerRef} {...provided.droppableProps} className="p-4 space-y-2">
+                                    {selectedSubTab && getSectionsForSubTab(selectedSubTab).map((section, index) => (
+                                        <Draggable key={section.id} draggableId={section.id} index={index}>
+                                            {(provided) => (
+                                                <div
+                                                    ref={provided.innerRef}
+                                                    {...provided.draggableProps}
+                                                    className={cn(
+                                                        "flex items-center justify-between p-2 rounded-md cursor-pointer",
+                                                        selectedSection === section.name ? "bg-blue-100" : "hover:bg-muted"
+                                                    )}
+                                                    onClick={() => handleSectionSelect(section.name)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <div {...provided.dragHandleProps}>
+                                                            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                                                        </div>
+                                                        <span>{section.name}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Switch
+                                                            checked={section.visible}
+                                                            onCheckedChange={(checked) => handleVisibilityChange({
+                                                                type: 'section',
+                                                                name: section.name,
+                                                                id: section.id,
+                                                                visible: section.visible,
+                                                                parent: {
+                                                                    maintab: selectedMainTab,
+                                                                    subtab: selectedSubTab
+                                                                }
+                                                            }, checked)}
+                                                            disabled={!structure.maintabs.find(t => t.name === selectedMainTab)?.visible ||
+                                                                !getSubTabsForMainTab(selectedMainTab || '').find(t => t.name === selectedSubTab)?.visible}
+                                                        />
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="text-destructive"
+                                                            onClick={() => onDelete({
+                                                                type: 'section',
+                                                                name: section.name,
+                                                                id: section.id,
+                                                                visible: section.visible,
+                                                                parent: {
+                                                                    maintab: selectedMainTab,
+                                                                    subtab: selectedSubTab
+                                                                }
+                                                            })}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </Draggable>
+                                    ))}
+                                    {provided.placeholder}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={section.visible}
-                                        onCheckedChange={(checked) => {
-                                            const { isVisible, parentType } = getParentVisibility({
-                                                type: 'section',
-                                                name: section.name,
-                                                id: section.id,
-                                                visible: section.visible,
-                                                parent: {
-                                                    maintab: selectedMainTab,
-                                                    subtab: selectedSubTab
-                                                }
-                                            });
-
-                                            if (!isVisible && checked) {
-                                                toast.error(`Cannot enable visibility while ${parentType} is hidden`);
-                                                return;
-                                            }
-
-                                            handleVisibilityChange({
-                                                type: 'section',
-                                                name: section.name,
-                                                id: section.id,
-                                                visible: section.visible,
-                                                parent: {
-                                                    maintab: selectedMainTab,
-                                                    subtab: selectedSubTab
-                                                }
-                                            }, checked);
-                                        }}
-                                        disabled={!structure.subtabs.find(t => t.name === selectedSubTab)?.visible}
-                                    />
-                                    <Button variant="ghost" size="icon" className="text-destructive">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                            )}
+                        </Droppable>
+                    </DragDropContext>
                 </ScrollArea>
             </div>
 
@@ -993,62 +995,74 @@ export function StructureTab({
                     </Button>
                 </div>
                 <ScrollArea className="h-[70vh] border rounded-md">
-                    <div className="p-4 space-y-2">
-                        {selectedSection && getSubsectionsForSection(selectedSection).map((subsection) => (
-                            <div
-                                key={subsection.id}
-                                className={cn(
-                                    "flex items-center justify-between p-2 rounded-md cursor-pointer",
-                                    selectedSubSection === subsection.name ? "bg-blue-100" : "hover:bg-muted"
-                                )}
-                                onClick={() => handleSubsectionSelect(subsection.name)}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                                    <span>{subsection.name}</span>
+                    <DragDropContext onDragEnd={(result) => onDragEnd({ ...result, type: 'subsection' })}>
+                        <Droppable droppableId="subsections">
+                            {(provided) => (
+                                <div ref={provided.innerRef} {...provided.droppableProps} className="p-4 space-y-2">
+                                    {selectedSection && getSubsectionsForSection(selectedSection).map((subsection, index) => (
+                                        <Draggable key={subsection.id} draggableId={subsection.id} index={index}>
+                                            {(provided) => (
+                                                <div
+                                                    ref={provided.innerRef}
+                                                    {...provided.draggableProps}
+                                                    className={cn(
+                                                        "flex items-center justify-between p-2 rounded-md cursor-pointer",
+                                                        selectedSubSection === subsection.name ? "bg-blue-100" : "hover:bg-muted"
+                                                    )}
+                                                    onClick={() => handleSubsectionSelect(subsection.name)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <div {...provided.dragHandleProps}>
+                                                            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                                                        </div>
+                                                        <span>{subsection.name}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Switch
+                                                            checked={subsection.visible}
+                                                            onCheckedChange={(checked) => handleVisibilityChange({
+                                                                type: 'subsection',
+                                                                name: subsection.name,
+                                                                id: subsection.id,
+                                                                visible: subsection.visible,
+                                                                parent: {
+                                                                    maintab: selectedMainTab,
+                                                                    subtab: selectedSubTab,
+                                                                    section: selectedSection
+                                                                }
+                                                            }, checked)}
+                                                            disabled={!structure.maintabs.find(t => t.name === selectedMainTab)?.visible ||
+                                                                !getSubTabsForMainTab(selectedMainTab || '').find(t => t.name === selectedSubTab)?.visible ||
+                                                                !getSectionsForSubTab(selectedSubTab || '').find(s => s.name === selectedSection)?.visible}
+                                                        />
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="text-destructive"
+                                                            onClick={() => onDelete({
+                                                                type: 'subsection',
+                                                                name: subsection.name,
+                                                                id: subsection.id,
+                                                                visible: subsection.visible,
+                                                                parent: {
+                                                                    maintab: selectedMainTab,
+                                                                    subtab: selectedSubTab,
+                                                                    section: selectedSection
+                                                                }
+                                                            })}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </Draggable>
+                                    ))}
+                                    {provided.placeholder}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={subsection.visible}
-                                        onCheckedChange={(checked) => {
-                                            const { isVisible, parentType } = getParentVisibility({
-                                                type: 'subsection',
-                                                name: subsection.name,
-                                                id: subsection.id,
-                                                visible: subsection.visible,
-                                                parent: {
-                                                    maintab: selectedMainTab,
-                                                    subtab: selectedSubTab,
-                                                    section: selectedSection
-                                                }
-                                            });
-
-                                            if (!isVisible && checked) {
-                                                toast.error(`Cannot enable visibility while ${parentType} is hidden`);
-                                                return;
-                                            }
-
-                                            handleVisibilityChange({
-                                                type: 'subsection',
-                                                name: subsection.name,
-                                                id: subsection.id,
-                                                visible: subsection.visible,
-                                                parent: {
-                                                    maintab: selectedMainTab,
-                                                    subtab: selectedSubTab,
-                                                    section: selectedSection
-                                                }
-                                            }, checked);
-                                        }}
-                                        disabled={!structure.sections.find(s => s.name === selectedSection)?.visible}
-                                    />
-                                    <Button variant="ghost" size="icon" className="text-destructive">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                            )}
+                        </Droppable>
+                    </DragDropContext>
                 </ScrollArea>
             </div>
 
@@ -1079,7 +1093,7 @@ export function StructureTab({
                             </div>
                         </div>
                         <ScrollArea className="h-[400px] pr-4">
-                            <DragDropContext onDragEnd={handleDragEnd}>
+                            <DragDropContext onDragEnd={onDragEnd}>
                                 <Droppable droppableId="fields">
                                     {(provided) => (
                                         <div
@@ -1110,39 +1124,22 @@ export function StructureTab({
                                                             <div className="flex items-center gap-2">
                                                                 <Switch
                                                                     checked={field.visible}
-                                                                    onCheckedChange={(checked) => {
-                                                                        const { isVisible, parentType } = getParentVisibility({
-                                                                            type: 'field',
-                                                                            name: field.name,
-                                                                            id: field.id,
-                                                                            visible: field.visible,
-                                                                            parent: {
-                                                                                maintab: selectedMainTab,
-                                                                                subtab: selectedSubTab,
-                                                                                section: selectedSection,
-                                                                                subsection: selectedSubSection
-                                                                            }
-                                                                        });
-
-                                                                        if (!isVisible && checked) {
-                                                                            toast.error(`Cannot enable visibility while ${parentType} is hidden`);
-                                                                            return;
+                                                                    onCheckedChange={(checked) => handleVisibilityChange({
+                                                                        type: 'field',
+                                                                        name: field.name,
+                                                                        id: field.id,
+                                                                        visible: field.visible,
+                                                                        parent: {
+                                                                            maintab: selectedMainTab,
+                                                                            subtab: selectedSubTab,
+                                                                            section: selectedSection,
+                                                                            subsection: selectedSubSection
                                                                         }
-
-                                                                        handleVisibilityChange({
-                                                                            type: 'field',
-                                                                            name: field.name,
-                                                                            id: field.id,
-                                                                            visible: field.visible,
-                                                                            parent: {
-                                                                                maintab: selectedMainTab,
-                                                                                subtab: selectedSubTab,
-                                                                                section: selectedSection,
-                                                                                subsection: selectedSubSection
-                                                                            }
-                                                                        }, checked);
-                                                                    }}
-                                                                    disabled={!structure.subsections.find(s => s.name === selectedSubSection)?.visible}
+                                                                    }, checked)}
+                                                                    disabled={!structure.maintabs.find(t => t.name === selectedMainTab)?.visible || 
+                                                                             !structure.subtabs.find(t => t.name === selectedSubTab)?.visible ||
+                                                                             !structure.sections.find(s => s.name === selectedSection)?.visible ||
+                                                                             !structure.subsections.find(ss => ss.name === selectedSubSection)?.visible}
                                                                 />
                                                                 <Button variant="ghost" size="icon">
                                                                     <Pencil className="h-4 w-4" />

@@ -37,7 +37,6 @@ interface SettingsDialogProps {
   processedSections: any[];
   visibilityState: any;
   orderState: any;
-  onVisibilityChange: (state: any) => void;
   onOrderChange: (state: any) => void;
 }
 
@@ -52,20 +51,28 @@ export function SettingsDialog({
   const [selectedMainTab, setSelectedMainTab] = useState<string | null>(null);
   const [selectedSubTab, setSelectedSubTab] = useState<string | null>(null);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
-  const [structure, setStructure] = useState<{
-    maintabs: StructureItem[];
-    subtabs: StructureItem[];
-    sections: StructureItem[];
-    subsections: StructureItem[];
-    fields: StructureItem[];
-  }>({
-    maintabs: [],
-    subtabs: [],
+  const defaultStructure = {
+    maintabs: [], // Add this
+    subtabs: [], // Add this
     sections: [],
-    subsections: [],
-    fields: []
-  });
-
+    subsections: [], // Add this
+    fields: [], // Add this
+    order: {
+      fields: {},
+      subtabs: {},
+      maintabs: {},
+      sections: {},
+      subsections: {}
+    },
+    visibility: {
+      fields: {},
+      subtabs: {},
+      maintabs: {},
+      sections: {},
+      subsections: {}
+    }
+  };
+  const [structure, setStructure] = useState<any>(defaultStructure);
   const [isSelectTablesDialogOpen, setIsSelectTablesDialogOpen] = useState(false);
   const [selectedTablesData, setSelectedTablesData] = useState({
     tables: [],
@@ -76,7 +83,6 @@ export function SettingsDialog({
     setSelectedTablesData({ tables, fields });
   };
 
-  // Add the handlers for CRUD operations
   const handleAdd = async (type: string, item: StructureItem) => {
     try {
       const { error } = await supabase
@@ -126,175 +132,73 @@ export function SettingsDialog({
       toast.error(`Failed to delete ${type}`);
     }
   };
+  const handleDragEnd = async (result: any) => {
+    if (!result.destination) return;
 
-  const handleVisibilityChange = async (item: StructureItem, visible: boolean) => {
     try {
-        // Get current structure based on the item type
-        let query = supabase
-            .from('profile_category_table_mapping_2')
-            .select('*');
-
-        if (item.type === 'maintab') {
-            query = query.eq('main_tab', item.name);
-        } else {
-            query = query
-                .eq('main_tab', item.parent?.maintab)
-                .eq('sub_tab', item.parent?.subtab);
-        }
-
-        const { data: records, error: fetchError } = await query;
-
-        if (fetchError) throw fetchError;
-
-        if (!records || records.length === 0) {
-            console.error('No matching records found');
-            toast.error('Failed to update visibility: No matching records found');
-            return;
-        }
-
-        // Update all matching records
-        for (const record of records) {
-            const updatedStructure = { ...record.structure };
-            const visibility = updatedStructure.visibility || {};
-
-            // Check parent visibility when trying to show an item
-            if (visible && item.type !== 'maintab') {
-                const { isVisible, parentType } = getParentVisibility(item);
-                if (!isVisible) {
-                    toast.error(`Cannot enable visibility while ${parentType} is hidden`);
-                    return;
-                }
-            }
-
-            // Update visibility for the current item
-            visibility[`${item.type}s`] = visibility[`${item.type}s`] || {};
-            visibility[`${item.type}s`][item.name] = visible;
-
-            // If hiding an item, cascade the change to children
-            if (!visible) {
-                const hideChildren = (items: StructureItem[], type: string) => {
-                    items.forEach(childItem => {
-                        visibility[type] = visibility[type] || {};
-                        visibility[type][childItem.name] = false;
-                    });
-                };
-
-                switch (item.type) {
-                    case 'maintab':
-                        hideChildren(getSubTabsForMainTab(item.name), 'subtabs');
-                        break;
-                    case 'subtab':
-                        hideChildren(getSectionsForSubTab(item.name), 'sections');
-                        break;
-                    case 'section':
-                        hideChildren(getSubsectionsForSection(item.name), 'subsections');
-                        break;
-                    case 'subsection':
-                        hideChildren(getFieldsForSubsection(item.name), 'fields');
-                        break;
-                }
-            }
-
-            // Update database
-            const { error: updateError } = await supabase
-                .from('profile_category_table_mapping_2')
-                .update({ 
-                    structure: {
-                        ...updatedStructure,
-                        visibility
-                    }
-                })
-                .eq('id', record.id);
-
-            if (updateError) throw updateError;
-        }
-
-        // Update local state
-        setStructure(prev => {
-            const newStructure = { ...prev };
-            const updateItems = (items: any[], type: string) => {
-                return items.map(item => ({
-                    ...item,
-                    visible: visible
-                }));
-            };
-
-            if (item.type === 'maintab') {
-                newStructure.maintabs = updateItems(prev.maintabs, 'maintabs');
-                // Update children visibility if parent is hidden
-                if (!visible) {
-                    newStructure.subtabs = updateItems(prev.subtabs.filter(st => 
-                        st.parent?.maintab === item.name), 'subtabs');
-                }
-            } else {
-                newStructure[`${item.type}s`] = updateItems(prev[`${item.type}s`], `${item.type}s`);
-            }
-
-            return newStructure;
-        });
-
-        toast.success('Visibility updated successfully');
-    } catch (error) {
-        console.error('Error updating visibility:', error);
-        toast.error('Failed to update visibility');
-    }
-};
-
-const handleDragEnd = async (result: any) => {
-  if (!result.destination) return;
-
-  try {
       const { type, source, destination } = result;
-      
+
       // Ensure we have valid structure data
       if (!structure || !structure[type]) {
-          console.error('Invalid structure data for drag and drop');
-          return;
+        console.error('Invalid structure data for drag and drop');
+        return;
       }
 
+      // Create a copy of the items array
       const items = Array.from(structure[type]);
+
+      // Perform the reorder
       const [removed] = items.splice(source.index, 1);
       items.splice(destination.index, 0, removed);
 
       // Update the order of items
       const updates = items.map((item, index) => ({
-          ...item,
-          order: index
+        ...item,
+        order: index
       }));
 
-      // Update each item in the database
-      for (const item of updates) {
-          const { error } = await supabase
-              .from('profile_category_table_mapping_2')
-              .update({
-                  structure: {
-                      ...structure,
-                      order: {
-                          ...structure.order,
-                          [type]: {
-                              ...structure.order?.[type],
-                              [item.name]: item.order
-                          }
-                      }
-                  }
-              })
-              .eq('id', item.id);
+      // Get the current record
+      const { data: currentRecord, error: fetchError } = await supabase
+        .from('profile_category_table_mapping_2')
+        .select('*')
+        .eq('main_tab', selectedMainTab)
+        .eq('sub_tab', selectedSubTab)
+        .single();
 
-          if (error) throw error;
-      }
+      if (fetchError) throw fetchError;
+
+      // Update the structure with new order
+      const updatedStructure = {
+        ...currentRecord.structure,
+        order: {
+          ...currentRecord.structure.order,
+          [type]: updates.reduce((acc, item) => ({
+            ...acc,
+            [item.name]: item.order
+          }), {})
+        }
+      };
+
+      // Update the database
+      const { error: updateError } = await supabase
+        .from('profile_category_table_mapping_2')
+        .update({ structure: updatedStructure })
+        .eq('id', currentRecord.id);
+
+      if (updateError) throw updateError;
 
       // Update local state
       setStructure(prev => ({
-          ...prev,
-          [type]: updates
+        ...prev,
+        [type]: updates
       }));
 
       toast.success('Order updated successfully');
-  } catch (error) {
+    } catch (error) {
       console.error('Error updating order:', error);
       toast.error('Failed to update order');
-  }
-};
+    }
+  };
 
   const fetchStructureData = async () => {
     try {
@@ -357,13 +261,26 @@ const handleDragEnd = async (result: any) => {
   };
 
   const processStructureData = (data: any[]) => {
+    const defaultProcessedData = {
+      maintabs: [],
+      subtabs: [],
+      sections: [],
+      subsections: [],
+      fields: [],
+      order: defaultStructure.order,
+      visibility: defaultStructure.visibility
+    };
+
+    if (!data || data.length === 0) {
+      return defaultProcessedData;
+    }
+
     const processedData = data.reduce((acc, item) => {
       const structure = item.structure || {};
       const visibility = structure.visibility || {};
       const order = structure.order || {};
 
-      // Process each level of the structure...
-      // (rest of your existing processing logic)
+      // Process your data here
       return acc;
     }, {
       maintabs: new Set<any>(),
@@ -375,17 +292,36 @@ const handleDragEnd = async (result: any) => {
 
     return {
       maintabs: Array.from(processedData.maintabs)
-        .sort((a, b) => a.order - b.order)
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
         .map((item, id) => ({
           id: String(id),
           ...item
         })),
-      // ... rest of your array conversions
+      subtabs: Array.from(processedData.subtabs),
+      sections: Array.from(processedData.sections),
+      subsections: Array.from(processedData.subsections),
+      fields: Array.from(processedData.fields),
+      order: defaultStructure.order,
+      visibility: defaultStructure.visibility
     };
   };
 
   useEffect(() => {
     fetchStructureData();
+  }, []);
+
+  useEffect(() => {
+    const loadStructure = async () => {
+      try {
+        await fetchStructureData();
+      } catch (error) {
+        console.error('Error loading structure:', error);
+        setStructure(defaultStructure); // Fallback to default structure
+        toast.error('Failed to load structure data');
+      }
+    };
+
+    loadStructure();
   }, []);
 
   return (
@@ -414,12 +350,11 @@ const handleDragEnd = async (result: any) => {
 
           <TabsContent value="structure">
             <StructureTab
-              items={structure.maintabs}
+              items={structure?.maintabs || []} // Add null check
               type="maintabs"
               onAdd={handleAdd}
               onEdit={handleEdit}
               onDelete={handleDelete}
-              onVisibilityChange={handleVisibilityChange}
               onDragEnd={handleDragEnd}
               isSelectTablesDialogOpen={isSelectTablesDialogOpen}
               setIsSelectTablesDialogOpen={setIsSelectTablesDialogOpen}
@@ -429,23 +364,31 @@ const handleDragEnd = async (result: any) => {
         </Tabs>
 
         {isSelectTablesDialogOpen && (
-          <Sheet open={isSelectTablesDialogOpen} onOpenChange={setIsSelectTablesDialogOpen}>
-            <SheetContent className="max-w-3xl">
-              <SheetHeader>
-                <SheetTitle>Select Tables and Fields</SheetTitle>
-              </SheetHeader>
-              <div className="p-4">
-                <SelectTablesAndFieldsDialog
-                  isOpen={isSelectTablesDialogOpen}
-                  onClose={() => setIsSelectTablesDialogOpen(false)}
-                  onApply={(tables, fields) => {
-                    handleTablesFieldsSelect(tables, fields);
-                    setIsSelectTablesDialogOpen(false);
-                  }}
-                />
+          <Dialog open={isSelectTablesDialogOpen} onOpenChange={setIsSelectTablesDialogOpen}>
+            <DialogContent className="max-w-3xl p-4 space-y-4">
+              <DialogHeader>
+                <DialogTitle>Select Tables and Fields</DialogTitle>
+              </DialogHeader>
+
+              <div className="flex flex-col space-y-2">
+                <p className="text-sm text-gray-600">
+                  Select tables and fields to add to the new structure.
+                </p>
+                <p className="text-sm text-gray-600">
+                  You can select multiple tables and fields by holding the Ctrl key while clicking.
+                </p>
               </div>
-            </SheetContent>
-          </Sheet>
+
+              <SelectTablesAndFieldsDialog
+                isOpen={isSelectTablesDialogOpen}
+                onClose={() => setIsSelectTablesDialogOpen(false)}
+                onApply={(tables, fields) => {
+                  handleTablesFieldsSelect(tables, fields);
+                  setIsSelectTablesDialogOpen(false);
+                }}
+              />
+            </DialogContent>
+          </Dialog>
         )}
       </DialogContent>
     </Dialog>
