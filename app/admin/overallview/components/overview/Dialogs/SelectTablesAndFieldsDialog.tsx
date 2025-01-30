@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 interface Column {
   column_name: string;
@@ -30,6 +33,9 @@ export function SelectTablesAndFieldsDialog({
   const [selectedFields, setSelectedFields] = useState<{ [table: string]: string[] }>({});
   const [tableSearchQuery, setTableSearchQuery] = useState('');
   const [fieldSearchQuery, setFieldSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'select' | 'create'>('select');
+  const [newColumnName, setNewColumnName] = useState('');
+  const [newColumnType, setNewColumnType] = useState<'text' | 'number' | 'boolean' | 'date'>('text');
 
   // Fetch tables on component mount
   useEffect(() => {
@@ -131,94 +137,160 @@ export function SelectTablesAndFieldsDialog({
     );
   };
 
+  const isTableFullySelected = (tableName: string) => {
+    const columns = tableColumns[tableName] || [];
+    return columns.every(col => selectedFields[tableName]?.includes(col.column_name));
+  };
+
+  const handleTableSelectAll = (tableName: string, checked: boolean) => {
+    if (checked) {
+      const columns = tableColumns[tableName] || [];
+      setSelectedFields(prev => ({ ...prev, [tableName]: columns.map(col => col.column_name) }));
+    } else {
+      setSelectedFields(prev => ({ ...prev, [tableName]: [] }));
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-4xl p-4">
         <DialogHeader>
-          <DialogTitle>Select Tables and Fields</DialogTitle>
+          <DialogTitle>Add Fields</DialogTitle>
         </DialogHeader>
+        
+        <Tabs defaultValue="select" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="select" onClick={() => setActiveTab('select')}>Select Existing Fields</TabsTrigger>
+            <TabsTrigger value="create" onClick={() => setActiveTab('create')}>Create New Column</TabsTrigger>
+          </TabsList>
 
-        <div className="grid grid-cols-2 gap-4">
-          {/* Tables Selection */}
-          <div className="space-y-4">
-            <h3 className="font-medium">Select Tables</h3>
-            <Input
-              placeholder="Search tables..."
-              value={tableSearchQuery}
-              onChange={(e) => setTableSearchQuery(e.target.value)}
-            />
-            <ScrollArea className="h-[400px] border rounded-md p-4">
+          <TabsContent value="select" className="space-y-4">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="select-all-tables"
-                    checked={selectedTables.length === tables.length}
-                    onCheckedChange={handleSelectAllTables}
-                  />
-                  <label htmlFor="select-all-tables">Select All Tables</label>
-                </div>
-                <div className="space-y-1">
-                  {filteredTables.map((table) => (
-                    <div key={table} className="flex items-center space-x-2">
+                <Label>Tables</Label>
+                <Input
+                  placeholder="Search tables..."
+                  value={tableSearchQuery}
+                  onChange={(e) => setTableSearchQuery(e.target.value)}
+                />
+                <ScrollArea className="h-[400px] border rounded-md p-2">
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
                       <Checkbox
-                        id={table}
-                        checked={selectedTables.includes(table)}
-                        onCheckedChange={(checked) => handleTableSelect(table, !!checked)}
+                        checked={selectedTables.length === tables.length}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedTables(tables);
+                          } else {
+                            setSelectedTables([]);
+                          }
+                        }}
                       />
-                      <label htmlFor={table}>{table}</label>
+                      <span>Select All</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </ScrollArea>
-          </div>
-
-          {/* Fields Selection */}
-          <div className="space-y-4">
-            <h3 className="font-medium">Select Fields</h3>
-            <Input
-              placeholder="Search fields..."
-              value={fieldSearchQuery}
-              onChange={(e) => setFieldSearchQuery(e.target.value)}
-            />
-            <ScrollArea className="h-[400px] border rounded-md p-4">
-              <div className="space-y-4">
-                {selectedTables.map((table) => (
-                  <div key={table} className="space-y-2">
-                    <h4 className="font-medium">{table}</h4>
-                    <div className="space-y-1 ml-4">
-                      {getFilteredColumns(table).map((column) => (
-                        <div key={`${table}-${column.column_name}`} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${table}-${column.column_name}`}
-                            checked={selectedFields[table]?.includes(column.column_name)}
-                            onCheckedChange={(checked) => handleFieldSelect(table, column.column_name, !!checked)}
-                          />
-                          <label htmlFor={`${table}-${column.column_name}`}>
-                            {column.column_name}
-                            <span className="text-sm text-muted-foreground ml-2">({column.data_type})</span>
-                          </label>
-                        </div>
-                      ))}
-                    </div>
+                    {filteredTables.map((table) => (
+                      <div key={table} className="flex items-center space-x-2">
+                        <Checkbox
+                          checked={selectedTables.includes(table)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedTables([...selectedTables, table]);
+                            } else {
+                              setSelectedTables(selectedTables.filter((t) => t !== table));
+                            }
+                          }}
+                        />
+                        <span>{table}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </ScrollArea>
               </div>
-            </ScrollArea>
-          </div>
-        </div>
 
-        <div className="flex justify-end space-x-2 mt-4">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
+              <div className="space-y-4 p-4 bg-primary-foreground/10 rounded-md shadow-md">
+                <h3 className="font-medium">Select Fields</h3>
+                <Input
+                  placeholder="Search fields..."
+                  value={fieldSearchQuery}
+                  onChange={(e) => setFieldSearchQuery(e.target.value)}
+                />
+                <ScrollArea className="h-[400px] border rounded-md p-2">
+                  <div className="space-y-4">
+                    {selectedTables.map((table) => (
+                      <div key={table} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">{table}</h4>
+                          <Checkbox
+                            checked={isTableFullySelected(table)}
+                            onCheckedChange={(checked) => handleTableSelectAll(table, checked)}
+                          />
+                        </div>
+                        <div className="ml-4 space-y-1">
+                          {getFilteredColumns(table).map((column) => (
+                            <div key={`${table}.${column.column_name}`} className="flex items-center space-x-2">
+                              <Checkbox
+                                checked={selectedFields[table]?.includes(column.column_name)}
+                                onCheckedChange={(checked) => handleFieldSelect(table, column.column_name, checked)}
+                              />
+                              <span>{column.column_name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="create" className="space-y-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Column Name</Label>
+                <Input
+                  placeholder="Enter column name..."
+                  value={newColumnName}
+                  onChange={(e) => setNewColumnName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Column Type</Label>
+                <Select value={newColumnType} onValueChange={(value: 'text' | 'number' | 'boolean' | 'date') => setNewColumnType(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select column type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="boolean">Boolean</SelectItem>
+                    <SelectItem value="date">Date</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (activeTab === 'select') {
+                onApply(selectedTables, selectedFields);
+              } else {
+                // Handle creating new column
+                if (newColumnName && newColumnType) {
+                  // Add logic to create new column in the database
+                  onApply([], [{ table: 'new', field: newColumnName }]);
+                }
+              }
+            }}
+          >
+            {activeTab === 'select' ? 'Add Selected Fields' : 'Create Column'}
           </Button>
-          <Button onClick={() => {
-            onApply(selectedTables, selectedFields);
-            onClose();
-          }}>
-            Apply Selection
-          </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
