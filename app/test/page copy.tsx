@@ -6,9 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Mail, Paperclip, Star, Clock } from "lucide-react";
-import EmailFilter from './EmailFilter';
-import EmailPopup from './EmailPopup';
-import FilterManager from './FilterManager';
+import EmailFilter from './components/EmailFilter';
+import EmailPopup from './components/EmailPopup';
+import FilterManager from './components/FilterManager';
 import settings from './settings.json'; // Import settings from JSON
 import { toast, Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabaseClient'
