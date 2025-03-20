@@ -18,7 +18,7 @@ import Link from "next/link"
 import { usePathname } from 'next/navigation'
 import { useState } from "react"
 
-import { useAuth } from "@clerk/clerk-react"
+import { useAuth } from "@clerk/nextjs"
 
 
 const adminNavItems = [

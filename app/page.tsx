@@ -2,7 +2,7 @@
 
 import { Dashboard } from "@/components/component/dashboard";
 
-export default function Home() {
+export default async function Home() {
   return (
     <main className="w-full">
       <Dashboard/>
