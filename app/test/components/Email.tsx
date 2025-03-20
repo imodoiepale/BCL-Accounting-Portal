@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge } from "@/components/ui/badge";
-import { Paperclip, Clock } from "lucide-react";
+import { Paperclip, Clock, Star, Trash2, Tag, Check, Circle } from "lucide-react";
 
 interface EmailProps {
   message: any;
@@ -29,43 +29,59 @@ export const Email: React.FC<EmailProps> = ({ message, accountEmail, onClick }) 
   };
 
   const hasAttachments = message.payload.parts?.some((part: any) => part.filename && part.filename.length > 0);
+  const isUnread = message.labelIds?.includes('UNREAD');
+  const from = getHeader(message.payload.headers, 'From');
+  const subject = getHeader(message.payload.headers, 'Subject') || '(no subject)';
 
   return (
-    <div onClick={() => onClick(message)} className="p-4 border-b hover:bg-blue-50 transition-colors cursor-pointer group">
-      <div className="flex items-start gap-4">
-        <div className="flex-shrink-0">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-200 transition-colors">
-            {getHeader(message.payload.headers, 'From').charAt(0).toUpperCase()}
+    <div 
+      onClick={() => onClick(message)} 
+      className="group px-3 py-2 border-b hover:bg-gray-50 transition-colors cursor-pointer flex items-start gap-3"
+    >
+      {/* Status and Avatar */}
+      <div className="flex flex-col items-center gap-1 pt-1">
+        {isUnread && <Circle className="w-2 h-2 fill-blue-500 text-blue-500" />}
+        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-sm">
+          {from.charAt(0).toUpperCase()}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm truncate text-gray-900">
+                {from.split('<')[0].trim()}
+              </span>
+              <span className="text-xs text-gray-400">{formatDate(message.internalDate)}</span>
+            </div>
+            <h3 className={`text-sm ${isUnread ? 'font-medium' : 'font-normal'} text-gray-900 truncate`}>
+              {subject}
+            </h3>
+            <p className="text-xs text-gray-500 line-clamp-1">{message.snippet}</p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button className="p-1 hover:bg-gray-100 rounded-full">
+              <Star className="w-4 h-4 text-gray-400" />
+            </button>
+            <button className="p-1 hover:bg-gray-100 rounded-full">
+              <Tag className="w-4 h-4 text-gray-400" />
+            </button>
+            <button className="p-1 hover:bg-gray-100 rounded-full">
+              <Trash2 className="w-4 h-4 text-gray-400" />
+            </button>
           </div>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex justify-between items-start mb-1">
-            <div className="font-medium text-gray-900 truncate pr-2">
-              {getHeader(message.payload.headers, 'Subject') || '(no subject)'}
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {hasAttachments && (
-                <Paperclip className="w-4 h-4 text-gray-400" />
-              )}
-              <Badge variant="outline" className="text-xs">
-                {accountEmail}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-            <span className="font-medium truncate">
-              {getHeader(message.payload.headers, 'From').split('<')[0].trim()}
-            </span>
-            <span className="text-gray-400">•</span>
-            <Clock className="w-4 h-4 text-gray-400" />
-            <span className="text-gray-400">{formatDate(message.internalDate)}</span>
-          </div>
-
-          <div className="text-sm text-gray-500 line-clamp-2">
-            {message.snippet}
-          </div>
+        {/* Metadata */}
+        <div className="flex items-center gap-2 mt-1">
+          {hasAttachments && <Paperclip className="w-3 h-3 text-gray-400" />}
+          <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
+            {accountEmail}
+          </Badge>
         </div>
       </div>
     </div>

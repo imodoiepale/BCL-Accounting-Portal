@@ -11,6 +11,7 @@ import { useGmailMessages } from './hooks/useGmailMessages';
 import { useGmailFilters } from './hooks/useGmailFilters';
 import EmailPopup from './components/EmailPopup';
 import FilterManager from './components/FilterManager';
+import { PlusCircle, RefreshCw, Trash2, Search, Inbox, Mail, Star, Settings2, X, UserCircle } from 'lucide-react';
 
 export default function GmailManager() {
   const [selectedAccount, setSelectedAccount] = useState('all');
@@ -86,41 +87,39 @@ export default function GmailManager() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 flex">
+    <div className="h-screen bg-gray-50 flex overflow-hidden">
       <Toaster position="top-right" />
 
-      {/* Accounts Section */}
-      <div className="w-1/4 sticky top-0 bg-white rounded-lg shadow p-4 mr-4">
-        <h2 className="text-lg font-bold mb-4">Accounts</h2>
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={addNewAccount}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            Add Account
-          </button>
-          {accounts.length > 0 && (
-            <>
+      {/* Sidebar */}
+      <div className="w-64 bg-white shadow-sm border-r flex flex-col">
+        <div className="p-3 border-b">
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">Accounts</h2>
+          <div className="space-y-2">
+            <button
+              onClick={addNewAccount}
+              className="w-full flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-sm"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Add Account
+            </button>
+            {accounts.length > 0 && (
               <button
                 onClick={refreshAllAccounts}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100 transition-colors text-sm"
                 disabled={loading}
               >
+                <RefreshCw className="w-4 h-4" />
                 Refresh All
               </button>
-              {selectedAccount !== 'all' && (
-                <button
-                  onClick={() => removeAccount(selectedAccount)}
-                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                >
-                  Remove
-                </button>
-              )}
-            </>
-          )}
-          <Select value={selectedAccount} onValueChange={setSelectedAccount} className="mt-4">
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select an account" />
+            )}
+          </div>
+          
+          <Select value={selectedAccount} onValueChange={setSelectedAccount} className="mt-2">
+            <SelectTrigger className="w-full h-8 text-sm">
+              <div className="flex items-center gap-2">
+                <UserCircle className="w-4 h-4" />
+                <SelectValue placeholder="Select account" />
+              </div>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Accounts</SelectItem>
@@ -134,67 +133,78 @@ export default function GmailManager() {
         </div>
       </div>
 
-      {/* Main Content Section */}
-      <div className="w-3/4">
-        <div className="sticky top-0 bg-white z-10 shadow">
-          <h1 className="text-3xl font-bold text-gray-900 text-center mb-8">
-            Gmail Manager
-          </h1>
-
-          <div className="mb-4 flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Search emails..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="border rounded-lg p-2 w-100px"
-            />
-            <button
-              onClick={() => setSearchQuery('')}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-            >
-              Clear
-            </button>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Controls */}
+        <div className="bg-white border-b px-4 py-2 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search emails..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                >
+                  <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="mb-4">
-            <div className="flex flex-wrap gap-2">
-              {filters.map((filter) => (
-                <button
-                  key={filter.name}
-                  onClick={() => setSelectedFilter(filter.name)}
-                  className={`px-4 py-2 rounded-lg ${selectedFilter === filter.name
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    } transition-colors`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span>{filter.name}</span>
-                    {filter.criteria.length > 0 && (
-                      <Badge variant="secondary" className="bg-opacity-20">
-                        {filter.criteria.length}
-                      </Badge>
-                    )}
-                  </div>
-                </button>
-              ))}
-              <button
-                onClick={() => setShowFilterManager(true)}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Manage Filters
-              </button>
-              <button
-                onClick={resetFilters}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-              >
-                Reset Filters
-              </button>
-            </div>
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              onClick={() => setSelectedFilter('all')}
+              className={`flex items-center gap-1 px-2 py-1 rounded ${
+                selectedFilter === 'all' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Inbox className="w-4 h-4" />
+              All
+            </button>
+            <button
+              onClick={() => setSelectedFilter('unread')}
+              className={`flex items-center gap-1 px-2 py-1 rounded ${
+                selectedFilter === 'unread' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Mail className="w-4 h-4" />
+              Unread
+            </button>
+            <button
+              onClick={() => setSelectedFilter('important')}
+              className={`flex items-center gap-1 px-2 py-1 rounded ${
+                selectedFilter === 'important' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Star className="w-4 h-4" />
+              Important
+            </button>
+            <button
+              onClick={() => setShowFilterManager(true)}
+              className="flex items-center gap-1 px-2 py-1 text-gray-600 hover:bg-gray-50 rounded"
+            >
+              <Settings2 className="w-4 h-4" />
+              Filters
+            </button>
+            <button
+              onClick={resetFilters}
+              className="flex items-center gap-1 px-2 py-1 text-gray-600 hover:bg-gray-50 rounded"
+            >
+              <Trash2 className="w-4 h-4" />
+              Reset
+            </button>
           </div>
         </div>
 
-        <div className="overflow-y-auto max-h-[60vh]">
+        {/* Email List */}
+        <div className="flex-1 overflow-auto">
           <EmailList
             messages={searchFilteredMessages}
             onLoadMore={() => fetchMessages(selectedAccount === 'all' ? accounts[0]?.email : selectedAccount)}
@@ -203,26 +213,27 @@ export default function GmailManager() {
             onEmailClick={handleEmailClick}
           />
         </div>
-
-        {showPopup && currentMessage && (
-          <EmailPopup
-            message={currentMessage}
-            onClose={() => setShowPopup(false)}
-            onReply={handleReply}
-            onForward={handleForward}
-          />
-        )}
-
-        {showFilterManager && (
-          <FilterManager
-            filters={filters}
-            onAddFilter={addFilter}
-            onEditFilter={editFilter}
-            onRemoveFilter={removeFilter}
-            onClose={() => setShowFilterManager(false)}
-          />
-        )}
       </div>
+
+      {/* Popups */}
+      {showPopup && currentMessage && (
+        <EmailPopup
+          message={currentMessage}
+          onClose={() => setShowPopup(false)}
+          onReply={handleReply}
+          onForward={handleForward}
+        />
+      )}
+
+      {showFilterManager && (
+        <FilterManager
+          filters={filters}
+          onAddFilter={addFilter}
+          onEditFilter={editFilter}
+          onRemoveFilter={removeFilter}
+          onClose={() => setShowFilterManager(false)}
+        />
+      )}
     </div>
   );
 }
