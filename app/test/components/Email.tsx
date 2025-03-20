@@ -1,6 +1,7 @@
 import React from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Paperclip, Clock, Star, Trash2, Tag, Check, Circle } from "lucide-react";
+import { getEmailColor } from '../utils/colors';
 
 interface EmailProps {
   message: any;
@@ -32,6 +33,8 @@ export const Email: React.FC<EmailProps> = ({ message, accountEmail, onClick }) 
   const isUnread = message.labelIds?.includes('UNREAD');
   const from = getHeader(message.payload.headers, 'From');
   const subject = getHeader(message.payload.headers, 'Subject') || '(no subject)';
+  const emailColorWithBg = getEmailColor(accountEmail, true);
+  const emailColor = getEmailColor(accountEmail);
 
   return (
     <div 
@@ -41,7 +44,7 @@ export const Email: React.FC<EmailProps> = ({ message, accountEmail, onClick }) 
       {/* Status and Avatar */}
       <div className="flex flex-col items-center gap-1 pt-1">
         {isUnread && <Circle className="w-2 h-2 fill-blue-500 text-blue-500" />}
-        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-sm">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${emailColorWithBg}`}>
           {from.charAt(0).toUpperCase()}
         </div>
       </div>
@@ -51,7 +54,7 @@ export const Email: React.FC<EmailProps> = ({ message, accountEmail, onClick }) 
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-sm truncate text-gray-900">
+              <span className={`font-medium text-sm truncate ${emailColor}`}>
                 {from.split('<')[0].trim()}
               </span>
               <span className="text-xs text-gray-400">{formatDate(message.internalDate)}</span>
@@ -79,7 +82,10 @@ export const Email: React.FC<EmailProps> = ({ message, accountEmail, onClick }) 
         {/* Metadata */}
         <div className="flex items-center gap-2 mt-1">
           {hasAttachments && <Paperclip className="w-3 h-3 text-gray-400" />}
-          <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
+          <Badge 
+            variant="secondary" 
+            className={`text-[10px] px-1 py-0 h-4 ${emailColorWithBg}`}
+          >
             {accountEmail}
           </Badge>
         </div>

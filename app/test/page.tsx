@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from 'react-hot-toast';
@@ -12,6 +12,7 @@ import { useGmailFilters } from './hooks/useGmailFilters';
 import EmailPopup from './components/EmailPopup';
 import FilterManager from './components/FilterManager';
 import { PlusCircle, RefreshCw, Trash2, Search, Inbox, Mail, Star, Settings2, X, UserCircle } from 'lucide-react';
+import { getEmailColor } from './utils/colors';
 
 export default function GmailManager() {
   const [selectedAccount, setSelectedAccount] = useState('all');
@@ -19,6 +20,7 @@ export default function GmailManager() {
   const [currentMessage, setCurrentMessage] = useState(null);
   const [showFilterManager, setShowFilterManager] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [accountSearchQuery, setAccountSearchQuery] = useState('');
 
   const {
     accounts,
@@ -46,6 +48,14 @@ export default function GmailManager() {
     resetFilters,
     applyFilters
   } = useGmailFilters();
+
+  // Filter accounts based on search
+  const filteredAccounts = useMemo(() => {
+    if (!accountSearchQuery) return accounts;
+    return accounts.filter(account => 
+      account.email.toLowerCase().includes(accountSearchQuery.toLowerCase())
+    );
+  }, [accounts, accountSearchQuery]);
 
   const handleEmailClick = (message: any) => {
     setCurrentMessage(message);
@@ -114,20 +124,53 @@ export default function GmailManager() {
             )}
           </div>
           
-          <Select value={selectedAccount} onValueChange={setSelectedAccount} className="mt-2">
-            <SelectTrigger className="w-full h-8 text-sm">
+          <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+            <SelectTrigger className="w-full h-8 text-sm mt-2">
               <div className="flex items-center gap-2">
                 <UserCircle className="w-4 h-4" />
                 <SelectValue placeholder="Select account" />
               </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Accounts</SelectItem>
-              {accounts.map((account) => (
-                <SelectItem key={account.email} value={account.email}>
-                  {account.email}
+              <div className="p-2">
+                <div className="relative mb-2">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search accounts..."
+                    value={accountSearchQuery}
+                    onChange={(e) => setAccountSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <SelectItem value="all" className="rounded-md">
+                  <span className="font-medium">All Accounts</span>
                 </SelectItem>
-              ))}
+                {filteredAccounts.map((account) => (
+                  <SelectItem 
+                    key={account.email} 
+                    value={account.email}
+                    className="rounded-md"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className={`font-medium ${getEmailColor(account.email)}`}>
+                        {account.email}
+                      </span>
+                      {selectedAccount === account.email && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeAccount(account.email);
+                          }}
+                          className="p-1 hover:bg-gray-100 rounded-full"
+                        >
+                          <X className="w-3 h-3 text-gray-400" />
+                        </button>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </div>
             </SelectContent>
           </Select>
         </div>
