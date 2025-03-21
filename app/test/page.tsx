@@ -6,11 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from 'react-hot-toast';
 import { EmailList } from './components/EmailList';
-import { useGmailAuth } from './hooks/useGmailAuth';
-import { useGmailMessages } from './hooks/useGmailMessages';
+import { useEmailAccounts } from './hooks/useEmailAccounts';
 import { useGmailFilters } from './hooks/useGmailFilters';
 import EmailPopup from './components/EmailPopup';
 import FilterManager from './components/FilterManager';
+import { AddAccountModal } from './components/AddAccountModal';
 import { PlusCircle, RefreshCw, Trash2, Search, Inbox, Mail, Star, Settings2, X, UserCircle } from 'lucide-react';
 import { getEmailColor } from './utils/colors';
 
@@ -24,19 +24,14 @@ export default function GmailManager() {
 
   const {
     accounts,
-    setAccounts,
-    addNewAccount,
-    removeAccount,
-  } = useGmailAuth();
-
-  const {
     loading,
-    hasMore,
+    showAddAccount,
+    setShowAddAccount,
+    addAccount,
+    removeAccount,
     fetchMessages,
-    refreshAllAccounts,
-    handleReply,
-    handleForward
-  } = useGmailMessages(accounts, setAccounts);
+    sendMessage
+  } = useEmailAccounts();
 
   const {
     filters,
@@ -60,6 +55,40 @@ export default function GmailManager() {
   const handleEmailClick = (message: any) => {
     setCurrentMessage(message);
     setShowPopup(true);
+  };
+
+  const handleReply = async (message: any, content: string) => {
+    try {
+      await sendMessage(message.accountEmail, {
+        to: [message.payload.headers.find(h => h.name === 'From')?.value],
+        subject: `Re: ${message.payload.headers.find(h => h.name === 'Subject')?.value}`,
+        text: content,
+      });
+    } catch (error) {
+      console.error('Failed to send reply:', error);
+    }
+  };
+
+  const handleForward = async (message: any, to: string[], content: string) => {
+    try {
+      await sendMessage(message.accountEmail, {
+        to,
+        subject: `Fwd: ${message.payload.headers.find(h => h.name === 'Subject')?.value}`,
+        text: content,
+      });
+    } catch (error) {
+      console.error('Failed to forward message:', error);
+    }
+  };
+
+  const refreshAllAccounts = async () => {
+    try {
+      for (const account of accounts) {
+        await fetchMessages(account.email);
+      }
+    } catch (error) {
+      console.error('Failed to refresh accounts:', error);
+    }
   };
 
   // Combine all messages from all accounts and add account information
@@ -106,7 +135,7 @@ export default function GmailManager() {
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Accounts</h2>
           <div className="space-y-2">
             <button
-              onClick={addNewAccount}
+              onClick={() => setShowAddAccount(true)}
               className="w-full flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-sm"
             >
               <PlusCircle className="w-4 h-4" />
@@ -153,9 +182,14 @@ export default function GmailManager() {
                     className="rounded-md"
                   >
                     <div className="flex items-center justify-between w-full">
-                      <span className={`font-medium ${getEmailColor(account.email)}`}>
-                        {account.email}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-medium ${getEmailColor(account.email)}`}>
+                          {account.email}
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {account.authMethod === 'oauth' ? 'OAuth' : 'IMAP'}
+                        </Badge>
+                      </div>
                       {selectedAccount === account.email && (
                         <button
                           onClick={(e) => {
@@ -251,7 +285,7 @@ export default function GmailManager() {
           <EmailList
             messages={searchFilteredMessages}
             onLoadMore={() => fetchMessages(selectedAccount === 'all' ? accounts[0]?.email : selectedAccount)}
-            hasMore={hasMore}
+            hasMore={true}
             loading={loading}
             onEmailClick={handleEmailClick}
           />
@@ -275,6 +309,26 @@ export default function GmailManager() {
           onEditFilter={editFilter}
           onRemoveFilter={removeFilter}
           onClose={() => setShowFilterManager(false)}
+        />
+      )}
+
+      {showAddAccount && (
+        <AddAccountModal
+          isOpen={showAddAccount}
+          onClose={() => setShowAddAccount(false)}
+          onAccountAdded={(account) => {
+            setShowAddAccount(false);
+            // Refresh accounts list
+            fetchMessages(account.email);
+          }}
+          onOAuthSelected={() => {
+            setShowAddAccount(false);
+            addAccount({
+              email: '',
+              provider: 'gmail',
+              authMethod: 'oauth'
+            });
+          }}
         />
       )}
     </div>

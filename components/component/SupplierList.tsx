@@ -25,7 +25,6 @@ const formatDate = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
-
 const sanitizeSupplierData = (data) => {
   const sanitized = {};
   for (const [key, value] of Object.entries(data)) {
