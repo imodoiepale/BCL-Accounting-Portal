@@ -35,5 +35,5 @@ next-env.d.ts
 
 .codegpt
 .env
-.env.local
+
 

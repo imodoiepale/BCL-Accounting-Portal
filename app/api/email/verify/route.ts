@@ -17,41 +17,36 @@ export const runtime = 'edge';
 
 export async function POST(request: Request) {
   try {
-    const { accountId } = await request.json();
+    const { provider, accessToken, appPassword, email } = await request.json();
 
-    if (!accountId) {
+    if (!provider || (!accessToken && !appPassword)) {
       return NextResponse.json(
-        { error: 'Account ID is required' },
+        { error: 'Provider and either access token or app password are required' },
         { status: 400 }
       );
     }
 
-    // Get account details
-    const { data: account } = await supabase
-      .from('bcl_emails_accounts')
-      .select()
-      .eq('id', accountId)
-      .single();
-
-    if (!account) {
-      return NextResponse.json(
-        { error: 'Account not found' },
-        { status: 404 }
-      );
-    }
-
     // For Gmail OAuth, verify in Edge
-    if (account.provider === 'gmail' && !account.app_password) {
+    if (provider === 'gmail' && accessToken) {
       try {
         const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
           headers: {
-            Authorization: `Bearer ${account.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         });
 
         if (!response.ok) {
+          console.error('Gmail API error:', await response.text());
           return NextResponse.json(
-            { error: 'Failed to verify Gmail account' },
+            { error: 'Invalid Gmail credentials' },
+            { status: 401 }
+          );
+        }
+
+        const profile = await response.json();
+        if (profile.emailAddress !== email) {
+          return NextResponse.json(
+            { error: 'Email address mismatch' },
             { status: 401 }
           );
         }
@@ -60,26 +55,18 @@ export async function POST(request: Request) {
       } catch (error) {
         console.error('Gmail verification error:', error);
         return NextResponse.json(
-          { error: 'Failed to verify Gmail account' },
-          { status: 401 }
+          { error: 'Failed to verify Gmail credentials' },
+          { status: 500 }
         );
       }
     }
 
-    // For IMAP accounts, redirect to IMAP verify endpoint
-    const imapResponse = await fetch('/api/email/imap/verify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ accountId }),
-    });
-
-    return NextResponse.json(await imapResponse.json());
+    // For other providers or app password, we'll verify during account creation
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Verification error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }

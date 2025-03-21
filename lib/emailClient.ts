@@ -125,6 +125,36 @@ export class EmailClient {
     return EmailClient.instance;
   }
 
+  async verifyCredentials(
+    provider: EmailAccount['provider'],
+    email: string,
+    appPassword?: string,
+    accessToken?: string
+  ): Promise<void> {
+    try {
+      const response = await fetch('/api/email/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider,
+          email,
+          appPassword,
+          accessToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to verify credentials');
+      }
+    } catch (error) {
+      console.error('Verification error:', error);
+      throw new Error(error instanceof Error ? error.message : 'Failed to verify credentials');
+    }
+  }
+
   async addAccount(
     email: string,
     provider: EmailAccount['provider'],
@@ -136,6 +166,9 @@ export class EmailClient {
     imapPort?: number
   ): Promise<EmailAccount> {
     try {
+      // Verify credentials before creating account
+      await this.verifyCredentials(provider, email, appPassword, accessToken);
+
       const response = await fetch('/api/email/accounts', {
         method: 'POST',
         headers: {
@@ -158,42 +191,10 @@ export class EmailClient {
         throw new Error(error.error || 'Failed to add account');
       }
 
-      const account = await response.json();
-
-      // Verify credentials before returning
-      await this.verifyCredentials(account);
-
-      return account;
+      return await response.json();
     } catch (error) {
-      console.error('Failed to add account:', error);
-      throw error;
-    }
-  }
-
-  private async verifyCredentials(account: EmailAccount): Promise<void> {
-    try {
-      const response = await fetch('/api/email/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          accountId: account.id,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to verify credentials');
-      }
-
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error('Failed to verify credentials');
-      }
-    } catch (error) {
-      console.error('Failed to verify credentials:', error);
-      throw error;
+      console.error('Account creation error:', error);
+      throw new Error(error instanceof Error ? error.message : 'Failed to add account');
     }
   }
 

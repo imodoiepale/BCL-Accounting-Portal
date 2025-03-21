@@ -23,12 +23,25 @@ export const supabase = createClient<Database>(
       detectSessionInUrl: isBrowser, // Only detect session in URL in browser
     },
     global: {
+      headers: {
+        'X-Client-Info': 'bcl-accounting-portal',
+      },
       fetch: (url, init) => {
-        if (init) {
-          init.cache = 'no-store';
-          init.credentials = 'include';
+        // Add default headers
+        const headers = new Headers(init?.headers);
+        if (!headers.has('Content-Type')) {
+          headers.set('Content-Type', 'application/json');
         }
-        return fetch(url, init);
+        
+        // Create new init object with updated headers
+        const newInit = {
+          ...init,
+          headers,
+          cache: 'no-store' as RequestCache,
+          credentials: 'same-origin' as RequestCredentials,
+        };
+
+        return fetch(url, newInit);
       },
     },
   }

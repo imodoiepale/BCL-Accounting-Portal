@@ -1,60 +1,74 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 
-const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 12;
-const AUTH_TAG_LENGTH = 16;
-
-// Only check for environment variable on the server side
-const isServer = typeof window === 'undefined';
-let ENCRYPTION_KEY: Buffer;
-
-if (isServer) {
-  if (!process.env.EMAIL_ENCRYPTION_KEY) {
-    throw new Error('EMAIL_ENCRYPTION_KEY environment variable is required');
+// Convert hex string to Uint8Array
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
   }
-  // Convert the hex key to a buffer
-  ENCRYPTION_KEY = Buffer.from(process.env.EMAIL_ENCRYPTION_KEY, 'hex');
-
-  if (ENCRYPTION_KEY.length !== 32) {
-    throw new Error('EMAIL_ENCRYPTION_KEY must be exactly 32 bytes when decoded from hex');
-  }
+  return bytes;
 }
 
-export function encrypt(text: string): string {
-  if (!isServer) {
-    throw new Error('Encryption can only be performed on the server side');
-  }
-
-  const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
-  
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  
-  const authTag = cipher.getAuthTag();
-  
-  // Combine IV, encrypted data, and auth tag
-  return iv.toString('hex') + ':' + encrypted + ':' + authTag.toString('hex');
+// Convert Uint8Array to hex string
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
-export function decrypt(encryptedData: string): string {
-  if (!isServer) {
-    throw new Error('Decryption can only be performed on the server side');
-  }
+export async function encrypt(text: string): Promise<string> {
+  const key = hexToBytes(process.env.EMAIL_ENCRYPTION_KEY!);
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // 96 bits for AES-GCM
 
-  const [ivHex, encryptedHex, authTagHex] = encryptedData.split(':');
-  
-  const iv = Buffer.from(ivHex, 'hex');
-  const encrypted = Buffer.from(encryptedHex, 'hex');
-  const authTag = Buffer.from(authTagHex, 'hex');
-  
-  const decipher = createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
-  decipher.setAuthTag(authTag);
-  
-  const decrypted = Buffer.concat([
-    decipher.update(encrypted),
-    decipher.final()
-  ]);
-  
-  return decrypted.toString('utf8');
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    key,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt']
+  );
+
+  const encodedText = textEncoder.encode(text);
+  const encryptedData = await crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv
+    },
+    cryptoKey,
+    encodedText
+  );
+
+  // Combine IV and encrypted data
+  const result = new Uint8Array(iv.length + new Uint8Array(encryptedData).length);
+  result.set(iv);
+  result.set(new Uint8Array(encryptedData), iv.length);
+
+  return bytesToHex(result);
+}
+
+export async function decrypt(encryptedHex: string): Promise<string> {
+  const encrypted = hexToBytes(encryptedHex);
+  const iv = encrypted.slice(0, 12);
+  const data = encrypted.slice(12);
+
+  const key = hexToBytes(process.env.EMAIL_ENCRYPTION_KEY!);
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    key,
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt']
+  );
+
+  const decrypted = await crypto.subtle.decrypt(
+    {
+      name: 'AES-GCM',
+      iv
+    },
+    cryptoKey,
+    data
+  );
+
+  return textDecoder.decode(decrypted);
 }
