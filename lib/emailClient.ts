@@ -1,4 +1,7 @@
 import { supabase } from './supabaseClient';
+import { simpleParser } from 'mailparser';
+import { decrypt } from './encryption';
+import Client from 'emailjs-imap-client';
 
 export interface EmailAttachment {
   filename: string;
@@ -17,6 +20,15 @@ export interface EmailAccount {
   token_expiry?: string;
   created_at: string;
   updated_at: string;
+  imap_host?: string;
+  imap_port?: number;
+  is_active?: boolean;
+}
+
+interface EmailAddress {
+  address: string;
+  name?: string;
+  value?: EmailAddress[];
 }
 
 export interface EmailMessage {
@@ -58,6 +70,41 @@ export interface EmailDraft {
   updated_at: string;
 }
 
+interface ProviderConfig {
+  imap: {
+    host: string;
+    port: number;
+    tls: boolean;
+  };
+  oauth?: boolean;
+}
+
+// Email provider configurations
+const PROVIDER_CONFIGS: Record<Exclude<EmailAccount['provider'], 'other'>, ProviderConfig> = {
+  gmail: {
+    imap: {
+      host: 'imap.gmail.com',
+      port: 993,
+      tls: true,
+    },
+    oauth: true,
+  },
+  outlook: {
+    imap: {
+      host: 'outlook.office365.com',
+      port: 993,
+      tls: true,
+    },
+  },
+  yahoo: {
+    imap: {
+      host: 'imap.mail.yahoo.com',
+      port: 993,
+      tls: true,
+    },
+  },
+};
+
 // Gmail API endpoints
 const GMAIL_API_BASE = 'https://gmail.googleapis.com';
 const GMAIL_SCOPES = [
@@ -78,48 +125,79 @@ export class EmailClient {
     return EmailClient.instance;
   }
 
-  async addAccount(email: string, provider: EmailAccount['provider'], appPassword?: string) {
+  async addAccount(
+    email: string,
+    provider: EmailAccount['provider'],
+    appPassword?: string,
+    accessToken?: string,
+    refreshToken?: string,
+    tokenExpiry?: string,
+    imapHost?: string,
+    imapPort?: number
+  ): Promise<EmailAccount> {
     try {
-      if (provider === 'gmail') {
-        // Store initial account info
-        const { data, error } = await supabase
-          .from('bcl_emails_accounts')
-          .insert({
-            email,
-            provider,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        return data;
-      }
-
-      // For other providers, require app password
-      if (!appPassword) {
-        throw new Error('App password is required for non-Gmail accounts');
-      }
-
-      // Store account with app password (encryption handled by server)
-      const { data, error } = await supabase
-        .from('bcl_emails_accounts')
-        .insert({
+      const response = await fetch('/api/email/accounts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email,
           provider,
-          app_password: appPassword, // Encryption will be handled by server-side function
-        })
-        .select()
-        .single();
+          appPassword,
+          accessToken,
+          refreshToken,
+          tokenExpiry,
+          imapHost,
+          imapPort,
+        }),
+      });
 
-      if (error) throw error;
-      return data;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add account');
+      }
+
+      const account = await response.json();
+
+      // Verify credentials before returning
+      await this.verifyCredentials(account);
+
+      return account;
     } catch (error) {
-      console.error('Failed to add email account:', error);
+      console.error('Failed to add account:', error);
       throw error;
     }
   }
 
-  private async refreshGmailToken(accountId: string) {
+  private async verifyCredentials(account: EmailAccount): Promise<void> {
+    try {
+      const response = await fetch('/api/email/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          accountId: account.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to verify credentials');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error('Failed to verify credentials');
+      }
+    } catch (error) {
+      console.error('Failed to verify credentials:', error);
+      throw error;
+    }
+  }
+
+  async refreshGmailToken(accountId: string): Promise<string> {
     const { data: account } = await supabase
       .from('bcl_emails_accounts')
       .select()
@@ -143,9 +221,7 @@ export class EmailClient {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to refresh token');
-    }
+    if (!response.ok) throw new Error('Failed to refresh token');
 
     const { access_token, expires_in } = await response.json();
     const token_expiry = new Date(Date.now() + expires_in * 1000).toISOString();
@@ -187,127 +263,61 @@ export class EmailClient {
     return account.access_token;
   }
 
-  async fetchMessages(accountId: string, options: { 
-    limit?: number; 
-    offset?: number; 
-    labels?: string[];
-    isArchived?: boolean;
-    isStarred?: boolean;
-    threadId?: string;
-    searchQuery?: string;
-  } = {}) {
+  async fetchMessages(
+    accountId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      labels?: string[];
+      isArchived?: boolean;
+      isStarred?: boolean;
+      threadId?: string;
+      searchQuery?: string;
+    } = {}
+  ): Promise<EmailMessage[]> {
     try {
-      const { data: account } = await supabase
-        .from('bcl_emails_accounts')
-        .select()
-        .eq('id', accountId)
-        .single();
-
-      if (!account) throw new Error('Account not found');
-
-      if (account.provider === 'gmail') {
-        const accessToken = await this.getGmailAccessToken(accountId);
-        let endpoint = `${GMAIL_API_BASE}/gmail/v1/users/me/messages`;
-        const queryParams = new URLSearchParams();
-
-        if (options.limit) queryParams.set('maxResults', options.limit.toString());
-        if (options.threadId) endpoint = `${GMAIL_API_BASE}/gmail/v1/users/me/threads/${options.threadId}`;
-        if (options.searchQuery) queryParams.set('q', options.searchQuery);
-
-        const response = await fetch(`${endpoint}?${queryParams}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-
-        if (!response.ok) throw new Error('Failed to fetch messages');
-
-        const result = await response.json();
-        const messages = options.threadId ? [result] : result.messages || [];
-
-        // Fetch full message details
-        const messageDetails = await Promise.all(
-          messages.map(async (msg: { id: string }) => {
-            const msgResponse = await fetch(
-              `${GMAIL_API_BASE}/gmail/v1/users/me/messages/${msg.id}?format=full`,
-              {
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                },
-              }
-            );
-
-            if (!msgResponse.ok) return null;
-
-            const data = await msgResponse.json();
-            const headers = data.payload.headers;
-            const getHeader = (name: string) => headers.find((h: any) => h.name.toLowerCase() === name.toLowerCase())?.value;
-
-            const message: EmailMessage = {
-              id: data.id,
-              account_id: accountId,
-              message_id: getHeader('Message-ID'),
-              subject: getHeader('Subject') || '',
-              from: getHeader('From') || '',
-              to: (getHeader('To') || '').split(',').map((e: string) => e.trim()),
-              cc: (getHeader('Cc') || '').split(',').filter(Boolean).map((e: string) => e.trim()),
-              bcc: (getHeader('Bcc') || '').split(',').filter(Boolean).map((e: string) => e.trim()),
-              date: getHeader('Date') || '',
-              body_text: this.extractBody(data.payload, 'text/plain'),
-              body_html: this.extractBody(data.payload, 'text/html'),
-              labels: data.labelIds || [],
-              is_read: !data.labelIds?.includes('UNREAD'),
-              is_archived: !data.labelIds?.includes('INBOX'),
-              is_starred: data.labelIds?.includes('STARRED') || false,
-              thread_id: data.threadId,
-              in_reply_to: getHeader('In-Reply-To'),
-              references: (getHeader('References') || '').split(' ').filter(Boolean),
-              created_at: new Date().toISOString(),
-            };
-
-            // Store in Supabase for caching
-            await supabase.from('bcl_emails_messages').upsert(message);
-
-            return message;
-          })
-        );
-
-        return messageDetails.filter(Boolean);
+      const account = await this.getAccount(accountId);
+      if (!account) {
+        throw new Error('Account not found');
       }
 
-      throw new Error('Provider not supported');
+      const response = await fetch('/api/email/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await this.getAccessToken(account)}`,
+        },
+        body: JSON.stringify({
+          accountId,
+          ...options,
+          provider: account.provider
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch messages');
+      }
+
+      const messages = await response.json();
+      return Array.isArray(messages) ? messages : [];
     } catch (error) {
       console.error('Failed to fetch messages:', error);
       throw error;
     }
   }
 
-  private extractBody(payload: any, mimeType: string): string {
-    if (!payload) return '';
+  private async getAccount(accountId: string): Promise<EmailAccount | null> {
+    const { data: account } = await supabase
+      .from('bcl_emails_accounts')
+      .select()
+      .eq('id', accountId)
+      .single();
 
-    if (payload.mimeType === mimeType) {
-      return Buffer.from(payload.body.data, 'base64').toString('utf-8');
-    }
-
-    if (payload.parts) {
-      for (const part of payload.parts) {
-        const body = this.extractBody(part, mimeType);
-        if (body) return body;
-      }
-    }
-
-    return '';
+    return account;
   }
 
-  async sendMessage(accountId: string, options: {
-    to: string[];
-    subject: string;
-    text?: string;
-    html?: string;
-    attachments?: EmailAttachment[];
-    inReplyTo?: string;
-    references?: string[];
-  }) {
+  async getUnreadCount(accountId: string): Promise<number> {
     try {
       const { data: account } = await supabase
         .from('bcl_emails_accounts')
@@ -317,112 +327,49 @@ export class EmailClient {
 
       if (!account) throw new Error('Account not found');
 
-      if (account.provider === 'gmail') {
+      if (account.provider === 'gmail' && account.access_token) {
         const accessToken = await this.getGmailAccessToken(accountId);
-        
-        // Create email in RFC 2822 format
-        const message = [
-          'From: ' + account.email,
-          'To: ' + options.to.join(', '),
-          'Subject: ' + options.subject,
-          'Content-Type: text/html; charset=utf-8',
-          '',
-          options.html || options.text
-        ].join('\r\n');
+        const response = await fetch(
+          `${GMAIL_API_BASE}/gmail/v1/users/me/messages?q=is:unread in:inbox`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
 
-        const encodedMessage = Buffer.from(message).toString('base64url');
-
-        const response = await fetch(`${GMAIL_API_BASE}/gmail/v1/users/me/messages/send`, {
+        if (!response.ok) throw new Error('Failed to fetch unread count');
+        const data = await response.json();
+        return data.resultSizeEstimate || 0;
+      } else {
+        // Use API route for unread count in Edge Runtime
+        const response = await fetch('/api/email/unread', {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await this.getAccessToken(account)}`,
           },
           body: JSON.stringify({
-            raw: encodedMessage,
-            threadId: options.inReplyTo,
-          }),
+            accountId,
+            provider: account.provider
+          })
         });
 
-        if (!response.ok) throw new Error('Failed to send message');
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to get unread count');
+        }
 
-        return response.json();
+        const data = await response.json();
+        return data.count;
       }
-
-      throw new Error('Provider not supported');
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('Failed to get unread count:', error);
       throw error;
     }
   }
 
-  async saveDraft(accountId: string, draft: Omit<EmailDraft, 'id' | 'account_id' | 'created_at' | 'updated_at'>) {
-    try {
-      const { data, error } = await supabase
-        .from('bcl_emails_drafts')
-        .insert({
-          account_id: accountId,
-          ...draft,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Failed to save draft:', error);
-      throw error;
-    }
-  }
-
-  async updateDraft(draftId: string, draft: Partial<EmailDraft>) {
-    try {
-      const { data, error } = await supabase
-        .from('bcl_emails_drafts')
-        .update(draft)
-        .eq('id', draftId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Failed to update draft:', error);
-      throw error;
-    }
-  }
-
-  async deleteDraft(draftId: string) {
-    try {
-      const { error } = await supabase
-        .from('bcl_emails_drafts')
-        .delete()
-        .eq('id', draftId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Failed to delete draft:', error);
-      throw error;
-    }
-  }
-
-  async getDrafts(accountId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('bcl_emails_drafts')
-        .select()
-        .eq('account_id', accountId)
-        .order('updated_at', { ascending: false });
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Failed to get drafts:', error);
-      throw error;
-    }
-  }
-
-  async toggleMessageFlag(messageId: string, flag: 'read' | 'archived' | 'starred', value: boolean) {
+  async toggleMessageFlag(messageId: string, flag: 'read' | 'archived' | 'starred', value: boolean): Promise<void> {
     try {
       const { data: message } = await supabase
         .from('bcl_emails_messages')
@@ -440,8 +387,9 @@ export class EmailClient {
 
       if (!account) throw new Error('Account not found');
 
-      if (account.provider === 'gmail') {
-        const accessToken = await this.getGmailAccessToken(message.account_id);
+      if (account.provider === 'gmail' && account.access_token) {
+        const accessToken = await this.getGmailAccessToken(account.id);
+        
         let addLabels: string[] = [];
         let removeLabels: string[] = [];
 
@@ -469,46 +417,65 @@ export class EmailClient {
             break;
         }
 
-        const response = await fetch(`${GMAIL_API_BASE}/gmail/v1/users/me/messages/${messageId}/modify`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            addLabelIds: addLabels,
-            removeLabelIds: removeLabels,
-          }),
-        });
+        const response = await fetch(
+          `${GMAIL_API_BASE}/gmail/v1/users/me/messages/${messageId}/modify`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              addLabelIds: addLabels,
+              removeLabelIds: removeLabels,
+            }),
+          }
+        );
 
         if (!response.ok) throw new Error('Failed to modify message');
+      } else {
+        // Use API route for message flags in Edge Runtime
+        const response = await fetch('/api/email/flags', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await this.getAccessToken(account)}`,
+          },
+          body: JSON.stringify({
+            accountId: account.id,
+            messageId,
+            flag,
+            value,
+            provider: account.provider
+          })
+        });
 
-        const result = await response.json();
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to modify message flags');
+        }
 
-        // Update local cache
-        const updateData = {
-          [`is_${flag}`]: value,
-        };
-
-        const { data, error } = await supabase
-          .from('bcl_emails_messages')
-          .update(updateData)
-          .eq('id', messageId)
-          .select()
-          .single();
-
-        if (error) throw error;
-        return data;
+        // Update local cache in Supabase
+        await supabase.from('bcl_emails_messages').update({
+          [flag === 'read' ? 'is_read' : flag === 'archived' ? 'is_archived' : 'is_starred']: value,
+          updated_at: new Date().toISOString()
+        }).eq('id', messageId).eq('account_id', account.id);
       }
-
-      throw new Error('Provider not supported');
     } catch (error) {
-      console.error(`Failed to toggle ${flag} flag:`, error);
+      console.error('Failed to toggle message flag:', error);
       throw error;
     }
   }
 
-  async getUnreadCount(accountId: string) {
+  async sendMessage(accountId: string, options: {
+    to: string[];
+    subject: string;
+    text?: string;
+    html?: string;
+    attachments?: EmailAttachment[];
+    inReplyTo?: string;
+    references?: string[];
+  }): Promise<void> {
     try {
       const { data: account } = await supabase
         .from('bcl_emails_accounts')
@@ -518,28 +485,132 @@ export class EmailClient {
 
       if (!account) throw new Error('Account not found');
 
-      if (account.provider === 'gmail') {
+      if (account.provider === 'gmail' && account.access_token) {
         const accessToken = await this.getGmailAccessToken(accountId);
         
-        const response = await fetch(
-          `${GMAIL_API_BASE}/gmail/v1/users/me/messages?q=is:unread in:inbox&maxResults=1`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
-        );
+        // Create email in RFC 2822 format
+        const message = [
+          'From: ' + account.email,
+          'To: ' + options.to.join(', '),
+          'Subject: ' + options.subject,
+          'Content-Type: text/html; charset=utf-8',
+          options.inReplyTo ? 'In-Reply-To: ' + options.inReplyTo : '',
+          options.references ? 'References: ' + options.references.join(' ') : '',
+          '',
+          options.html || options.text
+        ].filter(Boolean).join('\r\n');
 
-        if (!response.ok) throw new Error('Failed to get unread count');
+        const encodedMessage = Buffer.from(message).toString('base64url');
 
-        const result = await response.json();
-        return result.resultSizeEstimate || 0;
+        const response = await fetch(`${GMAIL_API_BASE}/gmail/v1/users/me/messages/send`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            raw: encodedMessage,
+            threadId: options.inReplyTo,
+          }),
+        });
+
+        if (!response.ok) throw new Error('Failed to send message');
+      } else {
+        // TODO: Implement SMTP sending for non-Gmail providers
+        throw new Error('SMTP sending not yet implemented for non-Gmail providers');
       }
-
-      throw new Error('Provider not supported');
     } catch (error) {
-      console.error('Failed to get unread count:', error);
+      console.error('Failed to send message:', error);
       throw error;
     }
+  }
+
+  async saveDraft(accountId: string, draft: Omit<EmailDraft, 'id' | 'account_id' | 'created_at' | 'updated_at'>): Promise<EmailDraft> {
+    try {
+      const { data, error } = await supabase
+        .from('bcl_emails_drafts')
+        .insert({
+          account_id: accountId,
+          ...draft,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Failed to save draft:', error);
+      throw error;
+    }
+  }
+
+  async updateDraft(draftId: string, draft: Partial<EmailDraft>): Promise<EmailDraft> {
+    try {
+      const { data, error } = await supabase
+        .from('bcl_emails_drafts')
+        .update(draft)
+        .eq('id', draftId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Failed to update draft:', error);
+      throw error;
+    }
+  }
+
+  async deleteDraft(draftId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('bcl_emails_drafts')
+        .delete()
+        .eq('id', draftId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Failed to delete draft:', error);
+      throw error;
+    }
+  }
+
+  async getDrafts(accountId: string): Promise<EmailDraft[]> {
+    try {
+      const { data, error } = await supabase
+        .from('bcl_emails_drafts')
+        .select()
+        .eq('account_id', accountId)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Failed to get drafts:', error);
+      throw error;
+    }
+  }
+
+  private extractBody(payload: any, mimeType: string): string {
+    if (!payload) return '';
+
+    if (payload.mimeType === mimeType) {
+      return Buffer.from(payload.body.data, 'base64').toString();
+    }
+
+    if (payload.parts) {
+      for (const part of payload.parts) {
+        const body = this.extractBody(part, mimeType);
+        if (body) return body;
+      }
+    }
+
+    return '';
+  }
+
+  private async getAccessToken(account: EmailAccount): Promise<string> {
+    // Implement logic to get access token for non-Gmail providers
+    // For now, just return an empty string
+    return '';
   }
 }

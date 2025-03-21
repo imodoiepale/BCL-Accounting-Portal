@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { Database } from '@/types/supabase';
-import { decrypt } from '@/lib/encryption';
+import { fetchGmailMessages } from '@/lib/gmailService';
 
 // Initialize Supabase with service role for server-side operations
 const supabase = createClient<Database>(
@@ -18,7 +18,10 @@ export const runtime = 'edge';
 
 export async function POST(request: Request) {
   try {
-    const { accountId, limit = 50, offset = 0, labels, isArchived, isStarred, threadId, searchQuery } = await request.json();
+    const body = await request.json();
+    console.log('Request body:', body);
+
+    const { accountId, limit = 50, offset = 0, labels, isArchived, isStarred, threadId, searchQuery } = body;
 
     if (!accountId) {
       return NextResponse.json(
@@ -27,12 +30,21 @@ export async function POST(request: Request) {
       );
     }
 
+    console.log('Fetching account:', accountId);
     // Get account details
-    const { data: account } = await supabase
+    const { data: account, error: accountError } = await supabase
       .from('bcl_emails_accounts')
       .select()
       .eq('id', accountId)
       .single();
+
+    if (accountError) {
+      console.error('Account fetch error:', accountError);
+      return NextResponse.json(
+        { error: 'Failed to fetch account' },
+        { status: 500 }
+      );
+    }
 
     if (!account) {
       return NextResponse.json(
@@ -41,48 +53,65 @@ export async function POST(request: Request) {
       );
     }
 
-    // Build query
-    let query = supabase
-      .from('bcl_emails_messages')
-      .select()
-      .eq('account_id', accountId)
-      .order('date', { ascending: false })
-      .range(offset, offset + limit - 1);
+    console.log('Account found:', { provider: account.provider, hasAccessToken: !!account.access_token });
 
-    // Apply filters
-    if (labels?.length) {
-      query = query.contains('labels', labels);
+    // For Gmail accounts with OAuth, fetch messages from Gmail API
+    if (account.provider === 'gmail' && account.access_token) {
+      try {
+        console.log('Fetching Gmail messages');
+        const messages = await fetchGmailMessages(account.access_token, accountId, limit);
+        console.log('Gmail messages fetched:', messages.length);
+
+        // Cache messages in Supabase
+        if (messages.length > 0) {
+          console.log('Caching messages in Supabase');
+          const { error: upsertError } = await supabase.from('bcl_emails_messages').upsert(
+            messages,
+            { onConflict: 'id' }
+          );
+
+          if (upsertError) {
+            console.error('Cache error:', upsertError);
+          }
+        }
+
+        return NextResponse.json(messages);
+      } catch (error) {
+        console.error('Gmail API error:', error);
+        if (error instanceof Error) {
+          if (error.message.includes('401')) {
+            // Token expired, let client handle refresh
+            return NextResponse.json(
+              { error: 'Token expired' },
+              { status: 401 }
+            );
+          }
+          return NextResponse.json(
+            { error: error.message },
+            { status: 500 }
+          );
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
     }
 
-    if (typeof isArchived === 'boolean') {
-      query = query.eq('is_archived', isArchived);
-    }
+    // For IMAP accounts, redirect to IMAP messages endpoint
+    const imapResponse = await fetch('/api/email/imap/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
 
-    if (typeof isStarred === 'boolean') {
-      query = query.eq('is_starred', isStarred);
-    }
-
-    if (threadId) {
-      query = query.eq('thread_id', threadId);
-    }
-
-    if (searchQuery) {
-      query = query.textSearch('subject', searchQuery, {
-        config: 'english',
-      });
-    }
-
-    const { data: messages, error } = await query;
-
-    if (error) {
-      throw error;
-    }
-
-    return NextResponse.json({ messages });
+    return NextResponse.json(await imapResponse.json());
   } catch (error) {
-    console.error('Failed to fetch messages:', error);
+    console.error('Message fetch error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch messages' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

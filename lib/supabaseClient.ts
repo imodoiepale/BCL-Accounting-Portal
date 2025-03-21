@@ -19,12 +19,16 @@ export const supabase = createClient<Database>(
   {
     auth: {
       persistSession: isBrowser, // Only persist sessions in browser
-      autoRefreshToken: isBrowser, // Only auto-refresh tokens in browser
-      detectSessionInUrl: isBrowser, // Only detect sessions in browser
+      autoRefreshToken: isBrowser, // Only refresh token in browser
+      detectSessionInUrl: isBrowser, // Only detect session in URL in browser
     },
     global: {
-      headers: {
-        'X-Client-Info': `bcl-accounting-portal@${process.env.npm_package_version || '0.1.0'}`,
+      fetch: (url, init) => {
+        if (init) {
+          init.cache = 'no-store';
+          init.credentials = 'include';
+        }
+        return fetch(url, init);
       },
     },
   }

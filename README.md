@@ -147,3 +147,5 @@ The email integration uses the following tables:
 - Attachment handling
 - Reply and forward functionality
 - Color-coded accounts for better visibility
+- OAuth 2.0 for Gmail
+- IMAP/SMTP with app passwords for other providers
